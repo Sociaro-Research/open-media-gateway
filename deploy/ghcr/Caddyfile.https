@@ -1,0 +1,13 @@
+{
+	admin off
+	http_port 8080
+	https_port 8443
+}
+
+{$GATEWAY_HOST} {
+	reverse_proxy ui:8080
+}
+
+http://127.0.0.1:8081 {
+	respond /healthz 200
+}

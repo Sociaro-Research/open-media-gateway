@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<meta name="supported-color-schemes" content="light">
+<title>{{.Subject}}</title>
+<style>
+  body,table,td,a { -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }
+  table,td { mso-table-lspace:0pt; mso-table-rspace:0pt; }
+  img { -ms-interpolation-mode:bicubic; }
+  a[x-apple-data-detectors] { color:inherit!important; text-decoration:none!important; }
+  @media only screen and (max-width:600px) {
+    .email-outer { padding:24px 12px!important; }
+    .email-content { padding:28px 24px!important; }
+    .email-title { font-size:28px!important; line-height:34px!important; }
+    .email-footer { padding:20px 24px!important; }
+  }
+</style>
+</head>
+<body style="margin:0;padding:0;width:100%;background-color:{{index .Palette "bg"}};font-family:Arial,Helvetica,sans-serif;color:{{index .Palette "text"}};">
+<div style="display:none;font-size:1px;line-height:1px;color:{{index .Palette "bg"}};max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;">{{.Preheader}}</div>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="{{index .Palette "bg"}}" style="width:100%;background-color:{{index .Palette "bg"}};">
+<tr><td class="email-outer" align="center" style="padding:48px 20px;">
+<!--[if mso]><table role="presentation" width="560" cellspacing="0" cellpadding="0" border="0"><tr><td><![endif]-->
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="{{index .Palette "panel"}}" style="width:100%;max-width:560px;background-color:{{index .Palette "panel"}};border:1px solid {{index .Palette "line"}};border-radius:20px;border-collapse:separate;">
+<tr><td class="email-content" style="padding:40px;">
+  {{if .HasLogo}}<img src="{{.Logo}}" width="190" height="40" alt="{{.Name}}" style="display:block;width:190px;height:auto;max-height:60px;object-fit:contain;max-width:100%;border:0;color:{{index .Palette "text"}};font-size:28px;font-weight:bold;">{{else if .Name}}<p style="margin:0;font-size:28px;font-weight:bold;color:{{index .Palette "text"}};">{{.Name}}</p>{{end}}
+  <h1 class="email-title" style="margin:32px 0 20px;font-size:32px;line-height:38px;letter-spacing:-0.8px;font-weight:700;color:{{index .Palette "text"}};">{{.Heading}}</h1>
+  <p style="margin:0;font-size:16px;line-height:26px;color:{{index .Palette "text"}};">{{.Intro}}</p>
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:28px 0 0;">
+    <tr><td align="center" bgcolor="{{index .Palette "accent"}}" style="background-color:{{index .Palette "accent"}};border-radius:9px;mso-padding-alt:15px 26px;">
+      <a href="{{.Link}}" style="display:inline-block;border:1px solid {{index .Palette "accent"}};border-radius:9px;padding:14px 25px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:22px;font-weight:bold;text-decoration:none;color:{{index .Palette "on-accent"}};mso-padding-alt:0;text-underline-color:{{index .Palette "accent"}};"><!--[if mso]><i style="mso-font-width:100%;mso-text-raise:22pt;">&nbsp;</i><![endif]--><span style="mso-text-raise:11pt;color:{{index .Palette "on-accent"}};">{{.Action}}</span><!--[if mso]><i style="mso-font-width:100%;">&nbsp;</i><![endif]--></a>
+    </td></tr>
+  </table>
+  <p style="margin:14px 0 28px;font-size:13px;line-height:20px;color:{{index .Palette "muted"}};">{{.Expiry}}</p>
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="{{index .Palette "panel-2"}}" style="width:100%;background-color:{{index .Palette "panel-2"}};border-radius:10px;">
+    <tr><td style="padding:16px 18px;font-size:14px;line-height:22px;color:{{index .Palette "muted"}};">{{.Reassurance}}</td></tr>
+  </table>
+</td></tr>
+<tr><td class="email-footer" style="padding:24px 40px;border-top:1px solid {{index .Palette "line"}};">
+  <p style="margin:0 0 8px;font-size:12px;line-height:19px;color:{{index .Palette "muted"}};">If the button doesn’t work, use this link:</p>
+  <p style="margin:0;font-size:12px;line-height:19px;word-break:break-all;overflow-wrap:anywhere;"><a href="{{.Link}}" style="color:{{index .Palette "accent"}};text-decoration:underline;word-break:break-all;overflow-wrap:anywhere;">{{.Link}}</a></p>
+</td></tr>
+</table>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:560px;">
+<tr><td align="center" style="padding:20px 16px 0;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:19px;color:{{index .Palette "muted"}};word-break:break-word;">
+  Sent to <span style="color:{{index .Palette "text"}};">{{.Recipient}}</span>
+</td></tr>
+</table>
+<!--[if mso]></td></tr></table><![endif]-->
+</td></tr>
+</table>
+</body>
+</html>

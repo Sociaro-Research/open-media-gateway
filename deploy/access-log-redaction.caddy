@@ -1,0 +1,27 @@
+# Copy this definition into the preserved external Caddyfile and replace each
+# existing site log directive with: import redacted_access_log
+# Back up the configuration first; validate with Caddy 2.11.7 before reloading.
+(redacted_access_log) {
+	log {
+		output stdout
+		format filter {
+			wrap json
+			fields {
+				request>headers>X-Api-Key delete
+				request>headers>Authorization delete
+				request>headers>Proxy-Authorization delete
+				request>headers>Cookie delete
+				resp_headers>Set-Cookie delete
+				request>uri query {
+					delete signature
+					delete token
+					delete code
+					delete state
+					delete api_key
+					delete access_token
+					delete X-Amz-Signature
+				}
+			}
+		}
+	}
+}

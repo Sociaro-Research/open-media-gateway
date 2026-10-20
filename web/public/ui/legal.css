@@ -1,0 +1,38 @@
+main {
+  width: min(760px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 64px 0 96px;
+}
+
+.back,
+a {
+  color: var(--accent);
+}
+
+.back {
+  display: inline-block;
+  margin-bottom: 32px;
+  text-decoration: none;
+}
+
+h1 {
+  margin: 0 0 8px;
+  font-size:var(--type-page); font-weight:700; line-height:1.2; letter-spacing:-.03em;
+}
+
+h2 {
+  margin:var(--space-section) 0 20px;
+  font-size:var(--type-section); font-weight:650; line-height:1.35; letter-spacing:-.02em;
+}
+
+p {
+  margin: 0;
+  color: var(--text);
+  line-height: 1.7;
+}
+
+.updated {
+  color: var(--muted);
+}
+
+a:hover { color:var(--highlight); }

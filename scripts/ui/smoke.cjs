@@ -1,0 +1,311 @@
+const {evidencePath} = require('./evidence.cjs');
+// Run with Node and Playwright installed (NODE_PATH may point to a shared runtime).
+const {chromium} = require('playwright');
+const http = require('node:http');
+const fs = require('node:fs');
+const path = require('node:path');
+const assert = require('node:assert/strict');
+const ui = path.resolve(__dirname, '../../web/public/ui');
+const output = process.env.UI_SCREENSHOT_DIR || evidencePath('/tmp/media-gateway-ui');
+fs.mkdirSync(output, {recursive: true});
+const server = http.createServer((req, res) => {
+  const name = req.url === '/' ? 'index.html' : path.basename(req.url.split('?')[0]);
+  const file = path.join(ui, name);
+  if (!fs.existsSync(file)) {res.writeHead(404).end(); return;}
+  res.setHeader('Content-Type', ({'.html':'text/html', '.js':'text/javascript', '.css':'text/css', '.png':'image/png'})[path.extname(file)] || 'application/octet-stream');
+  res.end(fs.readFileSync(file));
+});
+const video = {id:'test-video', display_name:'Test Video', media_type:'video', resolutions:['480p','720p'], ratios:['16:9','9:16'], min_duration:2, max_duration:15, default_duration:5, supports_audio:true, supports_camera_fixed:true, supports_draft:true, supports_last_frame:true, supports_image_input:true, supports_video_input:true, supports_audio_input:true, supports_negative_prompt:true, pricing:{known:true,reference_price_usd:0}};
+const speech = {id:'test-speech',display_name:'Test Speech',media_type:'speech',supports_voice:true,voices:['Cherry','Serena'],formats:['wav','mp3'],pricing:{known:false}};
+const music = {id:'test-music',display_name:'Test Music',media_type:'music',supports_lyrics:true,supports_gender:true,formats:['mp3','wav'],pricing:{known:false}};
+const image = {id:'test-image',display_name:'Test Image',media_type:'image',resolutions:['1024*1024'],supports_image_input:true,supports_negative_prompt:true,pricing:{known:false}};
+const providers = [{id:'mock',name:'Test provider',live:false,credentials_configured:true,default_model:video.id,models:[video,speech,music,image]},{id:'live',name:'Live provider',live:true,credentials_configured:true,default_model:speech.id,models:[speech]}];
+(async () => {
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const browser = await chromium.launch({headless:true, ...(process.env.UI_BROWSER_PATH ? {executablePath:process.env.UI_BROWSER_PATH} : {})});
+  const context = await browser.newContext({viewport:{width:1440,height:1100}});
+  const page = await context.newPage();
+  let resultDeletes=0;
+  let tasks = [], posts = [], failure = false, delay = 0;
+  let savedStorage = {driver:'local', endpoint:'', region:'', bucket:'', prefix:'', path_style:true, access_key_id:'', credentials_configured:false};
+  let storageWrites = [], storageChecks = [], storageFailure = false;
+  const errors = []; page.on('pageerror', error => errors.push(error.message));
+  await page.route('**/v1/**', async route => {
+    const url = new URL(route.request().url());
+    const json = body => route.fulfill({json:body});
+    if (url.pathname === '/v1/info') return json({provider:'mock',auth_mode:'google'});
+    if (url.pathname === '/v1/me') return json({name:'Design Preview', email:'preview@example.com',id:'preview',session_id:'preview-session',is_system_admin:true});
+    if(url.pathname==='/v1/organizations/11111111-1111-4111-8111-111111111111')return json({id:'11111111-1111-4111-8111-111111111111',name:'Test organization',role:'admin'});
+    if(url.pathname==='/v1/organizations')return json({data:[{id:'11111111-1111-4111-8111-111111111111',name:'Test organization',role:'admin',balance_usd:0,available_usd:0,storage_bytes:2500}]});
+ if (url.pathname === '/v1/api-keys' && route.request().method() === 'POST') return json({name:'Generation test',secret:'fixture-generation-key'});
+    if (['/v1/key','/v1/providers','/v1/references','/v1/storage/usage'].includes(url.pathname)||url.pathname.startsWith('/v1/generations')) assert.equal(route.request().headers().authorization,'Bearer fixture-generation-key');
+    if (url.pathname === '/v1/key') return json({organization:{id:'11111111-1111-4111-8111-111111111111',name:'Test organization',role:'admin'},key:{name:'Generation test',organization_id:'11111111-1111-4111-8111-111111111111',resource_mode:'shared'},usage:{month:'2026-09',actual_usd:0,reserved_usd:0,remaining_usd:null,unconfirmed_tasks:0,unknown_cost_tasks:0}});
+    if (url.pathname === '/v1/providers') return json({data:providers});
+    if (url.pathname === '/v1/admin/providers') return json({data:providers.map(p=>({...p,configured:true,enabled:true,status:'connected',description:'Media generation provider',models:p.models,model_count:p.models.length,media_counts:{video:1}}))});
+    if (url.pathname === '/v1/admin/storage/check') { storageChecks.push(route.request().postDataJSON()); return json({status:'ok'}); }
+    if (url.pathname === '/v1/admin/storage') {
+      if (route.request().method() === 'PUT') {
+        const input = route.request().postDataJSON(); storageWrites.push(input);
+        if (storageFailure) return route.fulfill({status:400,json:{error:{message:'S3 write check denied'}}});
+        const {access_key_id,secret_access_key,...settings}=input;
+        savedStorage=input.driver === 'local' ? {...savedStorage,driver:'local'} : {...settings,access_key_id:access_key_id || savedStorage.access_key_id,credentials_configured:!!access_key_id || savedStorage.credentials_configured};
+      }
+      return json(savedStorage);
+    }
+    if (url.pathname.match(/^\/v1\/generations\/[^/]+\/content$/) && route.request().method()==='DELETE'){resultDeletes++;const task=tasks.find(t=>url.pathname.includes('/'+t.id+'/'));task.result_deleted_at=new Date().toISOString();task.content_url=null;task.has_stored_result=false;return route.fulfill({status:204});}
+    if ((url.pathname === '/v1/generations' && route.request().method()==='GET')) return json({data:tasks});
+    if (url.pathname === '/v1/generations/estimate') return json({cost:{expected_usd:0,status:'reserved',pricing:{currency:'USD',unit:'generation',price:0,per:1}},remaining_usd:null,can_generate:true});
+    if (url.pathname === '/v1/generations') {
+      const request = route.request(); posts.push({key:request.headers()['idempotency-key'],body:request.postDataJSON()});
+      if (delay) await new Promise(resolve => setTimeout(resolve,delay));
+      if (failure) return route.fulfill({status:503,json:{error:{message:'Temporary test failure'}}});
+      const task = {...request.postDataJSON(),id:`task-${posts.length}`,status:'queued',created_at:Math.floor(Date.now()/1000),updated_at:Math.floor(Date.now()/1000)};
+      const body=request.postDataJSON();task.provider=body.model.split('/')[0];task.media_type=providers.find(p=>p.id===task.provider).models.find(m=>task.model===task.provider+'/'+m.id).media_type;tasks.unshift(task); return json(task);
+    }
+    return json({});
+  });
+  try {
+    await page.goto(`http://127.0.0.1:${server.address().port}`);
+    await page.locator('#createGenerationKey').click();
+    await page.waitForFunction(()=>selectedModel()?.id==='test-video');
+    assert.equal(await page.locator('#health').count(),0);
+    assert.equal(await page.locator('#summary').count(),0);
+    assert.equal(await page.locator('#watermark').isVisible(),false);
+    const nav = await page.locator('#sectionNav').boundingBox();
+    assert.ok(nav.x>=0 && nav.x+nav.width<=1440,'Navigation must fit the viewport');
+    await page.locator('#prompt').fill('A quiet mountain lake at sunrise.\nSoft light, detailed reflections and a slow cinematic camera movement.');
+    await page.locator('#duration').fill('8');
+    await page.locator('#ratio').selectOption('9:16');
+    await page.locator('#negativePrompt').fill('blur');
+    await page.locator('#imageURLsField .reference-manual summary').click();
+    await page.locator('#imageURLs').fill('https://example.com/reference.png');
+    await page.locator('.advanced-settings summary').click();
+    await page.locator('#seed').fill('0');
+    await page.locator('#watermarkOption').click();
+    await page.locator('#submitButton').click();
+    await page.locator('#confirmDialog').waitFor({state:'visible'});
+    const summary = await page.locator('#confirmFields').innerText();
+    for (const text of ['Duration','8 s','Aspect ratio','9:16','Negative prompt','blur','Image references','Seed','0','Watermark']) assert.ok(summary.includes(text),text);
+    assert.ok(!summary.includes('Resolution'),'Default resolution should be omitted');
+    await page.screenshot({path:path.join(output,'confirmation.png')});
+    const started = Date.now();
+    await page.locator('#confirmSubmit').evaluate(button=>{button.click();button.click();});
+    assert.equal(await page.locator('#confirmSubmit').isDisabled(),true);
+    assert.equal(await page.locator('#cancelConfirm').isDisabled(),true);
+    await page.keyboard.press('Escape');
+    assert.equal(await page.locator('#confirmDialog').isVisible(),true);
+    await page.waitForTimeout(800);
+    assert.equal(await page.locator('#confirmDialog').isVisible(),true);
+    assert.equal(await page.locator('.task').count(),0,'Polling must not reveal the task before animation');
+    await page.locator('#confirmDialog').waitFor({state:'hidden'});
+    assert.ok(Date.now()-started>=2000); assert.equal(posts.length,1);
+    assert.equal(await page.locator('.task-id').isVisible(),false);
+    assert.equal(await page.locator('#formMessage').innerText(),'');
+    assert.equal(await page.locator('.task .progress').isVisible(),true);
+    const before = await page.locator('.task-elapsed').innerText();
+    await page.waitForFunction(before=>document.querySelector('.task-elapsed')?.innerText!==before,before,{timeout:5000});
+    await page.locator('.task-menu summary').click();
+    await page.locator('.reuse-task').click();
+    assert.equal(await page.locator('#duration').inputValue(),'8');
+    assert.equal(await page.locator('#seed').inputValue(),'0');
+    assert.equal(await page.locator('#watermark').isChecked(),true);
+    assert.equal(await page.locator('#imageURLs').inputValue(),'https://example.com/reference.png');
+    tasks[0].cost={expected_usd:0.03,metered_usd:0.04};
+
+    await page.waitForFunction(()=>document.querySelector('.task-cost').textContent.includes('Estimated cost $0.03'));
+    assert.ok(!(await page.locator('.task-cost').innerText()).includes('Cost $0.04'),'Running task must retain the estimate');
+    tasks[0].status='completed'; tasks[0].updated_at=tasks[0].created_at+65;
+    tasks[0].cost={expected_usd:0.03,metered_usd:0.04,tariff_usd:0.05,actual_usd:0,package_units:1,billed_units:1};
+
+    await page.waitForFunction(()=>document.querySelector('.task-elapsed').textContent === 'Time 1m 5s');
+    assert.equal(await page.locator('.task .progress').isVisible(),true,'Show completion briefly');
+    await page.locator('.task .progress').waitFor({state:'detached',timeout:3000});
+    const costs=await page.locator('.task-cost').innerText();
+    assert.equal(await page.locator('.task-icon').count(),0);
+    assert.match(await page.locator('.task-parameters summary').innerText(),/^Parameters: video/);
+    await page.locator('.task-parameters summary').click();
+    await page.waitForFunction(()=>document.querySelector('.task-parameters summary').textContent==='Parameters');
+    assert.equal(await page.locator('.task-prompt').inputValue(),posts[0].body.prompt);
+    assert.equal(await page.locator('.task-prompt').getAttribute('rows'),'5');
+    assert.equal(await page.locator('.task-prompt').getAttribute('readonly'),'');
+    assert.equal(await page.locator('.task-title').evaluate(el=>getComputedStyle(el).whiteSpace),'nowrap');
+    await page.screenshot({path:evidencePath('/tmp/media-gateway-ui/journal-expanded.png')});
+    await page.locator('.task-parameters summary').click();
+    for(const text of ['Cost $0.05','Time 1m 5s']) assert.ok(costs.includes(text),text);
+    assert.ok(!/Estimated cost|Actual cost|Charged|Covered|Usage cost/.test(costs));
+    assert.ok(!costs.includes('$0.040000'),'Prices must not have trailing zeros');
+    assert.ok(!costs.includes('$0.04'),'Confirmed tariff must take precedence over preliminary metering');
+    const completedCost=tasks[0].cost;
+    tasks[0].cost={expected_usd:0.03};
+
+    await page.waitForFunction(()=>document.querySelector('.task-cost').textContent.includes('Estimated cost $0.03'));
+    tasks[0].cost={expected_usd:0.03,metered_usd:0};
+
+    await page.waitForFunction(()=>document.querySelector('.task-cost > span').textContent === 'Cost $0');
+    assert.ok(!(await page.locator('.task-cost').innerText()).includes('Estimated'));
+    assert.equal(await page.locator('.task .progress').count(),0,'Completed task updates must not replay progress');
+    tasks[0].cost=completedCost;
+
+    await page.waitForFunction(()=>document.querySelector('.task-cost').textContent.startsWith('Cost $0.05'));
+    await page.waitForTimeout(1100);
+    assert.equal(await page.locator('.task-elapsed').innerText(),'Time 1m 5s');
+    await page.screenshot({path:path.join(output,'generation-desktop.png'),fullPage:true});
+    // Retry an uncertain failure using the same idempotency key, including a slow request.
+    failure=true;
+    await page.locator('#submitButton').click(); await page.locator('#confirmSubmit').click();
+    await page.waitForFunction(()=>document.querySelector('#confirmStatus').className === 'error');
+    assert.equal(await page.locator('#confirmSubmit').isDisabled(),false);
+    failure=false; delay=2300;
+    await page.locator('#confirmSubmit').click();
+    await page.waitForTimeout(2050);
+    assert.equal(await page.locator('#confirmSubmit').isDisabled(),true);
+    await page.locator('#confirmDialog').waitFor({state:'hidden'});
+    assert.equal(posts[1].key,posts[2].key); assert.deepEqual(posts[1].body,posts[2].body);
+    delay=0;
+
+    await page.locator('#model').selectOption(JSON.stringify(['live',speech.id]));
+    assert.equal(await page.locator('#model option:checked').innerText(),'Test Speech');
+    await page.locator('#prompt').fill('Hello world');
+    await page.waitForFunction(()=>document.querySelector('#priceValue').textContent === 'Free');
+    await page.locator('#voice').fill('Serena');
+    await page.locator('#language').selectOption('English');
+    await page.locator('#instructions').fill('Warm and calm');
+    await page.locator('#format').selectOption('mp3');
+    await page.locator('#submitButton').click();
+    const speechSummary=await page.locator('#confirmFields').innerText();
+    for(const text of ['Serena','English','Warm and calm','mp3','Hello world']) assert.ok(speechSummary.includes(text));
+    await page.locator('#confirmSubmit').click(); await page.locator('#confirmDialog').waitFor({state:'hidden'});
+    await page.locator('.task-menu summary').first().click(); await page.locator('.reuse-task').first().click();
+    assert.equal(await page.locator('#voice').inputValue(),'Serena'); assert.equal(await page.locator('#language').inputValue(),'English');
+    assert.equal(await page.locator('#instructions').inputValue(),'Warm and calm'); assert.equal(await page.locator('#format').inputValue(),'mp3');
+    // Lyrics-only generation and image references also survive copying.
+    await page.locator('#model').selectOption(JSON.stringify(['mock',music.id]));
+    await page.locator('#prompt').fill(''); await page.locator('#lyrics').fill('Verse one\nChorus'); await page.locator('#gender').selectOption('male');
+    await page.locator('#submitButton').click(); assert.ok((await page.locator('#confirmFields').innerText()).includes('Verse one'));
+    await page.locator('#confirmSubmit').click(); await page.locator('#confirmDialog').waitFor({state:'hidden'});
+    await page.locator('.task-menu summary').first().click(); await page.locator('.reuse-task').first().click();
+    assert.equal(await page.locator('#lyrics').inputValue(),'Verse one\nChorus'); assert.equal(await page.locator('#gender').inputValue(),'male');
+    await page.locator('#model').selectOption(JSON.stringify(['mock',image.id])); await page.locator('#prompt').fill('An illustrated bird');
+    await page.locator('#submitButton').click(); await page.locator('#cancelConfirm').click();
+    if (process.argv.includes('--generations-only')) {
+      tasks[0].status='failed';tasks[0].error={code:'generation_failed',message:'Provider rejected the request'};
+      tasks[0].has_stored_result=true;
+      await page.getByText('Provider rejected the request',{exact:true}).waitFor();
+      await page.locator('.task-menu summary').first().click();
+      await page.locator('.delete-result').first().click();
+      await page.getByRole('button',{name:'Delete files',exact:true}).click();
+      await page.locator('.task-result').filter({hasText:'Stored result files deleted.'}).first().waitFor();
+      assert.equal(resultDeletes,1);
+      assert.equal(await page.locator('a[href^="https://provider.example"]').count(),0);
+      await page.reload();await page.locator('.task').first().waitFor();
+      assert.equal(await page.locator('.task[data-status="completed"] .progress, .task[data-status="failed"] .progress').count(),0);
+      for(const width of [1440,390]) {
+        await page.setViewportSize({width,height:1100});
+        await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+        assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+        await page.screenshot({path:path.join(output,`generation-contract-${width}.png`),fullPage:true});
+      }
+      assert.deepEqual(errors,[]);
+      console.log('PASS: unified API generation, Bearer auth, retry idempotency, Unix timestamps, completed/failed states, confirmed costs, video/speech/music parameter reuse, deletion, history reload and responsive layout.');
+      return;
+    }
+    await page.locator('#userMenuToggle').hover();
+    await page.getByRole('menuitem',{name:'Profile',exact:true}).click();
+    const profileTabs=page.locator('#profileContent .organization-tabs');
+    await profileTabs.getByRole('tab',{name:'Providers',exact:true}).click();
+    await page.locator('#providerDetailContent').waitFor({state:'visible'});
+    await page.screenshot({path:path.join(output,'providers-desktop.png'),fullPage:true});
+    assert.ok(!/[\u0410-\u042f\u0430-\u044f\u0401\u0451]/.test(await page.locator('body').innerText()));
+    await profileTabs.getByRole('tab',{name:'Storage',exact:true}).click();
+    const storage=page.locator('#storageView'),saveStorage=page.locator('#saveStorage');
+    const destination=value=>storage.locator(`input[name=destination][value=${value}]`);
+    const chooseStorage=async name=>{await storage.getByRole('combobox',{name:'Storage provider',exact:true}).click();await page.getByRole('option',{name,exact:true}).click();};
+    const stored=async()=>{await saveStorage.getByText('Saved',{exact:true}).waitFor();};
+    await destination('local').waitFor();assert.equal(await destination('local').isChecked(),true);
+    assert.equal(await saveStorage.isVisible(),false);
+    await destination('s3').check();await chooseStorage('Cloudflare R2');
+    assert.equal(await page.locator('#storageRegion').inputValue(),'auto');
+    assert.equal(await page.locator('#storagePathStyle').isChecked(),true);
+    await page.locator('#storageEndpoint').fill('account.r2.cloudflarestorage.com');
+    await page.locator('#storageBucket').fill('generated-media');
+    await storage.getByText('Optional settings',{exact:true}).click();
+    await page.locator('#storagePrefix').fill('artifacts');
+    await page.locator('#storageAccessKey').fill('test-access');
+    await page.locator('#storageSecretKey').fill('test-secret');
+    await page.locator('#checkStorage').click();
+    await storage.getByRole('status').filter({hasText:'Connection verified.'}).waitFor();
+    assert.equal(storageChecks.length,1);assert.equal(storageWrites.length,0);
+    assert.equal(storageChecks[0].endpoint,'https://account.r2.cloudflarestorage.com');
+    await saveStorage.click();await stored();
+    assert.equal(savedStorage.driver,'s3');assert.equal(storageWrites[0].secret_access_key,'test-secret');
+    assert.equal(await page.locator('#storageSecretKey').inputValue(),'************');
+    assert.equal(await page.locator('#storageAccessKey').inputValue(),'test-access');
+    assert.equal(await page.locator('#storageAccessKey').getAttribute('type'),'text');
+    await page.locator('#storageBucket').fill('draft-bucket');assert.equal(await saveStorage.isEnabled(),true);
+    await page.locator('#storageBucket').fill('generated-media');assert.equal(await saveStorage.isVisible(),false);
+    await page.locator('#storageSecretKey').focus();assert.equal(await saveStorage.isVisible(),false,'Focusing the mask is not a change');
+    await page.locator('#storageSecretKey').fill('replacement-draft');assert.equal(await saveStorage.isEnabled(),true);
+    await page.locator('#storageSecretKey').fill('');assert.equal(await saveStorage.isVisible(),false,'Empty replacement keeps the saved secret');
+    await page.locator('#storageSecretKey').fill('replacement-draft');
+    // Reopen saved settings to discard this unsaved replacement.
+    await profileTabs.getByRole('tab',{name:'Providers',exact:true}).click();
+    await profileTabs.getByRole('tab',{name:'Storage',exact:true}).click();
+    await page.waitForFunction(()=>document.querySelector('#storageBucket')?.value==='generated-media');
+    assert.equal(await page.locator('#storageSecretKey').inputValue(),'************');
+    await page.locator('#checkStorage').click();await storage.getByRole('status').filter({hasText:'Connection verified.'}).waitFor();
+    assert.equal(storageChecks.at(-1).secret_access_key,'','Never send the displayed mask');
+    assert.equal(await saveStorage.isVisible(),false);
+    storageFailure=true;await page.locator('#storageBucket').fill('unavailable-bucket');await saveStorage.click();
+    await storage.getByRole('status').filter({hasText:'denied'}).waitFor();
+    assert.equal(savedStorage.bucket,'generated-media');assert.equal(await page.locator('#storageBucket').inputValue(),'unavailable-bucket');
+    assert.equal(storageWrites.at(-1).secret_access_key,'','Editing a bucket preserves the secret');
+    assert.equal(await saveStorage.isEnabled(),true,'Failed save retains unsaved changes');storageFailure=false;
+    await profileTabs.getByRole('tab',{name:'Providers',exact:true}).click();await profileTabs.getByRole('tab',{name:'Storage',exact:true}).click();
+    await page.waitForFunction(()=>document.querySelector('#storageBucket')?.value==='generated-media');
+    await chooseStorage('Backblaze B2');await page.locator('#storageAccessKey').fill('b2-key-id');
+    await page.locator('#storageSecretKey').fill('b2-replacement-secret');
+    await page.locator('#storageEndpoint').fill('s3.us-west-004.backblazeb2.com');await page.locator('#storageEndpoint').press('Enter');await stored();
+    assert.equal(storageWrites.at(-1).endpoint,'https://s3.us-west-004.backblazeb2.com');
+    assert.equal(storageWrites.at(-1).secret_access_key,'b2-replacement-secret');
+    assert.equal(await page.locator('#storageSecretKey').inputValue(),'************');
+    await storage.getByText('Optional settings',{exact:true}).click();
+    await page.locator('#storagePrefix').fill('updated-prefix');await saveStorage.click();await stored();
+    assert.equal(storageWrites.at(-1).secret_access_key,'','Replacement is masked after saving and not reused');
+    await page.screenshot({path:path.join(output,'storage-desktop.png'),fullPage:true});
+    await page.setViewportSize({width:390,height:844});
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'Storage mobile must not overflow');
+    await page.screenshot({path:path.join(output,'storage-mobile.png'),fullPage:true});
+    await page.locator('#storageEndpoint').fill('invalid-url');await destination('local').check();await saveStorage.click();await stored();
+    assert.equal(savedStorage.driver,'local');
+    await page.locator('#workspaceSelect').selectOption('11111111-1111-4111-8111-111111111111',{force:true});
+    await page.locator('#generationNav').click();
+    await page.locator('.task').first().waitFor();
+    await page.setViewportSize({width:390,height:844});
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'Mobile must not overflow');
+    await page.screenshot({path:path.join(output,'generation-mobile.png'),fullPage:true});
+    await context.grantPermissions(['clipboard-read','clipboard-write']);
+    await page.locator('.task-parameters').first().evaluate(el=>el.open=true); await page.locator('.task-parameters').first().getByRole('button',{name:'Copy Task ID',exact:true}).click();
+    assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),tasks[0].id);
+    // Long prompts stay scrollable while confirmation controls remain visible on mobile.
+    await page.locator('#prompt').fill('A detailed scene. '.repeat(450));
+    await page.locator('#submitButton').click();
+    const confirmBounds = await page.locator('#confirmSubmit').boundingBox();
+    assert.ok(confirmBounds.y >= 0 && confirmBounds.y + confirmBounds.height <= 844);
+    assert.equal(await page.locator('#confirmFields dd').filter({hasText:'A detailed scene.'}).innerText(), 'A detailed scene. '.repeat(450).trim());
+    await page.locator('#cancelConfirm').click();
+    await page.locator('#prompt').fill('An illustrated bird');
+    await page.emulateMedia({reducedMotion:'reduce'});
+    await page.locator('#submitButton').click(); await page.locator('#confirmSubmit').click();
+    await page.locator('#confirmDialog').waitFor({state:'hidden'});
+    assert.equal(await page.locator('.task-arriving').count(),0);
+    // Deleting a partial result preserves history without exposing provider URLs.
+    await page.setViewportSize({width:1440,height:1100});tasks[0].status='failed';tasks[0].has_stored_result=true;await page.waitForFunction(()=>!document.querySelector('.delete-result').hidden);
+    await page.locator('.task-menu summary').first().click();await page.locator('.delete-result').first().click();await page.getByRole('heading',{name:'Delete stored result files?',exact:true}).waitFor();assert.equal(resultDeletes,0);await page.getByRole('button',{name:'Cancel',exact:true}).click();assert.equal(resultDeletes,0);
+    await page.locator('.task-menu summary').first().click();await page.locator('.delete-result').first().click();await page.getByRole('button',{name:'Delete files',exact:true}).click();await page.locator('.task-result').filter({hasText:'Stored result files deleted.'}).first().waitFor();assert.equal(await page.locator('a[href^="https://provider.example"]').count(),0);assert.equal(resultDeletes,1);assert.equal(await page.locator('.delete-result').first().isVisible(),false);assert.ok(tasks[0].prompt);
+    await page.reload();
+    await page.locator('.task').first().waitFor();
+    assert.equal(await page.locator('.task[data-status="completed"] .progress, .task[data-status="failed"] .progress').count(),0,'Historical completions must not flash a progress bar');
+    assert.deepEqual(errors,[]);
+    console.log('PASS: desktop/mobile, compact confirmation, single POST, 2s minimum, slow request, retry idempotency, timers, task copying, provider view, S3 storage settings/check/save/errors/mobile, clipboard and reduced motion.');
+  } catch (error) { await page.screenshot({path:path.join(output,'failure.png'),fullPage:true}); throw error; } finally {await browser.close();server.close();}
+})().catch(error=>{console.error(error);server.close();process.exitCode=1;});

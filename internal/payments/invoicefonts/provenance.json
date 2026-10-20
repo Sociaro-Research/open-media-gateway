@@ -1,0 +1,25 @@
+{
+  "font_version": "Liberation Sans 1.07.4",
+  "verified_upstream_revision": "mozilla/pdf.js@33734f1fdf1b8987c656c0a5f67b4e2cc57e9d13",
+  "original_acquisition_revision_recorded": false,
+  "license_description": "GNU GPL v2 with the Liberation font exception, as identified by the pinned upstream README",
+  "files": {
+    "LiberationSans-Regular.ttf": {
+      "sha256": "f8ace1f892b2bd9dc1792ba7f097fa7588f84fed48321480e04de5390828221f",
+      "verified_upstream_url": "https://raw.githubusercontent.com/mozilla/pdf.js/33734f1fdf1b8987c656c0a5f67b4e2cc57e9d13/external/standard_fonts/LiberationSans-Regular.ttf"
+    },
+    "LiberationSans-Bold.ttf": {
+      "sha256": "361c61b82d575c5c35fd9157fda8b0194bcfcd0d88ea8521a4fb5dd53d33dddc",
+      "verified_upstream_url": "https://raw.githubusercontent.com/mozilla/pdf.js/33734f1fdf1b8987c656c0a5f67b4e2cc57e9d13/external/standard_fonts/LiberationSans-Bold.ttf"
+    }
+  },
+  "notice": {
+    "path": "LICENSE",
+    "sha256": "d2c4d5b3e115a519cb58eb691aa64538397e2611f9ebe801392cf9667997e7dc",
+    "bytes": 22154,
+    "copied_verbatim_from": "https://raw.githubusercontent.com/mozilla/pdf.js/33734f1fdf1b8987c656c0a5f67b4e2cc57e9d13/external/standard_fonts/LICENSE_LIBERATION"
+  },
+  "upstream_explanation": "https://raw.githubusercontent.com/mozilla/pdf.js/33734f1fdf1b8987c656c0a5f67b4e2cc57e9d13/external/standard_fonts/README.md",
+  "font_bytes_modified": false,
+  "upstream_font_source_build_archive_included": false
+}

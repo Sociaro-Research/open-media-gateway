@@ -1,0 +1,34 @@
+# Selected automatically by initialize.py --public-url in a release bundle.
+# Reuse the pinned UI image's Caddy binary; no additional image or build.
+services:
+  gateway:
+    ports: !reset []
+  ui:
+    ports: !reset []
+  https:
+    image: ${UI_IMAGE:?Initialize .env first}
+    restart: unless-stopped
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      GATEWAY_HOST: ${GATEWAY_HOST:?Set an HTTPS domain with initialize.py}
+    command: ["caddy", "run", "--config", "/etc/caddy/Caddyfile.https", "--adapter", "caddyfile"]
+    ports:
+      - "80:8080"
+      - "443:8443"
+    volumes:
+      - ./Caddyfile.https:/etc/caddy/Caddyfile.https:ro
+      - https-data:/data
+      - https-config:/config
+    depends_on:
+      ui:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8081/healthz"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  https-data:
+  https-config:

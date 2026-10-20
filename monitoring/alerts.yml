@@ -1,0 +1,70 @@
+groups:
+  - name: media-gateway
+    rules:
+      - alert: GatewayTargetDown
+        expr: up{job=~"gateway|worker"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.job }} metrics target is unavailable"
+
+      # DNS removes absent services entirely, so up == 0 alone is insufficient.
+      - alert: GatewayTargetsMissing
+        expr: absent(up{job="gateway"}) or absent(up{job="worker"})
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "No {{ $labels.job }} metrics targets discovered"
+
+      - alert: GatewayDependencyUnavailable
+        expr: media_gateway_dependency_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.dependency }} is unavailable to {{ $labels.service }}"
+
+      - alert: GatewayMetricsCollectionFailed
+        expr: media_gateway_collector_success == 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.collector }} monitoring snapshot failed"
+
+      - alert: GatewayWorkerLoopStalled
+        expr: time() - media_gateway_worker_loop_last_success_timestamp_seconds > media_gateway_worker_loop_stale_after_seconds
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Worker {{ $labels.loop }} has stopped making progress"
+
+      - alert: GatewayTasksOverdue
+        expr: media_gateway_oldest_task_overdue_seconds > 120
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.status }} tasks are overdue for worker processing"
+
+      - alert: GatewayWebhooksOverdue
+        expr: media_gateway_oldest_webhook_overdue_seconds > 300
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Webhook deliveries are overdue"
+
+      - alert: GatewayHighHTTPErrorRate
+        expr: >-
+          sum(rate(media_gateway_http_requests_total{status=~"5.."}[5m]))
+          / clamp_min(sum(rate(media_gateway_http_requests_total[5m])), 0.001) > 0.05
+          and sum(increase(media_gateway_http_requests_total{status=~"5.."}[5m])) >= 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Gateway HTTP 5xx rate exceeds 5% (at least five errors)"

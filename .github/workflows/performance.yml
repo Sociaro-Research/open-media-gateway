@@ -1,0 +1,82 @@
+name: Performance and recovery
+
+on:
+  workflow_dispatch:
+    inputs:
+      stage_duration:
+        description: Duration of each measured load stage
+        default: 30s
+        required: true
+      history_rows:
+        description: Synthetic historical tasks per scenario
+        default: '100000'
+        required: true
+      pending_tasks:
+        description: Regularly polled pending tasks
+        default: '1000'
+        required: true
+      soak_duration:
+        description: Optional sustained-load run
+        type: choice
+        default: none
+        options: [none, 30m, 2h]
+
+permissions:
+  contents: read
+
+jobs:
+  performance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: gateway_test
+          POSTGRES_USER: gateway_test
+          POSTGRES_PASSWORD: gateway_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U gateway_test"
+          --health-interval 2s --health-timeout 3s --health-retries 30
+      redis:
+        image: redis:7.4-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 2s --health-timeout 3s --health-retries 30
+    env:
+      GATEWAY_TEST_DATABASE_URL: postgres://gateway_test:gateway_test@127.0.0.1:5432/gateway_test?sslmode=disable
+      GATEWAY_TEST_REDIS_URL: redis://127.0.0.1:6379/0
+      GATEWAY_PERF_OUTPUT: performance-results
+      GATEWAY_PERF_STAGE: ${{ inputs.stage_duration }}
+      GATEWAY_PERF_HISTORY: ${{ inputs.history_rows }}
+      GATEWAY_PERF_PENDING: ${{ inputs.pending_tasks }}
+      GATEWAY_PERF_SOAK: ${{ inputs.soak_duration != 'none' && inputs.soak_duration || '' }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Record source and machine
+        run: |
+          mkdir -p performance-results
+          git rev-parse HEAD > performance-results/commit.txt
+          go version > performance-results/go.txt
+          lscpu > performance-results/cpu.txt
+          free -m > performance-results/memory.txt
+      - name: Recovery with real lease expiry and race detector
+        env:
+          GATEWAY_REAL_LEASE_EXPIRY: '1'
+        run: go test -race -count=1 -timeout=5m -v ./internal/reliability > performance-results/recovery.log 2>&1
+      - name: Measured API, reports, files and polling load
+        env:
+          GATEWAY_PERF: '1'
+        run: go test -count=1 -timeout=150m -v -run TestPerformance ./internal/reliability > performance-results/load.log 2>&1
+      - name: CPU and allocation benchmarks
+        run: go test -run '^$' -bench 'Benchmark(MatchUsageBills|ReportSummary)$' -benchmem -benchtime=1x -count=3 ./internal/core > performance-results/benchmarks.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: performance-and-recovery
+          path: performance-results

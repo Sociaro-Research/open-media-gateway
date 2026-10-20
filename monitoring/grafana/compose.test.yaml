@@ -1,0 +1,14 @@
+# Use only with an explicitly isolated project; never with the deployment project.
+# Starts Grafana/Prometheus without application services, for provisioning/UI checks.
+services:
+  prometheus:
+    ports: !reset []
+  grafana:
+    # Docker suppresses host publishing on internal-only networks. This extra
+    # isolated-project network permits the localhost test tunnel; production
+    # remains attached only to monitoring-ui and has no published port.
+    networks: [default, monitoring-ui]
+    ports:
+      - "127.0.0.1:${GRAFANA_TEST_PORT:-13000}:3000"
+    environment:
+      GF_SERVER_ROOT_URL: http://127.0.0.1:${GRAFANA_TEST_UI_PORT:-18088}/monitoring/

@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "example": true,
+  "admin_ssh_host": "root@192.0.2.10",
+  "tunnel_ssh_host": "root@192.0.2.1",
+  "ssh_host_key_alias": "deployment.example.test",
+  "known_hosts_file": "deployment-private/known_hosts",
+  "admin_ssh_key_file": "ssh/administration_ed25519",
+  "restricted_ssh_key_file": null,
+  "public_origin": "https://app.example.test",
+  "repository_url": "git@github.com:example/project.git",
+  "github_ssh_key_file": null,
+  "wireguard_endpoint": "192.0.2.10:51820",
+  "wireguard_server_public_key_file": "deployment-private/wireguard-server.pub",
+  "wireguard_client_private_key_file": null,
+  "wireguard_client_address": "192.0.2.2/32",
+  "wireguard_server_address": "192.0.2.1/32",
+  "wireguard_allowed_route": "192.0.2.1/32",
+  "wireguard_listen_port": 51820
+}

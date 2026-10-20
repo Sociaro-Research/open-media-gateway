@@ -1,0 +1,135 @@
+rule_files:
+  - alerts.yml
+
+evaluation_interval: 1m
+
+tests:
+  - interval: 1m
+    input_series:
+      - series: 'up{job="gateway",instance="gateway:9091"}'
+        values: '0 0 0'
+      - series: 'up{job="worker",instance="worker:9091"}'
+        values: '1 1 1'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: GatewayTargetDown
+        exp_alerts:
+          - exp_labels:
+              job: gateway
+              instance: gateway:9091
+              severity: critical
+            exp_annotations:
+              summary: "gateway metrics target is unavailable"
+      - eval_time: 2m
+        alertname: GatewayTargetsMissing
+        exp_alerts: []
+
+  - interval: 1m
+    input_series:
+      - series: 'up{job="gateway"}'
+        values: '1 1 1'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: GatewayTargetsMissing
+        exp_alerts:
+          - exp_labels:
+              job: worker
+              severity: critical
+            exp_annotations:
+              summary: "No worker metrics targets discovered"
+
+  - interval: 1m
+    input_series:
+      - series: 'media_gateway_dependency_up{service="gateway",dependency="postgres"}'
+        values: '0 0 0'
+      - series: 'media_gateway_collector_success{service="gateway",collector="tasks"}'
+        values: '0 0 0'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: GatewayDependencyUnavailable
+        exp_alerts:
+          - exp_labels:
+              service: gateway
+              dependency: postgres
+              severity: critical
+            exp_annotations:
+              summary: "postgres is unavailable to gateway"
+      - eval_time: 2m
+        alertname: GatewayMetricsCollectionFailed
+        exp_alerts:
+          - exp_labels:
+              service: gateway
+              collector: tasks
+              severity: warning
+            exp_annotations:
+              summary: "tasks monitoring snapshot failed"
+
+  - interval: 1m
+    input_series:
+      - series: 'media_gateway_worker_loop_last_success_timestamp_seconds{service="worker",loop="consumer"}'
+        values: '0 0 0 0 0'
+      - series: 'media_gateway_worker_loop_stale_after_seconds{service="worker",loop="consumer"}'
+        values: '60 60 60 60 60'
+      - series: 'media_gateway_worker_loop_last_success_timestamp_seconds{service="worker",loop="dispatcher"}'
+        values: '0 60 120 180 240'
+      - series: 'media_gateway_worker_loop_stale_after_seconds{service="worker",loop="dispatcher"}'
+        values: '60 60 60 60 60'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: GatewayWorkerLoopStalled
+        exp_alerts:
+          - exp_labels:
+              service: worker
+              loop: consumer
+              severity: critical
+            exp_annotations:
+              summary: "Worker consumer has stopped making progress"
+
+  - interval: 1m
+    input_series:
+      - series: 'media_gateway_oldest_task_overdue_seconds{service="gateway",status="queued"}'
+        values: '121+60x6'
+      - series: 'media_gateway_oldest_webhook_overdue_seconds{service="gateway"}'
+        values: '301+60x6'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: GatewayTasksOverdue
+        exp_alerts:
+          - exp_labels:
+              service: gateway
+              status: queued
+              severity: warning
+            exp_annotations:
+              summary: "queued tasks are overdue for worker processing"
+      - eval_time: 6m
+        alertname: GatewayWebhooksOverdue
+        exp_alerts:
+          - exp_labels:
+              service: gateway
+              severity: warning
+            exp_annotations:
+              summary: "Webhook deliveries are overdue"
+
+  - interval: 1m
+    input_series:
+      - series: 'media_gateway_http_requests_total{service="gateway",status="503"}'
+        values: '0+10x15'
+      - series: 'media_gateway_http_requests_total{service="gateway",status="200"}'
+        values: '0+90x15'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: GatewayHighHTTPErrorRate
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "Gateway HTTP 5xx rate exceeds 5% (at least five errors)"
+
+  - interval: 1m
+    input_series:
+      - series: 'media_gateway_http_requests_total{service="gateway",status="503"}'
+        values: '0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: GatewayHighHTTPErrorRate
+        exp_alerts: []

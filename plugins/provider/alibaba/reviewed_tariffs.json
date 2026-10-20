@@ -1,0 +1,2307 @@
+{
+  "cosyvoice-v2": [
+    {
+      "per": 10000,
+      "price": 0.286706,
+      "region": "Beijing",
+      "unit": "character"
+    }
+  ],
+  "cosyvoice-v3-flash": [
+    {
+      "per": 10000,
+      "price": 0.13,
+      "region": "Singapore",
+      "unit": "character"
+    },
+    {
+      "per": 10000,
+      "price": 0.14335,
+      "region": "Beijing",
+      "unit": "character"
+    }
+  ],
+  "cosyvoice-v3-plus": [
+    {
+      "per": 10000,
+      "price": 0.26,
+      "region": "Singapore",
+      "unit": "character"
+    },
+    {
+      "per": 10000,
+      "price": 0.286706,
+      "region": "Beijing",
+      "unit": "character"
+    }
+  ],
+  "cosyvoice-v3.5-flash": [
+    {
+      "per": 10000,
+      "price": 0.116,
+      "region": "Beijing",
+      "unit": "character"
+    }
+  ],
+  "cosyvoice-v3.5-plus": [
+    {
+      "per": 10000,
+      "price": 0.22,
+      "region": "Beijing",
+      "unit": "character"
+    }
+  ],
+  "happyhorse-1.0-i2v": [
+    {
+      "per": 1000,
+      "price": 140.0,
+      "region": "Singapore",
+      "resolution": "720p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 240.0,
+      "region": "Singapore",
+      "resolution": "1080p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 123.769,
+      "region": "Beijing",
+      "resolution": "720p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 220.034,
+      "region": "Beijing",
+      "resolution": "1080p",
+      "unit": "second"
+    }
+  ],
+  "happyhorse-1.0-r2v": [
+    {
+      "per": 1000,
+      "price": 140.0,
+      "region": "Singapore",
+      "resolution": "720p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 240.0,
+      "region": "Singapore",
+      "resolution": "1080p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 123.769,
+      "region": "Beijing",
+      "resolution": "720p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 220.034,
+      "region": "Beijing",
+      "resolution": "1080p",
+      "unit": "second"
+    }
+  ],
+  "happyhorse-1.0-t2v": [
+    {
+      "per": 1000,
+      "price": 140.0,
+      "region": "Singapore",
+      "resolution": "720p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 240.0,
+      "region": "Singapore",
+      "resolution": "1080p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 123.769,
+      "region": "Beijing",
+      "resolution": "720p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 220.034,
+      "region": "Beijing",
+      "resolution": "1080p",
+      "unit": "second"
+    }
+  ],
+  "happyhorse-1.0-video-edit": [
+    {
+      "per": 1000,
+      "price": 140.0,
+      "region": "Singapore",
+      "resolution": "720p",
+      "unit": "second",
+      "video_input": false
+    },
+    {
+      "per": 1000,
+      "price": 140.0,
+      "region": "Singapore",
+      "resolution": "720p",
+      "unit": "second",
+      "video_input": true
+    },
+    {
+      "per": 1000,
+      "price": 240.0,
+      "region": "Singapore",
+      "resolution": "1080p",
+      "unit": "second",
+      "video_input": false
+    },
+    {
+      "per": 1000,
+      "price": 240.0,
+      "region": "Singapore",
+      "resolution": "1080p",
+      "unit": "second",
+      "video_input": true
+    },
+    {
+      "per": 1000,
+      "price": 123.769,
+      "region": "Beijing",
+      "resolution": "720p",
+      "unit": "second",
+      "video_input": false
+    },
+    {
+      "per": 1000,
+      "price": 123.769,
+      "region": "Beijing",
+      "resolution": "720p",
+      "unit": "second",
+      "video_input": true
+    },
+    {
+      "per": 1000,
+      "price": 220.034,
+      "region": "Beijing",
+      "resolution": "1080p",
+      "unit": "second",
+      "video_input": false
+    },
+    {
+      "per": 1000,
+      "price": 220.034,
+      "region": "Beijing",
+      "resolution": "1080p",
+      "unit": "second",
+      "video_input": true
+    }
+  ],
+  "happyhorse-1.1-i2v": [
+    {
+      "per": 1000,
+      "price": 70.0,
+      "region": "Singapore",
+      "resolution": "480p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 140.0,
+      "region": "Singapore",
+      "resolution": "720p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 180.0,
+      "region": "Singapore",
+      "resolution": "1080p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 61.8845,
+      "region": "Beijing",
+      "resolution": "480p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 123.769,
+      "region": "Beijing",
+      "resolution": "720p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 165.026,
+      "region": "Beijing",
+      "resolution": "1080p",
+      "unit": "second"
+    }
+  ],
+  "happyhorse-1.1-r2v": [
+    {
+      "per": 1000,
+      "price": 70.0,
+      "region": "Singapore",
+      "resolution": "480p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 140.0,
+      "region": "Singapore",
+      "resolution": "720p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 180.0,
+      "region": "Singapore",
+      "resolution": "1080p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 61.8845,
+      "region": "Beijing",
+      "resolution": "480p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 123.769,
+      "region": "Beijing",
+      "resolution": "720p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 165.026,
+      "region": "Beijing",
+      "resolution": "1080p",
+      "unit": "second"
+    }
+  ],
+  "happyhorse-1.1-t2v": [
+    {
+      "per": 1000,
+      "price": 70.0,
+      "region": "Singapore",
+      "resolution": "480p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 140.0,
+      "region": "Singapore",
+      "resolution": "720p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 180.0,
+      "region": "Singapore",
+      "resolution": "1080p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 61.8845,
+      "region": "Beijing",
+      "resolution": "480p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 123.769,
+      "region": "Beijing",
+      "resolution": "720p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 165.026,
+      "region": "Beijing",
+      "resolution": "1080p",
+      "unit": "second"
+    }
+  ],
+  "qwen-audio-3.0-tts-flash": [
+    {
+      "per": 10000,
+      "price": 0.15,
+      "region": "Singapore",
+      "unit": "character"
+    },
+    {
+      "per": 10000,
+      "price": 0.137521,
+      "region": "Beijing",
+      "unit": "character"
+    }
+  ],
+  "qwen-audio-3.0-tts-plus": [
+    {
+      "per": 10000,
+      "price": 0.2,
+      "region": "Singapore",
+      "unit": "character"
+    },
+    {
+      "per": 10000,
+      "price": 0.19253,
+      "region": "Beijing",
+      "unit": "character"
+    }
+  ],
+  "qwen-image-2.0": [
+    {
+      "per": 1,
+      "price": 0.035,
+      "region": "Singapore",
+      "unit": "image"
+    },
+    {
+      "per": 1,
+      "price": 0.028671,
+      "region": "Beijing",
+      "unit": "image"
+    }
+  ],
+  "qwen-image-2.0-2026-03-03": [
+    {
+      "per": 1,
+      "price": 0.035,
+      "region": "Singapore",
+      "unit": "image"
+    },
+    {
+      "per": 1,
+      "price": 0.028671,
+      "region": "Beijing",
+      "unit": "image"
+    }
+  ],
+  "qwen-image-2.0-pro": [
+    {
+      "per": 1,
+      "price": 0.075,
+      "region": "Singapore",
+      "unit": "image"
+    },
+    {
+      "per": 1,
+      "price": 0.071676,
+      "region": "Beijing",
+      "unit": "image"
+    }
+  ],
+  "qwen-image-2.0-pro-2026-03-03": [
+    {
+      "per": 1,
+      "price": 0.075,
+      "region": "Singapore",
+      "unit": "image"
+    },
+    {
+      "per": 1,
+      "price": 0.071676,
+      "region": "Beijing",
+      "unit": "image"
+    }
+  ],
+  "qwen-image-2.0-pro-2026-04-22": [
+    {
+      "per": 1,
+      "price": 0.075,
+      "region": "Singapore",
+      "unit": "image"
+    },
+    {
+      "per": 1,
+      "price": 0.071676,
+      "region": "Beijing",
+      "unit": "image"
+    }
+  ],
+  "qwen-image-2.0-pro-2026-06-22": [
+    {
+      "per": 1,
+      "price": 0.075,
+      "region": "Singapore",
+      "unit": "image"
+    },
+    {
+      "per": 1,
+      "price": 0.071676,
+      "region": "Beijing",
+      "unit": "image"
+    }
+  ],
+  "qwen-image-2.1-pro": [
+    {
+      "per": 1,
+      "price": 0.04,
+      "region": "Singapore",
+      "unit": "image"
+    },
+    {
+      "per": 1,
+      "price": 0.035333,
+      "region": "Beijing",
+      "unit": "image"
+    }
+  ],
+  "qwen-image-2.1-turbo": [
+    {
+      "per": 1,
+      "price": 0.016,
+      "region": "Singapore",
+      "unit": "image"
+    },
+    {
+      "per": 1,
+      "price": 0.014133,
+      "region": "Beijing",
+      "unit": "image"
+    }
+  ],
+  "qwen-image-3.0": [
+    {
+      "input_images": {
+        "free": 0,
+        "price": 0.003
+      },
+      "per": 1,
+      "price": 0.03,
+      "region": "Singapore",
+      "resolution": "1024*1024",
+      "unit": "image"
+    },
+    {
+      "input_images": {
+        "free": 0,
+        "price": 0.003
+      },
+      "per": 1,
+      "price": 0.03,
+      "region": "Singapore",
+      "resolution": "1536*1024",
+      "unit": "image"
+    },
+    {
+      "input_images": {
+        "free": 0,
+        "price": 0.003
+      },
+      "per": 1,
+      "price": 0.03,
+      "region": "Singapore",
+      "resolution": "1024*1536",
+      "unit": "image"
+    },
+    {
+      "input_images": {
+        "free": 0,
+        "price": 0.003
+      },
+      "per": 1,
+      "price": 0.03,
+      "region": "Singapore",
+      "resolution": "2048*2048",
+      "unit": "image"
+    },
+    {
+      "input_images": {
+        "free": 0,
+        "price": 0.00275
+      },
+      "per": 1,
+      "price": 0.024754,
+      "region": "Beijing",
+      "resolution": "1024*1024",
+      "unit": "image"
+    },
+    {
+      "input_images": {
+        "free": 0,
+        "price": 0.00275
+      },
+      "per": 1,
+      "price": 0.024754,
+      "region": "Beijing",
+      "resolution": "1536*1024",
+      "unit": "image"
+    },
+    {
+      "input_images": {
+        "free": 0,
+        "price": 0.00275
+      },
+      "per": 1,
+      "price": 0.024754,
+      "region": "Beijing",
+      "resolution": "1024*1536",
+      "unit": "image"
+    },
+    {
+      "input_images": {
+        "free": 0,
+        "price": 0.00275
+      },
+      "per": 1,
+      "price": 0.024754,
+      "region": "Beijing",
+      "resolution": "2048*2048",
+      "unit": "image"
+    }
+  ],
+  "qwen-image-3.0-pro": [
+    {
+      "input_images": {
+        "free": 0,
+        "price": 0.003
+      },
+      "per": 1,
+      "price": 0.04,
+      "region": "Singapore",
+      "resolution": "1024*1024",
+      "unit": "image"
+    },
+    {
+      "input_images": {
+        "free": 0,
+        "price": 0.003
+      },
+      "per": 1,
+      "price": 0.075,
+      "region": "Singapore",
+      "resolution": "1536*1024",
+      "unit": "image"
+    },
+    {
+      "input_images": {
+        "free": 0,
+        "price": 0.003
+      },
+      "per": 1,
+      "price": 0.075,
+      "region": "Singapore",
+      "resolution": "1024*1536",
+      "unit": "image"
+    },
+    {
+      "input_images": {
+        "free": 0,
+        "price": 0.003
+      },
+      "per": 1,
+      "price": 0.075,
+      "region": "Singapore",
+      "resolution": "2048*2048",
+      "unit": "image"
+    },
+    {
+      "input_images": {
+        "free": 0,
+        "price": 0.00275
+      },
+      "per": 1,
+      "price": 0.03438,
+      "region": "Beijing",
+      "resolution": "1024*1024",
+      "unit": "image"
+    },
+    {
+      "input_images": {
+        "free": 0,
+        "price": 0.00275
+      },
+      "per": 1,
+      "price": 0.068761,
+      "region": "Beijing",
+      "resolution": "1536*1024",
+      "unit": "image"
+    },
+    {
+      "input_images": {
+        "free": 0,
+        "price": 0.00275
+      },
+      "per": 1,
+      "price": 0.068761,
+      "region": "Beijing",
+      "resolution": "1024*1536",
+      "unit": "image"
+    },
+    {
+      "input_images": {
+        "free": 0,
+        "price": 0.00275
+      },
+      "per": 1,
+      "price": 0.068761,
+      "region": "Beijing",
+      "resolution": "2048*2048",
+      "unit": "image"
+    }
+  ],
+  "qwen-mt-image": [
+    {
+      "per": 1,
+      "price": 0.000431,
+      "region": "Beijing",
+      "unit": "image"
+    }
+  ],
+  "qwen-mt-image-2.0": [
+    {
+      "per": 1,
+      "price": 0.0006,
+      "region": "Singapore",
+      "unit": "image"
+    },
+    {
+      "per": 1,
+      "price": 0.000565,
+      "region": "Beijing",
+      "unit": "image"
+    }
+  ],
+  "qwen3-tts-flash": [
+    {
+      "per": 10000,
+      "price": 0.1,
+      "region": "Singapore",
+      "unit": "character"
+    },
+    {
+      "per": 10000,
+      "price": 0.114682,
+      "region": "Beijing",
+      "unit": "character"
+    }
+  ],
+  "qwen3-tts-flash-realtime": [
+    {
+      "per": 10000,
+      "price": 0.13,
+      "region": "Singapore",
+      "unit": "character"
+    },
+    {
+      "per": 10000,
+      "price": 0.143353,
+      "region": "Beijing",
+      "unit": "character"
+    }
+  ],
+  "vidu/vidu-image_reference2image": [
+    {
+      "per": 1,
+      "price": 0.1,
+      "region": "Singapore",
+      "resolution": "1024*1024",
+      "unit": "image"
+    },
+    {
+      "per": 1,
+      "price": 0.16,
+      "region": "Singapore",
+      "resolution": "2048*2048",
+      "unit": "image"
+    },
+    {
+      "per": 1,
+      "price": 0.24,
+      "region": "Singapore",
+      "resolution": "4096*4096",
+      "unit": "image"
+    }
+  ],
+  "vidu/viduq2-pro-fast_img2video": [
+    {
+      "per": 1000,
+      "price": 16.0,
+      "region": "Singapore",
+      "resolution": "720p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 32.0,
+      "region": "Singapore",
+      "resolution": "1080p",
+      "unit": "second"
+    }
+  ],
+  "vidu/viduq3-ad_reference2video": [
+    {
+      "per": 1000,
+      "price": 125.0,
+      "region": "Singapore",
+      "resolution": "720p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 150.0,
+      "region": "Singapore",
+      "resolution": "1080p",
+      "unit": "second"
+    }
+  ],
+  "vidu/viduq3-drama_reference2video": [
+    {
+      "per": 1000,
+      "price": 140.0,
+      "region": "Singapore",
+      "resolution": "720p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 140.0,
+      "region": "Singapore",
+      "resolution": "1080p",
+      "unit": "second"
+    }
+  ],
+  "vidu/viduq3-mix_reference2video": [
+    {
+      "per": 1000,
+      "price": 120.0,
+      "region": "Singapore",
+      "resolution": "720p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 145.0,
+      "region": "Singapore",
+      "resolution": "1080p",
+      "unit": "second"
+    }
+  ],
+  "wan2.1-kf2v-plus": [
+    {
+      "per": 1000,
+      "price": 100.0,
+      "region": "Singapore",
+      "resolution": "720p",
+      "unit": "second"
+    }
+  ],
+  "wan2.1-t2i-plus": [
+    {
+      "per": 1,
+      "price": 0.05,
+      "region": "Singapore",
+      "unit": "image"
+    }
+  ],
+  "wan2.1-t2i-turbo": [
+    {
+      "per": 1,
+      "price": 0.025,
+      "region": "Singapore",
+      "unit": "image"
+    }
+  ],
+  "wan2.1-t2v-plus": [
+    {
+      "per": 1000,
+      "price": 100.0,
+      "region": "Singapore",
+      "resolution": "720p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 100.0,
+      "region": "Singapore",
+      "resolution": "720p",
+      "unit": "second"
+    }
+  ],
+  "wan2.1-t2v-turbo": [
+    {
+      "per": 1000,
+      "price": 36.0,
+      "region": "Singapore",
+      "resolution": "480p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 36.0,
+      "region": "Singapore",
+      "resolution": "720p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 36.0,
+      "region": "Singapore",
+      "resolution": "480p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 36.0,
+      "region": "Singapore",
+      "resolution": "720p",
+      "unit": "second"
+    }
+  ],
+  "wan2.1-vace-plus": [
+    {
+      "per": 1000,
+      "price": 100.0,
+      "region": "Singapore",
+      "resolution": "720p",
+      "unit": "second"
+    }
+  ],
+  "wan2.2-animate-mix": [
+    {
+      "per": 1000,
+      "price": 180.0,
+      "region": "Singapore",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 90.0,
+      "region": "Beijing",
+      "unit": "second"
+    }
+  ],
+  "wan2.2-animate-move": [
+    {
+      "per": 1000,
+      "price": 120.0,
+      "region": "Singapore",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 60.0,
+      "region": "Beijing",
+      "unit": "second"
+    }
+  ],
+  "wan2.2-i2v-flash": [
+    {
+      "per": 1000,
+      "price": 15.0,
+      "region": "Singapore",
+      "resolution": "480p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 36.0,
+      "region": "Singapore",
+      "resolution": "720p",
+      "unit": "second"
+    }
+  ],
+  "wan2.2-i2v-plus": [
+    {
+      "per": 1000,
+      "price": 20.0,
+      "region": "Singapore",
+      "resolution": "480p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 100.0,
+      "region": "Singapore",
+      "resolution": "1080p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 20.07,
+      "region": "Beijing",
+      "resolution": "480p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 100.347,
+      "region": "Beijing",
+      "resolution": "1080p",
+      "unit": "second"
+    }
+  ],
+  "wan2.2-kf2v-flash": [
+    {
+      "per": 1000,
+      "price": 15.0,
+      "region": "Singapore",
+      "resolution": "480p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 36.0,
+      "region": "Singapore",
+      "resolution": "720p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 70.0,
+      "region": "Singapore",
+      "resolution": "1080p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 14.335,
+      "region": "Beijing",
+      "resolution": "480p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 28.671,
+      "region": "Beijing",
+      "resolution": "720p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 68.809,
+      "region": "Beijing",
+      "resolution": "1080p",
+      "unit": "second"
+    }
+  ],
+  "wan2.2-s2v": [
+    {
+      "per": 1000,
+      "price": 71.677,
+      "region": "Beijing",
+      "resolution": "480p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 129.018,
+      "region": "Beijing",
+      "resolution": "720p",
+      "unit": "second"
+    }
+  ],
+  "wan2.2-t2i-flash": [
+    {
+      "per": 1,
+      "price": 0.025,
+      "region": "Singapore",
+      "unit": "image"
+    },
+    {
+      "per": 1,
+      "price": 0.028671,
+      "region": "Beijing",
+      "unit": "image"
+    }
+  ],
+  "wan2.2-t2i-plus": [
+    {
+      "per": 1,
+      "price": 0.05,
+      "region": "Singapore",
+      "unit": "image"
+    },
+    {
+      "per": 1,
+      "price": 0.02007,
+      "region": "Beijing",
+      "unit": "image"
+    }
+  ],
+  "wan2.2-t2v-plus": [
+    {
+      "per": 1000,
+      "price": 20.0,
+      "region": "Singapore",
+      "resolution": "480p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 100.0,
+      "region": "Singapore",
+      "resolution": "1080p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 20.07,
+      "region": "Beijing",
+      "resolution": "480p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 100.347,
+      "region": "Beijing",
+      "resolution": "1080p",
+      "unit": "second"
+    }
+  ],
+  "wan2.5-i2i-preview": [
+    {
+      "per": 1,
+      "price": 0.03,
+      "region": "Singapore",
+      "unit": "image"
+    },
+    {
+      "per": 1,
+      "price": 0.028671,
+      "region": "Beijing",
+      "unit": "image"
+    }
+  ],
+  "wan2.5-i2v-preview": [
+    {
+      "per": 1000,
+      "price": 50.0,
+      "region": "Singapore",
+      "resolution": "480p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 100.0,
+      "region": "Singapore",
+      "resolution": "720p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 150.0,
+      "region": "Singapore",
+      "resolution": "1080p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 43.006,
+      "region": "Beijing",
+      "resolution": "480p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 86.012,
+      "region": "Beijing",
+      "resolution": "720p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 143.353,
+      "region": "Beijing",
+      "resolution": "1080p",
+      "unit": "second"
+    }
+  ],
+  "wan2.5-t2i-preview": [
+    {
+      "per": 1,
+      "price": 0.03,
+      "region": "Singapore",
+      "unit": "image"
+    },
+    {
+      "per": 1,
+      "price": 0.028671,
+      "region": "Beijing",
+      "unit": "image"
+    }
+  ],
+  "wan2.5-t2v-preview": [
+    {
+      "per": 1000,
+      "price": 50.0,
+      "region": "Singapore",
+      "resolution": "480p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 100.0,
+      "region": "Singapore",
+      "resolution": "720p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 150.0,
+      "region": "Singapore",
+      "resolution": "1080p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 43.006,
+      "region": "Beijing",
+      "resolution": "480p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 86.012,
+      "region": "Beijing",
+      "resolution": "720p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 143.353,
+      "region": "Beijing",
+      "resolution": "1080p",
+      "unit": "second"
+    }
+  ],
+  "wan2.6-i2v": [
+    {
+      "per": 1000,
+      "price": 100.0,
+      "region": "Singapore",
+      "resolution": "720p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 150.0,
+      "region": "Singapore",
+      "resolution": "1080p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 86.012,
+      "region": "Beijing",
+      "resolution": "720p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 143.353,
+      "region": "Beijing",
+      "resolution": "1080p",
+      "unit": "second"
+    }
+  ],
+  "wan2.6-i2v-flash": [
+    {
+      "audio": true,
+      "per": 1000,
+      "price": 50.0,
+      "region": "Singapore",
+      "resolution": "720p",
+      "unit": "second"
+    },
+    {
+      "audio": true,
+      "per": 1000,
+      "price": 75.0,
+      "region": "Singapore",
+      "resolution": "1080p",
+      "unit": "second"
+    },
+    {
+      "audio": false,
+      "per": 1000,
+      "price": 25.0,
+      "region": "Singapore",
+      "resolution": "720p",
+      "unit": "second"
+    },
+    {
+      "audio": false,
+      "per": 1000,
+      "price": 37.5,
+      "region": "Singapore",
+      "resolution": "1080p",
+      "unit": "second"
+    },
+    {
+      "audio": true,
+      "per": 1000,
+      "price": 43.006,
+      "region": "Beijing",
+      "resolution": "720p",
+      "unit": "second"
+    },
+    {
+      "audio": true,
+      "per": 1000,
+      "price": 71.676,
+      "region": "Beijing",
+      "resolution": "1080p",
+      "unit": "second"
+    },
+    {
+      "audio": false,
+      "per": 1000,
+      "price": 21.503,
+      "region": "Beijing",
+      "resolution": "720p",
+      "unit": "second"
+    },
+    {
+      "audio": false,
+      "per": 1000,
+      "price": 35.838,
+      "region": "Beijing",
+      "resolution": "1080p",
+      "unit": "second"
+    }
+  ],
+  "wan2.6-image": [
+    {
+      "per": 1,
+      "price": 0.03,
+      "region": "Singapore",
+      "unit": "image"
+    },
+    {
+      "per": 1,
+      "price": 0.028671,
+      "region": "Beijing",
+      "unit": "image"
+    }
+  ],
+  "wan2.6-r2v": [
+    {
+      "per": 1000,
+      "price": 100.0,
+      "region": "Singapore",
+      "resolution": "720p",
+      "unit": "second",
+      "video_input": false
+    },
+    {
+      "per": 1000,
+      "price": 100.0,
+      "region": "Singapore",
+      "resolution": "720p",
+      "unit": "second",
+      "video_input": true
+    },
+    {
+      "per": 1000,
+      "price": 150.0,
+      "region": "Singapore",
+      "resolution": "1080p",
+      "unit": "second",
+      "video_input": false
+    },
+    {
+      "per": 1000,
+      "price": 150.0,
+      "region": "Singapore",
+      "resolution": "1080p",
+      "unit": "second",
+      "video_input": true
+    },
+    {
+      "per": 1000,
+      "price": 86.012,
+      "region": "Beijing",
+      "resolution": "720p",
+      "unit": "second",
+      "video_input": false
+    },
+    {
+      "per": 1000,
+      "price": 86.012,
+      "region": "Beijing",
+      "resolution": "720p",
+      "unit": "second",
+      "video_input": true
+    },
+    {
+      "per": 1000,
+      "price": 143.353,
+      "region": "Beijing",
+      "resolution": "1080p",
+      "unit": "second",
+      "video_input": false
+    },
+    {
+      "per": 1000,
+      "price": 143.353,
+      "region": "Beijing",
+      "resolution": "1080p",
+      "unit": "second",
+      "video_input": true
+    }
+  ],
+  "wan2.6-r2v-flash": [
+    {
+      "audio": true,
+      "per": 1000,
+      "price": 50.0,
+      "region": "Singapore",
+      "resolution": "720p",
+      "unit": "second",
+      "video_input": false
+    },
+    {
+      "audio": true,
+      "per": 1000,
+      "price": 50.0,
+      "region": "Singapore",
+      "resolution": "720p",
+      "unit": "second",
+      "video_input": true
+    },
+    {
+      "audio": true,
+      "per": 1000,
+      "price": 75.0,
+      "region": "Singapore",
+      "resolution": "1080p",
+      "unit": "second",
+      "video_input": false
+    },
+    {
+      "audio": true,
+      "per": 1000,
+      "price": 75.0,
+      "region": "Singapore",
+      "resolution": "1080p",
+      "unit": "second",
+      "video_input": true
+    },
+    {
+      "audio": false,
+      "per": 1000,
+      "price": 25.0,
+      "region": "Singapore",
+      "resolution": "720p",
+      "unit": "second",
+      "video_input": false
+    },
+    {
+      "audio": false,
+      "per": 1000,
+      "price": 25.0,
+      "region": "Singapore",
+      "resolution": "720p",
+      "unit": "second",
+      "video_input": true
+    },
+    {
+      "audio": false,
+      "per": 1000,
+      "price": 37.5,
+      "region": "Singapore",
+      "resolution": "1080p",
+      "unit": "second",
+      "video_input": false
+    },
+    {
+      "audio": false,
+      "per": 1000,
+      "price": 37.5,
+      "region": "Singapore",
+      "resolution": "1080p",
+      "unit": "second",
+      "video_input": true
+    },
+    {
+      "audio": true,
+      "per": 1000,
+      "price": 43.006,
+      "region": "Beijing",
+      "resolution": "720p",
+      "unit": "second",
+      "video_input": false
+    },
+    {
+      "audio": true,
+      "per": 1000,
+      "price": 43.006,
+      "region": "Beijing",
+      "resolution": "720p",
+      "unit": "second",
+      "video_input": true
+    },
+    {
+      "audio": true,
+      "per": 1000,
+      "price": 71.676,
+      "region": "Beijing",
+      "resolution": "1080p",
+      "unit": "second",
+      "video_input": false
+    },
+    {
+      "audio": true,
+      "per": 1000,
+      "price": 71.676,
+      "region": "Beijing",
+      "resolution": "1080p",
+      "unit": "second",
+      "video_input": true
+    },
+    {
+      "audio": false,
+      "per": 1000,
+      "price": 21.503,
+      "region": "Beijing",
+      "resolution": "720p",
+      "unit": "second",
+      "video_input": false
+    },
+    {
+      "audio": false,
+      "per": 1000,
+      "price": 21.503,
+      "region": "Beijing",
+      "resolution": "720p",
+      "unit": "second",
+      "video_input": true
+    },
+    {
+      "audio": false,
+      "per": 1000,
+      "price": 35.838,
+      "region": "Beijing",
+      "resolution": "1080p",
+      "unit": "second",
+      "video_input": false
+    },
+    {
+      "audio": false,
+      "per": 1000,
+      "price": 35.838,
+      "region": "Beijing",
+      "resolution": "1080p",
+      "unit": "second",
+      "video_input": true
+    }
+  ],
+  "wan2.6-t2i": [
+    {
+      "per": 1,
+      "price": 0.03,
+      "region": "Singapore",
+      "unit": "image"
+    },
+    {
+      "per": 1,
+      "price": 0.028671,
+      "region": "Beijing",
+      "unit": "image"
+    }
+  ],
+  "wan2.6-t2v": [
+    {
+      "per": 1000,
+      "price": 100.0,
+      "region": "Singapore",
+      "resolution": "720p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 150.0,
+      "region": "Singapore",
+      "resolution": "1080p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 86.012,
+      "region": "Beijing",
+      "resolution": "720p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 143.353,
+      "region": "Beijing",
+      "resolution": "1080p",
+      "unit": "second"
+    }
+  ],
+  "wan2.7-i2v": [
+    {
+      "per": 1000,
+      "price": 100.0,
+      "region": "Singapore",
+      "resolution": "720p",
+      "unit": "second",
+      "video_input": false
+    },
+    {
+      "per": 1000,
+      "price": 100.0,
+      "region": "Singapore",
+      "resolution": "720p",
+      "unit": "second",
+      "video_input": true
+    },
+    {
+      "per": 1000,
+      "price": 150.0,
+      "region": "Singapore",
+      "resolution": "1080p",
+      "unit": "second",
+      "video_input": false
+    },
+    {
+      "per": 1000,
+      "price": 150.0,
+      "region": "Singapore",
+      "resolution": "1080p",
+      "unit": "second",
+      "video_input": true
+    },
+    {
+      "per": 1000,
+      "price": 86.012,
+      "region": "Beijing",
+      "resolution": "720p",
+      "unit": "second",
+      "video_input": false
+    },
+    {
+      "per": 1000,
+      "price": 86.012,
+      "region": "Beijing",
+      "resolution": "720p",
+      "unit": "second",
+      "video_input": true
+    },
+    {
+      "per": 1000,
+      "price": 143.353,
+      "region": "Beijing",
+      "resolution": "1080p",
+      "unit": "second",
+      "video_input": false
+    },
+    {
+      "per": 1000,
+      "price": 143.353,
+      "region": "Beijing",
+      "resolution": "1080p",
+      "unit": "second",
+      "video_input": true
+    }
+  ],
+  "wan2.7-i2v-2026-04-25": [
+    {
+      "per": 1000,
+      "price": 100.0,
+      "region": "Singapore",
+      "resolution": "720p",
+      "unit": "second",
+      "video_input": false
+    },
+    {
+      "per": 1000,
+      "price": 100.0,
+      "region": "Singapore",
+      "resolution": "720p",
+      "unit": "second",
+      "video_input": true
+    },
+    {
+      "per": 1000,
+      "price": 150.0,
+      "region": "Singapore",
+      "resolution": "1080p",
+      "unit": "second",
+      "video_input": false
+    },
+    {
+      "per": 1000,
+      "price": 150.0,
+      "region": "Singapore",
+      "resolution": "1080p",
+      "unit": "second",
+      "video_input": true
+    },
+    {
+      "per": 1000,
+      "price": 86.012,
+      "region": "Beijing",
+      "resolution": "720p",
+      "unit": "second",
+      "video_input": false
+    },
+    {
+      "per": 1000,
+      "price": 86.012,
+      "region": "Beijing",
+      "resolution": "720p",
+      "unit": "second",
+      "video_input": true
+    },
+    {
+      "per": 1000,
+      "price": 143.353,
+      "region": "Beijing",
+      "resolution": "1080p",
+      "unit": "second",
+      "video_input": false
+    },
+    {
+      "per": 1000,
+      "price": 143.353,
+      "region": "Beijing",
+      "resolution": "1080p",
+      "unit": "second",
+      "video_input": true
+    }
+  ],
+  "wan2.7-image": [
+    {
+      "per": 1,
+      "price": 0.03,
+      "region": "Singapore",
+      "unit": "image"
+    },
+    {
+      "per": 1,
+      "price": 0.027504,
+      "region": "Beijing",
+      "unit": "image"
+    }
+  ],
+  "wan2.7-image-pro": [
+    {
+      "per": 1,
+      "price": 0.075,
+      "region": "Singapore",
+      "unit": "image"
+    },
+    {
+      "per": 1,
+      "price": 0.068761,
+      "region": "Beijing",
+      "unit": "image"
+    }
+  ],
+  "wan2.7-r2v": [
+    {
+      "per": 1000,
+      "price": 100.0,
+      "region": "Singapore",
+      "resolution": "720p",
+      "unit": "second",
+      "video_input": false
+    },
+    {
+      "per": 1000,
+      "price": 100.0,
+      "region": "Singapore",
+      "resolution": "720p",
+      "unit": "second",
+      "video_input": true
+    },
+    {
+      "per": 1000,
+      "price": 150.0,
+      "region": "Singapore",
+      "resolution": "1080p",
+      "unit": "second",
+      "video_input": false
+    },
+    {
+      "per": 1000,
+      "price": 150.0,
+      "region": "Singapore",
+      "resolution": "1080p",
+      "unit": "second",
+      "video_input": true
+    },
+    {
+      "per": 1000,
+      "price": 86.012,
+      "region": "Beijing",
+      "resolution": "720p",
+      "unit": "second",
+      "video_input": false
+    },
+    {
+      "per": 1000,
+      "price": 86.012,
+      "region": "Beijing",
+      "resolution": "720p",
+      "unit": "second",
+      "video_input": true
+    },
+    {
+      "per": 1000,
+      "price": 143.353,
+      "region": "Beijing",
+      "resolution": "1080p",
+      "unit": "second",
+      "video_input": false
+    },
+    {
+      "per": 1000,
+      "price": 143.353,
+      "region": "Beijing",
+      "resolution": "1080p",
+      "unit": "second",
+      "video_input": true
+    }
+  ],
+  "wan2.7-r2v-2026-06-12": [
+    {
+      "per": 1000,
+      "price": 100.0,
+      "region": "Singapore",
+      "resolution": "720p",
+      "unit": "second",
+      "video_input": false
+    },
+    {
+      "per": 1000,
+      "price": 100.0,
+      "region": "Singapore",
+      "resolution": "720p",
+      "unit": "second",
+      "video_input": true
+    },
+    {
+      "per": 1000,
+      "price": 150.0,
+      "region": "Singapore",
+      "resolution": "1080p",
+      "unit": "second",
+      "video_input": false
+    },
+    {
+      "per": 1000,
+      "price": 150.0,
+      "region": "Singapore",
+      "resolution": "1080p",
+      "unit": "second",
+      "video_input": true
+    },
+    {
+      "per": 1000,
+      "price": 86.012,
+      "region": "Beijing",
+      "resolution": "720p",
+      "unit": "second",
+      "video_input": false
+    },
+    {
+      "per": 1000,
+      "price": 86.012,
+      "region": "Beijing",
+      "resolution": "720p",
+      "unit": "second",
+      "video_input": true
+    },
+    {
+      "per": 1000,
+      "price": 143.353,
+      "region": "Beijing",
+      "resolution": "1080p",
+      "unit": "second",
+      "video_input": false
+    },
+    {
+      "per": 1000,
+      "price": 143.353,
+      "region": "Beijing",
+      "resolution": "1080p",
+      "unit": "second",
+      "video_input": true
+    }
+  ],
+  "wan2.7-t2v": [
+    {
+      "per": 1000,
+      "price": 100.0,
+      "region": "Singapore",
+      "resolution": "720p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 150.0,
+      "region": "Singapore",
+      "resolution": "1080p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 86.012,
+      "region": "Beijing",
+      "resolution": "720p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 143.353,
+      "region": "Beijing",
+      "resolution": "1080p",
+      "unit": "second"
+    }
+  ],
+  "wan2.7-t2v-2026-04-25": [
+    {
+      "per": 1000,
+      "price": 100.0,
+      "region": "Singapore",
+      "resolution": "720p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 150.0,
+      "region": "Singapore",
+      "resolution": "1080p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 86.012,
+      "region": "Beijing",
+      "resolution": "720p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 143.353,
+      "region": "Beijing",
+      "resolution": "1080p",
+      "unit": "second"
+    }
+  ],
+  "wan2.7-t2v-2026-06-12": [
+    {
+      "per": 1000,
+      "price": 100.0,
+      "region": "Singapore",
+      "resolution": "720p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 150.0,
+      "region": "Singapore",
+      "resolution": "1080p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 86.012,
+      "region": "Beijing",
+      "resolution": "720p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 143.353,
+      "region": "Beijing",
+      "resolution": "1080p",
+      "unit": "second"
+    }
+  ],
+  "wan2.7-videoedit": [
+    {
+      "per": 1000,
+      "price": 100.0,
+      "region": "Singapore",
+      "resolution": "720p",
+      "unit": "second",
+      "video_input": false
+    },
+    {
+      "per": 1000,
+      "price": 100.0,
+      "region": "Singapore",
+      "resolution": "720p",
+      "unit": "second",
+      "video_input": true
+    },
+    {
+      "per": 1000,
+      "price": 150.0,
+      "region": "Singapore",
+      "resolution": "1080p",
+      "unit": "second",
+      "video_input": false
+    },
+    {
+      "per": 1000,
+      "price": 150.0,
+      "region": "Singapore",
+      "resolution": "1080p",
+      "unit": "second",
+      "video_input": true
+    },
+    {
+      "per": 1000,
+      "price": 86.012,
+      "region": "Beijing",
+      "resolution": "720p",
+      "unit": "second",
+      "video_input": false
+    },
+    {
+      "per": 1000,
+      "price": 86.012,
+      "region": "Beijing",
+      "resolution": "720p",
+      "unit": "second",
+      "video_input": true
+    },
+    {
+      "per": 1000,
+      "price": 143.353,
+      "region": "Beijing",
+      "resolution": "1080p",
+      "unit": "second",
+      "video_input": false
+    },
+    {
+      "per": 1000,
+      "price": 143.353,
+      "region": "Beijing",
+      "resolution": "1080p",
+      "unit": "second",
+      "video_input": true
+    }
+  ],
+  "wan3.0-video": [
+    {
+      "per": 1000,
+      "price": 50.0,
+      "region": "Singapore",
+      "resolution": "480p",
+      "unit": "second",
+      "video_input": false
+    },
+    {
+      "per": 1000,
+      "price": 50.0,
+      "region": "Singapore",
+      "resolution": "480p",
+      "unit": "second",
+      "video_input": true
+    },
+    {
+      "per": 1000,
+      "price": 100.0,
+      "region": "Singapore",
+      "resolution": "720p",
+      "unit": "second",
+      "video_input": false
+    },
+    {
+      "per": 1000,
+      "price": 100.0,
+      "region": "Singapore",
+      "resolution": "720p",
+      "unit": "second",
+      "video_input": true
+    },
+    {
+      "per": 1000,
+      "price": 200.0,
+      "region": "Singapore",
+      "resolution": "1080p",
+      "unit": "second",
+      "video_input": false
+    },
+    {
+      "per": 1000,
+      "price": 200.0,
+      "region": "Singapore",
+      "resolution": "1080p",
+      "unit": "second",
+      "video_input": true
+    },
+    {
+      "per": 1000,
+      "price": 41.256,
+      "region": "Beijing",
+      "resolution": "480p",
+      "unit": "second",
+      "video_input": false
+    },
+    {
+      "per": 1000,
+      "price": 41.256,
+      "region": "Beijing",
+      "resolution": "480p",
+      "unit": "second",
+      "video_input": true
+    },
+    {
+      "per": 1000,
+      "price": 82.513,
+      "region": "Beijing",
+      "resolution": "720p",
+      "unit": "second",
+      "video_input": false
+    },
+    {
+      "per": 1000,
+      "price": 82.513,
+      "region": "Beijing",
+      "resolution": "720p",
+      "unit": "second",
+      "video_input": true
+    },
+    {
+      "per": 1000,
+      "price": 165.025,
+      "region": "Beijing",
+      "resolution": "1080p",
+      "unit": "second",
+      "video_input": false
+    },
+    {
+      "per": 1000,
+      "price": 165.025,
+      "region": "Beijing",
+      "resolution": "1080p",
+      "unit": "second",
+      "video_input": true
+    }
+  ],
+  "wan3.0-video-prime": [
+    {
+      "per": 1000,
+      "price": 68.0,
+      "region": "Singapore",
+      "resolution": "480p",
+      "unit": "second",
+      "video_input": false
+    },
+    {
+      "per": 1000,
+      "price": 68.0,
+      "region": "Singapore",
+      "resolution": "480p",
+      "unit": "second",
+      "video_input": true
+    },
+    {
+      "per": 1000,
+      "price": 140.0,
+      "region": "Singapore",
+      "resolution": "720p",
+      "unit": "second",
+      "video_input": false
+    },
+    {
+      "per": 1000,
+      "price": 140.0,
+      "region": "Singapore",
+      "resolution": "720p",
+      "unit": "second",
+      "video_input": true
+    },
+    {
+      "per": 1000,
+      "price": 280.0,
+      "region": "Singapore",
+      "resolution": "1080p",
+      "unit": "second",
+      "video_input": false
+    },
+    {
+      "per": 1000,
+      "price": 280.0,
+      "region": "Singapore",
+      "resolution": "1080p",
+      "unit": "second",
+      "video_input": true
+    },
+    {
+      "per": 1000,
+      "price": 63.6,
+      "region": "Beijing",
+      "resolution": "480p",
+      "unit": "second",
+      "video_input": false
+    },
+    {
+      "per": 1000,
+      "price": 63.6,
+      "region": "Beijing",
+      "resolution": "480p",
+      "unit": "second",
+      "video_input": true
+    },
+    {
+      "per": 1000,
+      "price": 127.199,
+      "region": "Beijing",
+      "resolution": "720p",
+      "unit": "second",
+      "video_input": false
+    },
+    {
+      "per": 1000,
+      "price": 127.199,
+      "region": "Beijing",
+      "resolution": "720p",
+      "unit": "second",
+      "video_input": true
+    },
+    {
+      "per": 1000,
+      "price": 254.399,
+      "region": "Beijing",
+      "resolution": "1080p",
+      "unit": "second",
+      "video_input": false
+    },
+    {
+      "per": 1000,
+      "price": 254.399,
+      "region": "Beijing",
+      "resolution": "1080p",
+      "unit": "second",
+      "video_input": true
+    }
+  ],
+  "wanx2.0-t2i-turbo": [
+    {
+      "per": 1,
+      "price": 0.005735,
+      "region": "Beijing",
+      "unit": "image"
+    }
+  ],
+  "wanx2.1-imageedit": [
+    {
+      "per": 1,
+      "price": 0.02007,
+      "region": "Beijing",
+      "unit": "image"
+    }
+  ],
+  "wanx2.1-kf2v-plus": [
+    {
+      "per": 1000,
+      "price": 100.347,
+      "region": "Beijing",
+      "resolution": "720p",
+      "unit": "second"
+    }
+  ],
+  "wanx2.1-t2i-plus": [
+    {
+      "per": 1,
+      "price": 0.028671,
+      "region": "Beijing",
+      "unit": "image"
+    }
+  ],
+  "wanx2.1-t2i-turbo": [
+    {
+      "per": 1,
+      "price": 0.02007,
+      "region": "Beijing",
+      "unit": "image"
+    }
+  ],
+  "wanx2.1-t2v-plus": [
+    {
+      "per": 1000,
+      "price": 100.347,
+      "region": "Beijing",
+      "resolution": "720p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 100.347,
+      "region": "Beijing",
+      "resolution": "720p",
+      "unit": "second"
+    }
+  ],
+  "wanx2.1-t2v-turbo": [
+    {
+      "per": 1000,
+      "price": 34.405,
+      "region": "Beijing",
+      "resolution": "480p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 34.405,
+      "region": "Beijing",
+      "resolution": "720p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 34.405,
+      "region": "Beijing",
+      "resolution": "480p",
+      "unit": "second"
+    },
+    {
+      "per": 1000,
+      "price": 34.405,
+      "region": "Beijing",
+      "resolution": "720p",
+      "unit": "second"
+    }
+  ],
+  "wanx2.1-vace-plus": [
+    {
+      "per": 1000,
+      "price": 100.347,
+      "region": "Beijing",
+      "resolution": "720p",
+      "unit": "second"
+    }
+  ],
+  "z-image-turbo": [
+    {
+      "per": 1,
+      "price": 0.03,
+      "region": "Singapore",
+      "unit": "image"
+    },
+    {
+      "per": 1,
+      "price": 0.02868,
+      "region": "Beijing",
+      "unit": "image"
+    }
+  ]
+}

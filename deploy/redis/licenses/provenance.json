@@ -1,0 +1,2717 @@
+{
+  "component": "Redis",
+  "version": "7.4.11",
+  "project_license": "Gateway code remains Apache-2.0; these third-party terms are separate",
+  "upstream_source_archive": {
+    "url": "https://github.com/redis/redis/archive/refs/tags/7.4.11.tar.gz",
+    "sha256": "e973da69febfea096ab94690b44bf976482788a1b5e070df373b4f27697d57d4"
+  },
+  "upstream_container_recipe": {
+    "url": "https://github.com/redis/docker-library-redis/blob/74654c612ee06275377d483dc4e134e57b463e9e/alpine/Dockerfile",
+    "commit": "74654c612ee06275377d483dc4e134e57b463e9e"
+  },
+  "files": [
+    {
+      "path": "LICENSE.txt",
+      "upstream_path": "LICENSE.txt",
+      "bytes": 37493,
+      "sha256": "abffee3703161c0a6a0cd7f635b2c1ebb3b81bd199e9d18ea89652d678ae4287",
+      "preservation": "complete upstream file, byte-for-byte"
+    },
+    {
+      "path": "REDISCONTRIBUTIONS.txt",
+      "upstream_path": "REDISCONTRIBUTIONS.txt",
+      "bytes": 1805,
+      "sha256": "ae39a7795a8a67fc32c526d911eddad526df78d3510cbab56b8a38a071b95022",
+      "preservation": "complete upstream file, byte-for-byte"
+    },
+    {
+      "path": "deps/fpconv/LICENSE.txt",
+      "upstream_path": "deps/fpconv/LICENSE.txt",
+      "bytes": 1338,
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "preservation": "complete upstream file, byte-for-byte"
+    },
+    {
+      "path": "deps/hdr_histogram/COPYING.txt",
+      "upstream_path": "deps/hdr_histogram/COPYING.txt",
+      "bytes": 7048,
+      "sha256": "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499",
+      "preservation": "complete upstream file, byte-for-byte"
+    },
+    {
+      "path": "deps/hdr_histogram/LICENSE.txt",
+      "upstream_path": "deps/hdr_histogram/LICENSE.txt",
+      "bytes": 2161,
+      "sha256": "c124afa369aae960fa33f6944c82e161e482f2e998d6f07b37ae2c018f3c6c69",
+      "preservation": "complete upstream file, byte-for-byte"
+    },
+    {
+      "path": "deps/hiredis/COPYING",
+      "upstream_path": "deps/hiredis/COPYING",
+      "bytes": 1588,
+      "sha256": "dca05ce8fc87a8261783b4aed0deef8becc9350b6aa770bc714d0c1833b896eb",
+      "preservation": "complete upstream file, byte-for-byte"
+    },
+    {
+      "path": "deps/jemalloc/COPYING",
+      "upstream_path": "deps/jemalloc/COPYING",
+      "bytes": 1709,
+      "sha256": "94aa2caa98c25d942f58b956c71dba6a99ff98fc3a31cbc669fe2a4cd0268b53",
+      "preservation": "complete upstream file, byte-for-byte"
+    },
+    {
+      "path": "deps/lua/COPYRIGHT",
+      "upstream_path": "deps/lua/COPYRIGHT",
+      "bytes": 1528,
+      "sha256": "ee5e3e82af1e1b543c4f216e399d7c8cfee797711913f349e385101c4ae60a79",
+      "preservation": "complete upstream file, byte-for-byte"
+    },
+    {
+      "path": "SOURCE-NOTICES.txt",
+      "bytes": 189769,
+      "sha256": "a2438392f773a5be782d9050aaf36037b3a0be4ea7b32f7c28412097106b86df",
+      "preservation": "aggregate of verbatim source-comment blocks with added source-location delimiters"
+    }
+  ],
+  "source_notice_collection": {
+    "scope": "C-family source comments under upstream src/ and deps/ containing copyright, SPDX, public-domain or redistribution/permission notices; optional and test source notices may also be retained",
+    "comment_pattern": "/\\*.*?\\*/ (non-greedy, dot matches newlines)",
+    "keyword_pattern": "copyright|SPDX-License|\\bpublic domain\\b|permission is hereby granted|redistribution and use (case-insensitive)",
+    "unique_verbatim_blocks": 196,
+    "source_occurrences": 291,
+    "blocks": [
+      {
+        "sha256": "7e601fa559ed3e510d0a7aa81fad6ed1de52a747c4a03d3df0f9f561582a7cd7",
+        "bytes": 1899,
+        "sources": [
+          {
+            "path": "deps/fpconv/fpconv_dtoa.c",
+            "byte_offset": 0,
+            "bytes": 1899
+          }
+        ]
+      },
+      {
+        "sha256": "0ddd01f0c00e22273b5b9c7c791efd4e87aef9c7be17c301609e6d466070fd76",
+        "bytes": 1899,
+        "sources": [
+          {
+            "path": "deps/fpconv/fpconv_dtoa.h",
+            "byte_offset": 0,
+            "bytes": 1899
+          }
+        ]
+      },
+      {
+        "sha256": "5684382bd95e9ebd4b5e47aa6114376810df662772732cbe088970a24c8240ad",
+        "bytes": 1935,
+        "sources": [
+          {
+            "path": "deps/fpconv/fpconv_powers.h",
+            "byte_offset": 0,
+            "bytes": 1935
+          }
+        ]
+      },
+      {
+        "sha256": "7e987ce322647fdc6159fb665a41da5111273804131af76319ed9fae3e1e3361",
+        "bytes": 154,
+        "sources": [
+          {
+            "path": "deps/hdr_histogram/hdr_atomic.h",
+            "byte_offset": 0,
+            "bytes": 154
+          }
+        ]
+      },
+      {
+        "sha256": "c7718abf0c456d12dbf6acf2dbc8694afb1179fd821da084aed786eabca6053a",
+        "bytes": 159,
+        "sources": [
+          {
+            "path": "deps/hdr_histogram/hdr_histogram.c",
+            "byte_offset": 0,
+            "bytes": 159
+          }
+        ]
+      },
+      {
+        "sha256": "17f1ea0389111928bc7505ebee28fa0ef0712614dc7969957e760668a1956e45",
+        "bytes": 304,
+        "sources": [
+          {
+            "path": "deps/hdr_histogram/hdr_histogram.h",
+            "byte_offset": 0,
+            "bytes": 304
+          }
+        ]
+      },
+      {
+        "sha256": "0d712c66fcf7a80a77c5b089ca4cb2c21df8f171e4e54011130dfa0cf31f0d20",
+        "bytes": 1612,
+        "sources": [
+          {
+            "path": "deps/hiredis/adapters/ae.h",
+            "byte_offset": 0,
+            "bytes": 1612
+          },
+          {
+            "path": "deps/hiredis/adapters/libev.h",
+            "byte_offset": 0,
+            "bytes": 1612
+          },
+          {
+            "path": "deps/hiredis/adapters/libevent.h",
+            "byte_offset": 0,
+            "bytes": 1612
+          }
+        ]
+      },
+      {
+        "sha256": "2fa20b36c44c16a040d1c37069946646d3fe593d50498bedb5cfe22b43ed3a99",
+        "bytes": 1338,
+        "sources": [
+          {
+            "path": "deps/hiredis/adapters/qt.h",
+            "byte_offset": 0,
+            "bytes": 1338
+          }
+        ]
+      },
+      {
+        "sha256": "eb95fe8c7f4f5593da5dcdf92bd68a71777c731a7c67cbc0fe3ed50e7df1ba64",
+        "bytes": 1614,
+        "sources": [
+          {
+            "path": "deps/hiredis/alloc.c",
+            "byte_offset": 0,
+            "bytes": 1614
+          },
+          {
+            "path": "deps/hiredis/alloc.h",
+            "byte_offset": 0,
+            "bytes": 1614
+          },
+          {
+            "path": "deps/hiredis/examples/example-push.c",
+            "byte_offset": 0,
+            "bytes": 1614
+          },
+          {
+            "path": "deps/hiredis/sdscompat.h",
+            "byte_offset": 0,
+            "bytes": 1614
+          }
+        ]
+      },
+      {
+        "sha256": "783d274d1297a5f2c6f581db837ccdf30ac293a9881897e860ccaf2df20016b8",
+        "bytes": 1688,
+        "sources": [
+          {
+            "path": "deps/hiredis/async.c",
+            "byte_offset": 0,
+            "bytes": 1688
+          },
+          {
+            "path": "deps/hiredis/async.h",
+            "byte_offset": 0,
+            "bytes": 1688
+          },
+          {
+            "path": "deps/hiredis/async_private.h",
+            "byte_offset": 0,
+            "bytes": 1688
+          },
+          {
+            "path": "deps/hiredis/read.c",
+            "byte_offset": 0,
+            "bytes": 1688
+          },
+          {
+            "path": "deps/hiredis/read.h",
+            "byte_offset": 0,
+            "bytes": 1688
+          }
+        ]
+      },
+      {
+        "sha256": "59c7dbc45cd20b7c02c3808e8cb3f77917dc2a024b41a035e4192b5ca90d1532",
+        "bytes": 1921,
+        "sources": [
+          {
+            "path": "deps/hiredis/dict.c",
+            "byte_offset": 0,
+            "bytes": 1921
+          },
+          {
+            "path": "deps/hiredis/dict.h",
+            "byte_offset": 0,
+            "bytes": 1921
+          }
+        ]
+      },
+      {
+        "sha256": "d884f47d045ef0505cbe81b870a9d3a410b2fc649a8ad00426d7c9b571754fa7",
+        "bytes": 1811,
+        "sources": [
+          {
+            "path": "deps/hiredis/fuzzing/format_command_fuzzer.c",
+            "byte_offset": 0,
+            "bytes": 1811
+          }
+        ]
+      },
+      {
+        "sha256": "2622d2ef10510d1c4da3125d2d8ac64568d1942cf427d7b563944946c3177fc7",
+        "bytes": 1821,
+        "sources": [
+          {
+            "path": "deps/hiredis/hiredis.c",
+            "byte_offset": 0,
+            "bytes": 1821
+          },
+          {
+            "path": "deps/hiredis/hiredis.h",
+            "byte_offset": 0,
+            "bytes": 1821
+          }
+        ]
+      },
+      {
+        "sha256": "b8ab0b901755733c4857acbc7d2151598de17fccfd333383115f1328b5f2255c",
+        "bytes": 1570,
+        "sources": [
+          {
+            "path": "deps/hiredis/hiredis_ssl.h",
+            "byte_offset": 1,
+            "bytes": 1570
+          }
+        ]
+      },
+      {
+        "sha256": "a38e3a48ee269468e14d8fef82cf3fb7f907859445afd72b1b37145c32f45422",
+        "bytes": 1893,
+        "sources": [
+          {
+            "path": "deps/hiredis/net.c",
+            "byte_offset": 0,
+            "bytes": 1893
+          },
+          {
+            "path": "deps/hiredis/net.h",
+            "byte_offset": 0,
+            "bytes": 1893
+          }
+        ]
+      },
+      {
+        "sha256": "e52e05c8f533c266c0df63677b3cc05d408b23320ea3c4137974d6f36f8c2226",
+        "bytes": 1726,
+        "sources": [
+          {
+            "path": "deps/hiredis/sds.c",
+            "byte_offset": 0,
+            "bytes": 1726
+          },
+          {
+            "path": "deps/hiredis/sds.h",
+            "byte_offset": 0,
+            "bytes": 1726
+          },
+          {
+            "path": "deps/hiredis/sdsalloc.h",
+            "byte_offset": 0,
+            "bytes": 1726
+          }
+        ]
+      },
+      {
+        "sha256": "f04e3d60796ee77bd65954837ca0f66e641f7e462f945b116cdb01a050e458b4",
+        "bytes": 1600,
+        "sources": [
+          {
+            "path": "deps/hiredis/sockcompat.c",
+            "byte_offset": 0,
+            "bytes": 1600
+          },
+          {
+            "path": "deps/hiredis/sockcompat.h",
+            "byte_offset": 0,
+            "bytes": 1600
+          }
+        ]
+      },
+      {
+        "sha256": "664314dbe493d431ce2b8af54148ec3840ef2661088b4009ed820363fd310c9c",
+        "bytes": 1722,
+        "sources": [
+          {
+            "path": "deps/hiredis/ssl.c",
+            "byte_offset": 0,
+            "bytes": 1722
+          }
+        ]
+      },
+      {
+        "sha256": "08c5d71af6b2e8c2676a0060a727506650dcc5a2eb1be2f97da7dd533962760b",
+        "bytes": 1899,
+        "sources": [
+          {
+            "path": "deps/jemalloc/test/include/test/SFMT-alti.h",
+            "byte_offset": 0,
+            "bytes": 1899
+          },
+          {
+            "path": "deps/jemalloc/test/include/test/SFMT-params.h",
+            "byte_offset": 0,
+            "bytes": 1899
+          },
+          {
+            "path": "deps/jemalloc/test/include/test/SFMT-params11213.h",
+            "byte_offset": 0,
+            "bytes": 1899
+          },
+          {
+            "path": "deps/jemalloc/test/include/test/SFMT-params1279.h",
+            "byte_offset": 0,
+            "bytes": 1899
+          },
+          {
+            "path": "deps/jemalloc/test/include/test/SFMT-params132049.h",
+            "byte_offset": 0,
+            "bytes": 1899
+          },
+          {
+            "path": "deps/jemalloc/test/include/test/SFMT-params19937.h",
+            "byte_offset": 0,
+            "bytes": 1899
+          },
+          {
+            "path": "deps/jemalloc/test/include/test/SFMT-params216091.h",
+            "byte_offset": 0,
+            "bytes": 1899
+          },
+          {
+            "path": "deps/jemalloc/test/include/test/SFMT-params2281.h",
+            "byte_offset": 0,
+            "bytes": 1899
+          },
+          {
+            "path": "deps/jemalloc/test/include/test/SFMT-params4253.h",
+            "byte_offset": 0,
+            "bytes": 1899
+          },
+          {
+            "path": "deps/jemalloc/test/include/test/SFMT-params44497.h",
+            "byte_offset": 0,
+            "bytes": 1899
+          },
+          {
+            "path": "deps/jemalloc/test/include/test/SFMT-params607.h",
+            "byte_offset": 0,
+            "bytes": 1899
+          },
+          {
+            "path": "deps/jemalloc/test/include/test/SFMT-params86243.h",
+            "byte_offset": 0,
+            "bytes": 1899
+          },
+          {
+            "path": "deps/jemalloc/test/include/test/SFMT-sse2.h",
+            "byte_offset": 0,
+            "bytes": 1899
+          },
+          {
+            "path": "deps/jemalloc/test/include/test/SFMT.h",
+            "byte_offset": 0,
+            "bytes": 1899
+          },
+          {
+            "path": "deps/jemalloc/test/src/SFMT.c",
+            "byte_offset": 0,
+            "bytes": 1899
+          },
+          {
+            "path": "deps/jemalloc/test/unit/SFMT.c",
+            "byte_offset": 0,
+            "bytes": 1899
+          }
+        ]
+      },
+      {
+        "sha256": "1086ae6e743a3f17b8bf7a7e6ac05c7352946f854484b8d915ea286b6d414934",
+        "bytes": 397,
+        "sources": [
+          {
+            "path": "deps/jemalloc/test/include/test/SFMT-alti.h",
+            "byte_offset": 1900,
+            "bytes": 397
+          }
+        ]
+      },
+      {
+        "sha256": "a8dd1ed9ac01c0cd03bffee8951700beda834773b265c7583eeccadc2d63bcac",
+        "bytes": 429,
+        "sources": [
+          {
+            "path": "deps/jemalloc/test/include/test/SFMT-sse2.h",
+            "byte_offset": 1900,
+            "bytes": 429
+          }
+        ]
+      },
+      {
+        "sha256": "0ee3e8b0ab1ef19c9c4662099e9c84dd172f63e975a655ff5ef0169cc74c0335",
+        "bytes": 1019,
+        "sources": [
+          {
+            "path": "deps/jemalloc/test/include/test/SFMT.h",
+            "byte_offset": 1900,
+            "bytes": 1019
+          }
+        ]
+      },
+      {
+        "sha256": "2dbdff7d1d6404c954cb6693e96a4387febd820d587de488b5c0fd1dd0271e5b",
+        "bytes": 359,
+        "sources": [
+          {
+            "path": "deps/jemalloc/test/src/SFMT.c",
+            "byte_offset": 1900,
+            "bytes": 359
+          }
+        ]
+      },
+      {
+        "sha256": "292fd9afa8d39e3a618858c0f9cf1c0bcb323127365fe5decde277205fc23ec5",
+        "bytes": 1532,
+        "sources": [
+          {
+            "path": "deps/jemalloc/test/unit/hash.c",
+            "byte_offset": 0,
+            "bytes": 1532
+          }
+        ]
+      },
+      {
+        "sha256": "7d367083b39765c704dbda69f2873e4094f83567644a719d76cae263b0e17799",
+        "bytes": 3891,
+        "sources": [
+          {
+            "path": "deps/linenoise/linenoise.c",
+            "byte_offset": 0,
+            "bytes": 3891
+          }
+        ]
+      },
+      {
+        "sha256": "e9af473e14efcbba59f2deb937d65ae9f6da6a7d4c6e2b4575ca07b066f4f4d1",
+        "bytes": 1771,
+        "sources": [
+          {
+            "path": "deps/linenoise/linenoise.h",
+            "byte_offset": 0,
+            "bytes": 1771
+          }
+        ]
+      },
+      {
+        "sha256": "3c2eb46b494f685584c350acd18b74c0a7e0331822510d37ed93cf5ef581005f",
+        "bytes": 1191,
+        "sources": [
+          {
+            "path": "deps/lua/src/fpconv.c",
+            "byte_offset": 0,
+            "bytes": 1191
+          }
+        ]
+      },
+      {
+        "sha256": "6ccd579aa1276a3b8db5cf51f997130c2da9ab0b10b9f409097ab9c496a4945d",
+        "bytes": 109,
+        "sources": [
+          {
+            "path": "deps/lua/src/lapi.c",
+            "byte_offset": 0,
+            "bytes": 109
+          }
+        ]
+      },
+      {
+        "sha256": "4696b8cc49a987f8967ea858c175e7b11da6c98b7c044c4560fde458a23fb7c7",
+        "bytes": 133,
+        "sources": [
+          {
+            "path": "deps/lua/src/lapi.h",
+            "byte_offset": 0,
+            "bytes": 133
+          }
+        ]
+      },
+      {
+        "sha256": "404541f4bf9c44d0d7d77946b9e13ead9df303bcc9a39e9b8cb4fd6069cee599",
+        "bytes": 152,
+        "sources": [
+          {
+            "path": "deps/lua/src/lauxlib.c",
+            "byte_offset": 0,
+            "bytes": 152
+          }
+        ]
+      },
+      {
+        "sha256": "e3d4e3a828a380c692a519f2c39af795bca97f2f05c4bdf05a4bc4b6a3e5a5a0",
+        "bytes": 151,
+        "sources": [
+          {
+            "path": "deps/lua/src/lauxlib.h",
+            "byte_offset": 0,
+            "bytes": 151
+          }
+        ]
+      },
+      {
+        "sha256": "9892e07f1443cfc9643c7de46052fde100072481a32277329f5c4050b09d696e",
+        "bytes": 120,
+        "sources": [
+          {
+            "path": "deps/lua/src/lbaselib.c",
+            "byte_offset": 0,
+            "bytes": 120
+          }
+        ]
+      },
+      {
+        "sha256": "44f055258b29adf7a98eb393691436f71354457abf657f5d8153da2eb300d310",
+        "bytes": 125,
+        "sources": [
+          {
+            "path": "deps/lua/src/lcode.c",
+            "byte_offset": 0,
+            "bytes": 125
+          }
+        ]
+      },
+      {
+        "sha256": "080cf1dad51bad15a496c20edabbb99f1fcab3696f76beaa70e7465bb4fe79f9",
+        "bytes": 125,
+        "sources": [
+          {
+            "path": "deps/lua/src/lcode.h",
+            "byte_offset": 0,
+            "bytes": 125
+          }
+        ]
+      },
+      {
+        "sha256": "554ed7b196d7fc2b1efc5124ab9a845c74563f38d6076f474298dd8b7d26280d",
+        "bytes": 140,
+        "sources": [
+          {
+            "path": "deps/lua/src/ldblib.c",
+            "byte_offset": 0,
+            "bytes": 140
+          }
+        ]
+      },
+      {
+        "sha256": "1b0a3efb35cce91c3d71b2a624cec8ee72a68c9c55ccb87217e8d4880f29cb66",
+        "bytes": 119,
+        "sources": [
+          {
+            "path": "deps/lua/src/ldebug.c",
+            "byte_offset": 0,
+            "bytes": 119
+          }
+        ]
+      },
+      {
+        "sha256": "63ca8798981b1ad14fbafa6cb026e1e5d79957a854ea220f939cb19847f7a772",
+        "bytes": 150,
+        "sources": [
+          {
+            "path": "deps/lua/src/ldebug.h",
+            "byte_offset": 0,
+            "bytes": 150
+          }
+        ]
+      },
+      {
+        "sha256": "2403e6a6b22438bf4c7fb553d37fabd624eaebfc86e73791200076245993556e",
+        "bytes": 132,
+        "sources": [
+          {
+            "path": "deps/lua/src/ldo.c",
+            "byte_offset": 0,
+            "bytes": 132
+          }
+        ]
+      },
+      {
+        "sha256": "266ce89f0500d2cd562c072ad1b6b81c4c93ceb322c6f806a26bbdbc9c26a8bb",
+        "bytes": 131,
+        "sources": [
+          {
+            "path": "deps/lua/src/ldo.h",
+            "byte_offset": 0,
+            "bytes": 131
+          }
+        ]
+      },
+      {
+        "sha256": "0508126a84a8469f21329ef405c5f848f7ff5877fb5909b619728be4fc6c81e7",
+        "bytes": 129,
+        "sources": [
+          {
+            "path": "deps/lua/src/ldump.c",
+            "byte_offset": 0,
+            "bytes": 129
+          }
+        ]
+      },
+      {
+        "sha256": "02bbf10a08c8018a32dca30e89fb04333f7973a4284dac5daa9d7193aec82326",
+        "bytes": 160,
+        "sources": [
+          {
+            "path": "deps/lua/src/lfunc.c",
+            "byte_offset": 0,
+            "bytes": 160
+          }
+        ]
+      },
+      {
+        "sha256": "f6f210904a271410699eedf0f25a73b957aacde8dfe1248c5d0c27ef9303eba4",
+        "bytes": 159,
+        "sources": [
+          {
+            "path": "deps/lua/src/lfunc.h",
+            "byte_offset": 0,
+            "bytes": 159
+          }
+        ]
+      },
+      {
+        "sha256": "79a44be599d1704e8635c9e2a3654a70a1a135a732717bbaffb3decffcb6456f",
+        "bytes": 118,
+        "sources": [
+          {
+            "path": "deps/lua/src/lgc.c",
+            "byte_offset": 0,
+            "bytes": 118
+          }
+        ]
+      },
+      {
+        "sha256": "09de8e06d30b8114b5c231bd26ad65a53316679989def1df968c15c41fd69a76",
+        "bytes": 118,
+        "sources": [
+          {
+            "path": "deps/lua/src/lgc.h",
+            "byte_offset": 0,
+            "bytes": 118
+          }
+        ]
+      },
+      {
+        "sha256": "5c5e97d6440b03478e8a3d7a225fcaf43cce4e2f225b578ba895c6ae4cd6ec0d",
+        "bytes": 140,
+        "sources": [
+          {
+            "path": "deps/lua/src/linit.c",
+            "byte_offset": 0,
+            "bytes": 140
+          }
+        ]
+      },
+      {
+        "sha256": "66b709e06dea59f1aa3e7fbb6e142544ca6d4cddab9cf9c662e98d578c1172a6",
+        "bytes": 137,
+        "sources": [
+          {
+            "path": "deps/lua/src/liolib.c",
+            "byte_offset": 0,
+            "bytes": 137
+          }
+        ]
+      },
+      {
+        "sha256": "973c6ad897fec0fa80fad28994f602f708b653813fdcaecdde28fb2811addbff",
+        "bytes": 118,
+        "sources": [
+          {
+            "path": "deps/lua/src/llex.c",
+            "byte_offset": 0,
+            "bytes": 118
+          }
+        ]
+      },
+      {
+        "sha256": "61c751b8ae1bed99c99463db057cacd5f4c5d86f9e3f1fd5fdee5f066f654edd",
+        "bytes": 118,
+        "sources": [
+          {
+            "path": "deps/lua/src/llex.h",
+            "byte_offset": 0,
+            "bytes": 118
+          }
+        ]
+      },
+      {
+        "sha256": "b097ee7d96b56ca923fbe0c15e503e4fcf14c8f578dfbbd8d6d9a596dd023f95",
+        "bytes": 177,
+        "sources": [
+          {
+            "path": "deps/lua/src/llimits.h",
+            "byte_offset": 0,
+            "bytes": 177
+          }
+        ]
+      },
+      {
+        "sha256": "5bb3e04485369bcb57a9d7343e067db8a35619df6e7c2086587cebb6267f0d06",
+        "bytes": 135,
+        "sources": [
+          {
+            "path": "deps/lua/src/lmathlib.c",
+            "byte_offset": 0,
+            "bytes": 135
+          }
+        ]
+      },
+      {
+        "sha256": "79969951fd45508dd94e29b060f6da87c6b83225f5a083282f59521a6c50cd3f",
+        "bytes": 129,
+        "sources": [
+          {
+            "path": "deps/lua/src/lmem.c",
+            "byte_offset": 0,
+            "bytes": 129
+          }
+        ]
+      },
+      {
+        "sha256": "b0c2a4a0bd29fa59bac12f469c61df6c3504316df80cf1035cb85e57265d35db",
+        "bytes": 129,
+        "sources": [
+          {
+            "path": "deps/lua/src/lmem.h",
+            "byte_offset": 0,
+            "bytes": 129
+          }
+        ]
+      },
+      {
+        "sha256": "5a0f516b0663d5274bcfaf8b85a1ed4b7c3abfc1a340e4fce71cdfc33cb0cc64",
+        "bytes": 333,
+        "sources": [
+          {
+            "path": "deps/lua/src/loadlib.c",
+            "byte_offset": 0,
+            "bytes": 333
+          }
+        ]
+      },
+      {
+        "sha256": "14e049a144c0128f59228afd059ab2f23849b39d2458c4ed3d25a2ae4c3f5d84",
+        "bytes": 144,
+        "sources": [
+          {
+            "path": "deps/lua/src/lobject.c",
+            "byte_offset": 0,
+            "bytes": 144
+          }
+        ]
+      },
+      {
+        "sha256": "1a5c24e164578f4c64c018be49f1bfccd69cdb7a7ddfdd9079feb098009a8a51",
+        "bytes": 137,
+        "sources": [
+          {
+            "path": "deps/lua/src/lobject.h",
+            "byte_offset": 0,
+            "bytes": 137
+          }
+        ]
+      },
+      {
+        "sha256": "14731299e0d8f7ec5e560e29a595c0a35f7e912633e2bb4fbc0981af5a3a8545",
+        "bytes": 102,
+        "sources": [
+          {
+            "path": "deps/lua/src/lopcodes.c",
+            "byte_offset": 0,
+            "bytes": 102
+          }
+        ]
+      },
+      {
+        "sha256": "a6d87c961aa546d9270ee574038af664534c9b4b2cfec2ebb2688ec93f7c390b",
+        "bytes": 138,
+        "sources": [
+          {
+            "path": "deps/lua/src/lopcodes.h",
+            "byte_offset": 0,
+            "bytes": 138
+          }
+        ]
+      },
+      {
+        "sha256": "b4bd066cf6fb54a310469fdaabcd5455f4b5903c3e0d6e85ccbcaaa3811cc642",
+        "bytes": 137,
+        "sources": [
+          {
+            "path": "deps/lua/src/loslib.c",
+            "byte_offset": 0,
+            "bytes": 137
+          }
+        ]
+      },
+      {
+        "sha256": "397305f14727f1eb61b4854db5629fffeefa162b81a5ad676e7c8abaf8b53b72",
+        "bytes": 115,
+        "sources": [
+          {
+            "path": "deps/lua/src/lparser.c",
+            "byte_offset": 0,
+            "bytes": 115
+          }
+        ]
+      },
+      {
+        "sha256": "0b684d43fecf7f52d947b951a63711866225908fea28cb2906082c22a44c64a8",
+        "bytes": 115,
+        "sources": [
+          {
+            "path": "deps/lua/src/lparser.h",
+            "byte_offset": 0,
+            "bytes": 115
+          }
+        ]
+      },
+      {
+        "sha256": "4b3767ee811a1c33be81dfc5fad8e7a05fd752322c31e0bfd74f0f20f9a0bb2f",
+        "bytes": 116,
+        "sources": [
+          {
+            "path": "deps/lua/src/lstate.c",
+            "byte_offset": 0,
+            "bytes": 116
+          }
+        ]
+      },
+      {
+        "sha256": "8d62a2e10f4b40dd1764fde79bd6533b57b2a0dfc02c755d1e3332139be1a90e",
+        "bytes": 116,
+        "sources": [
+          {
+            "path": "deps/lua/src/lstate.h",
+            "byte_offset": 0,
+            "bytes": 116
+          }
+        ]
+      },
+      {
+        "sha256": "331875969c144582d0520c954477eefff16f9c11172c3d530cab05377559e0d4",
+        "bytes": 151,
+        "sources": [
+          {
+            "path": "deps/lua/src/lstring.c",
+            "byte_offset": 0,
+            "bytes": 151
+          }
+        ]
+      },
+      {
+        "sha256": "2c38c901a379f8a60b813eef4c38e41f2e22068d3897349d6b56474eaf60a20a",
+        "bytes": 151,
+        "sources": [
+          {
+            "path": "deps/lua/src/lstring.h",
+            "byte_offset": 0,
+            "bytes": 151
+          }
+        ]
+      },
+      {
+        "sha256": "de20002629f0c7dc480d5fb24fc0d2dafcfb8fba68de7363f525678f443c0921",
+        "bytes": 165,
+        "sources": [
+          {
+            "path": "deps/lua/src/lstrlib.c",
+            "byte_offset": 0,
+            "bytes": 165
+          }
+        ]
+      },
+      {
+        "sha256": "2bb3b5a1c598a970b07fa5c08a700fd9b4247a9f37c78cdff32d3e781e9e9062",
+        "bytes": 121,
+        "sources": [
+          {
+            "path": "deps/lua/src/ltable.c",
+            "byte_offset": 0,
+            "bytes": 121
+          }
+        ]
+      },
+      {
+        "sha256": "792f940f4ac309312d6796b46d52853442df4c7e7db3271f2ecb10c3a3509e72",
+        "bytes": 121,
+        "sources": [
+          {
+            "path": "deps/lua/src/ltable.h",
+            "byte_offset": 0,
+            "bytes": 121
+          }
+        ]
+      },
+      {
+        "sha256": "fce54de19f174524f06ce6a50d286700948e6dba18afac45d27bb8b3162b9d54",
+        "bytes": 135,
+        "sources": [
+          {
+            "path": "deps/lua/src/ltablib.c",
+            "byte_offset": 0,
+            "bytes": 135
+          }
+        ]
+      },
+      {
+        "sha256": "75f9c36beff9b73b21e98cdc8ae55d27af9aa30ac15154facc5d53a896d2cdfe",
+        "bytes": 111,
+        "sources": [
+          {
+            "path": "deps/lua/src/ltm.c",
+            "byte_offset": 0,
+            "bytes": 111
+          }
+        ]
+      },
+      {
+        "sha256": "da72a23259cfbe342ce096d85eb8676e7960d2c88c8b25ba091ddf41f36d2b62",
+        "bytes": 111,
+        "sources": [
+          {
+            "path": "deps/lua/src/ltm.h",
+            "byte_offset": 0,
+            "bytes": 111
+          }
+        ]
+      },
+      {
+        "sha256": "796bbb3ae810c1772288c896180d6c51a913e39005e8b59a680a125f582ec292",
+        "bytes": 129,
+        "sources": [
+          {
+            "path": "deps/lua/src/lua.c",
+            "byte_offset": 0,
+            "bytes": 129
+          }
+        ]
+      },
+      {
+        "sha256": "47f7a6d96503bd99e5b8e63412324ff7afc80ee8b3c709bc13dd37ec34cbc66a",
+        "bytes": 204,
+        "sources": [
+          {
+            "path": "deps/lua/src/lua.h",
+            "byte_offset": 0,
+            "bytes": 204
+          }
+        ]
+      },
+      {
+        "sha256": "9a583026c32bea43f01ffeb5b5320d7cdc708aa51beee1104d5b1877f3280479",
+        "bytes": 1284,
+        "sources": [
+          {
+            "path": "deps/lua/src/lua.h",
+            "byte_offset": 10531,
+            "bytes": 1284
+          }
+        ]
+      },
+      {
+        "sha256": "d31d22f5b2410f75a618788e2c9c1cf1ac3d07cb58714c855d515f513b164adf",
+        "bytes": 1305,
+        "sources": [
+          {
+            "path": "deps/lua/src/lua_bit.c",
+            "byte_offset": 0,
+            "bytes": 1305
+          }
+        ]
+      },
+      {
+        "sha256": "3828fc71155c3305c32f754690aab1b44b48bcdaef12de2b6967ff508ee1af1c",
+        "bytes": 1180,
+        "sources": [
+          {
+            "path": "deps/lua/src/lua_cjson.c",
+            "byte_offset": 0,
+            "bytes": 1180
+          }
+        ]
+      },
+      {
+        "sha256": "c701249143862eb86b119dc9b3246a6eee7276f67383505c86aca2677fef0c33",
+        "bytes": 887,
+        "sources": [
+          {
+            "path": "deps/lua/src/lua_cmsgpack.c",
+            "byte_offset": 1164,
+            "bytes": 887
+          }
+        ]
+      },
+      {
+        "sha256": "f54c52252c92713cf37ec0a671967e849bacd1ebc4bb843af58d60b3a0a602ae",
+        "bytes": 1283,
+        "sources": [
+          {
+            "path": "deps/lua/src/lua_cmsgpack.c",
+            "byte_offset": 29836,
+            "bytes": 1283
+          }
+        ]
+      },
+      {
+        "sha256": "40754001330983e6aabc981425db6de0206208defb25fcbf4026fe959b94b402",
+        "bytes": 273,
+        "sources": [
+          {
+            "path": "deps/lua/src/lua_struct.c",
+            "byte_offset": 0,
+            "bytes": 273
+          }
+        ]
+      },
+      {
+        "sha256": "372ab0b3ad5f263b328fda3c639731ed55ed1b03cbb213e317b6d18cbb641a0e",
+        "bytes": 1284,
+        "sources": [
+          {
+            "path": "deps/lua/src/lua_struct.c",
+            "byte_offset": 10195,
+            "bytes": 1284
+          }
+        ]
+      },
+      {
+        "sha256": "d6ab2898f88eb2d17c62e7ce04de1748c8de840c4c47be9f543f559e50deb504",
+        "bytes": 154,
+        "sources": [
+          {
+            "path": "deps/lua/src/luac.c",
+            "byte_offset": 0,
+            "bytes": 154
+          }
+        ]
+      },
+      {
+        "sha256": "65efbddb9079f3bf1b376424d3675c863e83a00c0519b0373736381addef00e9",
+        "bytes": 131,
+        "sources": [
+          {
+            "path": "deps/lua/src/luaconf.h",
+            "byte_offset": 0,
+            "bytes": 131
+          }
+        ]
+      },
+      {
+        "sha256": "6bf023d4683452017495f78c4444adb0a8e38b5072e567f54f8f987d5aa9b62f",
+        "bytes": 126,
+        "sources": [
+          {
+            "path": "deps/lua/src/lualib.h",
+            "byte_offset": 0,
+            "bytes": 126
+          }
+        ]
+      },
+      {
+        "sha256": "cf8cd8e2ec34681842cae1ff4f572e67777db161955be68172416d8403fab54f",
+        "bytes": 131,
+        "sources": [
+          {
+            "path": "deps/lua/src/lundump.c",
+            "byte_offset": 0,
+            "bytes": 131
+          }
+        ]
+      },
+      {
+        "sha256": "a6cfd7f8ae89d7d8501341c3e6a4bca9c34a9aca565af59471cd116fd43663a2",
+        "bytes": 132,
+        "sources": [
+          {
+            "path": "deps/lua/src/lundump.h",
+            "byte_offset": 0,
+            "bytes": 132
+          }
+        ]
+      },
+      {
+        "sha256": "ea9670432c4e23af6c1419cde7b9c89ffbca74a8ac56529aaaad73d449f82af1",
+        "bytes": 120,
+        "sources": [
+          {
+            "path": "deps/lua/src/lvm.c",
+            "byte_offset": 0,
+            "bytes": 120
+          }
+        ]
+      },
+      {
+        "sha256": "5267a920d784a740859f35593a33db5fcffed3ee641591cc16ead0010f48344d",
+        "bytes": 119,
+        "sources": [
+          {
+            "path": "deps/lua/src/lvm.h",
+            "byte_offset": 0,
+            "bytes": 119
+          }
+        ]
+      },
+      {
+        "sha256": "2632e96a2c85eddd1428060ee4cde717bf1cf6e2480fa267cf806af826ad4c32",
+        "bytes": 134,
+        "sources": [
+          {
+            "path": "deps/lua/src/lzio.c",
+            "byte_offset": 0,
+            "bytes": 134
+          }
+        ]
+      },
+      {
+        "sha256": "7b0e7723e946c4bd3fdefb7c7e2318d0e8a5da6e775c07f8ab222bd008a71255",
+        "bytes": 118,
+        "sources": [
+          {
+            "path": "deps/lua/src/lzio.h",
+            "byte_offset": 0,
+            "bytes": 118
+          }
+        ]
+      },
+      {
+        "sha256": "e613be1e5fdb8f0c999918cc5e541a7a4e0104b818623db0d25bfa9b9126f215",
+        "bytes": 111,
+        "sources": [
+          {
+            "path": "deps/lua/src/print.c",
+            "byte_offset": 0,
+            "bytes": 111
+          }
+        ]
+      },
+      {
+        "sha256": "d90df656f8ded2db5f3e3dda873349fe61d4df90f706f32767b2fa460807b498",
+        "bytes": 1179,
+        "sources": [
+          {
+            "path": "deps/lua/src/strbuf.c",
+            "byte_offset": 0,
+            "bytes": 1179
+          },
+          {
+            "path": "deps/lua/src/strbuf.h",
+            "byte_offset": 0,
+            "bytes": 1179
+          }
+        ]
+      },
+      {
+        "sha256": "901c1dbf08eda63324c8ed2855f3efac8f5f11dd212631506b17852973a9379c",
+        "bytes": 206,
+        "sources": [
+          {
+            "path": "src/acl.c",
+            "byte_offset": 0,
+            "bytes": 206
+          },
+          {
+            "path": "src/localtime.c",
+            "byte_offset": 0,
+            "bytes": 206
+          },
+          {
+            "path": "src/lolwut.h",
+            "byte_offset": 0,
+            "bytes": 206
+          }
+        ]
+      },
+      {
+        "sha256": "181d4700857e18f34e9a99df98ac097982e68f1f7b8997f8ca92330620a27acd",
+        "bytes": 264,
+        "sources": [
+          {
+            "path": "src/adlist.c",
+            "byte_offset": 0,
+            "bytes": 264
+          }
+        ]
+      },
+      {
+        "sha256": "9309d8a7c3188d4fecf3008d4bea63869c4ef8cd69565cda8579309e03845f6f",
+        "bytes": 264,
+        "sources": [
+          {
+            "path": "src/adlist.h",
+            "byte_offset": 0,
+            "bytes": 264
+          }
+        ]
+      },
+      {
+        "sha256": "81a3e30ae3b0ed2a2fc830e223f51ebe4c00ac74d9a5586a983eca476988b1c5",
+        "bytes": 400,
+        "sources": [
+          {
+            "path": "src/ae.c",
+            "byte_offset": 0,
+            "bytes": 400
+          },
+          {
+            "path": "src/ae.h",
+            "byte_offset": 0,
+            "bytes": 400
+          }
+        ]
+      },
+      {
+        "sha256": "42ff860b9faf798bf316350f940d18ea00a01b8ae8e96b7c7fa0262f2128f6b2",
+        "bytes": 242,
+        "sources": [
+          {
+            "path": "src/ae_epoll.c",
+            "byte_offset": 0,
+            "bytes": 242
+          }
+        ]
+      },
+      {
+        "sha256": "3680b8120997cbe61b72861e35fd5072363c6f59eaa5ba90784aa61e24205c30",
+        "bytes": 1606,
+        "sources": [
+          {
+            "path": "src/ae_evport.c",
+            "byte_offset": 0,
+            "bytes": 1606
+          }
+        ]
+      },
+      {
+        "sha256": "77153625b9b354afcafc929b3984651296dd272d56c5a7218e01677785dcde0c",
+        "bytes": 1634,
+        "sources": [
+          {
+            "path": "src/ae_kqueue.c",
+            "byte_offset": 0,
+            "bytes": 1634
+          }
+        ]
+      },
+      {
+        "sha256": "3e1445463f3b8975c1834b5fe4d3150e4ec966d758bc8562916699aab2146807",
+        "bytes": 237,
+        "sources": [
+          {
+            "path": "src/ae_select.c",
+            "byte_offset": 0,
+            "bytes": 237
+          }
+        ]
+      },
+      {
+        "sha256": "40d3916dd4e710d673869c33836b64d53a8e84e9799bf6b9f7961e4a3eb839d2",
+        "bytes": 265,
+        "sources": [
+          {
+            "path": "src/anet.c",
+            "byte_offset": 0,
+            "bytes": 265
+          },
+          {
+            "path": "src/anet.h",
+            "byte_offset": 0,
+            "bytes": 265
+          }
+        ]
+      },
+      {
+        "sha256": "ae01e7eed656b7d167d026a2828a6bcc9f29290066a5d8faced2d30581af0bd7",
+        "bytes": 206,
+        "sources": [
+          {
+            "path": "src/aof.c",
+            "byte_offset": 0,
+            "bytes": 206
+          },
+          {
+            "path": "src/asciilogo.h",
+            "byte_offset": 0,
+            "bytes": 206
+          },
+          {
+            "path": "src/bio.h",
+            "byte_offset": 0,
+            "bytes": 206
+          },
+          {
+            "path": "src/call_reply.c",
+            "byte_offset": 0,
+            "bytes": 206
+          },
+          {
+            "path": "src/call_reply.h",
+            "byte_offset": 0,
+            "bytes": 206
+          },
+          {
+            "path": "src/config.h",
+            "byte_offset": 0,
+            "bytes": 206
+          },
+          {
+            "path": "src/db.c",
+            "byte_offset": 0,
+            "bytes": 206
+          },
+          {
+            "path": "src/fmacros.h",
+            "byte_offset": 0,
+            "bytes": 206
+          },
+          {
+            "path": "src/memtest.c",
+            "byte_offset": 0,
+            "bytes": 206
+          },
+          {
+            "path": "src/multi.c",
+            "byte_offset": 0,
+            "bytes": 206
+          },
+          {
+            "path": "src/pubsub.c",
+            "byte_offset": 0,
+            "bytes": 206
+          },
+          {
+            "path": "src/rand.h",
+            "byte_offset": 0,
+            "bytes": 206
+          },
+          {
+            "path": "src/rdb.c",
+            "byte_offset": 0,
+            "bytes": 206
+          },
+          {
+            "path": "src/rdb.h",
+            "byte_offset": 0,
+            "bytes": 206
+          },
+          {
+            "path": "src/release.c",
+            "byte_offset": 0,
+            "bytes": 206
+          },
+          {
+            "path": "src/resp_parser.c",
+            "byte_offset": 0,
+            "bytes": 206
+          },
+          {
+            "path": "src/script.c",
+            "byte_offset": 0,
+            "bytes": 206
+          },
+          {
+            "path": "src/script.h",
+            "byte_offset": 0,
+            "bytes": 206
+          },
+          {
+            "path": "src/script_lua.h",
+            "byte_offset": 0,
+            "bytes": 206
+          },
+          {
+            "path": "src/server.c",
+            "byte_offset": 0,
+            "bytes": 206
+          },
+          {
+            "path": "src/slowlog.h",
+            "byte_offset": 0,
+            "bytes": 206
+          },
+          {
+            "path": "src/t_hash.c",
+            "byte_offset": 0,
+            "bytes": 206
+          },
+          {
+            "path": "src/t_list.c",
+            "byte_offset": 0,
+            "bytes": 206
+          },
+          {
+            "path": "src/t_set.c",
+            "byte_offset": 0,
+            "bytes": 206
+          },
+          {
+            "path": "src/t_string.c",
+            "byte_offset": 0,
+            "bytes": 206
+          },
+          {
+            "path": "src/timeout.c",
+            "byte_offset": 0,
+            "bytes": 206
+          },
+          {
+            "path": "src/util.h",
+            "byte_offset": 0,
+            "bytes": 206
+          }
+        ]
+      },
+      {
+        "sha256": "3818ba30339b99ff99c0f5c03491775d276797286ea90c7c2317a20ca53172e9",
+        "bytes": 3003,
+        "sources": [
+          {
+            "path": "src/atomicvar.h",
+            "byte_offset": 0,
+            "bytes": 3003
+          }
+        ]
+      },
+      {
+        "sha256": "c6c1c36f0f81f231118c82a587caf0aae7c8714bc19258d7d01784f05cae9bfd",
+        "bytes": 1963,
+        "sources": [
+          {
+            "path": "src/bio.c",
+            "byte_offset": 0,
+            "bytes": 1963
+          }
+        ]
+      },
+      {
+        "sha256": "9ec5fdb4baa93eb9bd93fd74665c70e45ce5a81095a0cc23e98d5b840782baa6",
+        "bytes": 225,
+        "sources": [
+          {
+            "path": "src/bitops.c",
+            "byte_offset": 0,
+            "bytes": 225
+          }
+        ]
+      },
+      {
+        "sha256": "9b3e1f622b4cba3e2e269f273bb01897a80bda198c123af2bd4862da521df6c3",
+        "bytes": 1928,
+        "sources": [
+          {
+            "path": "src/blocked.c",
+            "byte_offset": 0,
+            "bytes": 1928
+          }
+        ]
+      },
+      {
+        "sha256": "6dbbf1944d03139094a5a48f7288de06ea258735923083b8ff00ce85944ecb40",
+        "bytes": 206,
+        "sources": [
+          {
+            "path": "src/childinfo.c",
+            "byte_offset": 0,
+            "bytes": 206
+          },
+          {
+            "path": "src/module.c",
+            "byte_offset": 0,
+            "bytes": 206
+          },
+          {
+            "path": "src/redis-check-rdb.c",
+            "byte_offset": 0,
+            "bytes": 206
+          },
+          {
+            "path": "src/syscheck.c",
+            "byte_offset": 0,
+            "bytes": 206
+          }
+        ]
+      },
+      {
+        "sha256": "65b54e11b21f32fe7e03dd0a9f72fdbb491852b3f3208e5b2e1dcde0c4faa957",
+        "bytes": 254,
+        "sources": [
+          {
+            "path": "src/cli_common.c",
+            "byte_offset": 0,
+            "bytes": 254
+          }
+        ]
+      },
+      {
+        "sha256": "8fba91dbcfff403bc04a4a8c0011cb6bdf69635c225670c724bea0fbf495b665",
+        "bytes": 311,
+        "sources": [
+          {
+            "path": "src/cluster.c",
+            "byte_offset": 0,
+            "bytes": 311
+          },
+          {
+            "path": "src/debug.c",
+            "byte_offset": 0,
+            "bytes": 311
+          }
+        ]
+      },
+      {
+        "sha256": "3b43896fa07438241b51a87d430532c3a6e4bfea47d6bf000a03fc98b0872cec",
+        "bytes": 390,
+        "sources": [
+          {
+            "path": "src/cluster_legacy.c",
+            "byte_offset": 0,
+            "bytes": 390
+          },
+          {
+            "path": "src/cluster_legacy.h",
+            "byte_offset": 0,
+            "bytes": 390
+          },
+          {
+            "path": "src/networking.c",
+            "byte_offset": 0,
+            "bytes": 390
+          },
+          {
+            "path": "src/script_lua.c",
+            "byte_offset": 0,
+            "bytes": 390
+          },
+          {
+            "path": "src/server.h",
+            "byte_offset": 0,
+            "bytes": 390
+          }
+        ]
+      },
+      {
+        "sha256": "e7423ae580fec6c7fda7c81051b9cde0fa696da9569a00e74f10c72793a1f3e4",
+        "bytes": 385,
+        "sources": [
+          {
+            "path": "src/config.c",
+            "byte_offset": 0,
+            "bytes": 385
+          }
+        ]
+      },
+      {
+        "sha256": "a1b6074b473abc4f844edeb2f9d9e658a6d554151006c199b87bd59d33ac22e0",
+        "bytes": 1394,
+        "sources": [
+          {
+            "path": "src/connection.c",
+            "byte_offset": 0,
+            "bytes": 1394
+          }
+        ]
+      },
+      {
+        "sha256": "ce07ebef6511354a2f7cc38fd8aec97b0538a223ca1f151395ff5d72d579cba4",
+        "bytes": 206,
+        "sources": [
+          {
+            "path": "src/connection.h",
+            "byte_offset": 1,
+            "bytes": 206
+          },
+          {
+            "path": "src/connhelpers.h",
+            "byte_offset": 1,
+            "bytes": 206
+          },
+          {
+            "path": "src/socket.c",
+            "byte_offset": 0,
+            "bytes": 206
+          },
+          {
+            "path": "src/tls.c",
+            "byte_offset": 0,
+            "bytes": 206
+          }
+        ]
+      },
+      {
+        "sha256": "000ad5f14a42774d29e8bb1ea1ee6a8b46668c119c5acb5643225ef8a428e5b7",
+        "bytes": 1654,
+        "sources": [
+          {
+            "path": "src/crc16.c",
+            "byte_offset": 21,
+            "bytes": 1654
+          }
+        ]
+      },
+      {
+        "sha256": "490afabe83da973028c4bbd72ede4864fe01749028e3adabbb300a490f32d51f",
+        "bytes": 1628,
+        "sources": [
+          {
+            "path": "src/crc64.c",
+            "byte_offset": 0,
+            "bytes": 1628
+          }
+        ]
+      },
+      {
+        "sha256": "19b7ec70e40072b706fdecb2c148d3eb85242b8db24e64bbf384d3e4897c4760",
+        "bytes": 1018,
+        "sources": [
+          {
+            "path": "src/crc64.c",
+            "byte_offset": 1835,
+            "bytes": 1018
+          }
+        ]
+      },
+      {
+        "sha256": "be023599bcf82da1da22f0d67ee95d4f6762e17dd2d6dfd3b79abc74ed10a15b",
+        "bytes": 1258,
+        "sources": [
+          {
+            "path": "src/crcspeed.c",
+            "byte_offset": 0,
+            "bytes": 1258
+          }
+        ]
+      },
+      {
+        "sha256": "5aef58d2916220d889ed488502ca157c70077410d4b1d7da7c57616d3ca5c4bc",
+        "bytes": 1585,
+        "sources": [
+          {
+            "path": "src/crcspeed.h",
+            "byte_offset": 0,
+            "bytes": 1585
+          }
+        ]
+      },
+      {
+        "sha256": "3edee7bf728b434c24d8d56dd0ecc6190278a5f49fd29ce7890c5a5691306593",
+        "bytes": 367,
+        "sources": [
+          {
+            "path": "src/debugmacro.h",
+            "byte_offset": 0,
+            "bytes": 367
+          }
+        ]
+      },
+      {
+        "sha256": "86c125ece4b68bcac0d22b280aebbe4131d8e1cef26220119b8c9dd8ba9838ee",
+        "bytes": 524,
+        "sources": [
+          {
+            "path": "src/defrag.c",
+            "byte_offset": 0,
+            "bytes": 524
+          }
+        ]
+      },
+      {
+        "sha256": "d5503b0b8ff9bb0a1787ef440df587908d8c292119d25a7cf8dfa59a8402b35d",
+        "bytes": 519,
+        "sources": [
+          {
+            "path": "src/dict.c",
+            "byte_offset": 0,
+            "bytes": 519
+          }
+        ]
+      },
+      {
+        "sha256": "dc0f5bf3111462b7cecf9e59a2ad6ad32589f7211a136dcc75a23f330171c417",
+        "bytes": 519,
+        "sources": [
+          {
+            "path": "src/dict.h",
+            "byte_offset": 0,
+            "bytes": 519
+          }
+        ]
+      },
+      {
+        "sha256": "66ce5bc955bf59a2a16fd7f67dd463a0dbe5c4a94cdf89227f7609332ffb63b6",
+        "bytes": 179,
+        "sources": [
+          {
+            "path": "src/ebuckets.c",
+            "byte_offset": 0,
+            "bytes": 179
+          },
+          {
+            "path": "src/mstr.c",
+            "byte_offset": 0,
+            "bytes": 179
+          }
+        ]
+      },
+      {
+        "sha256": "de2114aa425f42a7ea1728bcf89b40631a1a15d95956f7585653d73f5a8e9c70",
+        "bytes": 6114,
+        "sources": [
+          {
+            "path": "src/ebuckets.h",
+            "byte_offset": 0,
+            "bytes": 6114
+          }
+        ]
+      },
+      {
+        "sha256": "4f03aeeb36f891cbb61949b2b47cf4dc2f8fafc7fe44a6691d11d9dc7008df68",
+        "bytes": 976,
+        "sources": [
+          {
+            "path": "src/endianconv.c",
+            "byte_offset": 0,
+            "bytes": 976
+          }
+        ]
+      },
+      {
+        "sha256": "306980490c8550e8f51dbc5e4692f74b55a0278df7dc6ab328bbe79f89db1ba6",
+        "bytes": 343,
+        "sources": [
+          {
+            "path": "src/endianconv.h",
+            "byte_offset": 0,
+            "bytes": 343
+          }
+        ]
+      },
+      {
+        "sha256": "b6bf46fa161aff944c70fa5f6ffca90319304435c0f4cd6cc1ea4b96c1bb383c",
+        "bytes": 206,
+        "sources": [
+          {
+            "path": "src/eval.c",
+            "byte_offset": 0,
+            "bytes": 206
+          },
+          {
+            "path": "src/functions.c",
+            "byte_offset": 0,
+            "bytes": 206
+          }
+        ]
+      },
+      {
+        "sha256": "cc208482ff286a1aa981928bcd410266ebed7bc88470f6d39ef199ce69946e77",
+        "bytes": 356,
+        "sources": [
+          {
+            "path": "src/evict.c",
+            "byte_offset": 0,
+            "bytes": 356
+          }
+        ]
+      },
+      {
+        "sha256": "c52a18772e25a1ae8aa4bcade57725017b84c467d1a98972a83e1f994ea3a1ef",
+        "bytes": 349,
+        "sources": [
+          {
+            "path": "src/expire.c",
+            "byte_offset": 0,
+            "bytes": 349
+          }
+        ]
+      },
+      {
+        "sha256": "0109b1cabdfa73c68d03278a3b71b549c66d1a745b5277ed02be5242017df46c",
+        "bytes": 861,
+        "sources": [
+          {
+            "path": "src/fmtargs.h",
+            "byte_offset": 0,
+            "bytes": 861
+          }
+        ]
+      },
+      {
+        "sha256": "ea110cc76e2b3c2b10673c42920060c1a95118bfa48e0f8da973113381c59f5a",
+        "bytes": 206,
+        "sources": [
+          {
+            "path": "src/function_lua.c",
+            "byte_offset": 0,
+            "bytes": 206
+          },
+          {
+            "path": "src/functions.h",
+            "byte_offset": 0,
+            "bytes": 206
+          },
+          {
+            "path": "src/logreqres.c",
+            "byte_offset": 0,
+            "bytes": 206
+          },
+          {
+            "path": "src/resp_parser.h",
+            "byte_offset": 0,
+            "bytes": 206
+          },
+          {
+            "path": "src/threads_mngr.c",
+            "byte_offset": 0,
+            "bytes": 206
+          },
+          {
+            "path": "src/threads_mngr.h",
+            "byte_offset": 0,
+            "bytes": 206
+          }
+        ]
+      },
+      {
+        "sha256": "b4c4c4a93f2341098b51da86fb8bed2434d67c2ec073714b31ec870965a7d24d",
+        "bytes": 1632,
+        "sources": [
+          {
+            "path": "src/geo.c",
+            "byte_offset": 0,
+            "bytes": 1632
+          }
+        ]
+      },
+      {
+        "sha256": "bd666d6372dc5cd6a18145c332d54f2e878f8a7cb2188f7022d835fa6ac64242",
+        "bytes": 1682,
+        "sources": [
+          {
+            "path": "src/geohash.c",
+            "byte_offset": 0,
+            "bytes": 1682
+          },
+          {
+            "path": "src/geohash.h",
+            "byte_offset": 0,
+            "bytes": 1682
+          },
+          {
+            "path": "src/geohash_helper.c",
+            "byte_offset": 0,
+            "bytes": 1682
+          },
+          {
+            "path": "src/geohash_helper.h",
+            "byte_offset": 0,
+            "bytes": 1682
+          }
+        ]
+      },
+      {
+        "sha256": "d4ebffee3ef72cac74cb9e9c9eccb762a31de2615c77fbf9aff32b9542597091",
+        "bytes": 355,
+        "sources": [
+          {
+            "path": "src/hyperloglog.c",
+            "byte_offset": 0,
+            "bytes": 355
+          }
+        ]
+      },
+      {
+        "sha256": "969bcace6795dcd1620476f6c46b595549b3f7681e7c52fdf530321ae22969d7",
+        "bytes": 1651,
+        "sources": [
+          {
+            "path": "src/intset.c",
+            "byte_offset": 0,
+            "bytes": 1651
+          },
+          {
+            "path": "src/intset.h",
+            "byte_offset": 0,
+            "bytes": 1651
+          },
+          {
+            "path": "src/redis-check-aof.c",
+            "byte_offset": 0,
+            "bytes": 1651
+          },
+          {
+            "path": "src/rio.h",
+            "byte_offset": 0,
+            "bytes": 1651
+          },
+          {
+            "path": "src/ziplist.h",
+            "byte_offset": 0,
+            "bytes": 1651
+          }
+        ]
+      },
+      {
+        "sha256": "e1a19b516d9914034ddebaa5c7cdf1d834ba3a2774e85556fd6ec8929d40e6a8",
+        "bytes": 730,
+        "sources": [
+          {
+            "path": "src/kvstore.c",
+            "byte_offset": 0,
+            "bytes": 730
+          }
+        ]
+      },
+      {
+        "sha256": "d21bd41f476bad5900ee6e5da0a67851cb9ab3eab2b5834c46a9f09d73e6a8d8",
+        "bytes": 527,
+        "sources": [
+          {
+            "path": "src/latency.c",
+            "byte_offset": 0,
+            "bytes": 527
+          }
+        ]
+      },
+      {
+        "sha256": "4c8543d310862efd5d672243c9618619c84b8cc5e2006fbc2be8d52d84094399",
+        "bytes": 376,
+        "sources": [
+          {
+            "path": "src/latency.h",
+            "byte_offset": 0,
+            "bytes": 376
+          }
+        ]
+      },
+      {
+        "sha256": "a66fa48160284610ebcd48a3dfce7ce2a06b83b0492cdcc660b22b62eea92d1b",
+        "bytes": 366,
+        "sources": [
+          {
+            "path": "src/listpack.c",
+            "byte_offset": 0,
+            "bytes": 366
+          },
+          {
+            "path": "src/listpack.h",
+            "byte_offset": 0,
+            "bytes": 366
+          }
+        ]
+      },
+      {
+        "sha256": "c277a338521f18dcb165e203370a97a36778023eb2eb9836d5375810137e5145",
+        "bytes": 1100,
+        "sources": [
+          {
+            "path": "src/listpack.c",
+            "byte_offset": 4840,
+            "bytes": 1100
+          }
+        ]
+      },
+      {
+        "sha256": "6a51c05c99edad4297024cb73de712b380f5787fa60f50bc0dbf7f55c553fdeb",
+        "bytes": 300,
+        "sources": [
+          {
+            "path": "src/listpack_malloc.h",
+            "byte_offset": 0,
+            "bytes": 300
+          }
+        ]
+      },
+      {
+        "sha256": "8aab74054e5f49c39cedb385ac9916bff3ac04e4fb0a4fab0d367465155d34cd",
+        "bytes": 472,
+        "sources": [
+          {
+            "path": "src/lolwut.c",
+            "byte_offset": 0,
+            "bytes": 472
+          },
+          {
+            "path": "src/lolwut5.c",
+            "byte_offset": 0,
+            "bytes": 472
+          }
+        ]
+      },
+      {
+        "sha256": "96160a3b77d186c0d8f68943157b883a0e83951452b38a95a4494365ab7697f7",
+        "bytes": 709,
+        "sources": [
+          {
+            "path": "src/lolwut6.c",
+            "byte_offset": 0,
+            "bytes": 709
+          }
+        ]
+      },
+      {
+        "sha256": "995e5910b936cc8b62cbeb2dd5590dbcc4d9bbf4e994926884e888f50e320f65",
+        "bytes": 2030,
+        "sources": [
+          {
+            "path": "src/lzf.h",
+            "byte_offset": 0,
+            "bytes": 2030
+          }
+        ]
+      },
+      {
+        "sha256": "e203eb9928ad31325bc02c1b6445d87c246a9f9236ee40bd83c78e0695bd5620",
+        "bytes": 2030,
+        "sources": [
+          {
+            "path": "src/lzfP.h",
+            "byte_offset": 0,
+            "bytes": 2030
+          }
+        ]
+      },
+      {
+        "sha256": "704f1a71f2227128eccfacd6d8a5a6af21bb800801f81c73e57a594118b34c00",
+        "bytes": 2030,
+        "sources": [
+          {
+            "path": "src/lzf_c.c",
+            "byte_offset": 0,
+            "bytes": 2030
+          },
+          {
+            "path": "src/lzf_d.c",
+            "byte_offset": 0,
+            "bytes": 2030
+          }
+        ]
+      },
+      {
+        "sha256": "d98d21357a0c1e41796873140ec17ce88803eac9e5742a0329290ca22cdea2bf",
+        "bytes": 1782,
+        "sources": [
+          {
+            "path": "src/modules/helloacl.c",
+            "byte_offset": 0,
+            "bytes": 1782
+          }
+        ]
+      },
+      {
+        "sha256": "f5cf1ecb5b40086f3588b6c52b185ccce0fa709455f55c038fdf3edc827e3917",
+        "bytes": 377,
+        "sources": [
+          {
+            "path": "src/modules/helloblock.c",
+            "byte_offset": 0,
+            "bytes": 377
+          }
+        ]
+      },
+      {
+        "sha256": "db5d3f4bd91813d6d337523140f7f2e4c15fcf56c5a0afb466ef6d1cdf8b1507",
+        "bytes": 348,
+        "sources": [
+          {
+            "path": "src/modules/hellocluster.c",
+            "byte_offset": 0,
+            "bytes": 348
+          }
+        ]
+      },
+      {
+        "sha256": "a8f62097163b0ae3546b677067bcabd91ebf402476a368d2307c18d0010e3e3c",
+        "bytes": 462,
+        "sources": [
+          {
+            "path": "src/modules/hellodict.c",
+            "byte_offset": 0,
+            "bytes": 462
+          }
+        ]
+      },
+      {
+        "sha256": "929e94e21f3b4690c77761f18051bff76fd002089b40c46329d18032f9032e67",
+        "bytes": 318,
+        "sources": [
+          {
+            "path": "src/modules/hellohook.c",
+            "byte_offset": 0,
+            "bytes": 318
+          }
+        ]
+      },
+      {
+        "sha256": "39c1ed176a06f84d88a2f7d92ebd5b4da6db35edced2e8b47720c94eec34c208",
+        "bytes": 347,
+        "sources": [
+          {
+            "path": "src/modules/hellotimer.c",
+            "byte_offset": 0,
+            "bytes": 347
+          }
+        ]
+      },
+      {
+        "sha256": "84573387bb77acb20306f2bee99bb585b6b91a6d09b8a3847efc2dbe3cccc8dc",
+        "bytes": 708,
+        "sources": [
+          {
+            "path": "src/modules/hellotype.c",
+            "byte_offset": 0,
+            "bytes": 708
+          }
+        ]
+      },
+      {
+        "sha256": "61b151a140a6b053abcce4a7585f965af2127f860b2e0f36b4acbe116a4e36a1",
+        "bytes": 550,
+        "sources": [
+          {
+            "path": "src/modules/helloworld.c",
+            "byte_offset": 0,
+            "bytes": 550
+          }
+        ]
+      },
+      {
+        "sha256": "deb00fec47b47b242e6f9bfdfb52ae8375ab381b1d73b715328ed8b808e226b9",
+        "bytes": 6686,
+        "sources": [
+          {
+            "path": "src/mstr.h",
+            "byte_offset": 0,
+            "bytes": 6686
+          }
+        ]
+      },
+      {
+        "sha256": "43e361dee0405c838de1abe077aa205ed9ac6ec2f17b23a57d990d0ab5f3c0ef",
+        "bytes": 2410,
+        "sources": [
+          {
+            "path": "src/mt19937-64.c",
+            "byte_offset": 0,
+            "bytes": 2410
+          },
+          {
+            "path": "src/mt19937-64.h",
+            "byte_offset": 0,
+            "bytes": 2410
+          }
+        ]
+      },
+      {
+        "sha256": "75d81f5ff218c6a055b33fb2ab74098a17d13458ce8233f9c98530929a6ddd27",
+        "bytes": 206,
+        "sources": [
+          {
+            "path": "src/notify.c",
+            "byte_offset": 0,
+            "bytes": 206
+          }
+        ]
+      },
+      {
+        "sha256": "73e5cf41dd2ee1656522c58f156d513964a8e1f7a5198f0f8af932755ed2d038",
+        "bytes": 238,
+        "sources": [
+          {
+            "path": "src/object.c",
+            "byte_offset": 0,
+            "bytes": 238
+          }
+        ]
+      },
+      {
+        "sha256": "4c5da5ff5097b515a41d25af5c871b2924fe5476ddd0a8dd98c60e3fec134eb1",
+        "bytes": 238,
+        "sources": [
+          {
+            "path": "src/pqsort.c",
+            "byte_offset": 0,
+            "bytes": 238
+          }
+        ]
+      },
+      {
+        "sha256": "e5ef68d1e452f3227237a9bed70b7d73e72effae6660254423a60b07a3443ed8",
+        "bytes": 1594,
+        "sources": [
+          {
+            "path": "src/pqsort.c",
+            "byte_offset": 304,
+            "bytes": 1594
+          }
+        ]
+      },
+      {
+        "sha256": "afe0a9b39c3f1e6edf5dadf78c0f26e5c8a58463b3916482ebabd23488c2b360",
+        "bytes": 394,
+        "sources": [
+          {
+            "path": "src/pqsort.h",
+            "byte_offset": 0,
+            "bytes": 394
+          }
+        ]
+      },
+      {
+        "sha256": "73ab499202864d90645dddc54a6eae04a0857f941cac1e446c8b489f749e9b40",
+        "bytes": 1649,
+        "sources": [
+          {
+            "path": "src/quicklist.c",
+            "byte_offset": 0,
+            "bytes": 1649
+          }
+        ]
+      },
+      {
+        "sha256": "672a8b0a3eda61940849c9a34f43eed0d8c4fe8418ce2b39e9a5414f7e5a929d",
+        "bytes": 1665,
+        "sources": [
+          {
+            "path": "src/quicklist.h",
+            "byte_offset": 0,
+            "bytes": 1665
+          }
+        ]
+      },
+      {
+        "sha256": "993b87294ef8b29bd88d140f5e9b7589cf2e01a9f21e974bc1a619f2670a3cfd",
+        "bytes": 2282,
+        "sources": [
+          {
+            "path": "src/rand.c",
+            "byte_offset": 0,
+            "bytes": 2282
+          }
+        ]
+      },
+      {
+        "sha256": "dd307eddabc4e213b503c4e3f1ebcce539fb66c8e54ee602fde16abceabed142",
+        "bytes": 245,
+        "sources": [
+          {
+            "path": "src/rax.c",
+            "byte_offset": 0,
+            "bytes": 245
+          },
+          {
+            "path": "src/rax.h",
+            "byte_offset": 0,
+            "bytes": 245
+          },
+          {
+            "path": "src/rax_malloc.h",
+            "byte_offset": 0,
+            "bytes": 245
+          }
+        ]
+      },
+      {
+        "sha256": "d5ab3ebea6158c84ad297cdaad289f93b8bfd09ee6ad65c7197c6c80a3c9a639",
+        "bytes": 234,
+        "sources": [
+          {
+            "path": "src/redis-benchmark.c",
+            "byte_offset": 0,
+            "bytes": 234
+          }
+        ]
+      },
+      {
+        "sha256": "a43ed350aa913276797c6c3e234d3477353d20463ba58b814be5b7cb5e28a3ee",
+        "bytes": 244,
+        "sources": [
+          {
+            "path": "src/redis-cli.c",
+            "byte_offset": 0,
+            "bytes": 244
+          }
+        ]
+      },
+      {
+        "sha256": "da5655da829dc3f427aac4085172e569d2bd2d898832036a4cb11275ff6c4572",
+        "bytes": 1985,
+        "sources": [
+          {
+            "path": "src/redisassert.c",
+            "byte_offset": 0,
+            "bytes": 1985
+          }
+        ]
+      },
+      {
+        "sha256": "291d0b70296246a7d03374630708d0920526994479f1ec9728a64bc706e8d5ef",
+        "bytes": 631,
+        "sources": [
+          {
+            "path": "src/redisassert.h",
+            "byte_offset": 0,
+            "bytes": 631
+          }
+        ]
+      },
+      {
+        "sha256": "aafce01424b11888bc051b186f1586c0dc3f78c01a600de586dbf78058cf3554",
+        "bytes": 355,
+        "sources": [
+          {
+            "path": "src/replication.c",
+            "byte_offset": 0,
+            "bytes": 355
+          }
+        ]
+      },
+      {
+        "sha256": "6e28052313e287838bb297e9a4a218927c7e94d431b7315780532c87f5cdcaa5",
+        "bytes": 2394,
+        "sources": [
+          {
+            "path": "src/rio.c",
+            "byte_offset": 0,
+            "bytes": 2394
+          }
+        ]
+      },
+      {
+        "sha256": "ee1bb879762d9b12ebab976a22f2d8a3e6eecee5fc907d242f62d4b5fab69127",
+        "bytes": 251,
+        "sources": [
+          {
+            "path": "src/sds.c",
+            "byte_offset": 0,
+            "bytes": 251
+          },
+          {
+            "path": "src/sds.h",
+            "byte_offset": 0,
+            "bytes": 251
+          },
+          {
+            "path": "src/sdsalloc.h",
+            "byte_offset": 0,
+            "bytes": 251
+          }
+        ]
+      },
+      {
+        "sha256": "53f4c17a875bbfc81280cea3391d792b067c618b2eb3b25c55401658687913bd",
+        "bytes": 239,
+        "sources": [
+          {
+            "path": "src/sentinel.c",
+            "byte_offset": 0,
+            "bytes": 239
+          }
+        ]
+      },
+      {
+        "sha256": "663e5fddeb8b746689dd7e778fd9a5c2fffd78b50ac6c2c141b64a03e7e5b2f5",
+        "bytes": 1397,
+        "sources": [
+          {
+            "path": "src/setcpuaffinity.c",
+            "byte_offset": 0,
+            "bytes": 1397
+          }
+        ]
+      },
+      {
+        "sha256": "2c1ce1879303322a6c1a17b75a76bdce915ca8c2d80f1ee66754f3b99caf80a6",
+        "bytes": 1472,
+        "sources": [
+          {
+            "path": "src/setproctitle.c",
+            "byte_offset": 0,
+            "bytes": 1472
+          }
+        ]
+      },
+      {
+        "sha256": "46fc0c6d8b1e82892861b8093beb214f1531d5367d6d6ebbee0b16a9ecc37daa",
+        "bytes": 339,
+        "sources": [
+          {
+            "path": "src/sha1.c",
+            "byte_offset": 75,
+            "bytes": 339
+          }
+        ]
+      },
+      {
+        "sha256": "ac028f51d92b79b629da0445bf1fedb133c53729e8d261a7641453a0c2c80cbf",
+        "bytes": 68,
+        "sources": [
+          {
+            "path": "src/sha1.h",
+            "byte_offset": 77,
+            "bytes": 68
+          }
+        ]
+      },
+      {
+        "sha256": "0215e69750e9f0433dcc4519eb26632d31903045a202441599a7245c0537dfce",
+        "bytes": 757,
+        "sources": [
+          {
+            "path": "src/sha256.c",
+            "byte_offset": 0,
+            "bytes": 757
+          }
+        ]
+      },
+      {
+        "sha256": "6db4bae3b39744aba6c18657802d96b258e1837e97a76ca97724b122dfe520e5",
+        "bytes": 370,
+        "sources": [
+          {
+            "path": "src/sha256.h",
+            "byte_offset": 0,
+            "bytes": 370
+          }
+        ]
+      },
+      {
+        "sha256": "d860d8aac1c52b280d010beb6e269a3b20bd09c49fd75149758793330318aac7",
+        "bytes": 2084,
+        "sources": [
+          {
+            "path": "src/siphash.c",
+            "byte_offset": 0,
+            "bytes": 2084
+          }
+        ]
+      },
+      {
+        "sha256": "465ebbdec30561c7a16127dcfdabf15091b200c2f1506dd1f04decede9c1f88d",
+        "bytes": 741,
+        "sources": [
+          {
+            "path": "src/slowlog.c",
+            "byte_offset": 0,
+            "bytes": 741
+          }
+        ]
+      },
+      {
+        "sha256": "42d47fcf7d2f7d9f49efc1cc3c7c5d9824d8529317f8e829c8b34f599ee1fc04",
+        "bytes": 233,
+        "sources": [
+          {
+            "path": "src/solarisfixes.h",
+            "byte_offset": 0,
+            "bytes": 233
+          }
+        ]
+      },
+      {
+        "sha256": "f6ee72b87e7aef904f43494343c30bb3aec6c0c1aa0ebf8c2410c514e566fa4e",
+        "bytes": 244,
+        "sources": [
+          {
+            "path": "src/sort.c",
+            "byte_offset": 0,
+            "bytes": 244
+          }
+        ]
+      },
+      {
+        "sha256": "0c2d3173f5b4ef7b66fd3841be9db426ea3b5386f3cee3ef1db1e00712fa612f",
+        "bytes": 483,
+        "sources": [
+          {
+            "path": "src/sparkline.c",
+            "byte_offset": 0,
+            "bytes": 483
+          }
+        ]
+      },
+      {
+        "sha256": "d0ccf7fd9923ed79137fc8d4853f2c28409eaf55c68302a2621329d13c8e5dc1",
+        "bytes": 335,
+        "sources": [
+          {
+            "path": "src/sparkline.h",
+            "byte_offset": 0,
+            "bytes": 335
+          }
+        ]
+      },
+      {
+        "sha256": "3ea90cb8593fd079d13dc0d51c8de5b49eed12aec6d5ce092fdb6318e3717071",
+        "bytes": 800,
+        "sources": [
+          {
+            "path": "src/strl.c",
+            "byte_offset": 0,
+            "bytes": 800
+          }
+        ]
+      },
+      {
+        "sha256": "21d06ba555baee6a58a6cf92357abfd36d7e3cdaa24687b62bdd2ea4153544b6",
+        "bytes": 276,
+        "sources": [
+          {
+            "path": "src/syncio.c",
+            "byte_offset": 0,
+            "bytes": 276
+          }
+        ]
+      },
+      {
+        "sha256": "60fa7ad35721ef66a56feeba3d5aad41ebc1709be8866dcc4303ac982429dc2d",
+        "bytes": 206,
+        "sources": [
+          {
+            "path": "src/syscheck.h",
+            "byte_offset": 0,
+            "bytes": 206
+          }
+        ]
+      },
+      {
+        "sha256": "03a634d0c2a0765f40bb1ea520cfc74733584fbc31bc591303f6d07b90f73658",
+        "bytes": 206,
+        "sources": [
+          {
+            "path": "src/t_stream.c",
+            "byte_offset": 0,
+            "bytes": 206
+          }
+        ]
+      },
+      {
+        "sha256": "7db18e8a319237a722d292d192f3416e7810ec42c3c2d6853f7566031bea1a4a",
+        "bytes": 1651,
+        "sources": [
+          {
+            "path": "src/t_zset.c",
+            "byte_offset": 0,
+            "bytes": 1651
+          }
+        ]
+      },
+      {
+        "sha256": "da05ec980cbae2c9cf4e187f199f6ecf28781591bb3d65903b8f11230b323fc5",
+        "bytes": 455,
+        "sources": [
+          {
+            "path": "src/testhelp.h",
+            "byte_offset": 0,
+            "bytes": 455
+          }
+        ]
+      },
+      {
+        "sha256": "95b3533d43dd9f38c614f2d58d224276e329ed976b0ac7e51d543b2d25f07472",
+        "bytes": 274,
+        "sources": [
+          {
+            "path": "src/tracking.c",
+            "byte_offset": 0,
+            "bytes": 274
+          }
+        ]
+      },
+      {
+        "sha256": "a4b975521ca115f21656d18ef37809052d43ade1a5b37e188a01d53041f674df",
+        "bytes": 1399,
+        "sources": [
+          {
+            "path": "src/unix.c",
+            "byte_offset": 0,
+            "bytes": 1399
+          }
+        ]
+      },
+      {
+        "sha256": "977ae4d2d62baaad058b913699646ee3311f28fea6b909f199c37884ec705240",
+        "bytes": 1612,
+        "sources": [
+          {
+            "path": "src/util.c",
+            "byte_offset": 0,
+            "bytes": 1612
+          }
+        ]
+      },
+      {
+        "sha256": "d5e9fc57eb8a3aed1ac7289281f5f2267f364106580689c56948ff2fb386045d",
+        "bytes": 9125,
+        "sources": [
+          {
+            "path": "src/ziplist.c",
+            "byte_offset": 0,
+            "bytes": 9125
+          }
+        ]
+      },
+      {
+        "sha256": "5a3d84f424613481fbcc1e68b625a28ad7443fc90b25046906a8863714fa2b35",
+        "bytes": 831,
+        "sources": [
+          {
+            "path": "src/zipmap.c",
+            "byte_offset": 0,
+            "bytes": 831
+          }
+        ]
+      },
+      {
+        "sha256": "a15eaf60a6221fbb7055b78c1d2c11faf62d3bc07d1ad9a19cbf74b191303375",
+        "bytes": 380,
+        "sources": [
+          {
+            "path": "src/zipmap.h",
+            "byte_offset": 0,
+            "bytes": 380
+          }
+        ]
+      },
+      {
+        "sha256": "12ba5e5156f279fb0ccda74bf93847dd85c87c504007fc2132ca47ccd9ff8ca9",
+        "bytes": 278,
+        "sources": [
+          {
+            "path": "src/zmalloc.c",
+            "byte_offset": 0,
+            "bytes": 278
+          },
+          {
+            "path": "src/zmalloc.h",
+            "byte_offset": 0,
+            "bytes": 278
+          }
+        ]
+      }
+    ]
+  }
+}
