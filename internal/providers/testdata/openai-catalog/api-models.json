@@ -1,0 +1,79 @@
+{
+  "data": [
+    {
+      "id": "gpt-image-2.5-flare"
+    },
+    {
+      "id": "gpt-image-2.5-sunburst"
+    },
+    {
+      "id": "gpt-image-2"
+    },
+    {
+      "id": "gpt-image-1.5"
+    },
+    {
+      "id": "gpt-image-1-mini"
+    },
+    {
+      "id": "gpt-image-1"
+    },
+    {
+      "id": "chatgpt-image-latest"
+    },
+    {
+      "id": "gpt-4o-mini-tts"
+    },
+    {
+      "id": "tts-1"
+    },
+    {
+      "id": "tts-1-hd"
+    },
+    {
+      "id": "gpt-audio-1.5"
+    },
+    {
+      "id": "gpt-audio"
+    },
+    {
+      "id": "gpt-audio-mini"
+    },
+    {
+      "id": "gpt-4o-mini-tts-2025-03-20"
+    },
+    {
+      "id": "gpt-4o-mini-tts-2025-12-15"
+    },
+    {
+      "id": "gpt-audio-2025-08-28"
+    },
+    {
+      "id": "gpt-audio-mini-2025-10-06"
+    },
+    {
+      "id": "gpt-audio-mini-2025-12-15"
+    },
+    {
+      "id": "gpt-image-2-2026-04-21"
+    },
+    {
+      "id": "gpt-image-2.5-flare-2026-09-08"
+    },
+    {
+      "id": "gpt-image-2.5-sunburst-2026-09-08"
+    },
+    {
+      "id": "sora-2-pro"
+    },
+    {
+      "id": "sora-2"
+    },
+    {
+      "id": "tts-1-1106"
+    },
+    {
+      "id": "tts-1-hd-1106"
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+# Ready-made images; keep the shared topology in compose.yaml.
+# Use both files (the installation .env sets COMPOSE_FILE automatically).
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:?Set POSTGRES_IMAGE in .env}
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Initialize .env first}
+
+  redis:
+    image: ${REDIS_IMAGE:?Set REDIS_IMAGE in .env}
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Initialize .env first}
+      REDISCLI_AUTH: ${REDIS_PASSWORD:?Initialize .env first}
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:?Initialize .env first}"]
+
+  gateway:
+    build: !reset null
+    image: ${GATEWAY_IMAGE:?Set GATEWAY_IMAGE in .env}
+    restart: unless-stopped
+    environment: &release-environment
+      DATABASE_URL: postgres://media_gateway:${POSTGRES_PASSWORD:?Initialize .env first}@postgres:5432/media_gateway?sslmode=disable
+      REDIS_URL: redis://:${REDIS_PASSWORD:?Initialize .env first}@redis:6379/0
+      CLIENT_API_KEY: ${CLIENT_API_KEY:?Initialize .env first}
+      SESSION_SIGNING_SECRET: ${SESSION_SIGNING_SECRET:?Initialize .env first}
+      WEBHOOK_SIGNING_SECRET: ${WEBHOOK_SIGNING_SECRET:?Initialize .env first}
+      MEDIA_URL_SIGNING_SECRET: ${MEDIA_URL_SIGNING_SECRET:?Initialize .env first}
+      PROVIDER_CREDENTIALS_ENCRYPTION_KEY: ${PROVIDER_CREDENTIALS_ENCRYPTION_KEY:?Initialize .env first}
+
+  worker:
+    build: !reset null
+    image: ${GATEWAY_IMAGE:?Set GATEWAY_IMAGE in .env}
+    restart: unless-stopped
+    environment: *release-environment
+
+  ui:
+    build: !reset null
+    image: ${UI_IMAGE:?Set UI_IMAGE in .env}
+    restart: unless-stopped
+
+  webhook-receiver:
+    build: !reset null
+    image: ${GATEWAY_IMAGE:?Set GATEWAY_IMAGE in .env}

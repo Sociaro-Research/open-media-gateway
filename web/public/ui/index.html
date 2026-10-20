@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title data-page-title="">Media gateway</title>
+  <script src="/ui/theme.js"></script>
+  <script src="/ui/console-entry.js?v=20260916-sites" defer></script>
+  <link rel="stylesheet" href="/ui/styles.css?v=20261019-payment-actions">
+  <link rel="stylesheet" href="/ui/docs.css?v=20260911-login-spacing">
+  <link rel="stylesheet" href="/ui/references.css?v=20261019-missing">
+<script src="/ui/site.js" defer></script></head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="Home">
+        <img class="brand-mark brand-wordmark" alt="" hidden>
+        <img class="brand-mark brand-symbol" alt="" hidden>
+      </a>
+        <nav class="section-nav" id="sectionNav" aria-label="Main navigation">
+          <button class="nav-button active" id="generationNav" type="button" aria-current="page">Playground</button>
+          <button id="configurationNav" type="button" hidden>Workspace</button>
+          <button class="nav-button" id="docsNav" type="button">Docs</button>
+          <button class="nav-button" id="systemNav" type="button" hidden>Administration</button>
+        <div id="workspacePicker" class="workspace-picker" hidden><select id="workspaceSelect" hidden data-plain-control aria-label="Organization"></select><button id="workspaceOpen" class="nav-button" type="button"></button><button id="workspaceToggle" type="button" aria-label="Choose organization" aria-haspopup="menu" aria-expanded="false" aria-controls="workspaceMenu"><span class="select-chevron" aria-hidden="true"></span></button><div id="workspaceMenu" role="menu" aria-label="Organizations" hidden></div></div>
+        </nav>
+      <div class="topbar-actions">
+        <div class="user-menu" id="userMenu" hidden>
+          <button id="userMenuToggle" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="userDropdown">
+          <span class="user-avatar">
+            <span id="userInitials" aria-label="Profile avatar"></span>
+            <img id="userPicture" alt="Profile photo" referrerpolicy="no-referrer" hidden>
+          </span>
+          <span class="user-identity"><strong id="userName"></strong><small id="userEmail"></small></span>
+          </button>
+          <div id="userDropdown" role="menu" aria-label="User menu" hidden>
+            <button id="personalSettingsButton" type="button" role="menuitem" >Profile</button>
+            <button id="logoutButton" type="button" role="menuitem">Sign out</button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <div id="sessionMessage" class="message" hidden></div>
+      <section class="auth-gate" id="authGate">
+        <div class="card auth-card">
+          <div class="auth-card-heading">
+            <h1 id="authTitle">Sign in to get started</h1>
+            <p class="auth-mode-switch" id="authModeSwitch" hidden><span id="authModeHint">Don’t have an account?</span> <button id="authSwitch" type="button" class="auth-link">Sign up</button></p>
+          </div>
+          <div class="auth-choices" id="authChoices">
+            <p id="authUnavailable" role="status" hidden></p>
+            <a class="google-login" id="googleLogin" hidden href="/auth/google"><img src="/ui/google-icon.svg" alt="" width="20" height="20" aria-hidden="true">Continue with Google</a>
+            <button class="secondary email-login" id="emailLogin" type="button" hidden>Continue with email</button>
+          </div>
+          <div id="emailAuthForms" hidden></div>
+          <p id="emailVerification" class="auth-hint" role="status" aria-live="polite" hidden></p>
+          <template id="emailAuthTemplate">
+            <form class="email-auth-form" method="post" autocomplete="on" aria-labelledby="authTitle" hidden>
+              <div data-auth-email><label>Email<input name="email" type="email" autocomplete="username" inputmode="email" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="254" required></label></div>
+              <div data-auth-password><label>Password<input name="password" type="password" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="128" required></label></div>
+              <p data-auth-hint class="auth-hint" hidden>Use 15–128 characters. A long, unique passphrase works well.</p>
+              <p data-auth-status class="auth-hint" role="status" aria-live="polite" hidden></p>
+              <button class="primary" type="submit">Sign in</button>
+            </form>
+          </template>
+          <div class="auth-form-links" id="authNavigation" hidden>
+            <button id="authForgot" type="button" class="auth-link">Forgot password?</button>
+            <button id="authBack" type="button" class="auth-link">Back</button>
+          </div>
+          <p class="auth-error" id="authError" hidden>Could not sign in. Try again, or use email if you already registered.</p>
+          <p class="legal-links"><a href="/privacy">Privacy Policy</a><span>·</span><a href="/terms">Terms of Service</a></p>
+        </div>
+      </section>
+      <section id="generationView" hidden>
+
+      <div class="layout">
+        <section class="card create-card">
+          <div class="section-heading">
+            <div>
+              <h2>New task</h2>
+            </div>
+          </div>
+
+          <form autocomplete="off" id="taskForm">
+            <div id="generationFields" hidden>
+            <label for="model">Model</label>
+            <select id="model" name="model" required disabled>
+              <option value="">Loading models…</option>
+            </select>
+
+            <label for="prompt">Prompt</label>
+            <textarea id="prompt" name="prompt" maxlength="10000"></textarea>
+            <div class="field-meta"><span id="promptCount">0 / 10,000</span></div>
+
+            <section class="generation-settings" id="generationSettings" aria-labelledby="settingsTitle">
+              <div class="settings-heading">
+                <div>
+                  <strong id="settingsTitle">Output settings</strong>
+                </div>
+              </div>
+
+              <div class="settings-grid" id="visualSettings">
+                <div id="resolutionField">
+                  <label for="resolution">Resolution</label>
+                  <select id="resolution" name="resolution" required></select>
+                </div>
+                <div id="ratioField">
+                  <label for="ratio">Aspect ratio</label>
+                  <select id="ratio" name="ratio" required></select>
+                </div>
+                <div id="durationField">
+                  <label for="duration">Duration (s)</label>
+                  <input id="duration" name="duration" type="number" required>
+                  <small id="durationHint"></small>
+                </div>
+              </div>
+
+              <div class="advanced-grid" id="commonMediaFields">
+                <div id="referenceModeField" hidden><label for="referenceMode">Reference mode</label><select id="referenceMode" name="referenceMode"></select><small id="referenceModeHint"></small></div>
+                <div id="imageURLsField" hidden>
+                  <label id="referencesLabel">Image references</label>
+                  <div id="referenceDropzone" class="reference-dropzone" role="group" aria-labelledby="referencesLabel">
+                    <p>Drop images here</p>
+                    <div class="reference-actions"><button id="uploadReference" type="button" class="secondary">Upload images</button><button id="chooseReferences" type="button" class="secondary">Choose from library</button></div>
+                    <small>PNG, JPEG, WebP or GIF · Up to 30 MB each</small>
+                  </div>
+                  <input id="referenceFiles" type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden>
+                  <div id="selectedReferences" class="selected-references"></div>
+                  <p id="referenceStatus" class="reference-status" role="status"></p>
+                  <details class="reference-manual"><summary>Use image URLs</summary>
+                  <label for="imageURLs" class="reference-url-label">Or paste image URLs <span class="optional">One per line</span></label>
+                  <textarea id="imageURLs" name="imageURLs"></textarea>
+                  </details>
+                </div>
+                <div id="videoURLField" hidden>
+                  <label for="videoURL">Video reference <span class="optional">URL</span></label>
+                  <textarea id="videoURL" name="videoURL" rows="2"></textarea>
+                  <small id="inputDurationHint" hidden>Output duration follows this video, up to the model’s maximum.</small>
+                </div>
+                <div id="audioURLField" hidden>
+                  <label for="audioURL">Audio reference <span class="optional">URL</span></label>
+                  <textarea id="audioURL" name="audioURL" rows="2"></textarea>
+                </div>
+                <div id="negativePromptField" hidden>
+                  <label for="negativePrompt">Negative prompt <span class="optional">optional</span></label>
+                  <input id="negativePrompt" name="negativePrompt" type="text">
+                </div>
+                <div id="voiceField" hidden>
+                  <label for="voice">Voice</label>
+                  <input id="voice" name="voice" list="voiceOptions">
+                  <datalist id="voiceOptions"></datalist>
+                </div>
+                <div id="languageField" hidden>
+                  <label for="language">Language</label>
+                  <select id="language" name="language">
+                    <option value="Auto">Auto</option><option value="Russian">Russian</option><option value="English">English</option><option value="Chinese">Chinese</option>
+                  </select>
+                </div>
+                <div id="instructionsField" hidden>
+                  <label for="instructions">Voice instructions <span class="optional">optional</span></label>
+                  <input id="instructions" name="instructions" type="text">
+                </div>
+                <div id="lyricsField" hidden>
+                  <label for="lyrics">Lyrics <span class="optional">optional</span></label>
+                  <textarea id="lyrics" name="lyrics"></textarea>
+                </div>
+                <div id="genderField" hidden>
+                  <label for="gender">Vocals</label>
+                  <select id="gender" name="gender"><option value="female">Female</option><option value="male">Male</option></select>
+                </div>
+                <div id="qualityField" hidden>
+                  <label for="quality">Quality</label>
+                  <select id="quality" name="quality"></select>
+                </div>
+                <div id="backgroundField" hidden>
+                  <label for="background">Background</label>
+                  <select id="background" name="background"></select>
+                </div>
+                <div id="formatField" hidden>
+                  <label for="format">File format</label>
+                  <select id="format" name="format"></select>
+                </div>
+              </div>
+
+              <div class="toggle-grid">
+                <label class="toggle-option" id="audioOption">
+                  <span><strong>Audio</strong><small>Synchronized audio</small></span>
+                  <input id="generateAudio" name="generateAudio" type="checkbox">
+                </label>
+                <label class="toggle-option" id="cameraOption">
+                  <span><strong>Fixed camera</strong><small>No camera movement</small></span>
+                  <input id="cameraFixed" name="cameraFixed" type="checkbox">
+                </label>
+              </div>
+
+              <details class="advanced-settings">
+                <summary>Advanced settings</summary>
+                <div class="advanced-grid">
+                <label class="toggle-option" id="watermarkOption">
+                  <span><strong>Watermark</strong><small>Provider watermark</small></span>
+                  <input id="watermark" name="watermark" type="checkbox">
+                </label>
+
+                  <div>
+                    <label for="seed">Seed <span class="optional">optional</span></label>
+                    <input id="seed" name="seed" type="number" min="0" max="4294967295" inputmode="numeric">
+                    <small>Use the same seed to reproduce a composition.</small>
+                  </div>
+                  <label class="check-option" id="draftOption">
+                    <input id="draft" name="draft" type="checkbox">
+                    <span><strong>Draft mode</strong><small>Faster, lower quality preview</small></span>
+                  </label>
+                  <label class="check-option" id="lastFrameOption">
+                    <input id="returnLastFrame" name="returnLastFrame" type="checkbox">
+                    <span><strong>Return last frame</strong><small>Continue the video in a new task</small></span>
+                  </label>
+                </div>
+              </details>
+
+            </section>
+
+            </div>
+            <section class="generation-key" id="connectionPanel" aria-label="Generation API key and budget">
+              <div class="generation-key-heading"><label for="apiKey">Gateway API key</label><a href="/organizations" id="manageGenerationKeys">Manage keys</a></div>
+              <div class="generation-key-input">
+                <input id="apiKey" type="text" class="secret-input" data-1p-ignore data-lpignore="true" data-bwignore="true" autocapitalize="off" autocorrect="off" spellcheck="false" autocomplete="off">
+                <button class="secondary" id="forgetGenerationKey" type="button">Forget key</button>
+              </div>
+              <div class="generation-key-actions"><button class="secondary" id="createGenerationKey" type="button">Generate new key</button><span>Saved in this tab for 24h; cleared on sign-out.</span></div>
+              <p id="connectionState" role="status" hidden></p>
+              <div id="generationKeyBudget" aria-live="polite" hidden></div>
+              <div class="price-card" id="priceCard" hidden>
+                <div><span>Estimated cost</span><strong id="priceValue">Key required</strong></div>
+                <p id="priceDetails"></p>
+              </div>
+            </section>
+
+            <button class="primary" id="submitButton" type="submit" hidden>
+              <span id="submitLabel">Generate</span>
+              <span aria-hidden="true">→</span>
+            </button>
+            <p class="form-message" id="formMessage" aria-live="polite"></p>
+          </form>
+        </section>
+
+        <section class="card journal-card">
+          <div class="section-heading journal-heading">
+            <div>
+              <h2>Journal</h2>
+            </div>
+          </div>
+
+
+          <div class="task-list" id="taskList" aria-live="polite">
+            <div class="empty-state">
+              <span>◎</span>
+              <strong>No tasks yet</strong>
+              <p>Organization generations will appear here.</p>
+            </div>
+          </div>
+        </section>
+      </div>
+      </section>
+
+      <section id="configurationView" aria-label="Workspace" hidden>
+        <aside class="configuration-sidebar" hidden>
+          <p class="configuration-title">Configuration</p>
+          <details id="configurationMenu" open>
+            <summary id="configurationMenuLabel">Configuration · Providers</summary>
+        <nav class="configuration-nav" aria-label="Configuration navigation">
+          <button id="providersNav" type="button">Providers</button>
+          <button id="storageNav" type="button" hidden>Storage</button>
+          <button id="organizationsNav" type="button">Organizations</button><button id="keysNav" type="button">API keys</button>
+        <button type="button" id="reportsNav">Reports</button>
+</nav>
+          </details>
+        </aside>
+        <div class="configuration-content">
+      <section class="providers-view" id="providersView" hidden>
+        <div class="providers-hero console-section-heading">
+          <div>
+            <p class="eyebrow">Administration</p>
+            <h1>Providers</h1>
+
+          </div>
+        </div>
+
+        <div class="providers-layout">
+          <aside class="card provider-sidebar">
+            <div class="provider-sidebar-heading">
+              <span>Available providers</span>
+              <strong id="providerAdminCount">3</strong>
+            </div>
+            <div class="provider-admin-list" id="providerAdminList">
+              <div class="provider-loading">Loading providers…</div>
+            </div>
+          </aside>
+
+          <section class="card provider-detail" id="providerDetail">
+            <div class="empty-state provider-empty" id="providerEmpty">
+              <span>⌁</span>
+              <strong>Select a provider</strong>
+              <p>View connection details, models and diagnostics.</p>
+            </div>
+
+            <div id="providerDetailContent" hidden>
+              <div class="provider-detail-header">
+                <div>
+                  <div class="provider-title-line">
+                    <h2 id="adminProviderName"></h2>
+                    <span class="provider-status" id="adminProviderStatus"></span>
+                  </div>
+                  <p id="adminProviderDescription"></p>
+                </div>
+                <label class="master-switch">
+                  <input id="adminProviderEnabled" type="checkbox" aria-label="Provider enabled">
+                </label>
+              </div>
+
+              <div class="provider-message" id="providerMessage" aria-live="polite"></div>
+
+              <div class="provider-facts">
+                <div><span>Connection</span><strong id="adminConnectionState">—</strong></div>
+                <div><span>Key source</span><strong id="adminCredentialSource">—</strong></div>
+                <div><span>Region</span><strong id="adminRegion">—</strong></div>
+                <div><span>Models</span><strong id="adminModelCount">0</strong></div>
+              </div>
+
+              <form id="providerForm" class="provider-form">
+                <div class="provider-dynamic-fields"></div>
+                <div class="provider-actions">
+                  <button class="primary compact" id="saveProviderButton" type="submit"><span>Save</span></button>
+                  <div class="provider-check-row">
+                    <button class="secondary" id="checkProviderButton" type="button">Check connection</button>
+                    <span class="provider-check-feedback" id="providerCheckFeedback" role="status" aria-live="polite"></span>
+                  </div>
+                </div>
+              </form>
+
+              <div class="provider-insights">
+                <section class="provider-panel">
+                  <div class="provider-section-heading"><div><h3>Media models</h3></div></div>
+                  <div class="media-counts" id="adminMediaCounts"></div>
+                  <div class="model-list" id="adminModelList"></div>
+                </section>
+              </div>
+            </div>
+          </section>
+        </div>
+      </section>
+      <section id="storageView" hidden>
+        <div class="providers-hero console-section-heading">
+          <div><h1>Storage</h1></div>
+        </div>
+        <div id="storageContent"></div>
+      </section>
+      <section id="reportsView" class="keys-view" hidden aria-label="Usage and reports"><div id="reportsContent"></div></section>
+      <section id="profileView" class="keys-view" hidden><div id="profileContent"></div></section>
+      <section id="organizationsView" class="keys-view" hidden><div id="organizationsContent"></div></section>
+ <section id="keysView" class="keys-view" hidden aria-label="API key administration">
+        <div id="keysContent" aria-live="polite"></div>
+      </section>
+        </div>
+      </section>
+
+      <section id="systemView" class="system-layout" hidden aria-label="Administration"><aside class="configuration-sidebar"><p class="step">ADMINISTRATION</p><nav class="configuration-nav" aria-label="System navigation"><button type="button" data-system-page="settings">Settings</button><button type="button" data-system-page="sharedProviders">Shared providers</button><button type="button" data-system-page="sharedStorage">Shared storage</button><button type="button" data-system-page="organizations">Organizations</button><button type="button" data-system-page="usage">Usage</button><button type="button" data-system-page="reports">Reports</button><button type="button" data-system-page="sales">Sales management</button><button type="button" data-system-page="administrators">Users</button><button type="button" data-system-page="catalog">Model catalogue</button><button type="button" data-system-page="activity">Audit Log</button><button type="button" data-system-page="monitoring">Monitoring ↗</button></nav></aside><div id="systemContent"></div></section>
+      <section id="docsView" hidden></section>
+    </main>
+  </div>
+
+  <dialog id="confirmDialog" class="confirm-dialog" aria-labelledby="confirmTitle">
+    <div class="confirm-heading"><h2 id="confirmTitle">Review generation</h2><button type="button" class="secondary" id="closeConfirm" aria-label="Close">✕</button></div>
+    <div id="requestSummary" class="request-summary"><dl id="confirmFields"></dl></div>
+    <div class="confirm-price"><span>Estimated cost</span><strong id="confirmPrice"></strong></div>
+    <p id="confirmStatus" role="status" hidden></p>
+    <div class="confirm-actions"><button type="button" class="secondary" id="cancelConfirm">Cancel</button><button type="button" class="primary" id="confirmSubmit">Confirm and generate <span aria-hidden="true">→</span></button></div>
+  </dialog>
+  <p id="journalAnnouncement" class="sr-only" role="status"></p>
+
+  <template id="taskTemplate">
+    <article class="task">
+      <div class="task-top">
+        <div class="task-title-wrap">
+          <div>
+            <strong class="task-title"></strong>
+
+          </div>
+        </div>
+        <div class="task-actions">
+          <span class="status-badge"></span>
+          <details class="task-menu">
+            <summary aria-label="Task actions">⋯</summary>
+            <div class="task-menu-items">
+              <button type="button" class="reuse-task">Copy to new task</button>
+              <button type="button" class="delete-result">Delete result files</button>
+            </div>
+          </details>
+        </div>
+      </div>
+      <div class="task-meta">
+        <span class="task-time"></span>
+      </div>
+      <details class="task-parameters"><summary>Parameters</summary><label class="task-prompt-label">Prompt<textarea class="task-prompt" rows="5" readonly aria-label="Full generation prompt"></textarea></label><dl></dl><label class="task-id-label">Task ID<input class="task-id" readonly aria-label="Task ID"></label></details>
+      <div class="progress"><span></span></div>
+      <div class="task-result"></div>
+    </article>
+  </template>
+
+  <script src="/ui/user-ui.js?v=20261013-sales-team-ui" defer></script>
+  <script src="/ui/model-info.js?v=20261002-organization-roles" defer></script>
+  <script src="/ui/model-picker.js" defer></script>
+  <script src="/ui/control-pickers.js?v=20261013-sales-employee-picker" defer></script>
+  <script src="/ui/form-ui.js?v=20261013-sales-team-ui" defer></script>
+  <script src="/ui/layout.js" defer></script>
+  <script src="/ui/contacts.js?v=20261018-contact-save" defer></script>
+  <script src="/ui/profile.js?v=20261019-pending-edits" defer></script>
+  <script src="/ui/workspace.js?v=20261018-navigation" defer></script>
+  <script src="/ui/storage-settings.js?v=20260915-direct-storage"></script>
+  <script src="/ui/organization-storage.js?v=20260911-provider-icons"></script>
+  <script src="/ui/limits.js" defer></script>
+  <script src="/ui/model-access.js" defer></script>
+  <script src="/ui/markups.js?v=20261013-sales-permissions" defer></script>
+  <script src="/ui/payment-notifications.js?v=20260916" defer></script>
+  <script src="/ui/vat-settings.js?v=20261019-company-settings" defer></script>
+  <script src="/ui/invoice.js?v=20261017-terms" defer></script>
+  <script src="/ui/stablecoin-payments.js?v=20261019-network-removal" defer></script>
+  <script src="/ui/payments.js?v=20261019-payment-actions" defer></script>
+  <script src="/ui/organization-roles.js?v=20261002-roles" defer></script>
+  <script src="/ui/audit-log.js?v=20261013-sales-team-ui" defer></script>
+  <script src="/ui/organization-journal.js?v=20261013-sales-team-ui" defer></script>
+  <script src="/ui/client-onboarding.js?v=20261013-sales-team-ui" defer></script>
+  <script src="/ui/organizations.js?v=20261018-invitation-roles" defer></script>
+ <script src="/ui/generation-key.js?v=20260911-provider-icons" defer></script>
+  <script src="/ui/email-login.js?v=20261018-invitation-continuation" defer></script>
+  <script src="/ui/provider-connections.js?v=20261019-timeouts-header-draft" defer></script>
+  <script src="/ui/app.js?v=20261019-playground-save-lock-navigation" defer></script>
+  <script src="/ui/email-delivery.js?v=20260914-credential-fields" defer></script>
+  <script src="/ui/login-methods.js" defer></script>
+  <script src="/ui/branding.js" defer></script>
+  <script src="/ui/timezones.js?v=20261009" defer></script>
+  <script src="/ui/catalog-sync.js?v=20261009-timezones" defer></script>
+  <script src="/ui/sales-bonuses.js?v=20261013-sales-settings" defer></script>
+  <script src="/ui/sales-permissions.js?v=20261013-sales-team-ui" defer></script>
+  <script src="/ui/sales.js?v=20261014-sales-role-transitions" defer></script>
+  <script src="/ui/system.js?v=20261018-registered-assets" defer></script>
+  <script src="/ui/report-summary.js?v=20261013bonus"></script>
+  <script src="/ui/report-details.js?v=20261013-sales-team-ui"></script>
+  <script src="/ui/reports.js?v=20261013-sales-team-ui"></script>
+  <script src="/ui/keys.js?v=20261013-sales-team-ui"></script>
+  <script src="/ui/storage-usage.js?v=20260911-provider-icons"></script>
+  <script src="/ui/prompt-references.js?v=20261019-missing" defer></script>
+  <script src="/ui/provider-reference-library.js?v=20261018-assets" defer></script>
+  <script src="/ui/references.js?v=20261019-assets-native-voice" defer></script>
+</body>
+</html>

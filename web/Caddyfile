@@ -1,0 +1,144 @@
+{
+	admin off
+	auto_https off
+}
+
+(docs) {
+	@mutations not method GET HEAD
+	handle @mutations {
+		respond 404
+	}
+	@resources path /site.json /openapi.json /openapi.yaml /branding/assets/*
+	handle @resources {
+		reverse_proxy {$GATEWAY_UPSTREAM:gateway:8080}
+	}
+	@pages path / /docs /docs/
+	handle @pages {
+		rewrite * /ui/documentation.html
+		file_server
+	}
+	@assets path /ui/site.js /ui/theme.js /ui/layout.js /ui/styles.css /ui/docs.css /ui/form-ui.js /ui/docs.js
+	handle @assets {
+		file_server
+	}
+	handle {
+		respond 404
+	}
+}
+
+{$UI_LISTEN::8080} {
+	root * {$UI_ROOT:/srv}
+	encode zstd gzip
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		Cache-Control no-store
+	}
+	# Grafana supplies its own nonce-based policy. Keep the console policy intact.
+	@consolePolicy not path /monitoring /monitoring/*
+	header @consolePolicy Content-Security-Policy "default-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self' https:; img-src 'self' data: blob: https:; media-src 'self' blob: https:; worker-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+	@documentation host {$DOCS_HOST:docs.invalid}
+	handle @documentation {
+		import docs
+	}
+	@monitoringEntry path /monitoring /monitoring/ /monitoring/login
+	handle @monitoringEntry {
+		header Vary Cookie
+		header Content-Security-Policy "default-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self' https:; img-src 'self' data: blob: https:; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+		reverse_proxy {$GATEWAY_UPSTREAM:gateway:8080} {
+			method GET
+			rewrite /auth/monitoring
+			header_up -Authorization
+			@authorized status 2xx
+			handle_response @authorized {
+				redir * /monitoring/d/gateway-overview/gateway-overview 302
+			}
+			@anonymous status 401
+			handle_response @anonymous {
+				rewrite * /ui/login.html
+				file_server {
+					status 200
+				}
+			}
+		}
+	}
+	handle /monitoring/* {
+		route {
+			# Strip caller credentials before assigning the verified proxy identity.
+			request_header -X-WEBAUTH-USER
+			forward_auth {$GATEWAY_UPSTREAM:gateway:8080} {
+				uri /auth/monitoring
+				header_up -Authorization
+				copy_headers X-WEBAUTH-USER
+			}
+			reverse_proxy {$GRAFANA_UPSTREAM:grafana:3000} {
+				header_up -Authorization
+				header_up -Cookie
+				header_down -Set-Cookie
+			}
+		}
+	}
+	@backend path /v1/* /auth/* /healthz /media/* /references/* /branding/assets/* /site.json /openapi.json /openapi.yaml
+	handle @backend {
+		reverse_proxy {$GATEWAY_UPSTREAM:gateway:8080}
+	}
+	@rawHTML path /ui/*.html /ui/
+	handle @rawHTML {
+		respond 404
+	}
+	@publicAssets path /ui/site.js /ui/theme.js /ui/layout.js /ui/styles.css /ui/docs.css /ui/form-ui.js /ui/email-login.js /ui/login.js /ui/google-icon.svg
+	handle @publicAssets {
+		file_server
+	}
+	@legal path /privacy /terms
+	handle @legal {
+		rewrite /privacy /ui/privacy.html
+		rewrite /terms /ui/terms.html
+		file_server
+	}
+	@docsPage path /docs /docs/
+	handle @docsPage {
+		rewrite * /ui/documentation.html
+		file_server
+	}
+	handle /ui/docs.js {
+		file_server
+	}
+	@privateAssets path /ui/* /provider-assets/*
+	handle @privateAssets {
+		header Vary Cookie
+		forward_auth {$GATEWAY_UPSTREAM:gateway:8080} {
+			uri /auth/session
+			header_up -Authorization
+		}
+		@providerIcons path /provider-assets/*
+		reverse_proxy @providerIcons {$GATEWAY_UPSTREAM:gateway:8080}
+		file_server
+	}
+	@console path / /system /organizations /api-keys /configuration /profile
+	handle @console {
+		header Vary Cookie
+		reverse_proxy {$GATEWAY_UPSTREAM:gateway:8080} {
+			method GET
+			rewrite /auth/session
+			header_up -Authorization
+			@authenticated status 2xx
+			handle_response @authenticated {
+				rewrite * /ui/index.html
+				file_server {
+					status 200
+				}
+			}
+			@anonymous status 401
+			handle_response @anonymous {
+				rewrite * /ui/login.html
+				file_server {
+					status 200
+				}
+			}
+		}
+	}
+	handle {
+		respond 404
+	}
+}

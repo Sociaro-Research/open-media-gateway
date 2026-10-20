@@ -1,0 +1,137 @@
+name: Deploy production
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A second click must not interrupt a deployment already changing the server.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require the release branch
+        env:
+          RELEASE_REF: ${{ github.ref }}
+        run: test "$RELEASE_REF" = refs/heads/main
+
+  connectivity:
+    needs: validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment:
+      name: production
+      deployment: false
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Prepare private deployment profile
+        env:
+          PROFILE_JSON: ${{ secrets.PRODUCTION_DEPLOY_PROFILE }}
+          HOST_PINS: ${{ secrets.PRODUCTION_DEPLOY_KNOWN_HOSTS }}
+          WG_PUBLIC_KEY: ${{ secrets.PRODUCTION_DEPLOY_WG_SERVER_PUBLIC_KEY }}
+        run: |
+          python3 - <<'PYTHON'
+          import json, os
+          from pathlib import Path
+          os.umask(0o077)
+          profile = json.loads(os.environ['PROFILE_JSON'])
+          directory = Path(os.environ['RUNNER_TEMP']) / 'deployment-private'
+          directory.mkdir(mode=0o700, exist_ok=True)
+          for field, name, variable in [('known_hosts_file', 'known_hosts', 'HOST_PINS'),
+                                        ('wireguard_server_public_key_file', 'wireguard.pub', 'WG_PUBLIC_KEY')]:
+              value = os.environ[variable].strip()
+              if not value:
+                  raise SystemExit('Required deployment trust data is missing.')
+              path = directory / name
+              path.write_text(value + '\n')
+              path.chmod(0o600)
+              profile[field] = str(path)
+          path = directory / 'deployment.json'
+          path.write_text(json.dumps(profile))
+          path.chmod(0o600)
+          with open(os.environ['GITHUB_ENV'], 'a') as target:
+              target.write('DEPLOY_CONFIG=' + str(path) + '\n')
+          PYTHON
+
+      - name: Install private network tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends wireguard-tools
+      - name: Check private deployment access before full CI
+        env:
+          DEPLOY_WG_PRIVATE_KEY: ${{ secrets.PRODUCTION_DEPLOY_WG_PRIVATE_KEY }}
+          DEPLOY_SSH_KEY: ${{ secrets.PRODUCTION_DEPLOY_SSH_KEY }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: python3 scripts/deployment/tunnel.py -- python3 scripts/deployment/client.py --check-connection
+
+  checks:
+    needs: connectivity
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    needs: checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment:
+      name: production
+      url: ${{ vars.PRODUCTION_PUBLIC_URL }}
+    steps:
+      - name: Check out the exact tested commit and previous release history
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check the release tree
+        run: |
+          git diff --check
+          make release-check
+
+      - name: Prepare private deployment profile
+        env:
+          PROFILE_JSON: ${{ secrets.PRODUCTION_DEPLOY_PROFILE }}
+          HOST_PINS: ${{ secrets.PRODUCTION_DEPLOY_KNOWN_HOSTS }}
+          WG_PUBLIC_KEY: ${{ secrets.PRODUCTION_DEPLOY_WG_SERVER_PUBLIC_KEY }}
+        run: |
+          python3 - <<'PYTHON'
+          import json, os
+          from pathlib import Path
+          os.umask(0o077)
+          profile = json.loads(os.environ['PROFILE_JSON'])
+          directory = Path(os.environ['RUNNER_TEMP']) / 'deployment-private'
+          directory.mkdir(mode=0o700, exist_ok=True)
+          for field, name, variable in [('known_hosts_file', 'known_hosts', 'HOST_PINS'),
+                                        ('wireguard_server_public_key_file', 'wireguard.pub', 'WG_PUBLIC_KEY')]:
+              value = os.environ[variable].strip()
+              if not value:
+                  raise SystemExit('Required deployment trust data is missing.')
+              path = directory / name
+              path.write_text(value + '\n')
+              path.chmod(0o600)
+              profile[field] = str(path)
+          path = directory / 'deployment.json'
+          path.write_text(json.dumps(profile))
+          path.chmod(0o600)
+          with open(os.environ['GITHUB_ENV'], 'a') as target:
+              target.write('DEPLOY_CONFIG=' + str(path) + '\n')
+          PYTHON
+
+      - name: Install private network tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends wireguard-tools
+
+      - name: Back up, deploy and verify production
+        env:
+          DEPLOY_PUBLIC_URL: ${{ vars.PRODUCTION_PUBLIC_URL }}
+          DEPLOY_WG_PRIVATE_KEY: ${{ secrets.PRODUCTION_DEPLOY_WG_PRIVATE_KEY }}
+          DEPLOY_SSH_KEY: ${{ secrets.PRODUCTION_DEPLOY_SSH_KEY }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: python3 scripts/deployment/tunnel.py -- python3 scripts/deployment/client.py

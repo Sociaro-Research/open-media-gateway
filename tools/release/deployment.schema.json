@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Private deployment profile",
+  "type": "object",
+  "required": [
+    "version",
+    "admin_ssh_host",
+    "tunnel_ssh_host",
+    "ssh_host_key_alias",
+    "known_hosts_file",
+    "public_origin",
+    "repository_url"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "example": {
+      "type": "boolean"
+    },
+    "admin_ssh_host": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tunnel_ssh_host": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ssh_host_key_alias": {
+      "type": "string",
+      "minLength": 1
+    },
+    "known_hosts_file": {
+      "type": "string",
+      "minLength": 1
+    },
+    "admin_ssh_key_file": {
+      "type": "string",
+      "minLength": 1
+    },
+    "restricted_ssh_key_file": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "public_origin": {
+      "type": "string",
+      "minLength": 1
+    },
+    "repository_url": {
+      "type": "string",
+      "minLength": 1
+    },
+    "github_ssh_key_file": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "wireguard_endpoint": {
+      "type": "string",
+      "minLength": 1
+    },
+    "wireguard_server_public_key_file": {
+      "type": "string",
+      "minLength": 1
+    },
+    "wireguard_client_private_key_file": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "wireguard_client_address": {
+      "type": "string",
+      "minLength": 1
+    },
+    "wireguard_server_address": {
+      "type": "string",
+      "minLength": 1
+    },
+    "wireguard_allowed_route": {
+      "type": "string",
+      "minLength": 1
+    },
+    "wireguard_listen_port": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65535
+    }
+  },
+  "additionalProperties": false
+}

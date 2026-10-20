@@ -1,0 +1,330 @@
+[
+  {
+    "key": "dola-seedream-5-0-flash-260915|_api|Model requires an adapter contract before it can be enabled",
+    "model": "dola-seedream-5-0-flash-260915",
+    "source": "_api",
+    "reason": "Model requires an adapter contract before it can be enabled",
+    "evidence": {
+      "id": "dola-seedream-5-0-flash-260915"
+    },
+    "first_seen": "2026-10-10T03:03:04Z",
+    "last_seen": "2026-10-10T03:03:04Z",
+    "occurrences": 1
+  },
+  {
+    "key": "dola-seedream-5-0-flash-260915|models|Model requires an adapter contract before it can be enabled",
+    "model": "dola-seedream-5-0-flash-260915",
+    "source": "models",
+    "reason": "Model requires an adapter contract before it can be enabled",
+    "evidence": {
+      "id": "dola-seedream-5-0-flash-260915",
+      "metadata": {
+        "facts": [
+          {
+            "label": "Provider: reference workflows",
+            "value": "Layer decomposition Single image generation Text-to-image Single image-to-image Multi-reference image-to-image"
+          },
+          {
+            "label": "Provider: output specifications / limits",
+            "value": "500"
+          }
+        ]
+      }
+    },
+    "first_seen": "2026-10-10T03:03:04Z",
+    "last_seen": "2026-10-10T03:03:04Z",
+    "occurrences": 1
+  },
+  {
+    "key": "dola-seedream-5-0-flash-260915|pricing|Model requires an adapter contract before it can be enabled",
+    "model": "dola-seedream-5-0-flash-260915",
+    "source": "pricing",
+    "reason": "Model requires an adapter contract before it can be enabled",
+    "evidence": {
+      "id": "dola-seedream-5-0-flash-260915",
+      "rates": [
+        {
+          "per": 1,
+          "unit": "image",
+          "price": 0.018,
+          "region": "Singapore"
+        }
+      ],
+      "metadata": {
+        "facts": [
+          {
+            "label": "Published tariff",
+            "value": "Free | 0.018"
+          }
+        ]
+      }
+    },
+    "first_seen": "2026-10-10T03:03:04Z",
+    "last_seen": "2026-10-10T03:03:04Z",
+    "occurrences": 1
+  },
+  {
+    "key": "dola-seedream-5-0-flash-260915|releases|Model requires an adapter contract before it can be enabled",
+    "model": "dola-seedream-5-0-flash-260915",
+    "source": "releases",
+    "reason": "Model requires an adapter contract before it can be enabled",
+    "evidence": {
+      "id": "dola-seedream-5-0-flash-260915",
+      "metadata": {
+        "description": "Designed for high-precision image generation, with the same capabilities as Seedream 5.0 pro, including interactive editing, layer decomposition, and native multilingual generation. Seedream 5.0 flash generates images faster and costs less, making it suitable for latency- and cost-sensitive applications. For instructions, see Seedream 5.0 pro / flash tutorial.",
+        "release_date": "2026-09"
+      }
+    },
+    "first_seen": "2026-10-10T03:03:04Z",
+    "last_seen": "2026-10-10T03:03:04Z",
+    "occurrences": 1
+  },
+  {
+    "key": "dola-seedream-5-0-pro-260628|models|Published capability details require adapter review|Provider: output specifications / limits",
+    "model": "dola-seedream-5-0-pro-260628",
+    "source": "models",
+    "reason": "Published capability details require adapter review",
+    "evidence": {
+      "label": "Provider: output specifications / limits",
+      "value": "500"
+    },
+    "first_seen": "2026-10-10T03:03:04Z",
+    "last_seen": "2026-10-10T03:03:04Z",
+    "occurrences": 1
+  },
+  {
+    "key": "dola-seedream-5-0-pro-260628|pricing|Published tariff needs a structured pricing rule|Published tariff",
+    "model": "dola-seedream-5-0-pro-260628",
+    "source": "pricing",
+    "reason": "Published tariff needs a structured pricing rule",
+    "evidence": {
+      "label": "Published tariff",
+      "value": "First image: Free From the 2nd image: 0.003 | Single image generation: ≤ 2.61 million pixels (1.5K or lower): 0.045 \\> 2.61 million pixels (higher than 1.5K): 0.09 Layer decomposition: ≤ 2.61 million pixels (1.5K or lower): 0.0225 \\> 2.61 million pixels (higher than 1.5K): 0.045"
+    },
+    "first_seen": "2026-10-10T03:03:04Z",
+    "last_seen": "2026-10-10T03:03:04Z",
+    "occurrences": 1
+  },
+  {
+    "key": "dreamina-seedance-2-0-260128|pricing|Published tariff needs a structured pricing rule|Published tariff condition",
+    "model": "dreamina-seedance-2-0-260128",
+    "source": "pricing",
+    "reason": "Published tariff needs a structured pricing rule",
+    "evidence": {
+      "label": "Published tariff condition",
+      "value": "Input-video tariffs require separate reviewed rules: For 480p and 720p outputs: Input without video: 7.0 Input with video: 4.3 For 1080p outputs: Input without video: 7.7 Input with video: 4.7 For 4K outputs: Input without video: 4.0 Input with video: 2.4"
+    },
+    "first_seen": "2026-10-10T03:03:04Z",
+    "last_seen": "2026-10-10T03:03:04Z",
+    "occurrences": 1
+  },
+  {
+    "key": "dreamina-seedance-2-0-fast-260128|pricing|Published tariff needs a structured pricing rule|Published tariff condition",
+    "model": "dreamina-seedance-2-0-fast-260128",
+    "source": "pricing",
+    "reason": "Published tariff needs a structured pricing rule",
+    "evidence": {
+      "label": "Published tariff condition",
+      "value": "Input-video tariffs require separate reviewed rules: For 480p and 720p outputs: Input without video: 5.6 Input with video: 3.3"
+    },
+    "first_seen": "2026-10-10T03:03:04Z",
+    "last_seen": "2026-10-10T03:03:04Z",
+    "occurrences": 1
+  },
+  {
+    "key": "dreamina-seedance-2-0-mini-260615|pricing|Published tariff needs a structured pricing rule|Published tariff condition",
+    "model": "dreamina-seedance-2-0-mini-260615",
+    "source": "pricing",
+    "reason": "Published tariff needs a structured pricing rule",
+    "evidence": {
+      "label": "Published tariff condition",
+      "value": "Input-video tariffs require separate reviewed rules: For 480p and 720p outputs: Input without video: 3.5 Input with video: 2.1"
+    },
+    "first_seen": "2026-10-10T03:03:04Z",
+    "last_seen": "2026-10-10T03:03:04Z",
+    "occurrences": 1
+  },
+  {
+    "key": "dreamina-seedance-2-5-260628|pricing|Published tariff needs a structured pricing rule|Published tariff condition",
+    "model": "dreamina-seedance-2-5-260628",
+    "source": "pricing",
+    "reason": "Published tariff needs a structured pricing rule",
+    "evidence": {
+      "label": "Published tariff condition",
+      "value": "Input-video tariffs require separate reviewed rules: For 480p and 720p outputs: Input without video: 10.70 Input with video: 6.40 For 1080p outputs: Input without video: 11.7 Input with video: 7.0"
+    },
+    "first_seen": "2026-10-10T03:03:04Z",
+    "last_seen": "2026-10-10T03:03:04Z",
+    "occurrences": 1
+  },
+  {
+    "key": "dreamina-seedance-2-5-260628|pricing|Tariff requires supported units, region and estimation rules|Singapore/1080p//token/1000000",
+    "model": "dreamina-seedance-2-5-260628",
+    "source": "pricing",
+    "reason": "Tariff requires supported units, region and estimation rules",
+    "evidence": {
+      "rate": {
+        "per": 1000000,
+        "unit": "token",
+        "price": 11.7,
+        "region": "Singapore",
+        "source": "[https://docs.byteplus.com/en/docs/modelark/1544106](https://docs.byteplus.com/en/docs/modelark/1544106)",
+        "resolution": "1080p"
+      },
+      "reason": "unsupported resolution"
+    },
+    "first_seen": "2026-10-10T03:03:04Z",
+    "last_seen": "2026-10-10T03:03:04Z",
+    "occurrences": 1
+  },
+  {
+    "key": "seedance-1-0-pro-250528|pricing|Published tariff needs a structured pricing rule|Published tariff",
+    "model": "seedance-1-0-pro-250528",
+    "source": "pricing",
+    "reason": "Published tariff needs a structured pricing rule",
+    "evidence": {
+      "label": "Published tariff",
+      "value": "2.5 | 1.25"
+    },
+    "first_seen": "2026-10-10T03:03:04Z",
+    "last_seen": "2026-10-10T03:03:04Z",
+    "occurrences": 1
+  },
+  {
+    "key": "seedance-1-0-pro-fast-251015|pricing|Published tariff needs a structured pricing rule|Published tariff",
+    "model": "seedance-1-0-pro-fast-251015",
+    "source": "pricing",
+    "reason": "Published tariff needs a structured pricing rule",
+    "evidence": {
+      "label": "Published tariff",
+      "value": "1 | 0.5"
+    },
+    "first_seen": "2026-10-10T03:03:04Z",
+    "last_seen": "2026-10-10T03:03:04Z",
+    "occurrences": 1
+  },
+  {
+    "key": "seedance-1-5-pro-251215|pricing|Published tariff needs a structured pricing rule|Published tariff",
+    "model": "seedance-1-5-pro-251215",
+    "source": "pricing",
+    "reason": "Published tariff needs a structured pricing rule",
+    "evidence": {
+      "label": "Published tariff",
+      "value": "Video with audio: 2.4 Video without audio: 1.2 | Video with audio: 1.2 Video without audio: 0.6"
+    },
+    "first_seen": "2026-10-10T03:03:04Z",
+    "last_seen": "2026-10-10T03:03:04Z",
+    "occurrences": 1
+  },
+  {
+    "key": "seedance-1.0-pro-fast-251015|releases-archive|Model requires an adapter contract before it can be enabled",
+    "model": "seedance-1.0-pro-fast-251015",
+    "source": "releases-archive",
+    "reason": "Model requires an adapter contract before it can be enabled",
+    "evidence": {
+      "id": "seedance-1.0-pro-fast-251015",
+      "metadata": {
+        "description": "A video generation model that achieves an excellent balance between output quality, generation speed, and cost. For usage instructions, see Create a video generation task.",
+        "release_date": "2025-10"
+      }
+    },
+    "first_seen": "2026-10-10T03:03:04Z",
+    "last_seen": "2026-10-10T03:03:04Z",
+    "occurrences": 1
+  },
+  {
+    "key": "seedream-3-0-t2i-250415|_api|Model requires an adapter contract before it can be enabled",
+    "model": "seedream-3-0-t2i-250415",
+    "source": "_api",
+    "reason": "Model requires an adapter contract before it can be enabled",
+    "evidence": {
+      "id": "seedream-3-0-t2i-250415"
+    },
+    "first_seen": "2026-10-10T03:03:04Z",
+    "last_seen": "2026-10-10T03:03:04Z",
+    "occurrences": 1
+  },
+  {
+    "key": "seedream-3.0-t2i-250415|releases-archive|Model requires an adapter contract before it can be enabled",
+    "model": "seedream-3.0-t2i-250415",
+    "source": "releases-archive",
+    "reason": "Model requires an adapter contract before it can be enabled",
+    "evidence": {
+      "id": "seedream-3.0-t2i-250415",
+      "metadata": {
+        "description": "Seedream 3.0 is a bilingual (Chinese and English) text-to-image model developed by ByteDance's large model team, supporting native high-resolution image generation. Seedream 3.0 offers significant improvements: native 2K resolution output, faster response times, more accurate small text generation, enhanced text layout, strong instruction following, improved aesthetics and structure, and better fidelity and detail. It leads in multiple evaluations and can be applied to more complex and diverse image generation scenarios.",
+        "release_date": "2025-06"
+      }
+    },
+    "first_seen": "2026-10-10T03:03:04Z",
+    "last_seen": "2026-10-10T03:03:04Z",
+    "occurrences": 1
+  },
+  {
+    "key": "seedream-4-0-250828|models|Published capability details require adapter review|Provider: output specifications / limits",
+    "model": "seedream-4-0-250828",
+    "source": "models",
+    "reason": "Published capability details require adapter review",
+    "evidence": {
+      "label": "Provider: output specifications / limits",
+      "value": "500"
+    },
+    "first_seen": "2026-10-10T03:03:04Z",
+    "last_seen": "2026-10-10T03:03:04Z",
+    "occurrences": 1
+  },
+  {
+    "key": "seedream-4-5-251128|models|Published capability details require adapter review|Provider: output specifications / limits",
+    "model": "seedream-4-5-251128",
+    "source": "models",
+    "reason": "Published capability details require adapter review",
+    "evidence": {
+      "label": "Provider: output specifications / limits",
+      "value": "500"
+    },
+    "first_seen": "2026-10-10T03:03:04Z",
+    "last_seen": "2026-10-10T03:03:04Z",
+    "occurrences": 1
+  },
+  {
+    "key": "seedream-5-0-260128|models|Published capability details require adapter review|Provider: output specifications / limits",
+    "model": "seedream-5-0-260128",
+    "source": "models",
+    "reason": "Published capability details require adapter review",
+    "evidence": {
+      "label": "Provider: output specifications / limits",
+      "value": "500"
+    },
+    "first_seen": "2026-10-10T03:03:04Z",
+    "last_seen": "2026-10-10T03:03:04Z",
+    "occurrences": 1
+  },
+  {
+    "key": "seedream-5-0-lite-260128|pricing|Model requires an adapter contract before it can be enabled",
+    "model": "seedream-5-0-lite-260128",
+    "source": "pricing",
+    "reason": "Model requires an adapter contract before it can be enabled",
+    "evidence": {
+      "id": "seedream-5-0-lite-260128",
+      "rates": [
+        {
+          "per": 1,
+          "unit": "image",
+          "price": 0.035,
+          "region": "Singapore"
+        }
+      ],
+      "metadata": {
+        "facts": [
+          {
+            "label": "Published tariff",
+            "value": "Free | 0.035"
+          }
+        ]
+      }
+    },
+    "first_seen": "2026-10-10T03:03:04Z",
+    "last_seen": "2026-10-10T03:03:04Z",
+    "occurrences": 1
+  }
+]

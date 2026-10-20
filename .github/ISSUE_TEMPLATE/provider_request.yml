@@ -1,0 +1,42 @@
+name: Provider request
+description: Propose a new media-generation provider or expand an existing one
+title: "[Provider]: "
+labels: [provider]
+body:
+  - type: input
+    id: provider
+    attributes:
+      label: Provider and API
+      description: Name the provider and link to its official API documentation.
+    validations:
+      required: true
+  - type: checkboxes
+    id: media
+    attributes:
+      label: Media capabilities
+      options:
+        - label: Image generation or editing
+        - label: Video generation or editing
+        - label: Speech or audio generation
+        - label: Music generation
+  - type: textarea
+    id: catalog
+    attributes:
+      label: Models and discovery
+      description: Explain whether the API exposes a model catalog and capability metadata.
+    validations:
+      required: true
+  - type: textarea
+    id: operations
+    attributes:
+      label: Operational details
+      description: Authentication, regions, async polling, result lifetime, limits, usage, and billing APIs.
+    validations:
+      required: true
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Provider terms
+      options:
+        - label: I checked that an independent open-source client is permitted by the provider's API terms.
+          required: true

@@ -1,0 +1,134 @@
+const {evidencePath}=require('./evidence.cjs');
+// Delayed synthetic API responses exercise picker continuations, never BytePlus.
+const {chromium,webkit}=require('playwright');
+const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const root=process.env.UI_SOURCE_DIR||path.resolve(__dirname,'../../web/public/ui');
+const output=process.env.UI_SCREENSHOT_DIR||evidencePath('/tmp/gateway-provider-reference-state');
+const width=Number(process.env.UI_VIEWPORT_WIDTH||1440),theme=process.env.UI_THEME||'light';
+fs.mkdirSync(output,{recursive:true});
+const deferred=()=>{let resolve;const promise=new Promise(done=>resolve=done);return {promise,resolve};};
+const model={id:'seedance',display_name:'Synthetic references',media_type:'video',reference_prompt_syntax:'numbered',supports_asset_references:true,supports_image_input:true,max_image_inputs:9,resolutions:['720p'],ratios:['16:9'],default_duration:5,reference_modes:[{id:'references',label:'References',min_images:0,max_images:9,min_videos:0,max_videos:0,min_audios:0,max_audios:0}]};
+const asset={id:'binding-existing',asset_id:'asset-existing',uri:'asset://asset-existing',group_id:'group-existing',name:'Existing character',type:'Image',status:'Active'};
+const org={id:'11111111-1111-4111-8111-111111111111',name:'Synthetic studio',role:'supermanager',available_usd:10};
+const server=http.createServer((req,res)=>{
+ const name=req.url.startsWith('/ui/')?path.basename(req.url.split('?')[0]):'index.html',file=path.join(root,name);
+ if(!fs.existsSync(file))return res.writeHead(404).end();
+ res.setHeader('Content-Type',name.endsWith('.js')?'text/javascript':name.endsWith('.css')?'text/css':'text/html');res.end(fs.readFileSync(file));
+});
+(async()=>{
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+ const origin='http://127.0.0.1:'+server.address().port,engine=process.env.UI_BROWSER_ENGINE==='webkit'?webkit:chromium;
+ const browser=await engine.launch({headless:true,...(engine===chromium&&process.env.UI_BROWSER_PATH?{executablePath:process.env.UI_BROWSER_PATH}:{})}),results=[];
+ async function run(name,test){
+  if(process.env.UI_CASE_FILTER&&!name.includes(process.env.UI_CASE_FILTER))return;
+  const context=await browser.newContext({viewport:{width,height:1100},colorScheme:theme}),page=await context.newPage(),errors=[],gates=[];
+  page.setDefaultTimeout(6000);page.on('pageerror',e=>errors.push(e.message));
+  const state={assets:[],groups:[{id:'group-existing',name:'Characters'}],imports:0,groupCreates:0,gate:null};
+  state.hold=match=>{const gate={match,arrived:deferred(),release:deferred()};state.gate=gate;gates.push(gate);return gate;};
+  await context.route('**/*',async route=>{
+   const req=route.request(),url=new URL(req.url()),p=url.pathname;
+   if(url.origin!==origin){errors.push('External request: '+url.origin);return route.abort();}
+   if(!p.startsWith('/v1/'))return route.continue();
+   const gate=state.gate;
+   if(gate&&gate.match(p,req.method())){state.gate=null;gate.arrived.resolve();await gate.release.promise;}
+   const json=data=>route.fulfill({json:data}).catch(()=>{});
+   if(p==='/v1/info')return json({auth_mode:'google',provider:'bytedance'});
+   if(p==='/v1/me')return json({id:'synthetic-admin',session_id:'fixture',name:'Synthetic admin',is_system_admin:true});
+   if(p==='/v1/organizations')return json({data:[org]});
+   if(p==='/v1/api-keys'&&req.method()==='POST')return json({secret:'synthetic-key'});
+   if(p==='/v1/key')return json({key:{id:'synthetic-key',name:'Fixture',organization_id:org.id,resource_mode:'shared',scopes:['generation']},organization:org,usage:{}});
+   if(p==='/v1/providers')return json({data:['bytedance','second'].map(id=>({id,name:id,default_model:model.id,models:[model]}))});
+   if(p==='/v1/generations/estimate')return json({cost:{expected_usd:0},can_generate:true});
+   if(p==='/v1/generations'&&req.method()==='POST'){errors.push('Unexpected generation submission');return route.abort();}
+   if(p.endsWith('/groups')){
+    if(req.method()==='POST'){state.groupCreates++;const group={id:'created-'+state.groupCreates,name:req.postDataJSON().name};state.groups.push(group);return json(group);}
+    return json({data:state.groups,can_import:true});
+   }
+   if(p.endsWith('/inventory'))return json({data:[asset]});
+   if(p.endsWith('/import')){state.imports++;state.assets=[asset];return json(asset);}
+   if(p.endsWith('/assets'))return json({data:state.assets});
+   return json({data:[]});
+  });
+  const picker=page.locator('#referenceLibrary');
+  async function open(){await page.locator('#chooseReferences').click();}
+  async function source(){await picker.locator('select[aria-label="image reference source"]').selectOption('provider');await picker.getByRole('button',{name:'Refresh',exact:true}).waitFor();await page.waitForFunction(()=>!document.querySelector('#referenceLibrary .provider-reference-library .reference-actions button').disabled);}
+  async function inventory(){await picker.getByRole('button',{name:'Import existing assets',exact:true}).click();await picker.getByRole('button',{name:'Import Existing character into this workspace',exact:true}).waitFor();}
+  async function close(){await picker.getByRole('button',{name:'Done',exact:true}).click();}
+  async function selectProvider(id){await page.locator('#model').selectOption(JSON.stringify([id,model.id]));await page.waitForFunction(id=>selectedProvider()?.id===id,id);}
+  try{
+   await page.goto(origin);await page.locator('#createGenerationKey').click();await page.waitForFunction(()=>selectedModel()?.id==='seedance');
+   await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);
+   await test({page,picker,state,open,source,inventory,close,selectProvider});
+   assert.deepEqual(errors,[]);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'no horizontal page overflow');
+   await page.screenshot({path:path.join(output,name.replaceAll(' ','-')+'.png'),fullPage:true});
+   results.push({name,result:'passed'});console.log('PASS '+name);
+  }catch(error){results.push({name,result:'failed',error:error.message});await page.screenshot({path:path.join(output,name.replaceAll(' ','-')+'.png'),fullPage:true});console.error('FAIL '+name+': '+error.message);}
+  finally{gates.forEach(g=>g.release.resolve());await context.close();}
+ }
+ try{
+  await run('repeat import preserves selected reference',async({page,picker,state,open,source,inventory,close})=>{
+   await open();await source();await inventory();
+   await picker.getByRole('button',{name:'Import Existing character into this workspace',exact:true}).click();
+   await page.waitForFunction(()=>document.querySelector('#imageURLs').value==='asset://asset-existing');
+   await inventory();
+   const gate=state.hold((p,m)=>p.endsWith('/import')&&m==='POST');
+   await picker.getByRole('button',{name:'Import Existing character into this workspace',exact:true}).click();await gate.arrived.promise;
+   gate.release.resolve();await picker.getByRole('button',{name:'Import existing assets',exact:true}).waitFor();
+   await page.waitForFunction(()=>document.querySelector('#referenceLibrary [data-asset-id="asset-existing"]'));
+   // A final API response and its continuation must settle before asserting absence.
+   await page.waitForTimeout(150);
+   assert.equal(await page.locator('#imageURLs').inputValue(),asset.uri,'reimporting an existing selection must not toggle it off');
+   assert.equal(state.imports,2);await close();
+  });
+  await run('reset during import refresh discards old selection',async({page,picker,state,open,source,inventory,close})=>{
+   await open();await source();await inventory();
+   const gate=state.hold((p,m)=>p.endsWith('/groups')&&m==='GET');
+   await picker.getByRole('button',{name:'Import Existing character into this workspace',exact:true}).click();await gate.arrived.promise;
+   await close();await page.locator('#forgetGenerationKey').click();
+   gate.release.resolve();await page.waitForTimeout(250);
+   assert.equal(await page.locator('#imageURLs').inputValue(),'','a completed old-key import must not repopulate the reset form');
+   await page.locator('#createGenerationKey').click();await page.waitForFunction(()=>selectedModel()?.id==='seedance');
+   assert.equal(await page.locator('#selectedReferences .reference-card').count(),0);
+  });
+  await run('overlapping imports select only once',async({page,picker,state,open,source,inventory})=>{
+   await open();await source();await inventory();const choose=picker.getByRole('button',{name:'Import Existing character into this workspace',exact:true});
+   const gate=state.hold((p,m)=>p.endsWith('/import')&&m==='POST');
+   await choose.click();await gate.arrived.promise;await choose.click();
+   await page.waitForFunction(()=>document.querySelector('#imageURLs').value==='asset://asset-existing');
+   gate.release.resolve();await picker.getByRole('button',{name:'Import existing assets',exact:true}).waitFor();await page.waitForTimeout(250);
+   assert.equal(await page.locator('#imageURLs').inputValue(),asset.uri,'two pending imports must leave exactly one selected URI');assert.equal(state.imports,2);
+  });
+  for(const reset of ['provider change','key reset'])await run('group create recovers after '+reset,async({page,picker,state,open,source,close,selectProvider})=>{
+   await open();await source();await picker.getByRole('button',{name:'New group',exact:true}).click();
+   await picker.getByRole('textbox',{name:'image group name',exact:true}).fill('Interrupted group');
+   const gate=state.hold((p,m)=>p.endsWith('/groups')&&m==='POST');
+   await picker.getByRole('button',{name:'Create group',exact:true}).click();await gate.arrived.promise;
+   await close();
+   if(reset==='provider change')await selectProvider('second');
+   else{await page.locator('#forgetGenerationKey').click();await page.locator('#createGenerationKey').click();await page.waitForFunction(()=>selectedModel()?.id==='seedance');}
+   gate.release.resolve();await open();await source();
+   const create=picker.getByRole('button',{name:'Create group',exact:true});
+   if(!await create.isVisible())await picker.getByRole('button',{name:'New group',exact:true}).click();
+   assert.equal(await create.isEnabled(),true,'the abandoned request must not leave Create group disabled');
+   await picker.getByRole('textbox',{name:'image group name',exact:true}).fill('New group');await create.focus();await page.keyboard.press('Enter');
+   await page.waitForFunction(()=>document.querySelector('#referenceLibrary select[aria-label="image asset group"]').value.startsWith('created-'));
+   await close();
+  });
+  await run('refresh recovers after provider change',async({page,picker,state,open,source,close,selectProvider})=>{
+   await open();await source();const gate=state.hold((p,m)=>p.endsWith('/groups')&&m==='GET');
+   await picker.getByRole('button',{name:'Refresh',exact:true}).click();await gate.arrived.promise;
+   await close();await selectProvider('second');gate.release.resolve();await open();await source();
+   assert.equal(await picker.getByRole('button',{name:'Refresh',exact:true}).isEnabled(),true,'refresh must be usable on the new provider');
+  });
+  await run('keyboard navigation closes reference preview',async({page})=>{
+   await page.locator('#imageURLs').evaluate(e=>{e.value=location.origin+'/references/image.png';e.dispatchEvent(new Event('input',{bubbles:true}));});
+   await page.locator('#prompt').fill('Use @Image1');await page.locator('.prompt-reference-token').waitFor();
+   await page.locator('#prompt').evaluate(e=>e.setSelectionRange(7,7));await page.keyboard.press('Alt+ArrowDown');await page.locator('#promptReferencePreview').waitFor();
+   await page.locator('#systemNav').focus();await page.keyboard.press('Enter');await page.locator('#systemView').waitFor();
+   await page.waitForFunction(()=>!document.querySelector('#promptReferencePreview'));
+   await page.locator('#generationNav').focus();await page.keyboard.press('Enter');await page.locator('#prompt').waitFor();
+   assert.equal(await page.locator('#prompt').inputValue(),'Use @Image1');
+  });
+ }finally{fs.writeFileSync(path.join(output,'results.json'),JSON.stringify({engine:process.env.UI_BROWSER_ENGINE||'chromium',version:browser.version(),width,theme,source:root,results},null,2)+'\n');await browser.close();server.close();}
+ if(results.some(r=>r.result==='failed'))process.exitCode=1;
+})().catch(error=>{console.error(error);server.close();process.exitCode=1});

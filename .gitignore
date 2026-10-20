@@ -1,0 +1,61 @@
+# Local configuration and secrets. Keep the example file public.
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+credentials*.json
+secrets*.json
+
+# Runtime data and build/test output.
+data/
+bin/
+dist/
+coverage.out
+coverage.*
+*.test
+*.out
+*.log
+*.patch
+*.tmp
+*.bak
+__pycache__/
+*.py[cod]
+.pytest_cache/
+node_modules/
+
+# Private maintainer records and retired development documents.
+/.local/
+/docs/audits/
+/docs/*-plan.md
+/docs/*-audit.md
+/docs/*testing-report.md
+/deploy/macos/
+
+# Editors and operating systems.
+.DS_Store
+.idea/
+.vscode/
+
+# Local research/export artifacts. These remain on the maintainer's machine,
+# but are not part of the distributable source tree.
+bridge/
+slides-build/
+trusted-read-*/
+diagrams/
+*.inspect.ndjson
+*.pdf
+*.pptx
+*.docx
+
+# Machine-specific launchd file; publish the sanitized example instead.
+deploy/macos/*.plist
+
+# Keep retired local asset imports outside source releases.
+internal/api/ui/assets/*.png
+
+deployment.json
+
+deployment-private/

@@ -1,0 +1,1779 @@
+{
+  "version": 1,
+  "models": {
+    "gpt-image-2.5-flare": {
+      "id": "gpt-image-2.5-flare",
+      "contract": {
+        "id": "gpt-image-2.5-flare",
+        "ratios": null,
+        "formats": [
+          "png",
+          "jpeg",
+          "webp"
+        ],
+        "no_seed": true,
+        "pricing": {
+          "known": false,
+          "reference_price_usd": 0,
+          "reference_description": ""
+        },
+        "qualities": [
+          "medium",
+          "low",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "media_type": "image",
+        "backgrounds": [
+          "opaque",
+          "transparent",
+          "auto"
+        ],
+        "resolutions": [
+          "1024x1024",
+          "1536x1024",
+          "1024x1536",
+          "2048x2048",
+          "2048x1152",
+          "1152x2048",
+          "3840x2160",
+          "2160x3840"
+        ],
+        "display_name": "",
+        "max_duration": 0,
+        "min_duration": 0,
+        "no_watermark": true,
+        "supports_audio": false,
+        "supports_draft": false,
+        "reference_modes": [
+          {
+            "id": "references",
+            "label": "References",
+            "max_audios": 0,
+            "max_images": 16,
+            "max_videos": 0,
+            "min_audios": 0,
+            "min_images": 0,
+            "min_videos": 0
+          }
+        ],
+        "default_duration": 0,
+        "max_image_inputs": 16,
+        "supports_last_frame": false,
+        "supports_image_input": true,
+        "supports_camera_fixed": false
+      },
+      "metadata": {
+        "facts": [
+          {
+            "label": "Provider: Input modalities",
+            "value": "text, image"
+          },
+          {
+            "label": "Provider: Output modalities",
+            "value": "image"
+          },
+          {
+            "label": "Provider: Supported endpoints",
+            "value": "image_generation, image_edit"
+          },
+          {
+            "label": "Provider: Supported features",
+            "value": "inpainting"
+          }
+        ],
+        "sources": [
+          {
+            "url": "[https://developers.openai.com/api/docs/models/gpt-image-2.5-flare](https://developers.openai.com/api/docs/models/gpt-image-2.5-flare)",
+            "title": "OpenAI model documentation"
+          },
+          {
+            "url": "[https://developers.openai.com/api/docs/pricing](https://developers.openai.com/api/docs/pricing)",
+            "title": "OpenAI pricing"
+          },
+          {
+            "url": "[https://developers.openai.com/api/docs/guides/image-generation#calculating-costs](https://developers.openai.com/api/docs/guides/image-generation#calculating-costs)",
+            "title": "Image cost calculation"
+          },
+          {
+            "url": "[https://developers.openai.com/api/docs/changelog](https://developers.openai.com/api/docs/changelog)",
+            "title": "Release announcement"
+          }
+        ],
+        "owned_by": "system",
+        "snapshot": "gpt-image-2.5-flare-2026-09-08",
+        "checked_at": "2026-09-13",
+        "api_created": 1788563147,
+        "description": "Fast, high-quality everyday image generation and editing.",
+        "release_date": "2026-09-08",
+        "version_date": "2026-09-08"
+      }
+    },
+    "gpt-image-2.5-sunburst": {
+      "id": "gpt-image-2.5-sunburst",
+      "contract": {
+        "id": "gpt-image-2.5-sunburst",
+        "ratios": null,
+        "formats": [
+          "png",
+          "jpeg",
+          "webp"
+        ],
+        "no_seed": true,
+        "pricing": {
+          "known": false,
+          "reference_price_usd": 0,
+          "reference_description": ""
+        },
+        "qualities": [
+          "medium",
+          "low",
+          "high",
+          "xhigh",
+          "max"
+        ],
+        "media_type": "image",
+        "backgrounds": [
+          "opaque",
+          "transparent",
+          "auto"
+        ],
+        "resolutions": [
+          "1024x1024",
+          "1536x1024",
+          "1024x1536",
+          "2048x2048",
+          "2048x1152",
+          "1152x2048",
+          "3840x2160",
+          "2160x3840"
+        ],
+        "display_name": "",
+        "max_duration": 0,
+        "min_duration": 0,
+        "no_watermark": true,
+        "supports_audio": false,
+        "supports_draft": false,
+        "reference_modes": [
+          {
+            "id": "references",
+            "label": "References",
+            "max_audios": 0,
+            "max_images": 16,
+            "max_videos": 0,
+            "min_audios": 0,
+            "min_images": 0,
+            "min_videos": 0
+          }
+        ],
+        "default_duration": 0,
+        "max_image_inputs": 16,
+        "supports_last_frame": false,
+        "supports_image_input": true,
+        "supports_camera_fixed": false
+      },
+      "metadata": {
+        "facts": [
+          {
+            "label": "Provider: Input modalities",
+            "value": "text, image"
+          },
+          {
+            "label": "Provider: Output modalities",
+            "value": "image"
+          },
+          {
+            "label": "Provider: Supported endpoints",
+            "value": "image_generation, image_edit"
+          },
+          {
+            "label": "Provider: Supported features",
+            "value": "inpainting"
+          }
+        ],
+        "sources": [
+          {
+            "url": "[https://developers.openai.com/api/docs/models/gpt-image-2.5-sunburst](https://developers.openai.com/api/docs/models/gpt-image-2.5-sunburst)",
+            "title": "OpenAI model documentation"
+          },
+          {
+            "url": "[https://developers.openai.com/api/docs/pricing](https://developers.openai.com/api/docs/pricing)",
+            "title": "OpenAI pricing"
+          },
+          {
+            "url": "[https://developers.openai.com/api/docs/guides/image-generation#calculating-costs](https://developers.openai.com/api/docs/guides/image-generation#calculating-costs)",
+            "title": "Image cost calculation"
+          },
+          {
+            "url": "[https://developers.openai.com/api/docs/changelog](https://developers.openai.com/api/docs/changelog)",
+            "title": "Release announcement"
+          }
+        ],
+        "owned_by": "system",
+        "snapshot": "gpt-image-2.5-sunburst-2026-09-08",
+        "checked_at": "2026-09-13",
+        "api_created": 1788563162,
+        "description": "Image generation and editing, with a focus on editing precision.",
+        "release_date": "2026-09-08",
+        "version_date": "2026-09-08"
+      }
+    },
+    "gpt-image-2": {
+      "id": "gpt-image-2",
+      "contract": {
+        "id": "gpt-image-2",
+        "ratios": null,
+        "formats": [
+          "png",
+          "jpeg",
+          "webp"
+        ],
+        "no_seed": true,
+        "pricing": {
+          "known": false,
+          "reference_price_usd": 0,
+          "reference_description": ""
+        },
+        "qualities": [
+          "medium",
+          "low",
+          "high"
+        ],
+        "media_type": "image",
+        "backgrounds": [
+          "opaque",
+          "transparent",
+          "auto"
+        ],
+        "resolutions": [
+          "1024x1024",
+          "1536x1024",
+          "1024x1536",
+          "2048x2048",
+          "2048x1152",
+          "1152x2048",
+          "3840x2160",
+          "2160x3840"
+        ],
+        "display_name": "",
+        "max_duration": 0,
+        "min_duration": 0,
+        "no_watermark": true,
+        "supports_audio": false,
+        "supports_draft": false,
+        "reference_modes": [
+          {
+            "id": "references",
+            "label": "References",
+            "max_audios": 0,
+            "max_images": 16,
+            "max_videos": 0,
+            "min_audios": 0,
+            "min_images": 0,
+            "min_videos": 0
+          }
+        ],
+        "default_duration": 0,
+        "max_image_inputs": 16,
+        "supports_last_frame": false,
+        "supports_image_input": true,
+        "supports_camera_fixed": false
+      },
+      "metadata": {
+        "facts": [
+          {
+            "label": "Provider: Input modalities",
+            "value": "text, image"
+          },
+          {
+            "label": "Provider: Output modalities",
+            "value": "image"
+          },
+          {
+            "label": "Provider: Supported endpoints",
+            "value": "batch, image_generation, image_edit"
+          },
+          {
+            "label": "Provider: Supported features",
+            "value": "inpainting"
+          }
+        ],
+        "sources": [
+          {
+            "url": "[https://developers.openai.com/api/docs/models/gpt-image-2](https://developers.openai.com/api/docs/models/gpt-image-2)",
+            "title": "OpenAI model documentation"
+          },
+          {
+            "url": "[https://developers.openai.com/api/docs/pricing](https://developers.openai.com/api/docs/pricing)",
+            "title": "OpenAI pricing"
+          },
+          {
+            "url": "[https://developers.openai.com/api/docs/guides/image-generation#calculating-costs](https://developers.openai.com/api/docs/guides/image-generation#calculating-costs)",
+            "title": "Image cost calculation"
+          },
+          {
+            "url": "[https://developers.openai.com/api/docs/changelog](https://developers.openai.com/api/docs/changelog)",
+            "title": "Release announcement"
+          }
+        ],
+        "owned_by": "system",
+        "snapshot": "gpt-image-2-2026-04-21",
+        "checked_at": "2026-09-13",
+        "api_created": 1776399795,
+        "description": "State-of-the-art image generation model",
+        "release_date": "2026-04-21",
+        "version_date": "2026-04-21"
+      },
+      "rates": [
+        {
+          "per": 1,
+          "unit": "multi_metric",
+          "price": 0.0,
+          "region": "standard",
+          "source": "[https://developers.openai.com/api/docs/pricing](https://developers.openai.com/api/docs/pricing)",
+          "components": [
+            {
+              "per": 1000000,
+              "price": 8.0,
+              "metric": "image_input_tokens"
+            },
+            {
+              "per": 1000000,
+              "price": 30.0,
+              "metric": "image_output_tokens"
+            },
+            {
+              "per": 1000000,
+              "price": 5.0,
+              "metric": "text_input_tokens"
+            }
+          ]
+        }
+      ]
+    },
+    "gpt-image-1.5": {
+      "id": "gpt-image-1.5",
+      "contract": {
+        "id": "gpt-image-1.5",
+        "ratios": null,
+        "formats": [
+          "png",
+          "jpeg",
+          "webp"
+        ],
+        "no_seed": true,
+        "pricing": {
+          "known": false,
+          "reference_price_usd": 0,
+          "reference_description": ""
+        },
+        "qualities": [
+          "medium",
+          "low",
+          "high"
+        ],
+        "media_type": "image",
+        "backgrounds": [
+          "opaque",
+          "transparent",
+          "auto"
+        ],
+        "resolutions": [
+          "1024x1024",
+          "1536x1024",
+          "1024x1536"
+        ],
+        "display_name": "",
+        "max_duration": 0,
+        "min_duration": 0,
+        "no_watermark": true,
+        "supports_audio": false,
+        "supports_draft": false,
+        "reference_modes": [
+          {
+            "id": "references",
+            "label": "References",
+            "max_audios": 0,
+            "max_images": 16,
+            "max_videos": 0,
+            "min_audios": 0,
+            "min_images": 0,
+            "min_videos": 0
+          }
+        ],
+        "default_duration": 0,
+        "max_image_inputs": 16,
+        "supports_last_frame": false,
+        "supports_image_input": true,
+        "supports_camera_fixed": false
+      },
+      "metadata": {
+        "facts": [
+          {
+            "label": "Provider: Input modalities",
+            "value": "text, image"
+          },
+          {
+            "label": "Provider: Output modalities",
+            "value": "image, text"
+          },
+          {
+            "label": "Provider: Supported endpoints",
+            "value": "batch, image_generation, image_edit"
+          },
+          {
+            "label": "Provider: Supported features",
+            "value": "inpainting"
+          }
+        ],
+        "sources": [
+          {
+            "url": "[https://developers.openai.com/api/docs/models/gpt-image-1.5](https://developers.openai.com/api/docs/models/gpt-image-1.5)",
+            "title": "OpenAI model documentation"
+          },
+          {
+            "url": "[https://developers.openai.com/api/docs/pricing](https://developers.openai.com/api/docs/pricing)",
+            "title": "OpenAI pricing"
+          },
+          {
+            "url": "[https://developers.openai.com/api/docs/guides/image-generation#calculating-costs](https://developers.openai.com/api/docs/guides/image-generation#calculating-costs)",
+            "title": "Image cost calculation"
+          },
+          {
+            "url": "[https://developers.openai.com/api/docs/deprecations](https://developers.openai.com/api/docs/deprecations)",
+            "title": "Deprecations"
+          },
+          {
+            "url": "[https://developers.openai.com/api/docs/changelog](https://developers.openai.com/api/docs/changelog)",
+            "title": "Release announcement"
+          }
+        ],
+        "owned_by": "system",
+        "snapshot": "gpt-image-1.5-2025-12-16",
+        "checked_at": "2026-09-13",
+        "api_created": 1764030620,
+        "description": "Our previous image generation model",
+        "release_date": "2025-12-16",
+        "version_date": "2025-12-16",
+        "shutdown_date": "2026-12-01"
+      }
+    },
+    "gpt-image-1-mini": {
+      "id": "gpt-image-1-mini",
+      "contract": {
+        "id": "gpt-image-1-mini",
+        "ratios": null,
+        "formats": [
+          "png",
+          "jpeg",
+          "webp"
+        ],
+        "no_seed": true,
+        "pricing": {
+          "known": false,
+          "reference_price_usd": 0,
+          "reference_description": ""
+        },
+        "qualities": [
+          "medium",
+          "low",
+          "high"
+        ],
+        "media_type": "image",
+        "backgrounds": [
+          "opaque",
+          "transparent",
+          "auto"
+        ],
+        "resolutions": [
+          "1024x1024",
+          "1536x1024",
+          "1024x1536"
+        ],
+        "display_name": "",
+        "max_duration": 0,
+        "min_duration": 0,
+        "no_watermark": true,
+        "supports_audio": false,
+        "supports_draft": false,
+        "reference_modes": [
+          {
+            "id": "references",
+            "label": "References",
+            "max_audios": 0,
+            "max_images": 16,
+            "max_videos": 0,
+            "min_audios": 0,
+            "min_images": 0,
+            "min_videos": 0
+          }
+        ],
+        "default_duration": 0,
+        "max_image_inputs": 16,
+        "supports_last_frame": false,
+        "supports_image_input": true,
+        "supports_camera_fixed": false
+      },
+      "metadata": {
+        "facts": [
+          {
+            "label": "Provider: Input modalities",
+            "value": "text, image"
+          },
+          {
+            "label": "Provider: Output modalities",
+            "value": "image"
+          },
+          {
+            "label": "Provider: Supported endpoints",
+            "value": "batch, image_edit, image_generation"
+          }
+        ],
+        "sources": [
+          {
+            "url": "[https://developers.openai.com/api/docs/models/gpt-image-1-mini](https://developers.openai.com/api/docs/models/gpt-image-1-mini)",
+            "title": "OpenAI model documentation"
+          },
+          {
+            "url": "[https://developers.openai.com/api/docs/pricing](https://developers.openai.com/api/docs/pricing)",
+            "title": "OpenAI pricing"
+          },
+          {
+            "url": "[https://developers.openai.com/api/docs/guides/image-generation#calculating-costs](https://developers.openai.com/api/docs/guides/image-generation#calculating-costs)",
+            "title": "Image cost calculation"
+          },
+          {
+            "url": "[https://developers.openai.com/api/docs/deprecations](https://developers.openai.com/api/docs/deprecations)",
+            "title": "Deprecations"
+          },
+          {
+            "url": "[https://developers.openai.com/api/docs/changelog](https://developers.openai.com/api/docs/changelog)",
+            "title": "Release announcement"
+          }
+        ],
+        "owned_by": "system",
+        "snapshot": "gpt-image-1-mini",
+        "checked_at": "2026-09-13",
+        "api_created": 1758845821,
+        "description": "A cost-efficient version of GPT Image 1",
+        "release_date": "2025-10-06",
+        "shutdown_date": "2026-12-01"
+      }
+    },
+    "gpt-image-1": {
+      "id": "gpt-image-1",
+      "contract": {
+        "id": "gpt-image-1",
+        "ratios": null,
+        "formats": [
+          "png",
+          "jpeg",
+          "webp"
+        ],
+        "no_seed": true,
+        "pricing": {
+          "known": false,
+          "reference_price_usd": 0,
+          "reference_description": ""
+        },
+        "qualities": [
+          "medium",
+          "low",
+          "high"
+        ],
+        "media_type": "image",
+        "backgrounds": [
+          "opaque",
+          "transparent",
+          "auto"
+        ],
+        "resolutions": [
+          "1024x1024",
+          "1536x1024",
+          "1024x1536"
+        ],
+        "display_name": "",
+        "max_duration": 0,
+        "min_duration": 0,
+        "no_watermark": true,
+        "supports_audio": false,
+        "supports_draft": false,
+        "reference_modes": [
+          {
+            "id": "references",
+            "label": "References",
+            "max_audios": 0,
+            "max_images": 16,
+            "max_videos": 0,
+            "min_audios": 0,
+            "min_images": 0,
+            "min_videos": 0
+          }
+        ],
+        "default_duration": 0,
+        "max_image_inputs": 16,
+        "supports_last_frame": false,
+        "supports_image_input": true,
+        "supports_camera_fixed": false
+      },
+      "metadata": {
+        "facts": [
+          {
+            "label": "Provider: Input modalities",
+            "value": "text, image"
+          },
+          {
+            "label": "Provider: Output modalities",
+            "value": "image"
+          },
+          {
+            "label": "Provider: Supported endpoints",
+            "value": "batch, image_generation, image_edit, responses"
+          },
+          {
+            "label": "Provider: Supported features",
+            "value": "inpainting"
+          }
+        ],
+        "sources": [
+          {
+            "url": "[https://developers.openai.com/api/docs/models/gpt-image-1](https://developers.openai.com/api/docs/models/gpt-image-1)",
+            "title": "OpenAI model documentation"
+          },
+          {
+            "url": "[https://developers.openai.com/api/docs/pricing](https://developers.openai.com/api/docs/pricing)",
+            "title": "OpenAI pricing"
+          },
+          {
+            "url": "[https://developers.openai.com/api/docs/guides/image-generation#calculating-costs](https://developers.openai.com/api/docs/guides/image-generation#calculating-costs)",
+            "title": "Image cost calculation"
+          },
+          {
+            "url": "[https://developers.openai.com/api/docs/deprecations](https://developers.openai.com/api/docs/deprecations)",
+            "title": "Deprecations"
+          },
+          {
+            "url": "[https://openai.com/index/image-generation-api/](https://openai.com/index/image-generation-api/)",
+            "title": "Release announcement"
+          }
+        ],
+        "owned_by": "system",
+        "snapshot": "gpt-image-1",
+        "checked_at": "2026-09-13",
+        "api_created": 1745517030,
+        "description": "Our previous image generation model",
+        "release_date": "2025-04-23",
+        "shutdown_date": "2026-10-23"
+      },
+      "rates": [
+        {
+          "per": 1,
+          "unit": "multi_metric",
+          "price": 0.0,
+          "region": "standard",
+          "source": "[https://developers.openai.com/api/docs/pricing](https://developers.openai.com/api/docs/pricing)",
+          "components": [
+            {
+              "per": 1000000,
+              "price": 10.0,
+              "metric": "image_input_tokens"
+            },
+            {
+              "per": 1000000,
+              "price": 40.0,
+              "metric": "image_output_tokens"
+            },
+            {
+              "per": 1000000,
+              "price": 5.0,
+              "metric": "text_input_tokens"
+            }
+          ]
+        }
+      ]
+    },
+    "chatgpt-image-latest": {
+      "id": "chatgpt-image-latest",
+      "contract": {
+        "id": "chatgpt-image-latest",
+        "ratios": null,
+        "formats": [
+          "png",
+          "jpeg",
+          "webp"
+        ],
+        "no_seed": true,
+        "pricing": {
+          "known": false,
+          "reference_price_usd": 0,
+          "reference_description": ""
+        },
+        "qualities": [
+          "medium",
+          "low",
+          "high"
+        ],
+        "media_type": "image",
+        "backgrounds": [
+          "opaque",
+          "transparent",
+          "auto"
+        ],
+        "resolutions": [
+          "1024x1024",
+          "1536x1024",
+          "1024x1536"
+        ],
+        "display_name": "",
+        "max_duration": 0,
+        "min_duration": 0,
+        "no_watermark": true,
+        "supports_audio": false,
+        "supports_draft": false,
+        "reference_modes": [
+          {
+            "id": "references",
+            "label": "References",
+            "max_audios": 0,
+            "max_images": 16,
+            "max_videos": 0,
+            "min_audios": 0,
+            "min_images": 0,
+            "min_videos": 0
+          }
+        ],
+        "default_duration": 0,
+        "max_image_inputs": 16,
+        "supports_last_frame": false,
+        "supports_image_input": true,
+        "supports_camera_fixed": false
+      },
+      "metadata": {
+        "facts": [
+          {
+            "label": "Provider: Input modalities",
+            "value": "text, image"
+          },
+          {
+            "label": "Provider: Output modalities",
+            "value": "image, text"
+          },
+          {
+            "label": "Provider: Supported endpoints",
+            "value": "batch, image_generation, image_edit"
+          },
+          {
+            "label": "Provider: Supported features",
+            "value": "inpainting"
+          }
+        ],
+        "sources": [
+          {
+            "url": "[https://developers.openai.com/api/docs/models/chatgpt-image-latest](https://developers.openai.com/api/docs/models/chatgpt-image-latest)",
+            "title": "OpenAI model documentation"
+          },
+          {
+            "url": "[https://developers.openai.com/api/docs/pricing](https://developers.openai.com/api/docs/pricing)",
+            "title": "OpenAI pricing"
+          },
+          {
+            "url": "[https://developers.openai.com/api/docs/guides/image-generation#calculating-costs](https://developers.openai.com/api/docs/guides/image-generation#calculating-costs)",
+            "title": "Image cost calculation"
+          },
+          {
+            "url": "[https://developers.openai.com/api/docs/deprecations](https://developers.openai.com/api/docs/deprecations)",
+            "title": "Deprecations"
+          },
+          {
+            "url": "[https://developers.openai.com/api/docs/changelog](https://developers.openai.com/api/docs/changelog)",
+            "title": "Release announcement"
+          }
+        ],
+        "owned_by": "system",
+        "snapshot": "chatgpt-image-latest",
+        "checked_at": "2026-09-13",
+        "api_created": 1765925279,
+        "description": "Previous image model used in ChatGPT.",
+        "release_date": "2025-12-16",
+        "shutdown_date": "2026-12-01"
+      }
+    },
+    "gpt-4o-mini-tts": {
+      "id": "gpt-4o-mini-tts",
+      "contract": {
+        "id": "gpt-4o-mini-tts",
+        "ratios": null,
+        "voices": [
+          "alloy",
+          "ash",
+          "coral",
+          "echo",
+          "fable",
+          "onyx",
+          "nova",
+          "sage",
+          "shimmer",
+          "ballad",
+          "verse",
+          "marin",
+          "cedar"
+        ],
+        "formats": [
+          "mp3",
+          "wav",
+          "flac",
+          "opus",
+          "aac"
+        ],
+        "no_seed": true,
+        "pricing": {
+          "known": false,
+          "reference_price_usd": 0,
+          "reference_description": ""
+        },
+        "media_type": "speech",
+        "no_language": true,
+        "resolutions": null,
+        "display_name": "",
+        "max_duration": 0,
+        "min_duration": 0,
+        "no_watermark": true,
+        "requires_voice": true,
+        "supports_audio": false,
+        "supports_draft": false,
+        "supports_voice": true,
+        "default_duration": 0,
+        "supports_last_frame": false,
+        "supports_camera_fixed": false
+      },
+      "metadata": {
+        "facts": [
+          {
+            "label": "Provider: Input modalities",
+            "value": "text"
+          },
+          {
+            "label": "Provider: Output modalities",
+            "value": "audio"
+          },
+          {
+            "label": "Provider: Supported endpoints",
+            "value": "speech_generation"
+          }
+        ],
+        "sources": [
+          {
+            "url": "[https://developers.openai.com/api/docs/models/gpt-4o-mini-tts](https://developers.openai.com/api/docs/models/gpt-4o-mini-tts)",
+            "title": "OpenAI model documentation"
+          },
+          {
+            "url": "[https://developers.openai.com/api/docs/pricing](https://developers.openai.com/api/docs/pricing)",
+            "title": "OpenAI pricing"
+          },
+          {
+            "url": "[https://openai.com/index/introducing-our-next-generation-audio-models/](https://openai.com/index/introducing-our-next-generation-audio-models/)",
+            "title": "Release announcement"
+          }
+        ],
+        "owned_by": "system",
+        "snapshot": "gpt-4o-mini-tts-2025-12-15",
+        "checked_at": "2026-09-13",
+        "api_created": 1742403959,
+        "description": "Text-to-speech model powered by GPT-4o Mini",
+        "release_date": "2025-03-20",
+        "version_date": "2025-12-15"
+      },
+      "rates": [
+        {
+          "per": 1,
+          "unit": "multi_metric",
+          "price": 0.0,
+          "region": "standard",
+          "source": "[https://developers.openai.com/api/docs/pricing](https://developers.openai.com/api/docs/pricing)",
+          "components": [
+            {
+              "per": 1000000,
+              "price": 12.0,
+              "metric": "audio_output_tokens"
+            },
+            {
+              "per": 1000000,
+              "price": 0.6,
+              "metric": "text_input_tokens"
+            }
+          ]
+        }
+      ]
+    },
+    "tts-1": {
+      "id": "tts-1",
+      "contract": {
+        "id": "tts-1",
+        "ratios": null,
+        "voices": [
+          "alloy",
+          "ash",
+          "coral",
+          "echo",
+          "fable",
+          "onyx",
+          "nova",
+          "sage",
+          "shimmer"
+        ],
+        "formats": [
+          "mp3",
+          "wav",
+          "flac",
+          "opus",
+          "aac"
+        ],
+        "no_seed": true,
+        "pricing": {
+          "known": false,
+          "reference_price_usd": 0,
+          "reference_description": ""
+        },
+        "media_type": "speech",
+        "no_language": true,
+        "resolutions": null,
+        "display_name": "",
+        "max_duration": 0,
+        "min_duration": 0,
+        "no_watermark": true,
+        "requires_voice": true,
+        "supports_audio": false,
+        "supports_draft": false,
+        "supports_voice": true,
+        "no_instructions": true,
+        "default_duration": 0,
+        "supports_last_frame": false,
+        "supports_camera_fixed": false
+      },
+      "metadata": {
+        "facts": [
+          {
+            "label": "Provider: Input modalities",
+            "value": "text"
+          },
+          {
+            "label": "Provider: Output modalities",
+            "value": "audio"
+          },
+          {
+            "label": "Provider: Supported endpoints",
+            "value": "speech_generation"
+          }
+        ],
+        "sources": [
+          {
+            "url": "[https://developers.openai.com/api/docs/models/tts-1](https://developers.openai.com/api/docs/models/tts-1)",
+            "title": "OpenAI model documentation"
+          },
+          {
+            "url": "[https://developers.openai.com/api/docs/pricing](https://developers.openai.com/api/docs/pricing)",
+            "title": "OpenAI pricing"
+          },
+          {
+            "url": "[https://openai.com/index/new-models-and-developer-products-announced-at-devday/](https://openai.com/index/new-models-and-developer-products-announced-at-devday/)",
+            "title": "Release announcement"
+          }
+        ],
+        "owned_by": "openai-internal",
+        "snapshot": "tts-1",
+        "checked_at": "2026-09-13",
+        "api_created": 1681940951,
+        "description": "Text-to-speech model optimized for speed",
+        "release_date": "2023-11-06"
+      }
+    },
+    "tts-1-hd": {
+      "id": "tts-1-hd",
+      "contract": {
+        "id": "tts-1-hd",
+        "ratios": null,
+        "voices": [
+          "alloy",
+          "ash",
+          "coral",
+          "echo",
+          "fable",
+          "onyx",
+          "nova",
+          "sage",
+          "shimmer"
+        ],
+        "formats": [
+          "mp3",
+          "wav",
+          "flac",
+          "opus",
+          "aac"
+        ],
+        "no_seed": true,
+        "pricing": {
+          "known": false,
+          "reference_price_usd": 0,
+          "reference_description": ""
+        },
+        "media_type": "speech",
+        "no_language": true,
+        "resolutions": null,
+        "display_name": "",
+        "max_duration": 0,
+        "min_duration": 0,
+        "no_watermark": true,
+        "requires_voice": true,
+        "supports_audio": false,
+        "supports_draft": false,
+        "supports_voice": true,
+        "no_instructions": true,
+        "default_duration": 0,
+        "supports_last_frame": false,
+        "supports_camera_fixed": false
+      },
+      "metadata": {
+        "facts": [
+          {
+            "label": "Provider: Input modalities",
+            "value": "text"
+          },
+          {
+            "label": "Provider: Output modalities",
+            "value": "audio"
+          },
+          {
+            "label": "Provider: Supported endpoints",
+            "value": "speech_generation"
+          }
+        ],
+        "sources": [
+          {
+            "url": "[https://developers.openai.com/api/docs/models/tts-1-hd](https://developers.openai.com/api/docs/models/tts-1-hd)",
+            "title": "OpenAI model documentation"
+          },
+          {
+            "url": "[https://developers.openai.com/api/docs/pricing](https://developers.openai.com/api/docs/pricing)",
+            "title": "OpenAI pricing"
+          },
+          {
+            "url": "[https://openai.com/index/new-models-and-developer-products-announced-at-devday/](https://openai.com/index/new-models-and-developer-products-announced-at-devday/)",
+            "title": "Release announcement"
+          }
+        ],
+        "owned_by": "system",
+        "snapshot": "tts-1-hd",
+        "checked_at": "2026-09-13",
+        "api_created": 1699046015,
+        "description": "Text-to-speech model optimized for quality",
+        "release_date": "2023-11-06"
+      }
+    },
+    "gpt-audio-1.5": {
+      "id": "gpt-audio-1.5",
+      "contract": {
+        "id": "gpt-audio-1.5",
+        "ratios": null,
+        "voices": [
+          "alloy",
+          "ash",
+          "ballad",
+          "coral",
+          "echo",
+          "sage",
+          "shimmer",
+          "verse"
+        ],
+        "formats": [
+          "mp3",
+          "wav",
+          "flac",
+          "opus"
+        ],
+        "no_seed": true,
+        "pricing": {
+          "known": false,
+          "reference_price_usd": 0,
+          "reference_description": ""
+        },
+        "media_type": "speech",
+        "no_language": true,
+        "resolutions": null,
+        "display_name": "",
+        "max_duration": 0,
+        "min_duration": 0,
+        "no_watermark": true,
+        "requires_voice": true,
+        "supports_audio": false,
+        "supports_draft": false,
+        "supports_voice": true,
+        "default_duration": 0,
+        "supports_last_frame": false,
+        "supports_camera_fixed": false
+      },
+      "metadata": {
+        "facts": [
+          {
+            "label": "Provider: Context window",
+            "value": "128,000 tokens"
+          },
+          {
+            "label": "Provider: Max output",
+            "value": "16,384 tokens"
+          },
+          {
+            "label": "Provider: Knowledge cutoff",
+            "value": "2024-09-30"
+          },
+          {
+            "label": "Provider: Input modalities",
+            "value": "text, audio"
+          },
+          {
+            "label": "Provider: Output modalities",
+            "value": "text, audio"
+          },
+          {
+            "label": "Provider: Supported endpoints",
+            "value": "chat_completions"
+          },
+          {
+            "label": "Provider: Supported features",
+            "value": "streaming, function_calling"
+          }
+        ],
+        "sources": [
+          {
+            "url": "[https://developers.openai.com/api/docs/models/gpt-audio-1.5](https://developers.openai.com/api/docs/models/gpt-audio-1.5)",
+            "title": "OpenAI model documentation"
+          },
+          {
+            "url": "[https://developers.openai.com/api/docs/pricing](https://developers.openai.com/api/docs/pricing)",
+            "title": "OpenAI pricing"
+          },
+          {
+            "url": "[https://developers.openai.com/api/docs/changelog](https://developers.openai.com/api/docs/changelog)",
+            "title": "Release announcement"
+          }
+        ],
+        "owned_by": "system",
+        "snapshot": "gpt-audio-1.5",
+        "checked_at": "2026-09-13",
+        "api_created": 1771550885,
+        "description": "The best voice model for audio in, audio out with Chat Completions.",
+        "release_date": "2026-02-23"
+      }
+    },
+    "gpt-audio": {
+      "id": "gpt-audio",
+      "contract": {
+        "id": "gpt-audio",
+        "ratios": null,
+        "voices": [
+          "alloy",
+          "ash",
+          "ballad",
+          "coral",
+          "echo",
+          "sage",
+          "shimmer",
+          "verse"
+        ],
+        "formats": [
+          "mp3",
+          "wav",
+          "flac",
+          "opus"
+        ],
+        "no_seed": true,
+        "pricing": {
+          "known": false,
+          "reference_price_usd": 0,
+          "reference_description": ""
+        },
+        "media_type": "speech",
+        "no_language": true,
+        "resolutions": null,
+        "display_name": "",
+        "max_duration": 0,
+        "min_duration": 0,
+        "no_watermark": true,
+        "requires_voice": true,
+        "supports_audio": false,
+        "supports_draft": false,
+        "supports_voice": true,
+        "default_duration": 0,
+        "supports_last_frame": false,
+        "supports_camera_fixed": false
+      },
+      "metadata": {
+        "facts": [
+          {
+            "label": "Provider: Context window",
+            "value": "128,000 tokens"
+          },
+          {
+            "label": "Provider: Max output",
+            "value": "16,384 tokens"
+          },
+          {
+            "label": "Provider: Knowledge cutoff",
+            "value": "2023-10-01"
+          },
+          {
+            "label": "Provider: Input modalities",
+            "value": "text, audio"
+          },
+          {
+            "label": "Provider: Output modalities",
+            "value": "text, audio"
+          },
+          {
+            "label": "Provider: Supported endpoints",
+            "value": "chat_completions"
+          },
+          {
+            "label": "Provider: Supported features",
+            "value": "streaming, function_calling"
+          }
+        ],
+        "sources": [
+          {
+            "url": "[https://developers.openai.com/api/docs/models/gpt-audio](https://developers.openai.com/api/docs/models/gpt-audio)",
+            "title": "OpenAI model documentation"
+          },
+          {
+            "url": "[https://developers.openai.com/api/docs/pricing](https://developers.openai.com/api/docs/pricing)",
+            "title": "OpenAI pricing"
+          },
+          {
+            "url": "[https://developers.openai.com/api/docs/deprecations](https://developers.openai.com/api/docs/deprecations)",
+            "title": "Deprecations"
+          }
+        ],
+        "owned_by": "system",
+        "snapshot": "gpt-audio-2025-08-28",
+        "checked_at": "2026-09-13",
+        "api_created": 1756339249,
+        "description": "For audio inputs and outputs with Chat Completions API",
+        "version_date": "2025-08-28",
+        "shutdown_date": "2027-01-20"
+      }
+    },
+    "gpt-audio-mini": {
+      "id": "gpt-audio-mini",
+      "contract": {
+        "id": "gpt-audio-mini",
+        "ratios": null,
+        "voices": [
+          "alloy",
+          "ash",
+          "ballad",
+          "coral",
+          "echo",
+          "sage",
+          "shimmer",
+          "verse"
+        ],
+        "formats": [
+          "mp3",
+          "wav",
+          "flac",
+          "opus"
+        ],
+        "no_seed": true,
+        "pricing": {
+          "known": false,
+          "reference_price_usd": 0,
+          "reference_description": ""
+        },
+        "media_type": "speech",
+        "no_language": true,
+        "resolutions": null,
+        "display_name": "",
+        "max_duration": 0,
+        "min_duration": 0,
+        "no_watermark": true,
+        "requires_voice": true,
+        "supports_audio": false,
+        "supports_draft": false,
+        "supports_voice": true,
+        "default_duration": 0,
+        "supports_last_frame": false,
+        "supports_camera_fixed": false
+      },
+      "metadata": {
+        "facts": [
+          {
+            "label": "Provider: Context window",
+            "value": "128,000 tokens"
+          },
+          {
+            "label": "Provider: Max output",
+            "value": "16,384 tokens"
+          },
+          {
+            "label": "Provider: Knowledge cutoff",
+            "value": "2023-10-01"
+          },
+          {
+            "label": "Provider: Input modalities",
+            "value": "text, audio"
+          },
+          {
+            "label": "Provider: Output modalities",
+            "value": "text, audio"
+          },
+          {
+            "label": "Provider: Supported endpoints",
+            "value": "chat_completions"
+          },
+          {
+            "label": "Provider: Supported features",
+            "value": "function_calling, prompt_caching"
+          }
+        ],
+        "sources": [
+          {
+            "url": "[https://developers.openai.com/api/docs/models/gpt-audio-mini](https://developers.openai.com/api/docs/models/gpt-audio-mini)",
+            "title": "OpenAI model documentation"
+          },
+          {
+            "url": "[https://developers.openai.com/api/docs/pricing](https://developers.openai.com/api/docs/pricing)",
+            "title": "OpenAI pricing"
+          },
+          {
+            "url": "[https://developers.openai.com/api/docs/deprecations](https://developers.openai.com/api/docs/deprecations)",
+            "title": "Deprecations"
+          },
+          {
+            "url": "[https://developers.openai.com/api/docs/changelog](https://developers.openai.com/api/docs/changelog)",
+            "title": "Release announcement"
+          }
+        ],
+        "owned_by": "system",
+        "snapshot": "gpt-audio-mini-2025-12-15",
+        "checked_at": "2026-09-13",
+        "api_created": 1759512027,
+        "description": "A cost-efficient version of GPT Audio",
+        "release_date": "2025-10-06",
+        "version_date": "2025-12-15",
+        "shutdown_date": "2027-01-20"
+      }
+    }
+  },
+  "warnings": [
+    {
+      "key": "chatgpt-image-latest|pricing|Tariff requires supported units, region and estimation rules|standard///multi_metric/1",
+      "model": "chatgpt-image-latest",
+      "source": "pricing",
+      "reason": "Tariff requires supported units, region and estimation rules",
+      "evidence": {
+        "rate": {
+          "per": 1,
+          "unit": "multi_metric",
+          "price": 0.0,
+          "region": "standard",
+          "source": "[https://developers.openai.com/api/docs/pricing](https://developers.openai.com/api/docs/pricing)",
+          "components": [
+            {
+              "per": 1000000,
+              "price": 8.0,
+              "metric": "image_input_tokens"
+            },
+            {
+              "per": 1000000,
+              "price": 32.0,
+              "metric": "image_output_tokens"
+            },
+            {
+              "per": 1000000,
+              "price": 5.0,
+              "metric": "text_input_tokens"
+            },
+            {
+              "per": 1000000,
+              "price": 10.0,
+              "metric": "text_output_tokens"
+            }
+          ]
+        },
+        "reason": "all existing usage metrics must be specified"
+      },
+      "first_seen": "2026-10-10T03:04:06Z",
+      "last_seen": "2026-10-10T03:04:06Z",
+      "occurrences": 1
+    },
+    {
+      "key": "gpt-4o-mini-tts-2025-03-20|_api|Model requires an adapter contract before it can be enabled",
+      "model": "gpt-4o-mini-tts-2025-03-20",
+      "source": "_api",
+      "reason": "Model requires an adapter contract before it can be enabled",
+      "evidence": {
+        "id": "gpt-4o-mini-tts-2025-03-20"
+      },
+      "first_seen": "2026-10-10T03:04:06Z",
+      "last_seen": "2026-10-10T03:04:06Z",
+      "occurrences": 1
+    },
+    {
+      "key": "gpt-4o-mini-tts-2025-12-15|_api|Model requires an adapter contract before it can be enabled",
+      "model": "gpt-4o-mini-tts-2025-12-15",
+      "source": "_api",
+      "reason": "Model requires an adapter contract before it can be enabled",
+      "evidence": {
+        "id": "gpt-4o-mini-tts-2025-12-15"
+      },
+      "first_seen": "2026-10-10T03:04:06Z",
+      "last_seen": "2026-10-10T03:04:06Z",
+      "occurrences": 1
+    },
+    {
+      "key": "gpt-audio-1.5|pricing|Tariff requires supported units, region and estimation rules|standard///multi_metric/1",
+      "model": "gpt-audio-1.5",
+      "source": "pricing",
+      "reason": "Tariff requires supported units, region and estimation rules",
+      "evidence": {
+        "rate": {
+          "per": 1,
+          "unit": "multi_metric",
+          "price": 0.0,
+          "region": "standard",
+          "source": "[https://developers.openai.com/api/docs/pricing](https://developers.openai.com/api/docs/pricing)",
+          "components": [
+            {
+              "per": 1000000,
+              "price": 32.0,
+              "metric": "audio_input_tokens"
+            },
+            {
+              "per": 1000000,
+              "price": 64.0,
+              "metric": "audio_output_tokens"
+            },
+            {
+              "per": 1000000,
+              "price": 2.5,
+              "metric": "text_input_tokens"
+            },
+            {
+              "per": 1000000,
+              "price": 10.0,
+              "metric": "text_output_tokens"
+            }
+          ]
+        },
+        "reason": "all existing usage metrics must be specified"
+      },
+      "first_seen": "2026-10-10T03:04:06Z",
+      "last_seen": "2026-10-10T03:04:06Z",
+      "occurrences": 1
+    },
+    {
+      "key": "gpt-audio-2025-08-28|_api|Model requires an adapter contract before it can be enabled",
+      "model": "gpt-audio-2025-08-28",
+      "source": "_api",
+      "reason": "Model requires an adapter contract before it can be enabled",
+      "evidence": {
+        "id": "gpt-audio-2025-08-28"
+      },
+      "first_seen": "2026-10-10T03:04:06Z",
+      "last_seen": "2026-10-10T03:04:06Z",
+      "occurrences": 1
+    },
+    {
+      "key": "gpt-audio-mini-2025-10-06|_api|Model requires an adapter contract before it can be enabled",
+      "model": "gpt-audio-mini-2025-10-06",
+      "source": "_api",
+      "reason": "Model requires an adapter contract before it can be enabled",
+      "evidence": {
+        "id": "gpt-audio-mini-2025-10-06"
+      },
+      "first_seen": "2026-10-10T03:04:06Z",
+      "last_seen": "2026-10-10T03:04:06Z",
+      "occurrences": 1
+    },
+    {
+      "key": "gpt-audio-mini-2025-12-15|_api|Model requires an adapter contract before it can be enabled",
+      "model": "gpt-audio-mini-2025-12-15",
+      "source": "_api",
+      "reason": "Model requires an adapter contract before it can be enabled",
+      "evidence": {
+        "id": "gpt-audio-mini-2025-12-15"
+      },
+      "first_seen": "2026-10-10T03:04:06Z",
+      "last_seen": "2026-10-10T03:04:06Z",
+      "occurrences": 1
+    },
+    {
+      "key": "gpt-audio-mini|pricing|Tariff requires supported units, region and estimation rules|standard///multi_metric/1",
+      "model": "gpt-audio-mini",
+      "source": "pricing",
+      "reason": "Tariff requires supported units, region and estimation rules",
+      "evidence": {
+        "rate": {
+          "per": 1,
+          "unit": "multi_metric",
+          "price": 0.0,
+          "region": "standard",
+          "source": "[https://developers.openai.com/api/docs/pricing](https://developers.openai.com/api/docs/pricing)",
+          "components": [
+            {
+              "per": 1000000,
+              "price": 10.0,
+              "metric": "audio_input_tokens"
+            },
+            {
+              "per": 1000000,
+              "price": 20.0,
+              "metric": "audio_output_tokens"
+            },
+            {
+              "per": 1000000,
+              "price": 0.6,
+              "metric": "text_input_tokens"
+            },
+            {
+              "per": 1000000,
+              "price": 2.4,
+              "metric": "text_output_tokens"
+            }
+          ]
+        },
+        "reason": "all existing usage metrics must be specified"
+      },
+      "first_seen": "2026-10-10T03:04:06Z",
+      "last_seen": "2026-10-10T03:04:06Z",
+      "occurrences": 1
+    },
+    {
+      "key": "gpt-audio|pricing|Tariff requires supported units, region and estimation rules|standard///multi_metric/1",
+      "model": "gpt-audio",
+      "source": "pricing",
+      "reason": "Tariff requires supported units, region and estimation rules",
+      "evidence": {
+        "rate": {
+          "per": 1,
+          "unit": "multi_metric",
+          "price": 0.0,
+          "region": "standard",
+          "source": "[https://developers.openai.com/api/docs/pricing](https://developers.openai.com/api/docs/pricing)",
+          "components": [
+            {
+              "per": 1000000,
+              "price": 32.0,
+              "metric": "audio_input_tokens"
+            },
+            {
+              "per": 1000000,
+              "price": 64.0,
+              "metric": "audio_output_tokens"
+            },
+            {
+              "per": 1000000,
+              "price": 2.5,
+              "metric": "text_input_tokens"
+            },
+            {
+              "per": 1000000,
+              "price": 10.0,
+              "metric": "text_output_tokens"
+            }
+          ]
+        },
+        "reason": "all existing usage metrics must be specified"
+      },
+      "first_seen": "2026-10-10T03:04:06Z",
+      "last_seen": "2026-10-10T03:04:06Z",
+      "occurrences": 1
+    },
+    {
+      "key": "gpt-image-1-mini|pricing|Tariff requires supported units, region and estimation rules|standard///multi_metric/1",
+      "model": "gpt-image-1-mini",
+      "source": "pricing",
+      "reason": "Tariff requires supported units, region and estimation rules",
+      "evidence": {
+        "rate": {
+          "per": 1,
+          "unit": "multi_metric",
+          "price": 0.0,
+          "region": "standard",
+          "source": "[https://developers.openai.com/api/docs/pricing](https://developers.openai.com/api/docs/pricing)",
+          "components": [
+            {
+              "per": 1000000,
+              "price": 2.5,
+              "metric": "image_input_tokens"
+            },
+            {
+              "per": 1000000,
+              "price": 8.0,
+              "metric": "image_output_tokens"
+            },
+            {
+              "per": 1000000,
+              "price": 2.0,
+              "metric": "text_input_tokens"
+            }
+          ]
+        },
+        "reason": "Mini requires its separate size/quality planning table"
+      },
+      "first_seen": "2026-10-10T03:04:06Z",
+      "last_seen": "2026-10-10T03:04:06Z",
+      "occurrences": 1
+    },
+    {
+      "key": "gpt-image-1.5|pricing|Tariff requires supported units, region and estimation rules|standard///multi_metric/1",
+      "model": "gpt-image-1.5",
+      "source": "pricing",
+      "reason": "Tariff requires supported units, region and estimation rules",
+      "evidence": {
+        "rate": {
+          "per": 1,
+          "unit": "multi_metric",
+          "price": 0.0,
+          "region": "standard",
+          "source": "[https://developers.openai.com/api/docs/pricing](https://developers.openai.com/api/docs/pricing)",
+          "components": [
+            {
+              "per": 1000000,
+              "price": 8.0,
+              "metric": "image_input_tokens"
+            },
+            {
+              "per": 1000000,
+              "price": 32.0,
+              "metric": "image_output_tokens"
+            },
+            {
+              "per": 1000000,
+              "price": 5.0,
+              "metric": "text_input_tokens"
+            },
+            {
+              "per": 1000000,
+              "price": 10.0,
+              "metric": "text_output_tokens"
+            }
+          ]
+        },
+        "reason": "all existing usage metrics must be specified"
+      },
+      "first_seen": "2026-10-10T03:04:06Z",
+      "last_seen": "2026-10-10T03:04:06Z",
+      "occurrences": 1
+    },
+    {
+      "key": "gpt-image-2-2026-04-21|_api|Model requires an adapter contract before it can be enabled",
+      "model": "gpt-image-2-2026-04-21",
+      "source": "_api",
+      "reason": "Model requires an adapter contract before it can be enabled",
+      "evidence": {
+        "id": "gpt-image-2-2026-04-21"
+      },
+      "first_seen": "2026-10-10T03:04:06Z",
+      "last_seen": "2026-10-10T03:04:06Z",
+      "occurrences": 1
+    },
+    {
+      "key": "gpt-image-2.5-flare-2026-09-08|_api|Model requires an adapter contract before it can be enabled",
+      "model": "gpt-image-2.5-flare-2026-09-08",
+      "source": "_api",
+      "reason": "Model requires an adapter contract before it can be enabled",
+      "evidence": {
+        "id": "gpt-image-2.5-flare-2026-09-08"
+      },
+      "first_seen": "2026-10-10T03:04:06Z",
+      "last_seen": "2026-10-10T03:04:06Z",
+      "occurrences": 1
+    },
+    {
+      "key": "gpt-image-2.5-sunburst-2026-09-08|_api|Model requires an adapter contract before it can be enabled",
+      "model": "gpt-image-2.5-sunburst-2026-09-08",
+      "source": "_api",
+      "reason": "Model requires an adapter contract before it can be enabled",
+      "evidence": {
+        "id": "gpt-image-2.5-sunburst-2026-09-08"
+      },
+      "first_seen": "2026-10-10T03:04:06Z",
+      "last_seen": "2026-10-10T03:04:06Z",
+      "occurrences": 1
+    },
+    {
+      "key": "sora-2-pro|_api|Model requires an adapter contract before it can be enabled",
+      "model": "sora-2-pro",
+      "source": "_api",
+      "reason": "Model requires an adapter contract before it can be enabled",
+      "evidence": {
+        "id": "sora-2-pro"
+      },
+      "first_seen": "2026-10-10T03:04:06Z",
+      "last_seen": "2026-10-10T03:04:06Z",
+      "occurrences": 1
+    },
+    {
+      "key": "sora-2|_api|Model requires an adapter contract before it can be enabled",
+      "model": "sora-2",
+      "source": "_api",
+      "reason": "Model requires an adapter contract before it can be enabled",
+      "evidence": {
+        "id": "sora-2"
+      },
+      "first_seen": "2026-10-10T03:04:06Z",
+      "last_seen": "2026-10-10T03:04:06Z",
+      "occurrences": 1
+    },
+    {
+      "key": "tts-1-1106|_api|Model requires an adapter contract before it can be enabled",
+      "model": "tts-1-1106",
+      "source": "_api",
+      "reason": "Model requires an adapter contract before it can be enabled",
+      "evidence": {
+        "id": "tts-1-1106"
+      },
+      "first_seen": "2026-10-10T03:04:06Z",
+      "last_seen": "2026-10-10T03:04:06Z",
+      "occurrences": 1
+    },
+    {
+      "key": "tts-1-hd-1106|_api|Model requires an adapter contract before it can be enabled",
+      "model": "tts-1-hd-1106",
+      "source": "_api",
+      "reason": "Model requires an adapter contract before it can be enabled",
+      "evidence": {
+        "id": "tts-1-hd-1106"
+      },
+      "first_seen": "2026-10-10T03:04:06Z",
+      "last_seen": "2026-10-10T03:04:06Z",
+      "occurrences": 1
+    },
+    {
+      "key": "tts-1-hd|pricing|Published tariff needs a structured pricing rule|Published tariff",
+      "model": "tts-1-hd",
+      "source": "pricing",
+      "reason": "Published tariff needs a structured pricing rule",
+      "evidence": {
+        "label": "Published tariff",
+        "value": "[[\"Text\",\"$30.00 / 1M characters\",\"-\",\"-\"]]"
+      },
+      "first_seen": "2026-10-10T03:04:06Z",
+      "last_seen": "2026-10-10T03:04:06Z",
+      "occurrences": 1
+    },
+    {
+      "key": "tts-1|pricing|Published tariff needs a structured pricing rule|Published tariff",
+      "model": "tts-1",
+      "source": "pricing",
+      "reason": "Published tariff needs a structured pricing rule",
+      "evidence": {
+        "label": "Published tariff",
+        "value": "[[\"Text\",\"$15.00 / 1M characters\",\"-\",\"-\"]]"
+      },
+      "first_seen": "2026-10-10T03:04:06Z",
+      "last_seen": "2026-10-10T03:04:06Z",
+      "occurrences": 1
+    }
+  ]
+}

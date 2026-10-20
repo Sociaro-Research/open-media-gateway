@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en"><head>
+  <script src="/ui/theme.js"></script><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="gateway-url" content=""><meta name="referrer" content="no-referrer">
+<link rel="stylesheet" href="/ui/styles.css?v=20260916-sites"><link rel="stylesheet" href="/ui/docs.css?v=20260916-sites">
+<title data-page-title="Sign in">Sign in · Media gateway</title><script src="/ui/site.js" defer></script></head><body><div class="shell"><header class="topbar">
+<a class="brand" href="/" aria-label="Home"><img class="brand-mark brand-wordmark" alt="" hidden><img class="brand-mark brand-symbol" alt="" hidden></a>
+<nav aria-label="Main navigation"><a class="nav-button" href="/docs">Documentation</a></nav></header><main>
+      <section class="auth-gate" id="authGate">
+        <div class="card auth-card">
+          <div class="auth-card-heading">
+            <h1 id="authTitle">Sign in to get started</h1>
+            <p class="auth-mode-switch" id="authModeSwitch" hidden><span id="authModeHint">Don’t have an account?</span> <button id="authSwitch" type="button" class="auth-link">Sign up</button></p>
+          </div>
+          <div class="auth-choices" id="authChoices">
+            <p id="authUnavailable" role="status" hidden></p>
+            <a class="google-login" id="googleLogin" hidden href="/auth/google"><img src="/ui/google-icon.svg" alt="" width="20" height="20" aria-hidden="true">Continue with Google</a>
+            <button class="secondary email-login" id="emailLogin" type="button" hidden>Continue with email</button>
+          </div>
+          <div id="emailAuthForms" hidden></div>
+          <p id="emailVerification" class="auth-hint" role="status" aria-live="polite" hidden></p>
+          <template id="emailAuthTemplate">
+            <form class="email-auth-form" method="post" autocomplete="on" aria-labelledby="authTitle" hidden>
+              <div data-auth-email><label>Email<input name="email" type="email" autocomplete="username" inputmode="email" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="254" required></label></div>
+              <div data-auth-password><label>Password<input name="password" type="password" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="128" required></label></div>
+              <p data-auth-hint class="auth-hint" hidden>Use 15–128 characters. A long, unique passphrase works well.</p>
+              <p data-auth-status class="auth-hint" role="status" aria-live="polite" hidden></p>
+              <button class="primary" type="submit">Sign in</button>
+            </form>
+          </template>
+          <div class="auth-form-links" id="authNavigation" hidden>
+            <button id="authForgot" type="button" class="auth-link">Forgot password?</button>
+            <button id="authBack" type="button" class="auth-link">Back</button>
+          </div>
+          <p class="auth-error" id="authError" hidden>Could not sign in. Try again, or use email if you already registered.</p>
+          <p class="legal-links"><a href="/privacy">Privacy Policy</a><span>·</span><a href="/terms">Terms of Service</a></p>
+        </div>
+      </section>
+</main></div><script src="/ui/form-ui.js?v=20260914-email-first-registration" defer></script><script src="/ui/email-login.js?v=20260914-email-first-registration" defer></script><script src="/ui/login.js?v=20260916-sites" defer></script></body></html>

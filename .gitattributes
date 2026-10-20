@@ -1,0 +1,16 @@
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pdf binary
+*.pptx binary
+*.docx binary
+
+# Preserve this original upstream notice verbatim, including its trailing spaces.
+internal/payments/invoicefonts/LICENSE -whitespace
+# Preserve upstream source-notice comment bytes, including trailing spaces.
+deploy/redis/licenses/SOURCE-NOTICES.txt -whitespace

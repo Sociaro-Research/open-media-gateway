@@ -1,0 +1,298 @@
+name: CI
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  security:
+    name: Secret history and dependency security
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out complete history
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install checksum-pinned scanners
+        run: python3 scripts/security/install-tools.py --bin-dir /tmp/gateway-security-tools
+
+      - name: Scan complete Git history for secrets
+        run: /tmp/gateway-security-tools/gitleaks git --config .gitleaks.toml --redact=100 --log-opts=--all .
+
+      - name: Check all dependency versions for known vulnerabilities
+        run: /tmp/gateway-security-tools/trivy fs --scanners vuln --severity HIGH,CRITICAL --exit-code 1 --skip-dirs .git .
+
+  go:
+    name: Go checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: gateway_test
+          POSTGRES_PASSWORD: gateway_test
+          POSTGRES_DB: gateway_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U gateway_test -d gateway_test"
+          --health-interval 2s --health-timeout 3s --health-retries 30
+      redis:
+        image: redis:7.4-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 2s --health-timeout 3s --health-retries 30
+    env:
+      GATEWAY_TEST_DATABASE_URL: postgres://gateway_test:gateway_test@127.0.0.1:5432/gateway_test?sslmode=disable
+      GATEWAY_TEST_REDIS_URL: redis://127.0.0.1:6379/0
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Set up Node for the persisted profile browser workflow
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install persisted profile browser dependencies
+        run: |
+          npm install --prefix /tmp/gateway-profile-browser --no-save --package-lock=false playwright@1.62.1
+          /tmp/gateway-profile-browser/node_modules/.bin/playwright install --with-deps chromium
+
+      - name: Verify code and integration tests
+        env:
+          NODE_PATH: /tmp/gateway-profile-browser/node_modules
+          GATEWAY_PROFILE_BROWSER_NODE: node
+          UI_SCREENSHOT_DIR: profile-contact-browser
+        run: make verify-ci TEST_FLAGS='-count=1 -coverprofile=coverage.out'
+
+      - name: Retain persisted profile browser evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: profile-contact-browser
+          path: internal/api/profile-contact-browser
+          if-no-files-found: ignore
+
+      - name: Verify backend-only build and first-administrator workflow
+        run: python3 scripts/verify-headless.py
+
+      - name: Verify release stop safety gates
+        run: |
+          python3 -m unittest discover -s scripts/tests -p 'test_stop_worker_release.py' -v
+          python3 -m unittest discover -s scripts/tests -p 'test_release*.py' -v
+
+  profile-name:
+    name: Persisted profile name browser checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: gateway_test
+          POSTGRES_PASSWORD: gateway_test
+          POSTGRES_DB: gateway_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U gateway_test -d gateway_test"
+          --health-interval 2s --health-timeout 3s --health-retries 30
+    env:
+      GATEWAY_TEST_DATABASE_URL: postgres://gateway_test:gateway_test@127.0.0.1:5432/gateway_test?sslmode=disable
+      GATEWAY_PROFILE_NAME_BROWSER_NODE: node
+      NODE_PATH: /tmp/gateway-profile-name/node_modules
+      UI_SCREENSHOT_DIR: profile-name-browser
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install isolated browser dependencies
+        run: |
+          npm install --prefix /tmp/gateway-profile-name --no-save --package-lock=false playwright@1.62.1
+          /tmp/gateway-profile-name/node_modules/.bin/playwright install --with-deps chromium webkit
+
+      - name: Verify real name saves and navigation in Chromium and WebKit
+        run: |
+          go test -race -count=1 -v -run '^TestProfileNameBrowserReconciliation$' ./internal/api
+          UI_BROWSER_ENGINE=webkit go test -race -count=1 -v -run '^TestProfileNameBrowserReconciliation$' ./internal/api
+
+      - name: Retain profile name evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: profile-name-browser
+          path: internal/api/profile-name-browser
+          if-no-files-found: error
+
+  container:
+    name: Container build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Validate Compose configuration
+        run: docker compose --profile ui --profile monitoring config --quiet
+
+      - name: Validate Prometheus configuration and alert behavior
+        run: |
+          docker run --rm --network none --entrypoint /bin/promtool -v "$PWD/monitoring:/etc/prometheus:ro" prom/prometheus:v3.15.0 check config /etc/prometheus/prometheus.yml
+          docker run --rm --network none --entrypoint /bin/promtool -w /etc/prometheus -v "$PWD/monitoring:/etc/prometheus:ro" prom/prometheus:v3.15.0 test rules alerts.test.yml
+
+      - name: Build image
+        run: docker build --tag media-gateway:ci .
+
+      - name: Build independent UI image
+        run: docker build --tag gateway-ui:ci web
+
+      - name: Build hardened database and cache images
+        run: |
+          docker build --tag gateway-postgres:ci deploy/postgres
+          docker build --tag gateway-redis:ci deploy/redis
+          test "$(docker run --rm --network none --entrypoint gosu gateway-postgres:ci postgres id -u)" = 70
+
+      - name: Set up Go for binary security assessment
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Scan built application and UI images
+        run: |
+          python3 scripts/security/install-tools.py --bin-dir /tmp/gateway-image-security-tools
+          /tmp/gateway-image-security-tools/trivy image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 media-gateway:ci
+          /tmp/gateway-image-security-tools/trivy image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 gateway-ui:ci
+          /tmp/gateway-image-security-tools/trivy image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 gateway-postgres:ci
+          /tmp/gateway-image-security-tools/trivy image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 gateway-redis:ci
+
+      - name: Validate UI configuration and extract its runtime
+        run: |
+          docker run --rm --cap-drop ALL --security-opt no-new-privileges gateway-ui:ci caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+          docker create --name gateway-ui-runtime gateway-ui:ci
+          docker cp gateway-ui-runtime:/usr/bin/caddy /tmp/gateway-ui-caddy
+          docker rm gateway-ui-runtime
+          go run scripts/security/check-go-binary.go /tmp/gateway-ui-caddy golang.org/x/crypto/openpgp
+
+      - name: Verify installation without source files
+        run: |
+          python3 scripts/verify-release.py --gateway media-gateway:ci --ui gateway-ui:ci \
+            --postgres gateway-postgres:ci --redis gateway-redis:ci
+
+      - name: Set up Node for UI checks
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install isolated browser-test dependencies
+        run: |
+          npm install --prefix /tmp/gateway-ui-tests --no-save --package-lock=false playwright@1.62.1
+          /tmp/gateway-ui-tests/node_modules/.bin/playwright install --with-deps chromium chrome webkit
+
+      - name: Verify independent UI and current workflows
+        env:
+          NODE_PATH: /tmp/gateway-ui-tests/node_modules
+          CADDY_BIN: /tmp/gateway-ui-caddy
+          GATEWAY_PERF_OUTPUT: ui-performance-results
+        run: |
+          make build-ui
+          node scripts/ui/separation.cjs
+          node scripts/ui/monitoring.cjs
+          node scripts/ui/origin-security.cjs
+          node scripts/ui/log-security.cjs
+          node scripts/ui/smoke.cjs --generations-only
+          node scripts/ui/performance.cjs
+          UI_BROWSER_ENGINE=webkit node scripts/ui/performance.cjs
+          node scripts/ui/branding.cjs
+          node scripts/ui/branding-startup.cjs
+          node scripts/ui/profile.cjs
+          node scripts/ui/support.cjs
+          node scripts/ui/report-details.cjs
+          UI_SCREENSHOT_DIR=ui-performance-results/report-pagination node scripts/ui/report-pagination.cjs
+          UI_SCREENSHOT_DIR=ui-performance-results/report-pagination UI_BROWSER_ENGINE=webkit node scripts/ui/report-pagination.cjs
+          node scripts/ui/audit-log.cjs
+          node scripts/ui/workspaces.cjs
+          node scripts/ui/workspace-navigation.cjs
+          node scripts/ui/control-pickers.cjs
+          node scripts/ui/email-login.cjs
+          node scripts/ui/email-invitations.cjs
+          UI_BROWSER_ENGINE=webkit node scripts/ui/email-invitations.cjs
+          node scripts/ui/installation-setup.cjs
+          node scripts/ui/email-delivery.cjs
+          node scripts/ui/catalog-sync.cjs
+          node scripts/ui/model-picker.cjs
+          node scripts/ui/provider-assets.cjs
+          UI_BROWSER_ENGINE=webkit node scripts/ui/provider-assets.cjs
+          node scripts/ui/references.cjs
+          UI_BROWSER_ENGINE=webkit node scripts/ui/references.cjs
+          node scripts/ui/model-information.cjs
+          node scripts/ui/accounting-references.cjs
+          UI_SCREENSHOT_DIR=ui-performance-results/reference-intent-chromium node scripts/ui/reference-intent.cjs
+          UI_SCREENSHOT_DIR=ui-performance-results/reference-intent-webkit UI_BROWSER_ENGINE=webkit node scripts/ui/reference-intent.cjs
+          UI_SCREENSHOT_DIR=ui-performance-results/voice-chooser-chromium UI_VOICE_UPLOAD=chooser node scripts/ui/reference-intent.cjs
+          UI_SCREENSHOT_DIR=ui-performance-results/voice-chooser-webkit UI_VOICE_UPLOAD=chooser UI_BROWSER_ENGINE=webkit node scripts/ui/reference-intent.cjs
+          node scripts/ui/logout-security.cjs
+          node scripts/ui/provider-connections.cjs
+          UI_BROWSER=webkit node scripts/ui/provider-connections.cjs
+          node scripts/ui/payments.cjs
+          node scripts/ui/stablecoins.cjs
+          UI_BROWSER=webkit node scripts/ui/stablecoins.cjs
+          node scripts/ui/organizations.cjs
+          node scripts/ui/organization-roles.cjs
+          UI_BROWSER_ENGINE=webkit node scripts/ui/organization-roles.cjs
+          node scripts/ui/sales.cjs
+          node scripts/ui/sonilo.cjs
+          node scripts/ui/openai.cjs
+          node scripts/ui/storage-settings.cjs
+          UI_BROWSER_ENGINE=webkit node scripts/ui/storage-settings.cjs
+
+      - name: Verify real Grafana provisioning and browser dashboard
+        env:
+          NODE_PATH: /tmp/gateway-ui-tests/node_modules
+          CADDY_BIN: /tmp/gateway-ui-caddy
+          GRAFANA_TEST_UPSTREAM: 127.0.0.1:13000
+          GRAFANA_TEST_UI_PORT: '18088'
+          UI_SCREENSHOT_DIR: ui-performance-results/monitoring
+        run: |
+          docker compose -p gateway-monitoring-ci --profile monitoring -f compose.yaml -f monitoring/grafana/compose.test.yaml up -d --wait grafana
+          node scripts/ui/monitoring.cjs
+
+      - name: Stop isolated monitoring checks
+        if: always()
+        run: docker compose -p gateway-monitoring-ci --profile monitoring -f compose.yaml -f monitoring/grafana/compose.test.yaml down
+
+      - name: Retain browser performance evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-performance
+          path: ui-performance-results
+          if-no-files-found: ignore

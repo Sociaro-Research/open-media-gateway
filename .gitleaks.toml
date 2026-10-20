@@ -1,0 +1,15 @@
+title = "Gateway secret scan"
+
+[extend]
+useDefault = true
+
+# Reviewed documentation placeholders and the disposable headless fixture only.
+# Do not allowlist whole files, generic key prefixes, or real credentials.
+[[allowlists]]
+description = "Public examples and isolated test encryption key"
+regexTarget = "match"
+regexes = [
+  '''(?i)(?:Bearer\s+|X-API-Key:\s*)(?:dev-client-key|YOUR_API_KEY)(?:['"\s]|$)''',
+  '''replace-with-an-independent-32-byte-secret(?:['"\s]|$)''',
+  '''isolated-headless-encryption-secret-32(?:['"\s]|$)''',
+]

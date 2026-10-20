@@ -1,0 +1,216 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: media_gateway
+      POSTGRES_USER: media_gateway
+      POSTGRES_PASSWORD: media_gateway
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U media_gateway -d media_gateway"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    volumes:
+      - redis-data:/data
+
+  gateway:
+    build: .
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    env_file: &provider-environment
+      - path: .env
+        required: false
+    environment: &gateway-environment
+      PORT: "8080"
+      # Dedicated internal listener; never published or routed through the UI.
+      METRICS_ADDR: ":9091"
+      DATABASE_URL: postgres://media_gateway:media_gateway@postgres:5432/media_gateway?sslmode=disable
+      REDIS_URL: redis://redis:6379/0
+      CLIENT_API_KEY: ${CLIENT_API_KEY:-dev-client-key}
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:-}
+      GOOGLE_OAUTH_REDIRECT_URL: ${GOOGLE_OAUTH_REDIRECT_URL:-}
+      SESSION_SIGNING_SECRET: ${SESSION_SIGNING_SECRET:-}
+      SESSION_TTL: ${SESSION_TTL:-720h}
+      AUTH_PUBLIC_URL: ${AUTH_PUBLIC_URL:-}
+      UI_PUBLIC_URL: ${UI_PUBLIC_URL:-}
+      DOCS_PUBLIC_URL: ${DOCS_PUBLIC_URL:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      MEDIA_PROVIDER: ${MEDIA_PROVIDER:-}
+      DEFAULT_MEDIA_MODEL: ${DEFAULT_MEDIA_MODEL:-}
+      VIDEO_PROVIDER: ${VIDEO_PROVIDER:-}
+      DEFAULT_VIDEO_MODEL: ${DEFAULT_VIDEO_MODEL:-}
+      MIGRATE: auto
+      PROVIDER_POLL_INTERVAL: ${PROVIDER_POLL_INTERVAL:-1s}
+      PROVIDER_TASK_TIMEOUT: ${PROVIDER_TASK_TIMEOUT:-30m}
+      MAX_POLL_ERRORS: ${MAX_POLL_ERRORS:-5}
+      PROVIDER_SETTINGS: ${PROVIDER_SETTINGS:-}
+      PROVIDER_HTTP_TIMEOUT: ${PROVIDER_HTTP_TIMEOUT:-30s}
+      OUTBOUND_ALLOW_PRIVATE_HOSTS: ${OUTBOUND_ALLOW_PRIVATE_HOSTS:-}
+      ARCHIVE_CONCURRENCY: ${ARCHIVE_CONCURRENCY:-4}
+      DISPATCH_INTERVAL: ${DISPATCH_INTERVAL:-1s}
+      WEBHOOK_SIGNING_SECRET: ${WEBHOOK_SIGNING_SECRET:-dev-webhook-secret}
+      WEBHOOK_HTTP_TIMEOUT: ${WEBHOOK_HTTP_TIMEOUT:-10s}
+      WEBHOOK_MAX_ATTEMPTS: ${WEBHOOK_MAX_ATTEMPTS:-8}
+      WEBHOOK_RETRY_BASE: ${WEBHOOK_RETRY_BASE:-1s}
+      STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
+      STORAGE_LOCAL_PATH: /data/media
+      STORAGE_MAX_BYTES: ${STORAGE_MAX_BYTES:-2147483648}
+      STORAGE_DOWNLOAD_TIMEOUT: ${STORAGE_DOWNLOAD_TIMEOUT:-5m}
+      MEDIA_URL_SIGNING_SECRET: ${MEDIA_URL_SIGNING_SECRET:-dev-media-url-secret}
+      PROVIDER_CREDENTIALS_ENCRYPTION_KEY: ${PROVIDER_CREDENTIALS_ENCRYPTION_KEY:-dev-provider-credentials-secret}
+      MEDIA_URL_TTL: ${MEDIA_URL_TTL:-1h}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      # Bind the development stack to localhost so the default development
+      # credentials are never exposed on the LAN by accident.
+      - "127.0.0.1:${PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "/gateway", "healthcheck"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    volumes:
+      - media-data:/data/media
+
+  worker:
+    build: .
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    entrypoint: ["/worker"]
+    stop_grace_period: ${WORKER_STOP_GRACE_PERIOD:-26m}
+    env_file: *provider-environment
+    environment:
+      <<: *gateway-environment
+      MIGRATE: "off"
+      WORKER_OPERATION_CONCURRENCY: ${WORKER_OPERATION_CONCURRENCY:-64}
+      WORKER_SHUTDOWN_TIMEOUT: ${WORKER_SHUTDOWN_TIMEOUT:-25m}
+    depends_on:
+      gateway:
+        condition: service_healthy
+    volumes:
+      - media-data:/data/media
+
+  ui:
+    profiles: ["ui"]
+    build: ./web
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      GATEWAY_UPSTREAM: gateway:8080
+      GRAFANA_UPSTREAM: grafana:3000
+      DOCS_HOST: ${DOCS_HOST:-docs.invalid}
+    networks: [default, monitoring-ui]
+    depends_on:
+      gateway:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${UI_PORT:-8088}:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/ui/theme.js"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  webhook-receiver:
+    profiles: ["webhook-test"]
+    build: .
+    entrypoint: ["/webhook-receiver"]
+    environment:
+      RECEIVER_PORT: "8090"
+      FAIL_FIRST: ${WEBHOOK_RECEIVER_FAIL_FIRST:-0}
+    ports:
+      - "8090:8090"
+
+  prometheus:
+    profiles: ["monitoring"]
+    image: prom/prometheus:v3.15.0
+    restart: unless-stopped
+    networks: [default, monitoring-ui]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+      - --storage.tsdb.retention.size=2GB
+    ports:
+      - "127.0.0.1:${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus-data:/prometheus
+
+  grafana:
+    profiles: ["monitoring"]
+    image: grafana/grafana:13.2.2
+    restart: unless-stopped
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    # No published port. Only the authenticated UI proxy exposes this service.
+    networks: [monitoring-ui]
+    environment:
+      GF_SERVER_ROOT_URL: ${UI_PUBLIC_URL:-http://localhost:8088}/monitoring/
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+      GF_AUTH_PROXY_ENABLED: "true"
+      GF_AUTH_PROXY_HEADER_NAME: X-WEBAUTH-USER
+      GF_AUTH_PROXY_AUTO_SIGN_UP: "true"
+      GF_AUTH_PROXY_SYNC_TTL: "0"
+      GF_AUTH_PROXY_ENABLE_LOGIN_TOKEN: "false"
+      GF_AUTH_BASIC_ENABLED: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_AUTH_DISABLE_SIGNOUT_MENU: "true"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_USERS_ALLOW_ORG_CREATE: "false"
+      GF_USERS_AUTO_ASSIGN_ORG_ROLE: Viewer
+      GF_USERS_DEFAULT_THEME: system
+      GF_SECURITY_DISABLE_INITIAL_ADMIN_CREATION: "true"
+      GF_SECURITY_CONTENT_SECURITY_POLICY: "true"
+      GF_SECURITY_CSRF_ALWAYS_CHECK: "true"
+      GF_SECURITY_DISABLE_GRAVATAR: "true"
+      GF_SNAPSHOTS_ENABLED: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
+      GF_PLUGINS_PREINSTALL_DISABLED: "true"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/gateway-overview.json
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/monitoring/api/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    depends_on:
+      prometheus:
+        condition: service_started
+
+networks:
+  monitoring-ui:
+    internal: true
+
+volumes:
+  postgres-data:
+  redis-data:
+  media-data:
+  prometheus-data:
+  grafana-data:
