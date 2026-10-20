@@ -1,0 +1,141 @@
+name: Publish v1.0.0 artifacts
+
+# One-time owner-approved release path. The ordinary release workflow keeps its
+# full CI gate. Build only the existing immutable v1.0.0 source; never retag it.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-refs/tags/v1.0.0
+  cancel-in-progress: false
+
+jobs:
+  images:
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    env:
+      RELEASE_VERSION: v1.0.0
+      RELEASE_ARCH: ${{ matrix.arch }}
+      REGISTRY_ROOT: ghcr.io/sociaro-research/open-media-gateway
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          ref: v1.0.0
+      - name: Verify immutable release source
+        run: test "$(git rev-parse HEAD)" = 99e4290496ae370f4e7df45b9bb54855d8f8403b
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - name: Build all installation images on native hardware
+        run: |
+          mkdir -p release-evidence
+          for name in gateway ui postgres redis; do
+            context=.
+            if [ "$name" = ui ]; then context=web; fi
+            if [ "$name" = postgres ] || [ "$name" = redis ]; then context="deploy/$name"; fi
+            docker buildx build --load --tag "gateway-$name:release-test" \
+              --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
+              --label "org.opencontainers.image.revision=$(git rev-parse HEAD)" \
+              --label "org.opencontainers.image.version=$RELEASE_VERSION" "$context"
+          done
+      - name: Retain software inventories
+        run: |
+          python3 scripts/security/install-tools.py --bin-dir /tmp/release-security-tools
+          for name in gateway ui postgres redis; do
+            /tmp/release-security-tools/trivy image --format cyclonedx --output "release-evidence/$name-$RELEASE_ARCH.cdx.json" "gateway-$name:release-test"
+          done
+      - name: Verify a source-free installation and restart
+        run: |
+          python3 scripts/verify-release.py --version "$RELEASE_VERSION" \
+            --gateway gateway-gateway:release-test --ui gateway-ui:release-test \
+            --postgres gateway-postgres:release-test --redis gateway-redis:release-test
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Push only verified images
+        run: |
+          for name in gateway ui postgres redis; do
+            candidate="$REGISTRY_ROOT/$name:build-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$RELEASE_ARCH"
+            docker tag "gateway-$name:release-test" "$candidate"
+            docker push "$candidate"
+            docker inspect --format '{{index .RepoDigests 0}}' "$candidate" > "release-evidence/$name-$RELEASE_ARCH.digest"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.arch }}
+          path: release-evidence
+          retention-days: 14
+
+  publish:
+    needs: images
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      packages: write
+    env:
+      RELEASE_VERSION: v1.0.0
+      REGISTRY_ROOT: ghcr.io/sociaro-research/open-media-gateway
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          ref: v1.0.0
+      - name: Verify immutable release source
+        run: test "$(git rev-parse HEAD)" = 99e4290496ae370f4e7df45b9bb54855d8f8403b
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          merge-multiple: true
+          path: release-evidence
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish immutable version manifests
+        run: python3 scripts/publish-release.py --version "$RELEASE_VERSION" --evidence release-evidence --output dist/releases
+      - name: Assemble installation bundle
+        run: |
+          python3 scripts/package-release.py --version "$RELEASE_VERSION" --images dist/releases/images.json --output dist/releases
+          cp release-evidence/*.cdx.json dist/releases/
+      - name: Publish GitHub release and downloads
+        run: |
+          cp deploy/ghcr/release-notes.md /tmp/release-notes.md
+          cat >> /tmp/release-notes.md <<'NOTES'
+
+          ## Validation scope
+
+          This release uses a build-and-publish exception approved by the owner.
+          Security, Go/integration, profile browser checks, image scans and the
+          source-free installation passed in the original release workflow.
+          The complete UI suite did not pass: attempt 1 failed the prompt-marker
+          count in `provider-assets.cjs`; attempt 2 passed that scenario but failed
+          the card-height assertion in `stablecoins.cjs`. These test failures are
+          deferred for investigation in the next version, not reported as passes
+          or confirmed product defects. Full regressions were not repeated.
+          Both architectures run the isolated installation smoke check before upload.
+
+          Original validation: https://github.com/Sociaro-Research/open-media-gateway/actions/runs/39443892932
+          NOTES
+          prerelease=()
+          if [[ "$RELEASE_VERSION" == *-* ]]; then prerelease=(--prerelease); fi
+          gh release create "$RELEASE_VERSION" dist/releases/* \
+            --verify-tag --title "Media Gateway $RELEASE_VERSION" --notes-file /tmp/release-notes.md "${prerelease[@]}"
