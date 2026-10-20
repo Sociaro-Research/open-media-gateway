@@ -18,7 +18,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Check out complete history
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -58,7 +58,7 @@ jobs:
       GATEWAY_TEST_REDIS_URL: redis://127.0.0.1:6379/0
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up Go
         uses: actions/setup-go@v7
@@ -67,7 +67,7 @@ jobs:
           cache-dependency-path: go.sum
 
       - name: Set up Node for the persisted profile browser workflow
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '24'
 
@@ -84,7 +84,7 @@ jobs:
         run: make verify-ci TEST_FLAGS='-count=1 -coverprofile=coverage.out'
 
       - name: Retain persisted profile browser evidence
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: profile-contact-browser
@@ -121,7 +121,7 @@ jobs:
       UI_SCREENSHOT_DIR: profile-name-browser
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Set up Go
         uses: actions/setup-go@v7
@@ -130,7 +130,7 @@ jobs:
           cache-dependency-path: go.sum
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '24'
 
@@ -145,7 +145,7 @@ jobs:
           UI_BROWSER_ENGINE=webkit go test -race -count=1 -v -run '^TestProfileNameBrowserReconciliation$' ./internal/api
 
       - name: Retain profile name evidence
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: profile-name-browser
@@ -158,7 +158,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Validate Compose configuration
         run: docker compose --profile ui --profile monitoring config --quiet
@@ -208,7 +208,7 @@ jobs:
             --postgres gateway-postgres:ci --redis gateway-redis:ci
 
       - name: Set up Node for UI checks
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '24'
 
@@ -290,7 +290,7 @@ jobs:
         run: docker compose -p gateway-monitoring-ci --profile monitoring -f compose.yaml -f monitoring/grafana/compose.test.yaml down
 
       - name: Retain browser performance evidence
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: browser-performance
