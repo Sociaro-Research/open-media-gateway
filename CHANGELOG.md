@@ -3,10 +3,9 @@
 All notable changes to Media Gateway will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and the project intends to use [Semantic Versioning](https://semver.org/) after
-the first public release.
+and the project follows [Semantic Versioning](https://semver.org/).
 
-## [v0.1.0-rc.1] - 2026-10-20
+## [v1.0.0] - 2026-10-20
 
 ### Added
 
