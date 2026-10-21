@@ -1,5 +1,5 @@
 // Verify real Caddy routing and the independently served UI against an isolated API fixture.
-const {chromium}=require('playwright');
+const {chromium,webkit}=require('playwright');
 const assert=require('node:assert/strict'),http=require('node:http'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),{spawn}=require('node:child_process');
 const root=path.resolve(__dirname,'../..'),tmp=fs.mkdtempSync(path.join(os.tmpdir(),'gateway-ui-routing-'));
 const listen=server=>new Promise(resolve=>server.listen(0,'127.0.0.1',()=>resolve(server.address().port)));
@@ -23,9 +23,9 @@ const upstream=http.createServer((req,res)=>{
 });
 (async()=>{
  const apiPort=await listen(upstream),reservation=http.createServer(),port=await listen(reservation);await new Promise(r=>reservation.close(r));
- const env={...process.env,UI_ROOT:path.join(root,'web/public'),GATEWAY_UPSTREAM:'127.0.0.1:'+apiPort,UI_LISTEN:':'+port,DOCS_HOST:'docs.localhost'};
+ const env={...process.env,UI_ROOT:path.join(root,'web/public'),GATEWAY_UPSTREAM:'127.0.0.1:'+apiPort,UI_LISTEN:':'+port,DOCS_HOST:'localhost'};
  const log=fs.openSync(path.join(tmp,'caddy.log'),'w');
- caddy=spawn(process.env.CADDY_BIN||'caddy',['run','--config',path.join(root,'web/Caddyfile'),'--adapter','caddyfile'],{env,stdio:['ignore',log,log]});fs.closeSync(log);
+ caddy=spawn(process.env.CADDY_BIN||'caddy',['run','--config',process.env.CADDY_CONFIG||path.join(root,'web/Caddyfile'),'--adapter','caddyfile'],{env,stdio:['ignore',log,log]});fs.closeSync(log);
  const base='http://127.0.0.1:'+port;
  let ready=false;for(let i=0;i<100;i++){try{const r=await fetch(base+'/ui/site.js');if(r.status===200){ready=true;break}}catch{}if(caddy.exitCode!==null)throw Error(fs.readFileSync(path.join(tmp,'caddy.log'),'utf8'));await delay(100)}assert.ok(ready,'Caddy did not start');
  const request=(p,code,headers={},method='GET')=>new Promise((resolve,reject)=>{
@@ -34,17 +34,18 @@ const upstream=http.createServer((req,res)=>{
  for(const p of ['/','/system','/organizations','/profile','/api-keys','/configuration']){const r=await request(p,200);assert.match(await r.text(),/Sign in to get started/);assert.equal(r.headers.get('cache-control'),'no-store');assert.ok(r.headers.get('vary').split(',').map(s=>s.trim()).includes('Cookie'));}
  assert.match(await (await request('/',200,{Authorization:'Bearer fixture-key'})).text(),/Sign in to get started/);
  for(const p of ['/ui/app.js','/ui/payments.js','/provider-assets/mock/icon.png'])await request(p,401);
- await request('/ui/index.html',404);await request('/ui/index.html',404,{Cookie:'test_session=alice'});await request('/ui/',404);
+ for(const p of ['/ui/index.html','/ui/privacy.html','/ui/terms.html','/ui/']){await request(p,404);await request(p,404,{Cookie:'test_session=alice'});}
  for(const p of ['/ui/app.js','/ui/report-details.js'])await request(p,200,{Cookie:'test_session=alice'});
  assert.match(await (await request('/system',200,{Cookie:'test_session=alice'})).text(),/generationView/);
  for(const p of ['/privacy','/terms','/docs','/ui/site.js','/ui/login.js','/ui/styles.css'])await request(p,200);
+ const legalCSS=await request('/ui/legal.css?v=20260911-console-consistency',200);assert.match(legalCSS.headers.get('content-type'),/^text\/css/);assert.equal(await legalCSS.text(),fs.readFileSync(path.join(root,'web/public/ui/legal.css'),'utf8'));
  for(const p of ['/v1/test','/auth/google/callback','/media/test','/references/test'])await request(p,p==='/v1/test'?200:418);
- const docs={Host:'docs.localhost'};
+ const docs={Host:'localhost'};
  for(const p of ['/','/docs','/openapi.json','/site.json','/ui/docs.js','/ui/site.js'])await request(p,200,docs);
  for(const p of ['/v1/info','/auth/session','/media/test','/ui/app.js','/ui/index.html','/system','/privacy'])await request(p,404,{...docs,Cookie:'test_session=alice',Authorization:'Bearer fixture-key'});
  await request('/site.json',404,docs,'POST');
- browser=await chromium.launch({headless:true,...(process.env.UI_BROWSER_PATH?{executablePath:process.env.UI_BROWSER_PATH}:{})});
- const context=await browser.newContext(),page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
+ browser=await (process.env.UI_BROWSER_ENGINE==='webkit'?webkit:chromium).launch({headless:true,...(process.env.UI_BROWSER_ENGINE!=='webkit'&&process.env.UI_BROWSER_PATH?{executablePath:process.env.UI_BROWSER_PATH}:{})});
+ const context=await browser.newContext(),page=await context.newPage(),errors=[];page.on('pageerror',e=>{if(process.env.UI_BROWSER_ENGINE==='webkit'&&e.message==='ResizeObserver loop completed with undelivered notifications.'){console.warn('WebKit resize notice: '+e.message);return;}errors.push(e.message);});
  const screenshots=process.env.UI_SCREENSHOT_DIR||path.join(tmp,'screenshots');fs.mkdirSync(screenshots,{recursive:true});
  for(const theme of ['dark','light'])for(const width of [1440,390,320]){
   await page.setViewportSize({width,height:1000});await page.emulateMedia({colorScheme:theme});await page.goto(base+'/');await page.evaluate(()=>GatewaySite.ready);
@@ -54,9 +55,25 @@ const upstream=http.createServer((req,res)=>{
   await page.getByRole('button',{name:'Continue with email',exact:true}).click();await page.getByRole('textbox',{name:'Email',exact:true}).focus();assert.ok(await page.evaluate(()=>document.activeElement?.tagName==='INPUT'));await page.keyboard.press('Tab');
   await page.screenshot({path:path.join(screenshots,`login-${theme}-${width}.png`)});
  }
+ for(const theme of ['dark','light'])for(const width of [1440,390,320])for(const legal of ['/privacy','/terms']){
+  assert.deepEqual(await context.cookies(),[],'Legal pages must be tested without a session');
+  await page.setViewportSize({width,height:1000});await page.emulateMedia({colorScheme:theme});
+  const cssResponse=page.waitForResponse(r=>new URL(r.url()).pathname==='/ui/legal.css');
+  await page.goto(base+legal);await page.evaluate(()=>GatewaySite.ready);
+  assert.equal((await cssResponse).status(),200,'Anonymous legal stylesheet');
+  await page.getByRole('heading',{name:legal==='/privacy'?'Privacy Policy':'Terms of Service',exact:true}).waitFor();
+  const layout=await page.locator('main').evaluate(n=>({padding:getComputedStyle(n).paddingTop,width:n.getBoundingClientRect().width,bodyWidth:document.body.getBoundingClientRect().width,clientWidth:document.documentElement.clientWidth}));
+  assert.equal(layout.padding,'64px','Legal stylesheet applied');
+  if(Math.abs(layout.width-Math.min(760,width-40))>=1)console.log('Legal viewport measurement',JSON.stringify({legal,theme,viewportWidth:width,...layout}));
+  assert.ok(Math.abs(layout.width-Math.min(760,layout.bodyWidth-40))<1,'Legal content width '+JSON.stringify(layout));
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Legal page overflow '+legal+' '+width);
+  await page.screenshot({path:path.join(screenshots,`${legal.slice(1)}-${theme}-${width}.png`)});
+  const home=page.locator('a.back[href="/"]');assert.equal(await home.getAttribute('aria-label'),brand.name);await home.focus();assert.ok(await home.evaluate(n=>n===document.activeElement));await page.keyboard.press('Enter');
+  await page.waitForURL(base+'/');await page.getByText('Sign in to get started',{exact:true}).waitFor();
+ }
  await context.addCookies([{name:'test_session',value:'alice',url:base}]);
  for(const width of [1440,390,320]){await page.setViewportSize({width,height:1000});await page.goto(base+'/');await page.evaluate(()=>GatewaySite.ready);await page.locator('#generationView').waitFor();await page.waitForFunction(()=>[...document.querySelectorAll('.brand img')].every(n=>n.complete&&n.naturalHeight));await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));const mark=await page.locator('.brand').boundingBox(),nav=await page.locator('#sectionNav').boundingBox();assert.ok(mark.x+mark.width<=nav.x+1||mark.y+mark.height<=nav.y+1,'Brand overlaps navigation '+width);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Console overflow '+width);await page.screenshot({path:path.join(screenshots,`console-${width}.png`)});}
- await page.goto('http://docs.localhost:'+port+'/');await page.evaluate(()=>GatewaySite.ready);await page.waitForFunction(()=>document.title.includes('White <Label>'));
+ await page.goto('http://localhost:'+port+'/');await page.evaluate(()=>GatewaySite.ready);await page.waitForFunction(()=>document.title.includes('White <Label>'));
  await page.getByRole('heading',{name:'Build with Gateway.',exact:true}).waitFor();assert.equal(await page.locator('.operation-error').count(),0);await page.locator('#docsSearch').fill('patch');await page.locator('#docsMenu a').filter({hasText:'PATCH'}).click();await page.getByRole('heading',{name:'Update profile',exact:true}).waitFor();assert.ok((await page.locator('#docsContent').innerText()).includes('GATEWAY_COOKIE_JAR'));assert.ok(!(await page.locator('#docsContent').innerText()).includes('Bearer $GATEWAY_API_KEY'));assert.equal(await page.locator('[data-console-link]').first().getAttribute('href'),'https://console.example.test/');assert.equal(await page.locator('meta[name="gateway-url"]').getAttribute('content'),'https://api.example.test');
- await page.screenshot({path:path.join(screenshots,'docs-320.png')});assert.deepEqual(errors,[]);console.log('PASS: independent Caddy UI, private session gating, API/capability proxying, docs isolation, branding, both themes and 1440/390/320px layouts. Screenshots: '+screenshots);
+ await page.screenshot({path:path.join(screenshots,'docs-320.png')});assert.deepEqual(errors,[]);console.log('PASS: independent Caddy UI, anonymous styled Privacy/Terms and keyboard Home, private session gating, API/capability proxying, docs isolation, branding, both themes and 1440/390/320px layouts. Screenshots: '+screenshots);
 })().catch(error=>{console.error(error);process.exitCode=1}).finally(async()=>{await browser?.close();upstream.close();if(caddy&&caddy.exitCode===null){caddy.kill('SIGTERM');await new Promise(r=>caddy.once('exit',r))}});
