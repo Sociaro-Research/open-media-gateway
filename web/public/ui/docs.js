@@ -39,29 +39,64 @@
     rows.forEach(row => { const r = node('tr'); row.forEach(cell => { const td = node('td'); td.append(cell instanceof Node ? cell : document.createTextNode(String(cell))); r.append(td); }); body.append(r); });
     t.append(head, body); wrap.append(t); parent.append(wrap);
   }
-  function fields(schema, parent = content, depth = 0) {
-    schema = resolve(schema) || {};
-    if (schema.description) paragraph(schema.description, parent);
-    const variants = schema.oneOf || schema.anyOf;
-    if (variants && depth < 4) {
-      variants.forEach((variant, index) => {
-        const details = node('details');
-        details.append(node('summary', variant.$ref?.split('/').pop() || `Variant ${index + 1}`));
-        fields(variant, details, depth + 1); parent.append(details);
-      });
+  // Required names on allOf siblings apply to every part of the same object.
+  function requiredFields(schema, seen = new Set()) {
+    if (!schema || seen.has(schema)) return [];
+    seen = new Set(seen).add(schema);
+    return [...new Set([...(schema.required || []),
+      ...(schema.$ref ? requiredFields(resolve(schema), seen) : []),
+      ...(schema.allOf || []).flatMap(part => requiredFields(part, seen))])];
+  }
+  function schemaType(schema) {
+    return [Array.isArray(schema.type) ? schema.type.join(' | ') : schema.type ||
+      (schema.allOf ? 'all of' : schema.oneOf ? 'one of' : schema.anyOf ? 'any of' : 'object'), schema.format].filter(Boolean).join(' · ');
+  }
+  function fields(schema, parent = content, depth = 0, ancestors = new Set(), inheritedRequired = []) {
+    schema ||= {};
+    const required = [...new Set([...inheritedRequired, ...requiredFields(schema)])];
+    if (schema.$ref) {
+      const name = schema.$ref.split('/').pop();
+      const reference = node('p', 'Schema: '); reference.append(link(name, `schema-${name}`)); parent.append(reference);
+      const target = resolve(schema);
+      if (!target || ancestors.has(target)) {
+        paragraph(target ? 'Recursive schema; follow the schema link for its fields.' : 'Schema reference could not be resolved.', parent);
+      } else if (depth >= 12) {
+        paragraph('Nested schema; follow the schema link for its fields.', parent);
+      } else {
+        fields(target, parent, depth + 1, new Set(ancestors).add(schema), required);
+      }
+      const siblings = {...schema}; delete siblings.$ref;
+      if (Object.keys(siblings).some(key => !['description', 'title', 'deprecated', 'example', 'examples', 'default', 'readOnly', 'writeOnly'].includes(key))) fields(siblings, parent, depth + 1, ancestors, required);
+      else if (siblings.description) paragraph(siblings.description, parent);
       return;
+    }
+    if (depth >= 12 || ancestors.has(schema)) {
+      paragraph('Nested schema display limit reached.', parent); return;
+    }
+    ancestors = new Set(ancestors).add(schema);
+    if (schema.description) paragraph(schema.description, parent);
+    let composed = false;
+    for (const [kind, label] of [['allOf', 'All of the following schemas apply:'], ['oneOf', 'Exactly one of the following schemas applies:'], ['anyOf', 'One or more of the following schemas apply:']]) {
+      if (!schema[kind]) continue;
+      composed = true; paragraph(label, parent);
+      schema[kind].forEach((part, index) => {
+        const section = node(kind === 'allOf' ? 'section' : 'details');
+        section.append(node(kind === 'allOf' ? 'h3' : 'summary', part.$ref?.split('/').pop() || `Schema ${index + 1}`));
+        fields(part, section, depth + 1, ancestors, required); parent.append(section);
+      });
     }
     const props = schema.properties || (schema.type === 'array' ? {items: schema.items} : {});
     if (!Object.keys(props).length) {
-      paragraph(schema.enum ? `Values: ${schema.enum.join(', ')}` : (schema.type || 'Any JSON value'), parent); return;
+      if (!composed || schema.type || schema.enum) paragraph(schema.enum ? `Values: ${schema.enum.join(', ')}` : schema.type ? schemaType(schema) : schema.required?.length ? `Required properties: ${schema.required.join(', ')}` : 'Any JSON value', parent);
+      return;
     }
     const list = node('div', undefined, 'docs-fields');
     Object.entries(props).forEach(([name, raw]) => {
       const field = resolve(raw) || {};
       const row = node('div', undefined, 'docs-field');
       const title = node('div', undefined, 'docs-field-name');
-      title.append(node('code', name), node('span', `${field.type || 'object'}${field.format ? ` · ${field.format}` : ''}`));
-      if (schema.required?.includes(name)) title.append(node('em', 'required'));
+      title.append(node('code', name), node('span', schemaType(field)));
+      if (required.includes(name)) title.append(node('em', 'required'));
       if (field.writeOnly) title.append(node('em', 'write only'));
       row.append(title);
       if (raw.description || field.description) paragraph(raw.description || field.description, row);
@@ -70,9 +105,9 @@
       if (field.default !== undefined) constraints.push(`Default: ${JSON.stringify(field.default)}`);
       for (const k of ['minimum','maximum','minLength','maxLength','minItems','maxItems']) if (field[k] !== undefined) constraints.push(`${k}: ${field[k]}`);
       if (constraints.length) row.append(node('small', constraints.join('  |  ')));
-      const nested = field.items || (field.properties || field.oneOf || field.anyOf ? field : null);
-      if (nested && depth < 4) {
-        const details = node('details'); details.append(node('summary', field.items ? 'Item schema' : 'Object fields')); fields(nested, details, depth + 1); row.append(details);
+      const nested = field.items || (raw.$ref || field.properties || field.oneOf || field.anyOf || field.allOf ? raw : null);
+      if (nested) {
+        const details = node('details'); details.append(node('summary', field.items ? 'Item schema' : 'Field schema')); fields(nested, details, depth + 1, ancestors); row.append(details);
       }
       if (field.additionalProperties) paragraph('Additional properties: ' + (typeof field.additionalProperties === 'object' ? field.additionalProperties.type || 'JSON' : 'any JSON value'), row);
       list.append(row);

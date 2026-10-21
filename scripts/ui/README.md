@@ -331,3 +331,13 @@ from prompt previews. All APIs use delayed synthetic fixtures. Repeat with
 `UI_BROWSER_ENGINE=webkit`, `UI_VIEWPORT_WIDTH=390` or `320`, and `UI_THEME=dark`.
 `UI_SOURCE_DIR` selects a baseline UI tree for the identical regression;
 `UI_SCREENSHOT_DIR` selects the local JSON results and screenshot directory.
+
+Run `node scripts/ui/documentation-schemas.cjs` and repeat with
+`UI_BROWSER_ENGINE=webkit` for composed documentation schemas. It uses Go's
+`docs.JSON()` to serve the complete current OpenAPI contract from a temporary
+localhost fixture, then separate synthetic schemas for required fields, reference
+siblings, alternatives and bounded recursion. Go and Playwright are required.
+Checks cover ReportGroup, ReportSummary, the three report endpoint responses,
+keyboard navigation, both themes and 1440/390/320px. No live API is called.
+`UI_EVIDENCE_DIR` selects the screenshots and JSON results directory;
+`UI_DOCS_SCRIPT` can select an archived renderer for a baseline regression.
