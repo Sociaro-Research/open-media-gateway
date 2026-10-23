@@ -164,7 +164,8 @@ const providers = [{id:'mock',name:'Test provider',live:false,credentials_config
     delay=0;
 
     await page.locator('#model').selectOption(JSON.stringify(['live',speech.id]));
-    assert.equal(await page.locator('#model option:checked').innerText(),'Test Speech');
+    assert.equal(await page.locator('#model option:checked').innerText(),'Test Speech · Live provider · test-speech');
+    assert.equal(await page.locator('#model').inputValue(),JSON.stringify(['live',speech.id]));
     await page.locator('#prompt').fill('Hello world');
     await page.waitForFunction(()=>document.querySelector('#priceValue').textContent === 'Free');
     await page.locator('#voice').fill('Serena');

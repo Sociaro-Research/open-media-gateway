@@ -9,6 +9,7 @@ const site={branding:{name:'Configured Brand',description:'Configured descriptio
 const server=http.createServer((req,res)=>{
  const p=new URL(req.url,'http://localhost').pathname;
  if(p.startsWith('/branding/assets/')){res.writeHead(200,{'Content-Type':'image/svg+xml'});return res.end(svg);}
+ if(p==='/legal/privacy'||p==='/legal/terms'){res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify({text:''}));}
  if(p==='/auth/methods'){res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify({google:true,email:false,email_delivery:false}));}
  if(p.startsWith('/v1/')){res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify(p==='/v1/me'?{id:'fixture',email:'user@example.test',is_system_admin:true}:p==='/v1/info'?{auth_mode:'google',console:{generation_ui:true}}:{data:[]}));}
  const name=files[p]||(p.startsWith('/ui/')?p.slice(4):null),file=name&&path.join(root,name);
@@ -42,7 +43,8 @@ const server=http.createServer((req,res)=>{
    assert.ok((await page.title()).includes('Configured Brand'),url+' title='+await page.title()+' errors='+JSON.stringify(errors));
    assert.ok(!requests.some(u=>/sociaro-(logo|symbol)/i.test(u)));
    if(url==='/privacy'||url==='/terms'){
-    assert.equal(await page.locator('[data-contact-email]').getAttribute('href'),'mailto:support@example.test');
+    await page.locator('[data-legal-default]').waitFor();
+    assert.ok((await page.locator('[data-legal-default]').innerText()).includes('[CONTACT EMAIL]'),'Operator template contact placeholder must remain explicit');
     assert.ok(!(await page.locator('body').innerText()).includes('Sociaro'));
    }
    await page.evaluate(()=>GatewayTheme.apply('light'));
@@ -57,7 +59,7 @@ const server=http.createServer((req,res)=>{
    assert.equal(await page.locator('.brand img[src]').count(),0);
    assert.equal(await page.locator('.brand img:visible').count(),0);
    assert.equal(await page.locator('link[rel=icon],link[rel=apple-touch-icon]').count(),0);
-   if(url==='/privacy'||url==='/terms')assert.equal(await page.locator('[data-contact-details]').isVisible(),false);
+   if(url==='/privacy'||url==='/terms')assert.ok((await page.locator('[data-legal-default]').innerText()).includes('[CONTACT EMAIL]'),'Brand reset must not rewrite legal text');
    assert.deepEqual(errors,[]);
    await page.close();
   }
