@@ -11,6 +11,7 @@ const upstream=http.createServer((req,res)=>{
  const p=new URL(req.url,'http://localhost').pathname;
  const json=data=>{res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify(data));};
  if(p==='/auth/session')return res.writeHead(req.headers.cookie?.includes('test_session=alice')?204:401,{'Cache-Control':'no-store'}).end();
+ if(p==='/legal/privacy'||p==='/legal/terms')return json({text:''});
  if(p==='/site.json')return json({branding:brand,api_url:'https://api.example.test',ui_url:'https://console.example.test',docs_url:''});
  if(p==='/auth/methods')return json({email:true,email_delivery:true,google:true});
  if(p==='/openapi.json')return json({openapi:'3.1.0',info:{title:'Fixture',version:'1'},tags:[{name:'Account'}],components:{schemas:{}},paths:{'/v1/me':{patch:{summary:'Update profile',security:[{sessionAuth:[]}],tags:['Account'],operationId:'update_profile',responses:{'200':{description:'Updated profile'}}}}},servers:[{url:'https://api.example.test'}]});
@@ -39,7 +40,7 @@ const upstream=http.createServer((req,res)=>{
  for(const p of ['/ui/index.html','/ui/privacy.html','/ui/terms.html','/ui/']){await request(p,404);await request(p,404,{Cookie:'test_session=alice'});}
  for(const p of ['/ui/app.js','/ui/report-details.js'])await request(p,200,{Cookie:'test_session=alice'});
  assert.match(await (await request('/system',200,{Cookie:'test_session=alice'})).text(),/generationView/);
- for(const p of ['/privacy','/terms','/docs','/ui/site.js','/ui/login.js','/ui/styles.css'])await request(p,200);
+ for(const p of ['/privacy','/terms','/docs','/ui/site.js','/ui/login.js','/ui/styles.css','/ui/legal.js','/legal/privacy','/legal/terms'])await request(p,200);
  const legalCSS=await request('/ui/legal.css?v=20260911-console-consistency',200);assert.match(legalCSS.headers.get('content-type'),/^text\/css/);assert.equal(await legalCSS.text(),fs.readFileSync(path.join(root,'web/public/ui/legal.css'),'utf8'));
  for(const p of ['/v1/test','/auth/google/callback','/media/test','/references/test'])await request(p,p==='/v1/test'?200:418);
  const docs={Host:'localhost'};
@@ -63,7 +64,7 @@ const upstream=http.createServer((req,res)=>{
   const cssResponse=page.waitForResponse(r=>new URL(r.url()).pathname==='/ui/legal.css');
   await page.goto(base+legal);await page.evaluate(()=>GatewaySite.ready);
   assert.equal((await cssResponse).status(),200,'Anonymous legal stylesheet');
-  await page.getByRole('heading',{name:legal==='/privacy'?'Privacy Policy':'Terms of Service',exact:true}).waitFor();
+  await page.getByRole('heading',{name:legal==='/privacy'?'Privacy Policy':'Terms of Use',exact:true}).waitFor();
   const layout=await page.locator('main').evaluate(n=>({padding:getComputedStyle(n).paddingTop,width:n.getBoundingClientRect().width,bodyWidth:document.body.getBoundingClientRect().width,clientWidth:document.documentElement.clientWidth}));
   assert.equal(layout.padding,'64px','Legal stylesheet applied');
   if(Math.abs(layout.width-Math.min(760,width-40))>=1)console.log('Legal viewport measurement',JSON.stringify({legal,theme,viewportWidth:width,...layout}));
