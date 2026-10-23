@@ -214,6 +214,9 @@ func (s *Server) inputReferenceURLs(r *http.Request, raw json.RawMessage) ([]str
 	if json.Unmarshal(raw, &array) == nil && len(array) > 0 {
 		var urls []string
 		for _, item := range array {
+			if strings.HasPrefix(strings.TrimSpace(string(item)), "[") {
+				return nil, errors.New("reference arrays must contain only image URLs or reference objects")
+			}
 			values, err := s.inputReferenceURLs(r, item)
 			if err != nil {
 				return nil, err
