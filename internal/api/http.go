@@ -455,7 +455,7 @@ func (s *Server) authenticate(next http.Handler) http.Handler {
 			user, key, err := s.keys.Authenticate(r.Context(), apikey.Hash(provided))
 			if err == nil {
 				scope := apikey.Generation
-				if (strings.HasPrefix(r.URL.Path, "/v1/organizations") && r.Method != "GET") || r.URL.Path == "/v1/invitations/accept" {
+				if (strings.HasPrefix(r.URL.Path, "/v1/organizations") && r.Method != http.MethodGet && r.Method != http.MethodHead) || r.URL.Path == "/v1/invitations/accept" {
 					scope = apikey.OrganizationsManage
 				}
 				if strings.HasPrefix(r.URL.Path, "/v1/organizations/") && (strings.HasSuffix(r.URL.Path, "/storage") || strings.Contains(r.URL.Path, "/payments") || strings.HasSuffix(r.URL.Path, "/payment-methods") || strings.HasSuffix(r.URL.Path, "/balance-history")) {
