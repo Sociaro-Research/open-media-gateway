@@ -393,7 +393,7 @@ func TestPublicReferenceAndRouteCoverage(t *testing.T) {
 	routes := map[string]bool{}
 	for _, match := range routePattern.FindAllStringSubmatch(string(source), -1) {
 		path := match[2]
-		if !strings.HasPrefix(path, "/v1/") && !strings.HasPrefix(path, "/auth/") && !strings.HasPrefix(path, "/media/") && !strings.HasPrefix(path, "/references/") && path != "/healthz" && path != "/site.json" {
+		if !strings.HasPrefix(path, "/legal/") && !strings.HasPrefix(path, "/v1/") && !strings.HasPrefix(path, "/auth/") && !strings.HasPrefix(path, "/media/") && !strings.HasPrefix(path, "/references/") && path != "/healthz" && path != "/site.json" {
 			continue
 		}
 		routes[strings.ToLower(match[1])+" "+normalize(path)] = true

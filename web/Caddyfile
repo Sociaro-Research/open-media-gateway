@@ -80,7 +80,7 @@
 			}
 		}
 	}
-	@backend path /v1/* /auth/* /healthz /media/* /references/* /branding/assets/* /site.json /openapi.json /openapi.yaml
+	@backend path /legal/privacy /legal/terms /v1/* /auth/* /healthz /media/* /references/* /branding/assets/* /site.json /openapi.json /openapi.yaml
 	handle @backend {
 		reverse_proxy {$GATEWAY_UPSTREAM:gateway:8080}
 	}
@@ -88,7 +88,7 @@
 	handle @rawHTML {
 		respond 404
 	}
-	@publicAssets path /ui/legal.css /ui/site.js /ui/theme.js /ui/layout.js /ui/styles.css /ui/docs.css /ui/form-ui.js /ui/email-login.js /ui/login.js /ui/google-icon.svg
+	@publicAssets path /ui/legal.css /ui/legal.js /ui/site.js /ui/theme.js /ui/layout.js /ui/styles.css /ui/docs.css /ui/form-ui.js /ui/email-login.js /ui/login.js /ui/google-icon.svg
 	handle @publicAssets {
 		file_server
 	}

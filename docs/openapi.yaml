@@ -34,6 +34,57 @@ tags:
 - name: Organizations
 - name: Payments
 paths:
+  /legal/{kind}:
+    get:
+      operationId: get_legal_kind
+      summary: Read a public plain-text legal document override
+      security: []
+      parameters:
+      - {in: path, name: kind, required: true, schema: {type: string, enum: [privacy, terms]}}
+      responses:
+        '200':
+          description: Empty text selects the bundled frontend template. Never render text as HTML.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [text]
+                properties:
+                  text: {type: string}
+        '404': {description: Unknown document}
+        '503': {description: Document storage unavailable}
+  /v1/system/legal/{kind}:
+    parameters:
+    - {in: path, name: kind, required: true, schema: {type: string, enum: [privacy, terms]}}
+    get:
+      operationId: get_v1_system_legal_kind
+      summary: Read legal document settings (Administrator only)
+      responses:
+        '200':
+          description: Saved override and optimistic concurrency token
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LegalDocument'}
+        '401': {description: Authentication required}
+        '403': {description: Administrator required}
+    put:
+      operationId: put_v1_system_legal_kind
+      summary: Publish or reset a plain-text legal document (Administrator only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/LegalDocument'}
+      responses:
+        '200':
+          description: Saved document with incremented concurrency token
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LegalDocument'}
+        '400': {description: Invalid text, version or request body}
+        '401': {description: Authentication required}
+        '403': {description: Administrator required}
+        '409': {description: Document changed since it was opened}
   "/site.json":
     get:
       tags: [Account]
@@ -6753,6 +6804,13 @@ components:
           schema:
             "$ref": "#/components/schemas/ErrorResponse"
   schemas:
+    LegalDocument:
+      type: object
+      additionalProperties: false
+      required: [text, version]
+      properties:
+        text: {type: string, maxLength: 65536, description: 'Plain UTF-8 text, at most 64 KiB in bytes. Empty text restores the bundled template. HTML is displayed literally.'}
+        version: {type: integer, minimum: 1, description: Optimistic concurrency token; not a legal agreement version or acceptance record.}
     SiteBranding:
       type: object
       additionalProperties: false

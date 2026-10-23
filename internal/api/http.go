@@ -162,6 +162,7 @@ func NewGateway(d Dependencies) http.Handler {
 func (s *Server) handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /site.json", s.siteConfiguration)
+	mux.HandleFunc("GET /legal/{kind}", s.legalDocument)
 	mux.HandleFunc("GET /auth/session", s.browserSession)
 	mux.HandleFunc("GET /auth/monitoring", s.monitoringSession)
 	mux.HandleFunc("GET /branding/assets/{asset}", func(w http.ResponseWriter, r *http.Request) { brandingAsset(w, r, s.brandingReader()) })
@@ -174,6 +175,8 @@ func (s *Server) handler() http.Handler {
 	s.registerPayments(mux)
 	mux.Handle("GET /v1/storage/usage", s.authenticate(http.HandlerFunc(s.storageUsage)))
 	if s.system != nil {
+		mux.Handle("GET /v1/system/legal/{kind}", s.authenticate(http.HandlerFunc(s.legalSettings)))
+		mux.Handle("PUT /v1/system/legal/{kind}", s.authenticate(http.HandlerFunc(s.legalSettings)))
 		mux.Handle("GET /v1/system/branding", s.authenticate(http.HandlerFunc(s.brandingSettings)))
 		mux.Handle("PUT /v1/system/branding", s.authenticate(http.HandlerFunc(s.brandingSettings)))
 		mux.Handle("GET /v1/system/storage/quota", s.authenticate(http.HandlerFunc(s.storageQuota)))

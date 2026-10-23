@@ -132,3 +132,23 @@ connection chooses whether the service or the organization pays the actual
 processing fee; the choice is fixed on each new payment. See [organization
 funding](payments.md) for webhook setup, test/live isolation, refunds, reconciliation
 and the separate trusted integration API.
+
+## Public legal documents
+
+In **Seller company and VAT**, an Administrator can open separate **Privacy Policy**
+and **Terms of Use** dialogs. Each starts with the saved override or bundled template.
+Save publishes immediately; Cancel, Close and Escape discard the draft. Closing
+is blocked during a save. Conflicting saves preserve the draft and require reopening
+the latest document before retrying.
+
+Documents are plain UTF-8 text, limited to 64 KiB each. HTML and URLs are displayed
+literally; line breaks are preserved. **Use default template** clears the override
+only after Save. Company/VAT saves do not alter either document. The stored
+concurrency counter prevents lost updates; it is not a legal acceptance record.
+No agreement acceptance or contract-history process is introduced.
+
+The public `GET /legal/privacy` and `GET /legal/terms` endpoints return only the
+override text without authentication. Empty text selects the bundled frontend
+template. A read failure shows an error and Retry instead of silently showing
+a potentially outdated template. Administrator reads and writes use
+`/v1/system/legal/{kind}`. Migration 070 creates the two empty overrides.

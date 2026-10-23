@@ -1521,3 +1521,8 @@ body:has(.detail-dialog[open]) { overflow:hidden; }
 .support-card > .field-explanation { margin:20px 0 0; }
 .member-contact .contact-links { gap:8px; margin-top:12px; }
 @media(max-width:600px) { .support-card { padding:20px; } }
+
+/* Legal documents use literal text, never operator-supplied HTML. */
+.legal-text { white-space:pre-wrap; overflow-wrap:anywhere; }
+.legal-editor { width:min(760px,calc(100vw - 32px)); max-width:760px; }
+.legal-editor textarea { --textarea-min-rows:8; --textarea-max-rows:14; }

@@ -368,3 +368,18 @@ decode and play the fixed MP3 returned by Mock Speech and Mock Music. It checks
 MIME type, size, duration, stereo PCM signal and playback to completion using only
 a local HTTP fixture. This does not call a provider or test physical speakers.
 JSON evidence is written through the shared evidence directory helper.
+
+Run `node scripts/ui/legal-documents.cjs` and repeat with
+`UI_BROWSER_ENGINE=webkit` for the legal-document editor and public display.
+Local fixtures cover default templates, independent documents, literal HTML
+payloads, save/cancel/Escape, pending writes, conflicts, reset, public read
+failure/retry, both themes and 1440/390/320px. `UI_EVIDENCE_DIR` stores screenshots.
+Backend permission and persistence tests run separately with disposable services.
+
+For a real session/API/PostgreSQL round trip, enable
+`GATEWAY_LEGAL_BROWSER_NODE=node` and run `TestLegalDocumentsBrowserWorkflow`
+through `scripts/with-test-services.py`. It uses an isolated schema, local users
+and the actual company-settings editor. It verifies public reads, anonymous and
+member denial, persisted text, concurrent-edit conflicts, literal HTML display,
+independent company saves, the UTF-8 byte limit and template reset.
+Repeat with `UI_BROWSER_ENGINE=webkit`. No live provider or payment calls run.
