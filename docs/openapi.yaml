@@ -7686,7 +7686,7 @@ components:
       additionalProperties: false
       description: OpenAI-style naming with Gateway extensions. Use only fields appropriate
         for the media type. Standard fields are accepted only at the top level; only advertised options.parameters
-        keys are accepted. JSON limit 64 KiB.
+        keys are accepted. JSON limit 64 KiB. Null prompt, webhook_url and max_expected_cost_usd behave as omission; model-specific prompt requirements still apply.
       properties:
         timeout_seconds:
           type: integer
@@ -7710,7 +7710,7 @@ components:
           description: Gateway customer-price ceiling, including markup. Admission rejects
             a higher quote.
           minimum: 0
-          type: number
+          type: [number, "null"]
         model:
           description: Exact public ID from GET /v1/models. Defaults to provider/model and can be renamed by the administrator. Separate provider and media_type request fields are not accepted.
           type: string
@@ -7727,7 +7727,7 @@ components:
         prompt:
           maxLength: 10000
           description: Text direction, subject to the model's limits. May be omitted or empty when prompt_optional or no_prompt is advertised; no_prompt rejects nonempty text.
-          type: string
+          type: [string, "null"]
         quality:
           type: string
         response_format:
@@ -7753,7 +7753,7 @@ components:
           type: string
         webhook_url:
           format: uri
-          type: string
+          type: [string, "null"]
       required:
       - model
       type: object
@@ -8243,75 +8243,77 @@ components:
       - music
       - audio
     MediaOptions:
+      description: Optional built-in controls accept null as omission. Values inside parameters follow the advertised provider parameter schema.
       type: object
       additionalProperties: false
       properties:
         parameters:
-          type: object
+          type: [object, "null"]
           additionalProperties: true
           description: Additional controls declared by MediaModel.parameters. Unknown keys and invalid types are rejected.
         duration:
-          type: integer
+          type: [integer, "null"]
           minimum: 0
           description: Music or audio output duration in seconds, when advertised by the model. Video requests use the top-level seconds field. Fractional effects may declare a number parameter instead.
         ratio:
-          type: string
+          type: [string, "null"]
           description: Video aspect ratio from the catalog, for example 16:9.
         generate_audio:
-          type: boolean
+          type: [boolean, "null"]
           description: Request synchronized audio when supports_audio is true.
         watermark:
-          type: boolean
+          type: [boolean, "null"]
           description: Provider watermark preference, subject to provider support.
         camera_fixed:
-          type: boolean
+          type: [boolean, "null"]
           description: Fixed camera; omit if supports_camera_fixed is false.
         draft:
-          type: boolean
+          type: [boolean, "null"]
           description: Preview generation when supports_draft is true; use draft_resolutions
             when listed.
         seed:
-          type: integer
+          type: [integer, "null"]
           format: int64
           description: Video random seed from 0 to 4294967295; omit for provider randomness.
           minimum: 0
           maximum: 4294967295
         return_last_frame:
-          type: boolean
+          type: [boolean, "null"]
           description: Return the final video frame when supports_last_frame is true.
         negative_prompt:
-          type: string
+          type: [string, "null"]
           description: Exclusions for models with supports_negative_prompt.
         reference_voices:
-          type: object
+          type: [object, "null"]
           additionalProperties: {type: string, format: uri}
           description: Wan 2.7 reference-to-video only. Maps an ordinary image/video URL to its voice audio URL. First frames cannot have a voice. WAV or MP3, 1–10 seconds, at most 15 MB. Defaults to the reference video's original voice when omitted.
         reference_mode:
-          type: string
+          type: [string, "null"]
           description: Select an ID from the model's reference_modes. This determines image order and native roles. If omitted, the model selects its default reference mode. first_frame_references uses its first image as the first frame; remaining images are ordinary references.
         video_urls:
-          type: array
+          type: [array, "null"]
           items: {type: string, format: uri}
           description: Video references in order. Models advertising supports_asset_references also accept asset://ID entries, mixed with URLs. Respect the selected reference mode's count limits.
         audio_urls:
-          type: array
+          type: [array, "null"]
           items: {type: string, format: uri}
           description: Audio references or driving audio according to the selected mode. Models advertising supports_asset_references also accept asset://ID entries, mixed with URLs.
         language:
-          type: string
+          type: [string, "null"]
           description: Speech language, subject to the model; for example English
             or Auto.
         lyrics:
-          type: string
+          type: [string, "null"]
           description: Music lyrics when supports_lyrics is true.
         gender:
-          type: string
+          type: [string, "null"]
           enum:
           - female
           - male
+          - null
           description: Vocal gender when supports_gender is true.
         format:
-          type: string
+          type: [string, "null"]
           description: Output format from the model’s formats list.
     ProviderUsage:
       type: object
