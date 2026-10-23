@@ -84,10 +84,12 @@ For edits, add `image`: a URL, `{ "image_url": "https://…" }`,
 `input_reference` accepts these same forms for video.
 
 `/v1/images/edits` also accepts multipart `image` or `image[]` files;
-`/v1/videos` accepts a multipart `input_reference` image with local storage. With S3,
-multipart requests return `409 direct_upload_required` before reading file bytes:
-upload directly using `/v1/references/uploads`, then submit JSON with the saved
-reference ID or URL. Total multipart size is
+`/v1/videos` accepts multipart forms with an optional `input_reference` image.
+Text-only forms require no reference storage or media signer and use the same
+model validation as JSON. Multipart file uploads require local storage. With S3,
+file uploads return `409 direct_upload_required` after inspecting part headers,
+without draining or spooling the file. Upload directly using
+`/v1/references/uploads`, then send the saved reference ID or URL. Total multipart size is
 32 MiB; at most 16 edit images or one video reference. Each image still obeys the
 library's MIME/30 MiB limit and the model's capabilities. Scalar controls are form
 strings; `options` is JSON text. Uploaded files are stored in the reusable library,

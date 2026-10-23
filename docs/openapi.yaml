@@ -1453,7 +1453,7 @@ paths:
       description: 'Returns HTTP 202 immediately after queue admission. Poll status_url
         until completed/failed; download content_url with the same API key. Provider
         execution never runs synchronously in this request. This endpoint selects media_type=video.
-        Multipart uploads are local-storage only, with a 32 MiB total limit. S3 returns 409 direct_upload_required; upload with /v1/references/uploads and send JSON referencing that file. Local uploads are saved to the reference library;
+        Multipart video forms may omit input_reference for text-to-video. Text-only forms do not require reference storage. File uploads are local-storage only, with a 32 MiB total limit. S3 file uploads return 409 direct_upload_required; upload with /v1/references/uploads and send the reference ID or URL. Local uploads are saved to the reference library;
         uploaded files remain reusable even if later generation admission fails. Use
         image/image[] for edits, input_reference for video. options is JSON text.'
       operationId: post_v1_videos
@@ -1485,7 +1485,6 @@ paths:
               required:
               - model
               - prompt
-              - input_reference
               type: object
         required: true
       responses:

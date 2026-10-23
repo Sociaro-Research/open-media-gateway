@@ -96,7 +96,7 @@ func TestS3ReferenceRedirectAndEarlyUploadRejection(t *testing.T) {
 		t.Fatal("signing failure should not proxy", w.Code)
 	}
 	store.fail = false
-	for _, endpoint := range []string{"/v1/references", "/v1/images/edits", "/v1/videos"} {
+	for _, endpoint := range []string{"/v1/references", "/v1/images/edits"} {
 		r := httptest.NewRequest("POST", endpoint, unreadBody{})
 		r.Header.Set("Content-Type", "multipart/form-data; boundary=fixture")
 		r.Header.Set("Authorization", "Bearer "+"secret")

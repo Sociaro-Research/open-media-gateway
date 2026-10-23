@@ -1,9 +1,13 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"mime"
+	"mime/multipart"
 	"net/http"
 	"strings"
 	"time"
@@ -14,12 +18,33 @@ import (
 // Multipart edit/video uploads use the existing durable reference library. Their
 // URLs, rather than base64 file bodies, are persisted in queued jobs.
 func (s *Server) multipartGeneration(w http.ResponseWriter, r *http.Request) (map[string]json.RawMessage, bool) {
-	if s.references == nil || s.mediaSigner == nil {
-		writeError(w, 503, "service_unavailable", "reference storage is unavailable")
+	if r.URL.Path != "/v1/images/edits" && r.URL.Path != "/v1/videos" {
+		invalidParameter(w, "body", "multipart is supported for image edits and videos")
 		return nil, false
 	}
-	if r.URL.Path != "/v1/images/edits" && r.URL.Path != "/v1/videos" {
-		invalidParameter(w, "body", "multipart is supported for image edits and video input references")
+	// Bound parsing and disk spooling before consuming the request body.
+	if s.references != nil {
+		release, err := s.references.AdmitMultipart()
+		if err != nil {
+			s.referenceError(w, err)
+			return nil, false
+		}
+		defer release()
+	}
+	_ = http.NewResponseController(w).SetReadDeadline(time.Now().Add(2 * time.Minute))
+	_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(3 * time.Minute))
+	r.Body = http.MaxBytesReader(w, r.Body, 32<<20)
+	if r.URL.Path == "/v1/videos" {
+		fields, files, ok := videoMultipartFields(w, r)
+		if !ok {
+			return nil, false
+		}
+		if !files {
+			return fields, true
+		}
+	}
+	if s.references == nil || s.mediaSigner == nil {
+		writeError(w, 503, "service_unavailable", "reference storage is unavailable")
 		return nil, false
 	}
 	if direct, err := s.references.RequiresDirectUpload(r.Context()); err != nil {
@@ -29,17 +54,6 @@ func (s *Server) multipartGeneration(w http.ResponseWriter, r *http.Request) (ma
 		s.referenceError(w, references.ErrDirectUploadRequired)
 		return nil, false
 	}
-	release, err := s.references.AdmitMultipart()
-	if err != nil {
-		s.referenceError(w, err)
-		return nil, false
-	}
-	defer release()
-	_ = http.NewResponseController(w).SetReadDeadline(time.Now().Add(2 * time.Minute))
-	_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(3 * time.Minute))
-	// Total upload budget, independent of the number of files. The library applies
-	// its per-file MIME and size checks, storage quota and owner isolation too.
-	r.Body = http.MaxBytesReader(w, r.Body, 32<<20)
 	if err := r.ParseMultipartForm(1 << 20); err != nil {
 		if r.MultipartForm != nil {
 			_ = r.MultipartForm.RemoveAll()
@@ -48,23 +62,9 @@ func (s *Server) multipartGeneration(w http.ResponseWriter, r *http.Request) (ma
 		return nil, false
 	}
 	defer r.MultipartForm.RemoveAll()
-	fields := map[string]json.RawMessage{}
-	for key, values := range r.MultipartForm.Value {
-		if len(values) != 1 {
-			invalidParameter(w, key, "field must appear once")
-			return nil, false
-		}
-		value := values[0]
-		if len(value) > 64<<10 {
-			invalidParameter(w, key, "field exceeds 64 KiB")
-			return nil, false
-		}
-		switch key {
-		case "options", "n", "stream", "max_expected_cost_usd", "timeout_seconds":
-			fields[key] = json.RawMessage(value)
-		default:
-			fields[key], _ = json.Marshal(value)
-		}
+	fields, ok := multipartGenerationFields(w, r.MultipartForm.Value)
+	if !ok {
+		return nil, false
 	}
 	key := "image"
 	if r.URL.Path == "/v1/videos" {
@@ -125,6 +125,77 @@ func (s *Server) multipartGeneration(w http.ResponseWriter, r *http.Request) (ma
 		urls = append(urls, s.referenceAbsoluteURL(r, item))
 	}
 	fields[key], _ = json.Marshal(urls)
+	return fields, true
+}
+
+// videoMultipartFields accepts scalar-only video forms without involving upload
+// storage. On the first file header, replay the bounded prefix so the existing
+// upload parser still runs only after storage/direct-upload admission. Multipart
+// readers may prefetch a small buffer, but no file is drained or spooled here.
+func videoMultipartFields(w http.ResponseWriter, r *http.Request) (map[string]json.RawMessage, bool, bool) {
+	mediaType, params, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+	if err != nil || mediaType != "multipart/form-data" || params["boundary"] == "" {
+		invalidParameter(w, "body", "invalid multipart request")
+		return nil, false, false
+	}
+	var prefix bytes.Buffer
+	reader := multipart.NewReader(io.TeeReader(r.Body, &prefix), params["boundary"])
+	values := map[string][]string{}
+	for parts := 0; ; parts++ {
+		part, err := reader.NextPart()
+		if err == io.EOF {
+			fields, ok := multipartGenerationFields(w, values)
+			return fields, false, ok
+		}
+		if err != nil {
+			invalidParameter(w, "body", "invalid multipart request or upload exceeds 32 MiB")
+			return nil, false, false
+		}
+		if parts >= 1000 {
+			invalidParameter(w, "body", "multipart form exceeds 1000 parts")
+			return nil, false, false
+		}
+		if part.FileName() != "" {
+			r.Body = struct {
+				io.Reader
+				io.Closer
+			}{io.MultiReader(bytes.NewReader(prefix.Bytes()), r.Body), r.Body}
+			return nil, true, true
+		}
+		name := part.FormName()
+		value, err := io.ReadAll(io.LimitReader(part, (64<<10)+1))
+		if err != nil || len(value) > 64<<10 {
+			invalidParameter(w, name, "field exceeds 64 KiB or could not be read")
+			return nil, false, false
+		}
+		// Match the standard form parser's bounded in-memory field budget.
+		if prefix.Len() > 11<<20 {
+			invalidParameter(w, "body", "multipart fields exceed 11 MiB")
+			return nil, false, false
+		}
+		values[name] = append(values[name], string(value))
+	}
+}
+
+func multipartGenerationFields(w http.ResponseWriter, values map[string][]string) (map[string]json.RawMessage, bool) {
+	fields := map[string]json.RawMessage{}
+	for key, values := range values {
+		if len(values) != 1 {
+			invalidParameter(w, key, "field must appear once")
+			return nil, false
+		}
+		value := values[0]
+		if len(value) > 64<<10 {
+			invalidParameter(w, key, "field exceeds 64 KiB")
+			return nil, false
+		}
+		switch key {
+		case "options", "n", "stream", "max_expected_cost_usd", "timeout_seconds":
+			fields[key] = json.RawMessage(value)
+		default:
+			fields[key], _ = json.Marshal(value)
+		}
+	}
 	return fields, true
 }
 
