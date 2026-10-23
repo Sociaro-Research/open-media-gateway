@@ -71,6 +71,9 @@ jobs:
         with:
           node-version: '24'
 
+      - name: Use existing Ubuntu archive fallbacks
+        run: sudo python3 scripts/ci/ubuntu-apt-mirrors.py
+
       - name: Install persisted profile browser dependencies
         run: |
           npm install --prefix /tmp/gateway-profile-browser --no-save --package-lock=false playwright@1.62.1
@@ -96,6 +99,7 @@ jobs:
 
       - name: Verify release stop safety gates
         run: |
+          python3 -m unittest discover -s scripts/tests -p 'test_ci_apt_mirrors.py' -v
           python3 -m unittest discover -s scripts/tests -p 'test_stop_worker_release.py' -v
           python3 -m unittest discover -s scripts/tests -p 'test_release*.py' -v
 
@@ -133,6 +137,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '24'
+
+      - name: Use existing Ubuntu archive fallbacks
+        run: sudo python3 scripts/ci/ubuntu-apt-mirrors.py
 
       - name: Install isolated browser dependencies
         run: |
@@ -211,6 +218,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '24'
+
+      - name: Use existing Ubuntu archive fallbacks
+        run: sudo python3 scripts/ci/ubuntu-apt-mirrors.py
 
       - name: Install isolated browser-test dependencies
         run: |
