@@ -1218,8 +1218,8 @@ table .control-row { --control-height:44px; }
 .report-chart-switches { gap:20px; }
 .report-chart-switch { display:flex; align-items:center; gap:10px; margin:0; font-size:13px; font-weight:400; }
 .report-chart-empty { color:var(--muted); margin:24px 0; font-size:14px; }
-.report-spend-layout { display:grid; grid-template-columns:60px minmax(0,1fr); gap:12px; }
-.report-spend-axis { height:240px; display:flex; flex-direction:column; justify-content:space-between; text-align:right; font-size:12px; color:var(--muted); }
+.report-spend-layout { display:grid; grid-template-columns:max-content minmax(0,1fr); gap:12px; }
+.report-spend-axis { min-width:60px; height:240px; display:flex; flex-direction:column; justify-content:space-between; text-align:right; font-size:12px; color:var(--muted); }
 .report-spend-scroll { overflow-x:auto; padding:0 0 12px; }
 .report-spend-bars { display:flex; gap:8px; min-width:100%; width:max-content; }
 .report-spend-item { flex:1; min-width:52px; }
@@ -1243,7 +1243,7 @@ table .control-row { --control-height:44px; }
 .report-donut strong { background:var(--panel); width:136px; height:136px; border-radius:50%; display:grid; place-items:center; font-size:16px; padding:8px; text-align:center; overflow-wrap:anywhere; }
 .report-provider-dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:8px; }
 @media(max-width:1100px) { .report-metrics { grid-template-columns:repeat(3,minmax(0,1fr)); } }
-@media(max-width:700px) { .report-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); } .report-summary-card { padding:20px; } .report-metric { padding:12px; } .report-provider-layout { grid-template-columns:minmax(0,1fr); } .report-model-bars li { grid-template-columns:minmax(76px,1fr) minmax(40px,1fr) max-content; gap:8px; } .report-spend-layout { grid-template-columns:45px minmax(0,1fr); gap:8px; } }
+@media(max-width:700px) { .report-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); } .report-summary-card { padding:20px; } .report-metric { padding:12px; } .report-provider-layout { grid-template-columns:minmax(0,1fr); } .report-model-bars li { grid-template-columns:minmax(76px,1fr) minmax(40px,1fr) max-content; gap:8px; } .report-spend-layout { gap:8px; } .report-spend-axis { min-width:45px; } }
 @media(max-width:480px) {
  .report-metrics { grid-template-columns:minmax(0,1fr); }
  .report-metric { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:8px 12px; }

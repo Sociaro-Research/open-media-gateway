@@ -3,7 +3,14 @@
  const el=(tag,text,cls)=>{const n=document.createElement(tag);if(text!=null)n.textContent=text;if(cls)n.className=cls;return n;};
  const number=n=>new Intl.NumberFormat('en-US',{maximumFractionDigits:0}).format(n);
  const usd=n=>n==null?'—':new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',minimumFractionDigits:2,maximumFractionDigits:6}).format(n);
- const shortUSD=n=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',notation:'compact',maximumFractionDigits:1}).format(n);
+ function axisLabels(min,max){
+  const magnitude=Math.max(Math.abs(min),Math.abs(max));
+  const [divisor,suffix]=magnitude>=1e12?[1e12,'T']:magnitude>=1e9?[1e9,'B']:magnitude>=1e6?[1e6,'M']:magnitude>=1e3?[1e3,'K']:[1,''];
+  const step=(max-min)/4/divisor;
+  const digits=Math.min(8,Math.max(0,1-Math.floor(Math.log10(step))));
+  const format=new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',minimumFractionDigits:0,maximumFractionDigits:digits});
+  return [1,.75,.5,.25,0].map(part=>{const value=(min+(max-min)*part)/divisor;const label=format.format(Math.abs(value)<step*1e-9?0:value);return (label==='-$0'?'$0':label)+suffix;});
+ }
  const date=(s,year=true)=>new Intl.DateTimeFormat('en-GB',{day:'numeric',month:'short',...(year?{year:'numeric'}:{}),timeZone:'UTC'}).format(new Date(s+'T00:00:00Z'));
  const period=(p,year=true)=>p.from===p.to?date(p.from,year):date(p.from,year)+' – '+date(p.to,year);
  function mount(parent){
@@ -47,10 +54,11 @@
   function drawSpend(){
    if(!data)return;
    spend.h.textContent=({day:'Daily',week:'Weekly',month:'Monthly'}[interval])+' '+(chartMetric==='profit'?'Profit':'Spend');
-   spendChart.replaceChildren();const points=data.periods,metric=chartMetric==='profit'?'profit_usd':'spend_usd',max=Math.max(...points.map(p=>p[metric]||0),0),min=Math.min(...points.map(p=>p[metric]||0),0);
+   spendChart.replaceChildren();const points=data.periods,metric=chartMetric==='profit'?'profit_usd':'spend_usd',highest=Math.max(...points.map(p=>p[metric]||0),0),min=Math.min(...points.map(p=>p[metric]||0),0);
    if(!points.length){blank(spendChart,'No requests in this period.');return;}
+   const max=highest===min?1:highest; // An all-zero series uses a visible $0–$1 scale.
    const layout=el('div',null,'report-spend-layout'),axis=el('div',null,'report-spend-axis'),scroll=el('div',null,'report-spend-scroll'),bars=el('div',null,'report-spend-bars'+(showYear?' with-year':''));
-   for(const part of [1,.75,.5,.25,0])axis.append(el('span',shortUSD(min+(max-min)*part)));
+   for(const label of axisLabels(min,max))axis.append(el('span',label));
    const scale=max-min||1;
    for(const p of points){const item=el('div',null,'report-spend-item'),track=el('div',null,'report-spend-track'),bar=el('div',null,'report-spend-bar');const amount=p[metric]||0;bar.style.height=(100*Math.abs(amount)/scale)+'%';bar.style.position='absolute';bar.style.bottom=(100*(Math.min(0,amount)-min)/scale)+'%';if(amount<0)bar.style.background='var(--red)';
     const label=period(p,showYear),value=chartMetric==='profit'?`${usd(p.profit_usd||0)} · ${number(p.pending_profit_requests||0)} pending`:p.priced_requests===0&&p.requests>0?'Cost pending':usd(p.spend_usd);

@@ -352,3 +352,11 @@ called. `UI_EVIDENCE_DIR` selects results/screenshots at 1440/390/320px. The exi
 real console handler, and `separation.cjs` checks the preference header through
 real Caddy while retaining public/private route isolation; both accept the same
 browser-engine setting.
+
+Run `node scripts/ui/report-axis.cjs` and repeat with
+`UI_BROWSER_ENGINE=webkit` for Usage axis precision, zero and negative ranges,
+micro amounts and compact large amounts. The synthetic local fixtures check
+five distinct labels, numeric accuracy, unchanged bar geometry and tooltip
+amounts, keyboard tooltips, both themes and 1440/390/320px layouts.
+`UI_SOURCE_DIR` selects a baseline UI tree; `UI_EVIDENCE_DIR` selects the
+screenshots and JSON results directory. No live API or paid provider is used.
