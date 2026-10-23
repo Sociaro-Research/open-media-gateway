@@ -74,6 +74,37 @@ func openAIHeading(value any) string {
 	}
 	return ""
 }
+
+// Rows omit the grouped Model cell. Resolve price columns by their labels,
+// so a presentation-only reorder cannot turn cached input into output pricing.
+func openAIPriceColumns(value any) (input, output int, valid bool) {
+	headings, ok := astroValue(value).([]any)
+	if !ok || len(headings) != 5 || openAIHeading(headings[0]) != "Model" || openAIHeading(headings[1]) != "Modality" {
+		return 0, 0, false
+	}
+	seen := map[string]bool{}
+	for index, heading := range headings[2:] {
+		label := openAIHeading(heading)
+		if label == "Output / cost" {
+			label = "Output"
+		}
+		if seen[label] {
+			return 0, 0, false
+		}
+		seen[label] = true
+		switch label {
+		case "Input":
+			input = index + 1
+		case "Output":
+			output = index + 1
+		case "Cached input":
+		default:
+			return 0, 0, false
+		}
+	}
+	return input, output, seen["Input"] && seen["Output"] && seen["Cached input"]
+}
+
 func parseOpenAIPrices(body []byte) ([]Entry, string, error) {
 	root, err := html.Parse(bytes.NewReader(body))
 	if err != nil {
@@ -127,14 +158,11 @@ func parseOpenAIPrices(body []byte) ([]Entry, string, error) {
 							continue
 						}
 						rate := Rate{Region: "standard", Unit: "multi_metric", Per: 1}
-						unsupported := false
-						headings, ok := astroValue(props["headings"]).([]any)
-						if !ok || len(headings) != 5 || openAIHeading(headings[0]) != "Model" || openAIHeading(headings[1]) != "Modality" || openAIHeading(headings[2]) != "Input" || openAIHeading(headings[3]) != "Cached input" || (openAIHeading(headings[4]) != "Output" && openAIHeading(headings[4]) != "Output / cost") {
-							unsupported = true
-						}
+						inputColumn, outputColumn, columnsOK := openAIPriceColumns(props["headings"])
+						unsupported := !columnsOK
 						for _, row := range rows {
 							cells, ok := row.([]any)
-							if !ok || len(cells) != 4 {
+							if !columnsOK || !ok || len(cells) != 4 {
 								unsupported = true
 								continue
 							}
@@ -150,9 +178,9 @@ func parseOpenAIPrices(body []byte) ([]Entry, string, error) {
 							}
 							// Legacy Speech prices explicitly override the section's token
 							// unit. Match the entire cell, never its numeric prefix.
-							if value, ok := cells[1].(string); ok && (id == "tts-1" || id == "tts-1-hd") && prefix == "text" && len(rows) == 1 {
+							if value, ok := cells[inputColumn].(string); ok && (id == "tts-1" || id == "tts-1-hd") && prefix == "text" && len(rows) == 1 {
 								match := regexp.MustCompile(`^\$([0-9]+(?:\.[0-9]+)?) / 1M characters$`).FindStringSubmatch(value)
-								if len(match) == 2 && cells[3] == "-" {
+								if len(match) == 2 && cells[outputColumn] == "-" {
 									price, e := money.Parse(match[1])
 									if e == nil {
 										rate.Unit, rate.Per, rate.Price = "character", 1_000_000, price
@@ -163,7 +191,7 @@ func parseOpenAIPrices(body []byte) ([]Entry, string, error) {
 							for _, c := range []struct {
 								index  int
 								suffix string
-							}{{1, "_input_tokens"}, {3, "_output_tokens"}} {
+							}{{inputColumn, "_input_tokens"}, {outputColumn, "_output_tokens"}} {
 								value, ok := cells[c.index].(float64)
 								if !ok {
 									if cells[c.index] != "-" {

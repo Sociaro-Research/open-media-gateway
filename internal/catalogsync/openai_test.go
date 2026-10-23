@@ -3,6 +3,7 @@ package catalogsync
 import (
 	"encoding/json"
 	"html"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -46,7 +47,7 @@ func TestOpenAICharacterTariffsAndUnsupportedChanges(t *testing.T) {
 			t.Fatal("partial tariff silently accepted", entries, err)
 		}
 	}
-	for _, hs := range [][]any{{"Model", "Modality", "Output", "Cached input", "Input"}, nil} {
+	for _, hs := range [][]any{{"Model", "Modality", "Output", "Cached input", "Output / cost"}, nil} {
 		entries, _, err := parseOpenAIPrices(openAIPriceFixture("gpt-image-1", [][]any{{"Text", 5.0, "-", 40.0}}, hs))
 		if err != nil || len(entries) != 1 || len(entries[0].Rates) != 0 {
 			t.Fatal("unknown columns accepted", entries, err)
@@ -58,5 +59,51 @@ func TestOpenAICharacterTariffsAndUnsupportedChanges(t *testing.T) {
 	entries, _, err := parseOpenAIPrices(body)
 	if err != nil || len(entries) != 1 || entries[0].Rates[0].Components[1].Price != 40_000_000 {
 		t.Fatal("batch price mixed into standard", entries, err)
+	}
+}
+
+func TestOpenAIReorderedPriceColumns(t *testing.T) {
+	for _, tc := range []struct {
+		id   string
+		rows [][]any
+	}{
+		{"gpt-image-1.5", [][]any{{"Image", 8.0, 2.0, 32.0}, {"Text", 5.0, 1.25, 10.0}}},
+		{"gpt-audio", [][]any{{"Audio", 32.0, "-", 64.0}, {"Text", 2.5, "-", 10.0}}},
+		{"gpt-4o-mini-tts", [][]any{{"Audio", "-", "-", 12.0}, {"Text", 0.6, "-", "-"}}},
+		{"tts-1", [][]any{{"Text", "$15.00 / 1M characters", "-", "-"}}},
+		{"tts-1-hd", [][]any{{"Text", "$30.00 / 1M characters", "-", "-"}}},
+	} {
+		t.Run(tc.id, func(t *testing.T) {
+			baseline, _, err := parseOpenAIPrices(openAIPriceFixture(tc.id, tc.rows, []any{"Model", "Modality", "Input", "Cached input", "Output"}))
+			if err != nil || len(baseline) != 1 || len(baseline[0].Rates) != 1 {
+				t.Fatal(baseline, err)
+			}
+			for _, order := range [][3]int{{1, 3, 2}, {3, 2, 1}, {2, 1, 3}} {
+				labels := []string{"Modality", "Input", "Cached input", "Output / cost"}
+				headings := []any{"Model", "Modality"}
+				rows := [][]any{}
+				for _, column := range order {
+					headings = append(headings, map[string]any{"__pricingTooltipHeading": []any{0, map[string]any{"label": []any{0, labels[column]}}}})
+				}
+				for _, row := range tc.rows {
+					rows = append(rows, []any{row[0], row[order[0]], row[order[1]], row[order[2]]})
+				}
+				entries, _, err := parseOpenAIPrices(openAIPriceFixture(tc.id, rows, headings))
+				if err != nil || !reflect.DeepEqual(entries, baseline) {
+					t.Fatal(order, entries, baseline, err)
+				}
+			}
+		})
+	}
+	for _, headings := range [][]any{
+		{"Model", "Modality", "Input", "Output", "Discount"},
+		{"Model", "Modality", "Input", "Output", "Output / cost"},
+		{"Model", "Modality", "Input", "Input", "Cached input"},
+		{"Model", "Modality", "Input", "Output"},
+	} {
+		entries, _, err := parseOpenAIPrices(openAIPriceFixture("gpt-image-1", [][]any{{"Image", 8.0, 32.0, 2.0}}, headings))
+		if err != nil || len(entries) != 1 || len(entries[0].Rates) != 0 || entries[0].Metadata == nil {
+			t.Fatal("ambiguous columns accepted", entries, err)
+		}
 	}
 }

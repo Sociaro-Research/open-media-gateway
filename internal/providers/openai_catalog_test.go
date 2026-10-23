@@ -2,10 +2,13 @@ package providers
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"io"
 	"net/http"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -217,4 +220,73 @@ func TestConfiguredOpenAICataloguePreservesManualOverrides(t *testing.T) {
 			t.Fatal("native reviewed model overrides manual snapshot")
 		}
 	}
+}
+
+// Replay an externally retained pre-run state without committing installation
+// records. Pricing HTML is a separate current-source capture, not historical bytes.
+func TestOpenAIPricingColumnOrderRetainedStateReplay(t *testing.T) {
+	dir := os.Getenv("GATEWAY_OPENAI_STATE_REPLAY_DIR")
+	pricing := os.Getenv("GATEWAY_OPENAI_REVIEW_DIR")
+	if dir == "" || pricing == "" {
+		t.Skip("no retained OpenAI state and current pricing capture")
+	}
+	m, ctx, capture := openaiCatalogFixture(t)
+	read := func(name string, target any) {
+		t.Helper()
+		body, err := os.ReadFile(dir + "/" + name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err = json.Unmarshal(body, target); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var previous catalogsync.State
+	var recorded catalogsync.Run
+	read("openai-state-before-run.json", &previous)
+	read("openai-run.json", &recorded)
+	check := func(model core.MediaModel, rate catalogsync.Rate) error {
+		return m.CheckCatalogRate(ctx, "openai", model, rate)
+	}
+	now := recorded.StartedAt
+	_, baseline := catalogsync.Reconcile(previous, capture, recorded.Sources, now, check)
+	if len(baseline.OpenWarnings) != 39 || len(baseline.Changes) != 0 {
+		t.Fatalf("baseline: %+v", baseline)
+	}
+	body, err := os.ReadFile(pricing + "/pricing.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := range recorded.Sources {
+		ob := &recorded.Sources[i]
+		if ob.Source.ID != "pricing" {
+			continue
+		}
+		entries, text, err := catalogsync.Parse(ob.Source, body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		ob.Entries, ob.Text = entries, text
+		sum := sha256.Sum256([]byte(text))
+		ob.Hash = hex.EncodeToString(sum[:])
+	}
+	next, run := catalogsync.Reconcile(previous, capture, recorded.Sources, now, check)
+	if len(run.ResolvedWarnings) != 37 || len(run.OpenWarnings) != 2 {
+		t.Fatalf("resolved=%d open=%+v", len(run.ResolvedWarnings), run.OpenWarnings)
+	}
+	for _, w := range run.OpenWarnings {
+		if w.Source != "changelog" && w.Source != "deprecations" {
+			t.Fatal(w)
+		}
+	}
+	for id, entry := range previous.Models {
+		if !reflect.DeepEqual(entry.Rates, next.Models[id].Rates) {
+			t.Fatal("tariff changed", id, entry.Rates, next.Models[id].Rates)
+		}
+	}
+	_, repeat := catalogsync.Reconcile(next, capture, recorded.Sources, now.Add(time.Hour), check)
+	if len(repeat.Changes) != 0 || len(repeat.NewWarnings) != 0 || len(repeat.ResolvedWarnings) != 0 || len(repeat.OpenWarnings) != 2 || repeat.EmailStatus != "not_needed" {
+		t.Fatalf("repeat: %+v", repeat)
+	}
+	t.Log("Retained baseline: 39 warnings, 0 changes; fixed pricing: 37 resolved, 2 document warnings retained, all stored rates unchanged; quiet repeat verified")
 }
