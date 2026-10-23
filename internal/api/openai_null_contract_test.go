@@ -18,7 +18,7 @@ func TestOptionalGenerationNullsPreserveOmissionAndIdempotency(t *testing.T) {
 		{"/v1/generations/estimate", "mock-video-v1", `"prompt":"test"`},
 		{"/v1/images/generations", "mock-image-v1", `"prompt":"test"`},
 		{"/v1/images/edits", "mock-image-v1", `"prompt":"test","image":"https://fixture.invalid/a.png"`},
-		{"/v1/audio/speech", "mock-speech-v1", `"input":"test","voice":"Mock","response_format":"wav"`},
+		{"/v1/audio/speech", "mock-speech-v1", `"input":"test","voice":"Mock","response_format":"mp3"`},
 		{"/v1/audio/generations", "mock-music-v1", `"prompt":"test"`},
 	} {
 		t.Run(tc.path, func(t *testing.T) {
