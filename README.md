@@ -6,9 +6,9 @@
 > integration testing. The API may change before the first stable release. Do
 > not expose the development configuration to the public internet.
 
-The included privacy and terms pages describe the development service. Operators
-should review and replace them for their own public installation; they are not
-universal production policies or a legal review.
+The included privacy and terms pages are operator templates with explicit
+placeholders. Complete and review them for your installation before public use;
+they are not universal policies or a legal review.
 
 Media Gateway is a provider-neutral asynchronous API for generating images,
 video, speech, and music. A client submits one media task; the Gateway records
