@@ -2,7 +2,7 @@
 openapi: 3.1.0
 info:
   title: Media Gateway API
-  version: 1.0.0
+  version: 1.0.1
   description: One asynchronous API for image, video, speech and music generation.
     Connect providers once, then access your organization through the console or your
     applications. Generation endpoints use OpenAI vocabulary with asynchronous Gateway

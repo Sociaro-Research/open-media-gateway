@@ -1,15 +1,25 @@
-Ready-made Linux AMD64 and ARM64 images are available in GHCR. The gateway image
-also runs the worker. The installation archive contains Compose configuration,
-a local/server initializer, automatic-HTTPS configuration, documentation and monitoring configuration; no source
-checkout or compiler is required.
+Open Media Gateway 1.0.1 is the first maintenance update. It includes the fixes
+listed in the [changelog](https://github.com/Sociaro-Research/open-media-gateway/blob/v1.0.1/CHANGELOG.md):
 
-Download the archive and its SHA-256 file, verify the checksum, extract it and
-follow its README. Image references are pinned by digest. Software inventories
-for both architectures are attached as CycloneDX files.
+- Correct legal pages and administrator editing, documentation themes and schemas,
+  chart labels, catalogue statuses, model names and mock audio playback.
+- Repair storage diagnostics, pricing/catalogue parsing, multipart video requests,
+  negative cost-limit errors and organization artifact HEAD access.
+- Preserve accepted optional nulls and video-duration spellings, improve invitation
+  feedback and installation guides, and ship Original as the only fresh theme.
+- Build Go components with the patched Go 1.27.3 toolchain.
 
-This is the first official release of Open Media Gateway. The application is
-licensed under Apache-2.0; bundled third-party components retain their own licenses
-and notices.
+Four image families (gateway/worker, UI, PostgreSQL and Redis) are rebuilt for
+Linux AMD64 and ARM64. Download the installation archive and its SHA-256 file,
+verify the checksum and follow the bundled README. Image references are pinned
+by digest; CycloneDX inventories for both architectures are attached.
 
-Use the bundled Quick start for localhost or an HTTPS domain. Create the first
-owner in the browser with the private server setup code; email delivery is optional.
+For an existing installation, back up the database, media and configuration,
+retain the Compose project name, secrets and volumes, and follow the bundled
+update and worker-drain procedure. This update adds the legal-document database
+migration; an image rollback does not undo database migrations. Existing saved
+themes and user preferences remain supported.
+
+No running installation is deployed by this release. Generation through the
+included mock provider is free; live provider credentials and charges are separate.
+The application is Apache-2.0; bundled components retain their own notices.
