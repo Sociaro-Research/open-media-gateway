@@ -383,6 +383,8 @@ func (s *Server) listProviders(w http.ResponseWriter, r *http.Request) {
 func (s *Server) submitGeneration(w http.ResponseWriter, r *http.Request, input core.CreateMediaInput) {
 	task, err := s.service.CreateMediaRequest(r.Context(), input, r.Header.Get("Idempotency-Key"))
 	switch {
+	case errors.Is(err, core.ErrCostLimitInvalid):
+		invalidParameter(w, "max_expected_cost_usd", err.Error())
 	case errors.Is(err, core.ErrPromptRequired), errors.Is(err, core.ErrPromptTooLong), errors.Is(err, core.ErrModelRequired),
 		errors.Is(err, core.ErrProviderUnavailable), errors.Is(err, core.ErrModelUnavailable), errors.Is(err, core.ErrOptionsInvalid),
 		errors.Is(err, core.ErrWebhookInvalid), errors.Is(err, core.ErrIdempotencyKey):

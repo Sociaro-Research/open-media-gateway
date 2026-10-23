@@ -7708,7 +7708,7 @@ components:
           type: string
         max_expected_cost_usd:
           description: Gateway customer-price ceiling, including markup. Admission rejects
-            a higher quote.
+            a higher quote. Negative values return HTTP 400 with error.param set to max_expected_cost_usd.
           minimum: 0
           type: [number, "null"]
         model:

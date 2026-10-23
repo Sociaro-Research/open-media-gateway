@@ -25,6 +25,7 @@ var (
 	ErrModelRequired       = errors.New("model is required")
 	ErrModelUnavailable    = errors.New("selected model is not available for this provider")
 	ErrOptionsInvalid      = errors.New("media options are not supported by the selected model")
+	ErrCostLimitInvalid    = errors.New("max_expected_cost_usd must not be negative")
 	ErrProviderUnavailable = errors.New("selected provider is not configured")
 	ErrWebhookInvalid      = webhookurl.ErrDestination
 	ErrIdempotencyKey      = errors.New("Idempotency-Key must not exceed 200 characters")
@@ -90,7 +91,7 @@ func (s *TaskService) CreateMediaRequest(ctx context.Context, input CreateMediaI
 
 func (s *TaskService) prepare(ctx context.Context, input CreateMediaInput, idempotencyKey string) (Task, error) {
 	if input.MaxExpectedUSD != nil && *input.MaxExpectedUSD < 0 {
-		return Task{}, ErrOptionsInvalid
+		return Task{}, ErrCostLimitInvalid
 	}
 	prompt := strings.TrimSpace(input.Prompt)
 	if len([]rune(prompt)) > 10000 {

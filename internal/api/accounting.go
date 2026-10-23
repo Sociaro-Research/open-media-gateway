@@ -18,6 +18,8 @@ func (s *Server) estimateGeneration(w http.ResponseWriter, r *http.Request, inpu
 	}
 	quote, err := estimator.Estimate(r.Context(), input)
 	switch {
+	case errors.Is(err, core.ErrCostLimitInvalid):
+		invalidParameter(w, "max_expected_cost_usd", err.Error())
 	case errors.Is(err, core.ErrPricingUnavailable):
 		writeError(w, 422, "pricing_unavailable", err.Error())
 	case errors.Is(err, core.ErrKeyUnavailable):
