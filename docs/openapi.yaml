@@ -7735,9 +7735,8 @@ components:
             is supported. All endpoints return an asynchronous job, never immediate bytes/base64.
           type: string
         seconds:
-          description: Video duration. Model-specific limits apply; no restriction to
-            OpenAI durations.
-          pattern: ^[1-9][0-9]*$
+          description: Video duration. A positive integer string; an optional leading plus sign and leading zeroes are accepted and normalized ("+05" becomes "5"). Model-specific limits apply; no restriction to OpenAI durations.
+          pattern: ^[+]?[0]*[1-9][0-9]*$
           type: string
         size:
           description: Image WIDTHxHEIGHT (mapped to the provider catalog), or video WIDTHxHEIGHT
