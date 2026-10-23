@@ -124,11 +124,15 @@ logging. The UI proxy preserves Host; the gateway enforces public host checks.
 Using the existing shared console/API origin preserves browser cookies and OAuth
 callbacks. A different frontend origin requires a separate authentication design.
 
-Build and validate all three images before stopping anything. Follow the ordered
-commands in AGENTS.md: gateway health, UI health, worker, then external Caddy
-configuration and reload. The UI's health check probes a public static asset;
-separately verify API reachability and session gating after deployment. A brief
-maintenance window is possible during this first routing transition.
+Build and validate all three images before stopping anything. Follow the
+[worker-drain safeguards](#later-releases-and-rollback) before replacing the
+gateway or applying migrations. Start the gateway and wait for its health check,
+then start the UI and wait for its health check. Start the worker next; validate
+and reload the preserved external Caddy configuration last. Complete the
+[post-deployment checks](#verify-and-record) before declaring the upgrade
+successful. The UI's health check probes a public static asset; separately verify
+API reachability and session gating. A brief maintenance window is possible during
+this first routing transition.
 
 Edit mounted server config files in place. Replacing a bind-mounted file by
 rename can leave the container reading its previous inode; if a file is replaced,
