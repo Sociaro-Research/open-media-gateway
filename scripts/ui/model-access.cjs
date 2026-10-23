@@ -128,6 +128,12 @@ let grants=[],version=1,writes=0,checkFails=false;
   await page.screenshot({path:output+'/organization-mobile.png',fullPage:true});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'organization mobile overflow');
   await page.setViewportSize({width:1440,height:1100});await page.screenshot({path:output+'/organization-desktop.png',fullPage:true});
   await editor.getByRole('button',{name:'Remove',exact:true}).click();await editor.getByRole('button',{name:'Save',exact:true}).click();await editor.getByRole('button',{name:'Saved',exact:true}).waitFor();assert.deepEqual(grants,[]);
+  models=models.map(m=>({...m,name:'Shared model'}));
+  await page.evaluate(async provider=>{const host=document.createElement('section');host.id='model-label-test';host.style='padding:24px';document.querySelector('main').append(host);await ModelAccess.provider(host,provider,api,{current:()=>true});},provider());
+  const namedRows=page.locator('#model-label-test .model-access-row');
+  const displayNames=await namedRows.locator('.model-access-identity strong').allTextContents();
+  assert.equal(new Set(displayNames).size,2);assert.ok(displayNames.every(n=>n.startsWith('Shared model · ')));
+  assert.deepEqual(await namedRows.evaluateAll(rows=>rows.map(row=>[row.dataset.model,row.querySelector('input[aria-label="Public API name"]').value])),models.map(m=>[m.model,m.public_id]));
   assert.deepEqual(errors,[]);console.log('PASS: real provider screen, rename, disable, reload, name conflict, search, public API name, organization grants/revocation, desktop and mobile.');
  }finally{await browser.close();server.close()}
 })().catch(e=>{console.error(e);server.close();process.exitCode=1});

@@ -3,11 +3,38 @@
   const filters = new WeakMap();
   const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
   const key = (provider, model = '') => JSON.stringify([provider, model]);
+  // Labels are presentation only: never change native/public IDs or selection values.
+  function uniqueCatalog(providers) {
+    const entries = providers.flatMap(p => (p.models || []).map(m => ({provider:p, model:m, key:key(p.id,m.id), base:(m.display_name || m.name || m.public_id || m.id).trim() || m.id})));
+    const names = new Map(entries.map(e => [e.key,e.base]));
+    const normalized = name => name.normalize('NFKC').trim().replace(/\s+/g,' ').toLowerCase();
+    function collisions() {
+      const groups = new Map();
+      for (const e of entries) { const name=normalized(names.get(e.key));if(!groups.has(name))groups.set(name,new Set());groups.get(name).add(e.key); }
+      return new Set([...groups.values()].filter(keys=>keys.size>1).flatMap(keys=>[...keys]));
+    }
+    for (let level=1;level<=3;level++) {
+      const duplicate=collisions();if(!duplicate.size)break;
+      for (const e of entries) if(duplicate.has(e.key)) {
+        const context=level===1?'':level===2?(e.provider.name || e.provider.id):e.provider.id;
+        names.set(e.key,e.base+' · '+(context?context+' · ':'')+e.model.id);
+      }
+    }
+    // Reserve other labels, including literal names resembling generated labels.
+    // Stable identity order also resolves case-only IDs and unusual imported names.
+    const duplicate=collisions(),used=new Set(entries.filter(e=>!duplicate.has(e.key)).map(e=>normalized(names.get(e.key))));
+    for (const identity of [...duplicate].sort()) {
+      const base=names.get(identity);let name=base,suffix=2;
+      while(used.has(normalized(name)))name=base+' · '+suffix++;
+      names.set(identity,name);used.add(normalized(name));
+    }
+    return providers.map(p=>({...p,models:(p.models || []).map(m=>({...m,display_name:names.get(key(p.id,m.id))}))}));
+  }
   function populate(control, providers, {value = control.value, placeholder, allModels = false, label = m => m.display_name || m.name || m.public_id || m.id, optionValue = (p, m) => key(p.id, m.id)} = {}) {
     control.dataset.modelPicker = '';
     const children = [];
     if (placeholder) children.push(new Option(placeholder, ''));
-    for (const provider of [...providers].sort((a, b) => (a.name || a.id).localeCompare(b.name || b.id))) {
+    for (const provider of uniqueCatalog(providers).sort((a, b) => (a.name || a.id).localeCompare(b.name || b.id))) {
       if (!allModels && !provider.models?.length) continue;
       const group = el('optgroup'); group.label = provider.name || provider.id;
       group.providerInfo = provider;
@@ -100,5 +127,5 @@
     });
     api.show(state.trigger, panel); window.FormUI.refresh(); render(); search.focus();
   }
-  window.ModelPicker = {key, populate, open};
+  window.ModelPicker = {key, uniqueCatalog, populate, open};
 })();

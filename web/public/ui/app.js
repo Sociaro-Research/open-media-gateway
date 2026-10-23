@@ -529,7 +529,7 @@ function renderProviderDetail(provider) {
   });
   elements.adminMediaCounts.replaceChildren(...(counts.length ? counts : [Object.assign(document.createElement('span'), {textContent: 'Connect to view the model catalog'})]));
 
-  const models = (provider.models || []).map(model => {
+  const models = ModelPicker.uniqueCatalog([provider])[0].models.map(model => {
     const row = document.createElement('div');
     row.className = 'provider-model-row';
     const copy = document.createElement('div');

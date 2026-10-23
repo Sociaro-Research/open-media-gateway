@@ -31,6 +31,31 @@ catalog[1].icon_url='/provider-assets/openai/icon.svg';catalog[1].icon_monochrom
  try{
   await page.goto('http://127.0.0.1:'+server.address().port+'/');await page.locator('#createGenerationKey').click();await page.waitForFunction(()=>selectedModel()?.id==='old');await open();
   assert.deepEqual(await popup.locator('.picker-group').allTextContents(),['Studio One','Studio Two']);
+  const originalNames=await names();assert.equal(new Set(originalNames).size,originalNames.length,'visible options distinguish matching names across providers');
+  await page.evaluate(()=>{
+   const raw=[
+    {id:'openai--one',name:'Main',models:[{id:'a',display_name:'Shared'},{id:'A',display_name:'Shared'},{id:'b',display_name:'Shared'},{id:'literal',display_name:'Shared · b'},{id:'solo',display_name:'Unique'}]},
+    {id:'openai--two',name:'Main',models:[{id:'a',display_name:'Shared'}]},
+    {id:'bytedance',name:'Other provider',models:[{id:'a',display_name:'Shared'}]}
+   ];
+   for(const p of raw)for(const m of p.models){m.public_id=p.id+'/'+m.id;m.pricing={known:true,reference_price_usd:.123};m.metadata={version_date:'2026-01-01'};}
+   const snapshot=JSON.stringify(raw),normalized=s=>s.normalize('NFKC').replace(/\s+/g,' ').trim().toLowerCase();
+   const flatten=providers=>providers.flatMap(p=>p.models.map(m=>[ModelPicker.key(p.id,m.id),m]));
+   const named=ModelPicker.uniqueCatalog(raw),entries=flatten(named),labels=entries.map(([,m])=>normalized(m.display_name));
+   if(new Set(labels).size!==entries.length)throw Error('duplicate model labels');
+   if(named[0].models.find(m=>m.id==='solo').display_name!=='Unique')throw Error('unique label changed');
+   for(const [identity,m]of entries){const before=flatten(raw).find(([k])=>k===identity)[1];const {display_name:ignored,...rest}=m;const {display_name:oldName,...old}=before;if(JSON.stringify(rest)!==JSON.stringify(old))throw Error('model identity/capabilities changed');}
+   const reordered=ModelPicker.uniqueCatalog([...raw].reverse().map(p=>({...p,models:[...p.models].reverse()})));
+   const expected=new Map(entries.map(([id,m])=>[id,m.display_name]));
+   if(flatten(reordered).some(([id,m])=>expected.get(id)!==m.display_name))throw Error('labels depend on input order');
+   if(JSON.stringify(ModelPicker.uniqueCatalog(named))!==JSON.stringify(named))throw Error('labels change on repopulation');
+   if(JSON.stringify(raw)!==snapshot)throw Error('source catalog mutated');
+   const select=document.createElement('select'),chosen=ModelPicker.key('openai--two','a');
+   ModelPicker.populate(select,raw,{value:chosen,label:m=>m.display_name+' — ≈ $0.123'});
+   if(select.value!==chosen||new Set([...select.options].map(o=>normalized(o.textContent))).size!==entries.length)throw Error('selection or custom labels changed');
+   if(select.selectedOptions[0].modelInfo.id!=='a'||select.selectedOptions[0].modelInfo.public_id!=='openai--two/a')throw Error('native/public lookup changed');
+  });
+
   await popup.locator('.model-picker-provider-mark img').evaluateAll(images=>Promise.all(images.map(img=>img.decode())));
   assert.equal(await popup.locator('.model-picker-provider-mark img').first().evaluate(img=>img.naturalWidth),172,'original Sonilo asset is decoded');
   const heading=await popup.locator('.model-picker-provider').first().boundingBox(),mark=await popup.locator('.model-picker-provider-mark').first().boundingBox();
@@ -60,7 +85,7 @@ catalog[1].icon_url='/provider-assets/openai/icon.svg';catalog[1].icon_monochrom
   await search().fill('no-such-model');await popup.getByText('No models match these filters.').waitFor();
   await popup.getByRole('button',{name:'Clear model filters'}).click();assert.equal((await names()).length,40);
   await search().fill('Gamma');await page.keyboard.press('Escape');assert.equal(await popup.count(),0);await open();assert.equal(await search().inputValue(),'Gamma','filters persist per picker');
-  const info=popup.getByRole('button',{name:'Information about Cinema Gamma'}).first();await info.hover();await page.locator('.model-info-popup').waitFor();assert.ok((await page.locator('.model-info-popup').innerText()).includes('Published model details'));await page.keyboard.press('Escape');assert.equal(await popup.count(),1);
+  const info=popup.getByRole('button',{name:/^Information about Cinema Gamma/}).first();await info.hover();await page.locator('.model-info-popup').waitFor();assert.ok((await page.locator('.model-info-popup').innerText()).includes('Published model details'));await page.keyboard.press('Escape');assert.equal(await popup.count(),1);
   await search().focus();await page.keyboard.press('ArrowDown');await page.keyboard.press('Enter');assert.deepEqual(await page.evaluate(()=>[selectedProvider().id,selectedModel().id]),['other','new'],'keyboard chooses the provider-specific model');
   for(const [width,height] of [[1440,900],[390,900],[320,900],[390,480]]){
    await page.setViewportSize({width,height});await open();if(await popup.getByRole('button',{name:'Clear model filters'}).isEnabled())await popup.getByRole('button',{name:'Clear model filters'}).click();

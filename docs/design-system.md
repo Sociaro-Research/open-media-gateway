@@ -371,3 +371,11 @@ Use native field validity and the shared validation message to block the
 Playground form until corrected; do not add this restriction to the API. The picker reuses shared floating fields and
 ControlPickers for source/group selection. Check 1440/390/320px, long scrolling
 text, both themes, keyboard and both browser engines after changing this layer.
+
+Model lists keep distinct native versions visible. The shared ModelPicker derives
+unique display labels within its supplied catalog, adding native model ID,
+provider/connection name and then connection ID only when needed. Case/whitespace
+collisions and literal names resembling those qualifiers are resolved
+in stable identity order. These are presentation labels: catalog IDs, public API
+names, prices, routing and stored names remain unchanged. Provider model tables
+reuse the same naming helper; filtering does not rename the remaining choices.

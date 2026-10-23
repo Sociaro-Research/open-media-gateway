@@ -107,3 +107,31 @@ func TestMiniPlanningUsesItsPublishedSizeQualityTable(t *testing.T) {
 		}
 	}
 }
+
+func TestReviewedDisplayNamesPreserveAudioVersions(t *testing.T) {
+	seen := map[string]string{}
+	for _, id := range modelIDs {
+		model := describeModel(id)
+		if model.ID != id {
+			t.Fatalf("display naming changed native ID: %q -> %q", id, model.ID)
+		}
+		if previous := seen[model.DisplayName]; previous != "" {
+			t.Fatalf("models %q and %q share display name %q", previous, id, model.DisplayName)
+		}
+		seen[model.DisplayName] = id
+		if strings.HasPrefix(id, "gpt-audio") && model.DisplayName != id+" · spoken response" {
+			t.Fatalf("audio version/alias lost: %q -> %q", id, model.DisplayName)
+		}
+	}
+	// Display disambiguation must not change the reviewed alias used for tariffs.
+	for _, tc := range []struct{ id, alias string }{
+		{"gpt-audio-2025-08-28", "gpt-audio"},
+		{"gpt-audio-mini-2025-10-06", "gpt-audio-mini"},
+		{"gpt-audio-mini-2025-12-15", "gpt-audio-mini"},
+		{"gpt-audio", "gpt-audio"}, {"gpt-audio-mini", "gpt-audio-mini"}, {"gpt-audio-1.5", "gpt-audio-1.5"},
+	} {
+		if canonicalModel(tc.id) != tc.alias {
+			t.Fatalf("tariff alias changed for %q", tc.id)
+		}
+	}
+}

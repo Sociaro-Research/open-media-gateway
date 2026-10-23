@@ -17,10 +17,11 @@
    table.setAttribute('aria-label','Provider model settings');scroll.tabIndex=0;scroll.setAttribute('role','region');scroll.setAttribute('aria-label','Provider model settings table');
    for(const text of ['Model','Public API name','Available by default','']){const th=el('th',text);th.scope='col';header.append(th)}
    head.append(header);table.append(head,body);scroll.append(table);parent.append(scroll);
+   const labels=new Map(ModelPicker.uniqueCatalog([{id:provider.id,name:provider.name,models:models.map(m=>({id:m.model,display_name:m.name||m.model}))}])[0].models.map(m=>[m.id,m.display_name]));
    const rows=[];
    for(let model of models) {
     const row=el('tr',null,'model-access-row');row.dataset.model=model.model;
-    const identity=el('td'),heading=el('div',null,'model-access-identity');heading.append(el('strong',model.name||model.model));if(model.name&&model.name!==model.model)heading.append(el('small',model.model));identity.append(heading);
+    const identity=el('td'),heading=el('div',null,'model-access-identity');heading.append(el('strong',labels.get(model.model)));if(model.name&&model.name!==model.model)heading.append(el('small',model.model));identity.append(heading);
     const nameCell=el('td'),name=el('input');name.value=model.public_id;name.required=true;name.maxLength=200;name.pattern=String.raw`[A-Za-z0-9][A-Za-z0-9._:\/\-]{0,199}`;name.autocomplete='off';name.spellcheck=false;name.setAttribute('aria-label','Public API name');
     const status=el('p',null,'model-access-status');status.setAttribute('role','status');nameCell.append(name,status);
     const toggle=el('td',null,'model-access-toggle'),enabled=el('input');enabled.type='checkbox';enabled.checked=model.enabled_by_default;enabled.setAttribute('aria-label','Available by default');toggle.append(enabled);

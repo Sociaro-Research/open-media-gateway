@@ -78,7 +78,7 @@ func describeModel(id string) core.MediaModel {
 		// A bounded audio reply, not verbatim narration or an interactive session.
 		m.MediaType = "speech"
 		m.NoLanguage = true
-		m.DisplayName = id + " · spoken response"
+		m.DisplayName = m.ID + " · spoken response"
 		m.SupportsVoice = true
 		m.RequiresVoice = true
 		m.Voices = []string{"alloy", "ash", "ballad", "coral", "echo", "sage", "shimmer", "verse"}
