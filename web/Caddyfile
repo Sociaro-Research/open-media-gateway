@@ -86,7 +86,7 @@
 	handle @rawHTML {
 		respond 404
 	}
-	@publicAssets path /ui/site.js /ui/theme.js /ui/layout.js /ui/styles.css /ui/docs.css /ui/form-ui.js /ui/email-login.js /ui/login.js /ui/google-icon.svg
+	@publicAssets path /ui/legal.css /ui/site.js /ui/theme.js /ui/layout.js /ui/styles.css /ui/docs.css /ui/form-ui.js /ui/email-login.js /ui/login.js /ui/google-icon.svg
 	handle @publicAssets {
 		file_server
 	}
