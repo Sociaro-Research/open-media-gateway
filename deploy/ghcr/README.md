@@ -4,6 +4,8 @@ Ready-made Linux AMD64/ARM64 images. Requirements: Docker Engine (or Docker
 Desktop), Compose **2.24.4+** and Python **3.9+**. No source checkout or compiler.
 Run the commands below from this extracted directory, on the machine that will
 host Gateway. For private packages, authenticate to GHCR first (see below).
+On Windows, first read the included `docs/windows-wsl.md` guide for Docker Desktop
+and Ubuntu in WSL 2, then run these commands in Ubuntu with Desktop running.
 
 The included guides work offline. Links to source-only guides point to the
 matching release tag in the project repository rather than missing local files.

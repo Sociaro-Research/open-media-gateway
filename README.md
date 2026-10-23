@@ -22,6 +22,7 @@ delivers signed webhooks.
 For the current source checkout, use Docker Engine or Docker Desktop with
 **Compose 2.24.4+** and **Python 3.9+** in a Linux/macOS/WSL shell. No provider
 account or paid key is required. Docker builds the Go binaries and UI for you.
+For Windows setup, start with [Docker Desktop + Ubuntu in WSL 2](docs/windows-wsl.md).
 
 ```sh
 git clone https://github.com/Sociaro-Research/open-media-gateway.git

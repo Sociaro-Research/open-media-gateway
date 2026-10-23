@@ -6,6 +6,8 @@ must come from the same version.
 
 ## Use and operate Gateway
 
+- [Windows installation with Docker Desktop and WSL 2](windows-wsl.md)
+
 - [Configuration](configuration.md), [release installation and publishing](ghcr-release.md),
   [deployment and rollback](deployment.md), [GitHub Actions deployment](github-actions-deployment.md)
 - [First owner and administration](system-administration.md), [email authentication](email-authentication.md)

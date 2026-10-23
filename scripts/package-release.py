@@ -37,6 +37,7 @@ FILES = {
     "deploy/redis/licenses/deps/jemalloc/COPYING": "licenses/redis/deps/jemalloc/COPYING",
     "deploy/redis/licenses/deps/lua/COPYRIGHT": "licenses/redis/deps/lua/COPYRIGHT",
     "docs/configuration.md": "docs/configuration.md",
+    "docs/windows-wsl.md": "docs/windows-wsl.md",
     "docs/frontend-separation.md": "docs/frontend-separation.md",
     "docs/system-administration.md": "docs/system-administration.md",
     "docs/email-authentication.md": "docs/email-authentication.md",
