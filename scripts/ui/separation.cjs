@@ -46,7 +46,7 @@ const upstream=http.createServer((req,res)=>{
  for(const p of ['/','/docs','/openapi.json','/site.json','/ui/docs.js','/ui/site.js'])await request(p,200,docs);
  for(const p of ['/v1/info','/auth/session','/media/test','/ui/app.js','/ui/index.html','/system','/privacy'])await request(p,404,{...docs,Cookie:'test_session=alice',Authorization:'Bearer fixture-key'});
  await request('/site.json',404,docs,'POST');
- browser=await (process.env.UI_BROWSER_ENGINE==='webkit'?webkit:chromium).launch({headless:true,...(process.env.UI_BROWSER_ENGINE!=='webkit'&&process.env.UI_BROWSER_PATH?{executablePath:process.env.UI_BROWSER_PATH}:{})});
+ browser=await chromium.launch({headless:true,...(process.env.UI_BROWSER_ENGINE!=='webkit'&&process.env.UI_BROWSER_PATH?{executablePath:process.env.UI_BROWSER_PATH}:{})});
  const context=await browser.newContext(),page=await context.newPage(),errors=[];page.on('pageerror',e=>{if(process.env.UI_BROWSER_ENGINE==='webkit'&&e.message==='ResizeObserver loop completed with undelivered notifications.'){console.warn('WebKit resize notice: '+e.message);return;}errors.push(e.message);});
  const screenshots=process.env.UI_SCREENSHOT_DIR||path.join(tmp,'screenshots');fs.mkdirSync(screenshots,{recursive:true});
  for(const theme of ['dark','light'])for(const width of [1440,390,320]){
