@@ -24,6 +24,7 @@ for file in $required_files; do
 done
 
 python3 scripts/check-source-tree.py
+python3 scripts/check-release-docs.py
 
 # The UI is built from its own Docker context; keep its distributed project
 # notices identical to the canonical root copies.

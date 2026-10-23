@@ -2,9 +2,10 @@
 
 [OpenAI-style asynchronous API and migration guide](docs/openai-api.md)
 
-> **Status: early preview.** The project is ready for local development and
-> integration testing. The API may change before the first stable release. Do
-> not expose the development configuration to the public internet.
+> Published versions and their artifacts are listed in
+> [GitHub Releases](https://github.com/Sociaro-Research/open-media-gateway/releases).
+> Review the [deployment guide](docs/deployment.md) before operating an installation.
+> Do not expose the development configuration to the public internet.
 
 The included privacy and terms pages are operator templates with explicit
 placeholders. Complete and review them for your installation before public use;

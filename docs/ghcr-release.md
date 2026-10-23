@@ -21,7 +21,12 @@ hardened runtime; optional Prometheus/Grafana use their upstream images.
 ## Publish a version
 
 1. Commit and push the intended release to `main`; complete project release
-   checks. Do not include unfinished changes. Update the changelog for the release.
+   checks. Do not include unfinished changes. Update the changelog and
+   `docs/openapi.yaml` `info.version` for the release (without the tag's `v` prefix).
+   This YAML is the source embedded by Go and converted to `/openapi.json`; it is
+   not a generated file. The Git tag supplies `RELEASE_VERSION` to the release
+   workflow, and `make release-check` rejects a mismatched documentation version.
+   Check a planned version locally with `RELEASE_VERSION=vX.Y.Z make release-check`.
 2. Create an annotated version tag on that commit and push it, for example:
    `git tag -a v0.1.0 -m 'Media Gateway v0.1.0'` and
    `git push origin v0.1.0`. Use a new version for every changed release.

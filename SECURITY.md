@@ -2,9 +2,9 @@
 
 ## Supported versions
 
-Until the first stable release, security fixes are provided only on the latest
-commit of the default branch. Tagged preview releases may receive a replacement
-release, but are not maintained as parallel support lines.
+Security fixes are provided on the latest commit of the default branch.
+Tagged releases are not maintained as parallel support lines; use a subsequent
+release containing the fix when it is published.
 
 ## Reporting a vulnerability
 
