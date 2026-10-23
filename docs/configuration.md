@@ -28,8 +28,13 @@ For first-administrator setup, global settings and access recovery, see [System 
 | `DOCS_HOST` | separate docs UI | `docs.invalid` | Documentation hostname in the independent UI server |
 | `SESSION_TTL` | no | `720h` | Lifetime of an opaque browser session |
 | `MIGRATE` | no | `auto` | `auto` applies embedded migrations; `off` disables it |
-| `MEDIA_PROVIDER` | no | `mock` | Default adapter when a request omits `provider` |
-| `DEFAULT_MEDIA_MODEL` | no | provider default | Default model when a request omits `model` |
+| `MEDIA_PROVIDER` | no | `mock` | Default adapter for internal task-service configuration |
+| `DEFAULT_MEDIA_MODEL` | no | provider default | Default model for the internal task service's default adapter |
+
+These variables configure internal task-service defaults. Every public generation
+request must supply `model` with the exact public ID returned by `GET /v1/models`.
+Separate `provider` and `media_type` request fields are rejected; the endpoint and
+model determine the media type. See the [API request contract](openai-api.md#requests-and-provider-extensions).
 
 See [Grafana and Prometheus monitoring](monitoring.md) for the Administrator
 browser dashboard, metrics, alert rules, private access,
