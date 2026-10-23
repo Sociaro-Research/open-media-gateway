@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -32,6 +33,20 @@ func TestColorPresetPersistenceAndLegacyWritePreservation(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Exec(`UPDATE site_branding SET configuration=$1,version=$2 WHERE id=TRUE`, original, version)
+
+	// The migration seeds an empty object; reads expose only Original without
+	// persisting a catalog or rewriting existing administrator configuration.
+	if _, err = db.Exec(`UPDATE site_branding SET configuration='{}' WHERE id=TRUE`); err != nil {
+		t.Fatal(err)
+	}
+	fresh, err := NewSystemRepository(db).Branding(ctx)
+	if err != nil || len(fresh.Presets) != 1 || fresh.DefaultPreset != "original" || fresh.Presets[0].ID != "original" || fresh.Presets[0].Name != "Original" {
+		t.Fatal("unexpected fresh catalog", fresh, err)
+	}
+	var untouched []byte
+	if err = db.QueryRow(`SELECT configuration FROM site_branding WHERE id=TRUE`).Scan(&untouched); err != nil || !bytes.Equal(untouched, []byte("{}")) {
+		t.Fatal("read persisted settings", string(untouched), err)
+	}
 	legacy := branding.Defaults()
 	legacy.Dark["accent"] = "#abcd12"
 	legacy.Light["switch-off"] = "#eef7e0"
@@ -55,6 +70,10 @@ func TestColorPresetPersistenceAndLegacyWritePreservation(t *testing.T) {
 	if settings.Presets[0].Dark["accent"] != "#abcd12" || settings.DefaultPreset != "original" {
 		t.Fatal("legacy colors lost", settings)
 	}
+	// A previously persisted Clear Lime remains an ordinary editable theme.
+	savedPalette := branding.Defaults().Normalize()
+	savedPalette.Light["accent"] = "#b8dc00"
+	settings.Presets = append(settings.Presets, branding.Preset{ID: "clear-lime", Name: "Clear Lime", Dark: savedPalette.Dark, Light: savedPalette.Light})
 	settings.DefaultPreset = "clear-lime"
 	saved, err := repo.SaveBranding(ctx, user.ID, settings)
 	if err != nil {

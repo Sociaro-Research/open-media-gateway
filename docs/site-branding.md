@@ -24,13 +24,16 @@ Check contrast in both modes before saving.
 
 ## Color themes
 
-Each named preset contains a complete dark and light palette. On reading a legacy
-appearance record, its exact existing colors become **Original**, selected as the
-default. **Clear Lime** is offered alongside it: cool neutral panels, lime action
-fills, readable olive accent text in light mode, and independent switch track,
-off/on thumb and on-edge colors. The administrator can edit or rename either
-preset. The generated catalog becomes durable with the next Appearance or Color themes Save;
-reading old settings does not write to the database.
+Each named preset contains a complete dark and light palette. Fresh installations
+ship with **Original** as the only preset and the site default. On reading a legacy
+appearance record without a preset catalog, its exact existing colors become
+**Original**. The generated catalog becomes durable with the next Appearance or
+Color themes Save; reading old settings does not write to the database.
+
+Saved catalogs, including previously saved Clear Lime and administrator-created
+presets, retain their colors, names and default selection. Existing users retain
+their saved color theme IDs. Administrators can create, edit, rename and delete
+presets through the existing editor; upgrades do not remove themes.
 
 The **Color theme** dropdown lists existing presets, marks the default with
 **(default)** and initially selects that default. Its last option, **+ Create new theme**,

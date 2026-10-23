@@ -45,7 +45,7 @@ func completePalette(palette map[string]string) map[string]string {
 // The original pair remains a separate preset when the default is changed later.
 func (s Settings) Normalize() Settings {
 	if s.Presets == nil {
-		s.Presets = []Preset{{ID: "original", Name: "Original", Dark: s.Dark, Light: s.Light}, ClearLime()}
+		s.Presets = []Preset{{ID: "original", Name: "Original", Dark: s.Dark, Light: s.Light}}
 		s.DefaultPreset = "original"
 	}
 	presets := make([]Preset, len(s.Presets))
@@ -130,14 +130,4 @@ func (s Settings) validatePresets() error {
 		return errors.New("choose an existing default color theme")
 	}
 	return nil
-}
-
-// ClearLime is an editable starting point, never an override of the original colors.
-func ClearLime() Preset {
-	base := Defaults()
-	dark := map[string]string{"bg": "#080b10", "panel": "#121922", "panel-2": "#1b2532", "field": "#0d131c", "popup": "#1b2532", "line": "#334153", "text": "#edf2f7", "muted": "#aab4c2", "accent": "#b8dc00", "accent-dark": "#1d2812", "highlight": "#c5eb00", "on-accent": "#182000", "on-highlight": "#182000", "on-warning": "#11151b", "switch-off": "#66758a", "accent-text": "#b8dc00", "chart-1": "#b8dc00", "switch-thumb": "#ffffff", "switch-thumb-on": "#182000", "switch-on-border": "#b8dc00"}
-	light := map[string]string{"bg": "#f5f7fa", "panel-2": "#edf1f5", "line": "#d2d9e2", "text": "#202938", "muted": "#596575", "accent": "#b8dc00", "accent-dark": "#f4f8e7", "highlight": "#526b00", "on-accent": "#1a210e", "on-highlight": "#ffffff", "switch-off": "#66758a", "accent-text": "#526b00", "chart-1": "#668700", "switch-thumb": "#ffffff", "switch-thumb-on": "#1a210e", "switch-on-border": "#b8dc00", "chart-2": "#157e96", "chart-3": "#7d50bd", "chart-4": "#af6b1b", "chart-5": "#287b57", "chart-6": "#b14f7a"}
-	maps.Copy(base.Dark, dark)
-	maps.Copy(base.Light, light)
-	return Preset{ID: "clear-lime", Name: "Clear Lime", Dark: base.Dark, Light: base.Light}
 }

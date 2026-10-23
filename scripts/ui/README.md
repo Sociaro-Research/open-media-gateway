@@ -389,3 +389,10 @@ Invitation feedback is covered by `organization-roles.cjs` and `organizations.cj
 with no effective login method, email, Google, both, failed invitation creation,
 unavailable or malformed configuration, and first-owner invitations. Delivery
 configuration alone does not determine sign-in availability.
+
+Run `node scripts/ui/color-presets.cjs` (also with `UI_BROWSER_ENGINE=webkit`)
+for the Original-only fresh catalog, stale personal selection fallback without
+rewriting the preference, legacy palette fallback, saved Clear Lime preservation,
+and custom theme creation/editing/deletion, independent saves and keyboard controls
+at 1440/390/320px. The alternate palette is a test fixture for existing catalogs;
+it is not bundled in new installations. All writes stay in localhost fixtures.

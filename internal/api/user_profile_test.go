@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"github.com/Sociaro-Research/open-media-gateway/internal/auth"
+	"github.com/Sociaro-Research/open-media-gateway/internal/branding"
 	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
 	"github.com/Sociaro-Research/open-media-gateway/internal/system"
 	"strings"
@@ -34,11 +35,23 @@ func TestProfileColorThemesMustExist(t *testing.T) {
 	fixture := &profileAuthFixture{}
 	s.auth = fixture
 	h := s.handler()
-	for _, id := range []string{"original", "clear-lime", ""} {
+	for _, id := range []string{"original", ""} {
 		w := sendTest(h, "PATCH", "/v1/me", `{"color_preset":"`+id+`"}`, "alice", "")
 		if w.Code != 200 || !strings.Contains(w.Body.String(), `"color_preset":"`+id+`"`) {
 			t.Fatal(w.Code, w.Body)
 		}
+	}
+	// Clear Lime is selectable only when an administrator has saved it.
+	if w := sendTest(h, "PATCH", "/v1/me", `{"color_preset":"clear-lime"}`, "alice", ""); w.Code != 400 {
+		t.Fatal(w.Code, w.Body)
+	}
+	saved := branding.Defaults().Normalize()
+	palette := branding.Defaults().Normalize()
+	saved.Presets = append(saved.Presets, branding.Preset{ID: "clear-lime", Name: "Clear Lime", Dark: palette.Dark, Light: palette.Light})
+	s.system = &brandingFixture{systemFixture: &systemFixture{settings: system.Defaults(), admins: map[string]bool{}}, brand: saved}
+	h = s.handler()
+	if w := sendTest(h, "PATCH", "/v1/me", `{"color_preset":"clear-lime"}`, "alice", ""); w.Code != 200 {
+		t.Fatal(w.Code, w.Body)
 	}
 	calls := len(fixture.ids)
 	if w := sendTest(h, "PATCH", "/v1/me", `{"color_preset":"missing"}`, "alice", ""); w.Code != 400 {

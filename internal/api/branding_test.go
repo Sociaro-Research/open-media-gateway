@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -183,5 +184,39 @@ func TestUnconfiguredPublicBrandingAndClearingIdentity(t *testing.T) {
 	}
 	if w = sendTest(h, "GET", "/branding/assets/logo", "", "", ""); w.Code != 404 {
 		t.Fatal("cleared image still served", w.Code)
+	}
+}
+
+type failingBrandingReader struct{}
+
+func (failingBrandingReader) Branding(context.Context) (branding.Settings, error) {
+	return branding.Settings{}, errors.New("unavailable fixture")
+}
+
+func TestBrandingFallbackCatalogContainsOnlyOriginal(t *testing.T) {
+	for _, reader := range []branding.Reader{nil, failingBrandingReader{}, &brandingFixture{brand: branding.Defaults()}} {
+		settings := readBranding(context.Background(), reader)
+		if len(settings.Presets) != 1 || settings.DefaultPreset != "original" || settings.Presets[0].ID != "original" || settings.Presets[0].Name != "Original" {
+			t.Fatal("unexpected fallback catalog", settings)
+		}
+	}
+	s, _ := newPersonalTestServer()
+	s.system = &brandingFixture{systemFixture: &systemFixture{settings: system.Defaults(), admins: map[string]bool{"alice": true}}, brand: branding.Defaults()}
+	h := s.handler()
+	w := sendTest(h, "GET", "/v1/system/branding", "", "alice", "")
+	var response struct {
+		Settings branding.Settings `json:"settings"`
+		Defaults branding.Settings `json:"defaults"`
+	}
+	if w.Code != 200 {
+		t.Fatal(w.Code, w.Body)
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	for _, settings := range []branding.Settings{response.Settings, response.Defaults} {
+		if len(settings.Presets) != 1 || settings.DefaultPreset != "original" || settings.Presets[0].ID != "original" {
+			t.Fatal("unexpected editor defaults", settings)
+		}
 	}
 }

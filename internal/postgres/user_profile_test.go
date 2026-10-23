@@ -45,7 +45,7 @@ func TestUserProfilePersistsAndSurvivesGoogleLogin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	name, theme, preset := "  Custom name  ", "system", "clear-lime"
+	name, theme, preset := "  Custom name  ", "system", "original"
 	columns := []string{"date", "generation_id", "status"}
 	if _, err = manager.UpdateProfile(ctx, user.ID, auth.ProfileUpdate{Name: &name, Theme: &theme, ReportColumns: &columns, ColorPreset: &preset}); err != nil {
 		t.Fatal(err)

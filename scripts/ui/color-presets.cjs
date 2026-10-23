@@ -1,6 +1,7 @@
 const {evidencePath} = require('./evidence.cjs');
 // Isolated admin catalog and personal color selection; all writes stay localhost.
-const {chromium}=require('playwright');
+const {chromium,webkit}=require('playwright');
+const engine=process.env.UI_BROWSER_ENGINE==='webkit'?webkit:chromium;
 const fs=require('node:fs'),http=require('node:http'),path=require('node:path'),assert=require('node:assert/strict');
 const root=path.resolve(__dirname,'../../web/public/ui');
 const keys=['bg','panel','panel-2','field','popup','line','switch-off','text','muted','accent','accent-dark','highlight','on-accent','on-highlight','blue','red','success','yellow','on-warning','chart-2','chart-3','chart-4','chart-5','chart-6'];
@@ -11,8 +12,8 @@ const complete=palette=>({...palette,...Object.fromEntries(Object.entries(roles)
 const defaults={name:'',description:'',contact_email:'',dark:complete(Object.fromEntries(keys.map((k,i)=>[k,dark[i]]))),light:complete(Object.fromEntries(keys.map((k,i)=>[k,light[i]]))),assets:{},site_max_width:1280,content_max_width:null,sidebar_subsections:false,version:1};
 const original={id:'original',name:'Original',dark:structuredClone(defaults.dark),light:structuredClone(defaults.light)};
 const lime={id:'clear-lime',name:'Clear Lime',dark:{...defaults.dark,bg:'#080b10',panel:'#121922','panel-2':'#1b2532',field:'#0d131c',popup:'#1b2532',line:'#334153',text:'#edf2f7',muted:'#aab4c2',accent:'#b8dc00','accent-dark':'#1d2812',highlight:'#c5eb00','on-accent':'#182000','on-highlight':'#182000','on-warning':'#11151b','switch-off':'#66758a','accent-text':'#b8dc00','chart-1':'#b8dc00','switch-thumb':'#ffffff','switch-thumb-on':'#182000','switch-on-border':'#b8dc00'},light:{...defaults.light,bg:'#f5f7fa','panel-2':'#edf1f5',line:'#d2d9e2',text:'#202938',muted:'#596575',accent:'#b8dc00','accent-dark':'#f4f8e7',highlight:'#526b00','on-accent':'#1a210e','on-highlight':'#ffffff','switch-off':'#66758a','accent-text':'#526b00','chart-1':'#668700','switch-thumb':'#ffffff','switch-thumb-on':'#1a210e','switch-on-border':'#b8dc00','chart-2':'#157e96','chart-3':'#7d50bd','chart-4':'#af6b1b','chart-5':'#287b57','chart-6':'#b14f7a'}};
-let settings={...structuredClone(defaults),presets:[original,lime],default_preset:'original'},user={id:'self',name:'Palette administrator',email:'admin@example.test',theme:'dark',color_preset:'',is_system_admin:true},fail=false,profileFail=false,puts=0;
-if(process.env.UI_PALETTE_PATH){const raw=JSON.parse(fs.readFileSync(process.env.UI_PALETTE_PATH,'utf8'));const saved=raw.branding||raw;settings={...saved,presets:[{id:'original',name:'Original',dark:complete(saved.dark),light:complete(saved.light)},lime],default_preset:'original'};}
+let settings={...structuredClone(defaults),presets:[original],default_preset:'original'},user={id:'self',name:'Palette administrator',email:'admin@example.test',theme:'dark',color_preset:'',is_system_admin:true},fail=false,profileFail=false,puts=0;
+if(process.env.UI_PALETTE_PATH){const raw=JSON.parse(fs.readFileSync(process.env.UI_PALETTE_PATH,'utf8'));const saved=raw.branding||raw;settings={...saved,presets:[{id:'original',name:'Original',dark:complete(saved.dark),light:complete(saved.light)}],default_preset:'original'};}
 if(process.env.UI_ASSET_DIR)for(const [key,asset]of Object.entries(settings.assets||{})){const file=path.join(process.env.UI_ASSET_DIR,key+(asset.mime==='image/svg+xml'?'.svg':'.png'));if(fs.existsSync(file))asset.data=fs.readFileSync(file).toString('base64');}
 const server=http.createServer(async(req,res)=>{
  const p=new URL(req.url,'http://localhost').pathname,json=(data,status=200)=>{res.writeHead(status,{'Content-Type':'application/json'});res.end(JSON.stringify(data));};
@@ -20,7 +21,7 @@ const server=http.createServer(async(req,res)=>{
  if(p==='/v1/system/branding'){
   if(!user.is_system_admin)return json({error:{message:'Administrator required'}},403);
   if(req.method==='PUT'){puts++;const next=await body();if(fail)return json({error:{message:'Conflict'}},409);assert.equal(next.version,settings.version);settings={...next,version:settings.version+1};return json(settings);}
-  return json({settings,defaults:{...defaults,presets:[{...original,dark:defaults.dark,light:defaults.light},lime],default_preset:'original'},colors:Object.keys(defaults.dark).map(key=>({key,label:key==='accent'?'Primary accent':key,group:key.startsWith('chart-')?'Charts':'Colors'}))});
+  return json({settings,defaults:{...defaults,presets:[{...original,dark:defaults.dark,light:defaults.light}],default_preset:'original'},colors:Object.keys(defaults.dark).map(key=>({key,label:key==='accent'?'Primary accent':key,group:key.startsWith('chart-')?'Charts':'Colors'}))});
  }
  if(p==='/v1/me'){if(req.method==='PATCH'){const update=await body();if(profileFail)return json({error:{message:'Could not save profile'}},500);if(update.color_preset&&!settings.presets.some(x=>x.id===update.color_preset))return json({error:{message:'Unknown color theme'}},400);user={...user,...update};}return json(user);}
  if(p==='/site.json')return json({branding:settings});
@@ -38,10 +39,27 @@ const server=http.createServer(async(req,res)=>{
 (async()=>{
  await new Promise(r=>server.listen(Number(process.env.UI_PREVIEW_PORT||0),'127.0.0.1',r));const base=`http://127.0.0.1:${server.address().port}`;
  if(process.env.UI_PREVIEW_PORT){console.log('Local color-theme preview: '+base+'/profile');return;}
- const browser=await chromium.launch({headless:true,...(process.env.UI_BROWSER_PATH?{executablePath:process.env.UI_BROWSER_PATH}:{})}),page=await browser.newPage({viewport:{width:1440,height:1000},colorScheme:'dark'}),errors=[],out=path.resolve(process.env.UI_EVIDENCE_DIR||evidencePath('/tmp/gateway-color-presets-ui'));fs.mkdirSync(out,{recursive:true});page.on('pageerror',e=>errors.push(e.message));page.setDefaultTimeout(10000);
+ const browser=await engine.launch({headless:true,...(process.env.UI_BROWSER_PATH?{executablePath:process.env.UI_BROWSER_PATH}:{})}),page=await browser.newPage({viewport:{width:1440,height:1000},colorScheme:'dark'}),errors=[],out=path.resolve(process.env.UI_EVIDENCE_DIR||evidencePath('/tmp/gateway-color-presets-ui'));fs.mkdirSync(out,{recursive:true});page.on('pageerror',e=>errors.push(e.message));page.setDefaultTimeout(10000);
  const select=async(name,value)=>{let title=value;if(name==='Color theme'&&await page.locator('.branding-color-settings').count())title=await page.locator('.branding-color-settings select[name=color_preset]').evaluate((select,name)=>[...select.options].find(o=>o.textContent===name||o.textContent===name+' (default)')?.textContent,value);await page.getByRole('combobox',{name,exact:true}).click();await page.getByRole('option',{name:title,exact:true}).click();};
  const appearance=page.locator('.branding-settings'),form=page.locator('.branding-color-settings'),save=async()=>{await form.getByRole('button',{name:'Save',exact:true}).click();await form.getByRole('button',{name:'Saved',exact:true}).waitFor();},palette=key=>form.locator(`input[name="${key}"]`),current=()=>page.locator('html').getAttribute('data-color-preset');
  try{
+  // Fresh distribution and legacy fallback expose only Original; loading a
+  // stale user selection falls back without rewriting that saved preference.
+  if(!process.env.UI_PALETTE_PATH){
+   user.color_preset='clear-lime';
+   await page.goto(base+'/profile');await page.getByRole('combobox',{name:'Color theme',exact:true}).waitFor();
+   assert.deepEqual(await page.locator('select[name=color_preset] option').allTextContents(),['Site default','Original']);
+   assert.equal(await current(),'original');assert.equal(user.color_preset,'clear-lime');
+   await page.goto(base+'/system');await page.getByRole('tab',{name:'Appearance',exact:true}).click();await form.getByLabel('Theme name',{exact:true}).waitFor();
+   assert.deepEqual(await form.locator('select[name=color_preset] option').allTextContents(),['Original (default)','+ Create new theme']);
+   assert.equal(await form.getByRole('button',{name:'Delete',exact:true}).isDisabled(),true);
+   assert.equal(await form.getByRole('switch',{name:'Default theme',exact:true}).isDisabled(),true);
+   const legacy=await page.evaluate(s=>GatewaySite.normalize(s),defaults);
+   assert.deepEqual(legacy.presets.map(p=>[p.id,p.name]),[['original','Original']]);assert.equal(legacy.default_preset,'original');
+   assert.equal(puts,0,'opening fresh settings persisted a catalog');
+  }
+  // Previously saved catalogs still load and remain editable after an upgrade.
+  user.color_preset='';settings.presets.push(structuredClone(lime));
   await page.goto(base+'/system');await page.getByRole('tab',{name:'Appearance',exact:true}).click();await form.getByLabel('Theme name',{exact:true}).waitFor();
   const preserved=structuredClone(settings.presets[0]);assert.equal(await form.getByRole('button',{name:'+ Create new theme',exact:true}).count(),0);assert.equal(await form.locator('select[name=color_preset]').inputValue(),'original');assert.deepEqual(await form.locator('select[name=color_preset] option').allTextContents(),['Original (default)','Clear Lime','+ Create new theme']);assert.equal(await form.locator(':scope > .field-explanation,.branding-preset-controls small').count(),0);assert.equal(await form.locator('.branding-preview-header').getByRole('heading',{name:'Preview',exact:true}).count(),1);await select('Color theme','+ Create new theme');const cancelled=page.getByRole('dialog');await cancelled.getByRole('button',{name:'Cancel',exact:true}).click();await cancelled.waitFor({state:'detached'});assert.equal(await form.locator('select[name=color_preset]').inputValue(),'original');assert.equal(await form.getByRole('button',{name:'Save',exact:true}).isVisible(),false);const previewSwitch=form.getByRole('switch',{name:'Light preview',exact:true});await previewSwitch.focus();await previewSwitch.press('Space');assert.equal(await previewSwitch.isChecked(),true);assert.equal(await page.locator('.branding-preview').evaluate(n=>getComputedStyle(n).getPropertyValue('--text').trim()),preserved.light.text);assert.equal(await page.locator('html').getAttribute('data-theme'),'dark');assert.equal(await form.getByRole('button',{name:'Save',exact:true}).isVisible(),false);await previewSwitch.press('Space');assert.equal(await page.getByRole('button',{name:/Reset/}).count(),0);assert.equal(await page.getByRole('combobox',{name:'Default color theme',exact:true}).count(),0);assert.equal(await form.getByRole('button',{name:'Discard'}).isVisible(),false);assert.equal(await form.getByRole('switch',{name:'Default theme',exact:true}).isChecked(),true);assert.equal(await form.getByRole('button',{name:'Save',exact:true}).isVisible(),false);
   await select('Color theme','Clear Lime');assert.equal(await palette('dark_switch-thumb').inputValue(),'#ffffff');assert.equal(await form.getByRole('button',{name:'Save',exact:true}).isVisible(),false,'choosing an editor creates a dirty draft');
@@ -78,6 +96,6 @@ const server=http.createServer(async(req,res)=>{
   await page.goto(base+'/docs');await page.evaluate(()=>GatewaySite.ready);assert.equal(await current(),settings.default_preset);user={...user,id:'other',color_preset:'original'};await page.goto(base+'/profile');await page.getByRole('combobox',{name:'Color theme',exact:true}).waitFor();assert.equal(await current(),'original');
   await select('Color theme','Site default');await savePersonal();assert.equal(user.color_preset,'');assert.equal(await current(),settings.default_preset);
   user.color_preset='removed-preset';await page.reload();await page.getByRole('combobox',{name:'Color theme',exact:true}).waitFor();assert.equal(await current(),settings.default_preset);assert.equal(await page.locator('select[name=color_preset]').inputValue(),'');
-  assert.deepEqual(errors,[]);console.log('PASS: named paired palettes, create/rename/edit/delete, default switch, independent section save/discard, copy isolation, hidden-palette validation, draft/discard, conflict/retry, default, personal persistence/failure/mode/account isolation, public docs, keyboard and 1440/390/320px.');
+  assert.deepEqual(errors,[]);console.log('PASS: Original-only fresh/default fallback, retained stale user preference, saved Clear Lime, named paired palettes, create/rename/edit/delete, default switch, independent section save/discard, copy isolation, hidden-palette validation, draft/discard, conflict/retry, default, personal persistence/failure/mode/account isolation, public docs, keyboard and 1440/390/320px.');
  }finally{await browser.close();server.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;server.close();});
