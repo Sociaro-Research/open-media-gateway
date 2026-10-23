@@ -383,3 +383,9 @@ and the actual company-settings editor. It verifies public reads, anonymous and
 member denial, persisted text, concurrent-edit conflicts, literal HTML display,
 independent company saves, the UTF-8 byte limit and template reset.
 Repeat with `UI_BROWSER_ENGINE=webkit`. No live provider or payment calls run.
+
+Invitation feedback is covered by `organization-roles.cjs` and `organizations.cjs`
+(`UI_BROWSER_ENGINE=webkit` selects WebKit). Fixtures check post-success warnings
+with no effective login method, email, Google, both, failed invitation creation,
+unavailable or malformed configuration, and first-owner invitations. Delivery
+configuration alone does not determine sign-in availability.

@@ -53,8 +53,8 @@
    form.onsubmit=async e=>{
     e.preventDefault();if(submitting||!form.reportValidity())return;
     const input=Object.fromEntries(new FormData(form)),snapshot=JSON.stringify(input);if(submittedValues&&submittedValues!==snapshot)operation=crypto.randomUUID();submittedValues=snapshot;
-    submitting=true;submit.disabled=cancel.disabled=close.disabled=true;form.setAttribute('aria-busy','true');message.hidden=false;FormUI.message(message,'Creating company…');
-    try{await api('/v1/client-onboardings',{method:'POST',body:JSON.stringify({...input,operation_id:operation})});dialog.close();await load();}
+    status.classList.remove('settings-warning');FormUI.message(status,'');submitting=true;submit.disabled=cancel.disabled=close.disabled=true;form.setAttribute('aria-busy','true');message.hidden=false;FormUI.message(message,'Creating company…');
+    try{await api('/v1/client-onboardings',{method:'POST',body:JSON.stringify({...input,operation_id:operation})});dialog.close();await InvitationFeedback.created(status,alive);await load();}
     catch(error){FormUI.message(message,error.message,'error');}
     finally{submitting=false;form.removeAttribute('aria-busy');submit.disabled=cancel.disabled=close.disabled=false;FormUI.update(form);}
    };

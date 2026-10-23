@@ -4,6 +4,8 @@ const {chromium,webkit}=require('playwright'),http=require('node:http'),fs=requi
 const root=path.resolve(__dirname,'../../web/public/ui');const server=http.createServer((req,res)=>{let file=path.join(root,path.basename(req.url.split('?')[0]));if(!path.extname(file))file=path.join(root,'index.html');if(!fs.existsSync(file))return res.writeHead(404).end();res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html');res.end(fs.readFileSync(file));});
 (async()=>{await new Promise(r=>server.listen(0,'127.0.0.1',r));const browser=await (process.env.UI_BROWSER_ENGINE==='webkit'?webkit:chromium).launch({headless:true,executablePath:process.env.UI_BROWSER_PATH}),page=await browser.newPage({viewport:{width:1440,height:1080},hasTouch:true}),errors=[],writes=[];page.on('pageerror',e=>{if(!e.message.includes('ResizeObserver loop completed with undelivered notifications'))errors.push(e.message)});page.setDefaultTimeout(10000);let storageFixture={driver:'gateway'};let clientManagerFixture=false,assignedManager='',admin=true,role='supermanager',balance=100,accepted=false,invitationRows=[],failInvitation=false,previewRole='member',firstOwnerPreview=false;
 const oid='22222222-2222-4222-8222-222222222222',uid='11111111-1111-4111-8111-111111111111';const organization=()=>({id:oid,name:'Example team',role,balance_usd:balance,available_usd:balance,credit_limit_usd:0,default_weekly_limit_usd:0,weekly_limit_usd:20,weekly_committed_usd:5,storage_bytes:2048,client_manager_email:assignedManager});
+ let loginMethods={email:true,google:false},loginReadFailure=false,loginReads=0;
+ await page.route('**/auth/methods',async route=>{loginReads++;return loginReadFailure?route.fulfill({status:503,json:{error:{message:'Configuration unavailable'}}}):route.fulfill({json:loginMethods});});
 await page.route('**/v1/**',async route=>{const req=route.request(),p=new URL(req.url()).pathname,method=req.method(),data=req.postData()?req.postDataJSON():null,json=value=>route.fulfill({json:value});if(method!=='GET')writes.push({p,method,data});
 if(p==='/v1/info')return json({auth_mode:'google',provider:'mock',console:{generation_ui:true,personal_providers:true,shared_resources:true,version:1}});
 if(p==='/v1/me')return json({id:uid,name:'Organization tester',email:'tester@example.test',is_system_admin:admin,is_client_manager:clientManagerFixture,session_id:'fixture'});
@@ -55,11 +57,33 @@ try{const base='http://127.0.0.1:'+server.address().port;
  await roleTrigger.scrollIntoViewIfNeeded();await roleTrigger.press('ArrowDown');await page.getByRole('listbox',{name:'Invitation role',exact:true}).waitFor();await page.waitForFunction(()=>document.activeElement?.getAttribute('role')==='listbox');await page.keyboard.press('Home');for(let i=0;i<3;i++)await page.keyboard.press('ArrowDown');await page.keyboard.press('Enter');assert.equal(await invitationRole.inputValue(),'developer');
  failInvitation=true;await invitationForm.getByRole('button',{name:'Create invitation',exact:true}).click();await invitationForm.getByRole('status').filter({hasText:'Invitation fixture unavailable'}).waitFor();assert.equal(await invitationRole.inputValue(),'developer');failInvitation=false;
  await invitationForm.getByRole('button',{name:'Create invitation',exact:true}).focus();await page.keyboard.press('Enter');await page.getByLabel('One-time invitation link',{exact:true}).waitFor();assert.equal(writes.filter(w=>w.p.endsWith('/invitations')).at(-1).data.role,'developer');
- await page.locator('.member-invitations .docs-table tbody tr').waitFor();assert.match(await page.locator('.member-invitations .docs-table tbody tr').innerText(),/Developer/);assert.equal(await page.getByText('Invited role: Developer',{exact:true}).count(),1);
- for(const width of [1440,390,320]){
-  await page.setViewportSize({width,height:950});await invitationForm.scrollIntoViewIfNeeded();await capture('invitation-role-'+(process.env.UI_BROWSER_ENGINE||'chromium')+'-'+width);await page.locator('.member-invitations').screenshot({path:evidencePath('/tmp/gateway-role-layout/invitation-form-')+(process.env.UI_BROWSER_ENGINE||'chromium')+'-'+width+'.png'});
-  await roleTrigger.click();await page.getByRole('listbox',{name:'Invitation role',exact:true}).waitFor();await capture('invitation-role-picker-'+(process.env.UI_BROWSER_ENGINE||'chromium')+'-'+width);await page.keyboard.press('Escape');
+ const feedback=invitationForm.getByRole('status');
+ for(const scenario of [
+  {name:'none',methods:{email:false,google:false,email_delivery:true},warning:true},
+  {name:'email_without_delivery',methods:{email:true,google:false,email_delivery:false}},
+  {name:'google',methods:{email:false,google:true,email_delivery:false}},
+  {name:'both',methods:{email:true,google:true}},
+  {name:'read_failure',methods:{email:false,google:false},failure:true,unknown:true},
+  {name:'invalid_response',methods:{},unknown:true}
+ ]){
+  loginMethods=scenario.methods;loginReadFailure=!!scenario.failure;const reads=loginReads;
+  await invitationForm.getByRole('button',{name:'Create invitation',exact:true}).click();
+  await page.waitForFunction(()=>!document.querySelector('.member-invitations form button[type=submit]').disabled);
+  assert.equal(loginReads,reads+1,'fresh login config after '+scenario.name);
+  const message=await feedback.textContent();assert.ok(message.startsWith('Invitation created.'));
+  assert.equal(message.includes('No sign-in method is enabled.'),!!scenario.warning,scenario.name);
+  assert.equal(message.includes('Could not check sign-in availability.'),!!scenario.unknown,scenario.name);
+  assert.ok(await page.getByLabel('One-time invitation link',{exact:true}).isVisible());
  }
+ loginReadFailure=false;loginMethods={email:false,google:false};failInvitation=true;const readsBeforeFailure=loginReads;
+ await invitationForm.getByRole('button',{name:'Create invitation',exact:true}).click();await feedback.filter({hasText:'Invitation fixture unavailable'}).waitFor();
+ assert.equal(loginReads,readsBeforeFailure,'failed creation must not check login configuration');assert.ok(!(await feedback.textContent()).includes('No sign-in method'));
+ failInvitation=false;await invitationForm.getByRole('button',{name:'Create invitation',exact:true}).click();await feedback.filter({hasText:'No sign-in method is enabled'}).waitFor();
+ await page.locator('.member-invitations .docs-table tbody tr').waitFor();assert.match(await page.locator('.member-invitations .docs-table tbody tr').innerText(),/Developer/);assert.equal(await page.getByText('Invited role: Developer',{exact:true}).count(),1);
+ for(const theme of ['dark','light']){await page.evaluate(theme=>GatewayTheme.apply(theme),theme);for(const width of [1440,390,320]){
+  await page.setViewportSize({width,height:950});await invitationForm.scrollIntoViewIfNeeded();await capture('invitation-role-'+(process.env.UI_BROWSER_ENGINE||'chromium')+'-'+width);await page.locator('.member-invitations').screenshot({path:evidencePath('/tmp/gateway-role-layout/invitation-form-')+(process.env.UI_BROWSER_ENGINE||'chromium')+'-'+theme+'-'+width+'.png'});
+  await roleTrigger.click();await page.getByRole('listbox',{name:'Invitation role',exact:true}).waitFor();await capture('invitation-role-picker-'+(process.env.UI_BROWSER_ENGINE||'chromium')+'-'+width);await page.keyboard.press('Escape');
+ }}
  await page.setViewportSize({width:1440,height:1080});
  admin=false;role='admin';await page.goto(base+'/organizations');await page.getByRole('tab',{name:'Members',exact:true}).click();await invitationRole.waitFor({state:'attached'});assert.deepEqual(await invitationRole.locator('option').evaluateAll(o=>o.map(n=>n.value)),['developer','member']);
  role='supermanager';await page.goto(base+'/organizations');await page.getByRole('tab',{name:'Members',exact:true}).click();await invitationRole.waitFor({state:'attached'});assert.equal(await invitationRole.locator('option').count(),5);
