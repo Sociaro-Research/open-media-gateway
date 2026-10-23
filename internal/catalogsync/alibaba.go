@@ -11,7 +11,7 @@ import (
 	"golang.org/x/net/html"
 )
 
-var alibabaMediaID = regexp.MustCompile(`\b(?:vidu/[a-zA-Z0-9_-]+|happyhorse-[a-zA-Z0-9._-]*|qwen-mt-image[a-zA-Z0-9._-]*|qwen-image[a-zA-Z0-9._-]*|qwen-audio-[0-9.]+-tts[a-zA-Z0-9._-]*|qwen3-tts[a-zA-Z0-9._-]*|qwen-tts[a-zA-Z0-9._-]*|cosyvoice-[a-zA-Z0-9._-]*|wan[0-9x][a-zA-Z0-9._-]*|z-image[a-zA-Z0-9._-]*)\b`)
+var alibabaMediaID = regexp.MustCompile(`\b(?:(?:vidu|pixverse)/[a-zA-Z0-9_-]+|happyhorse-[a-zA-Z0-9._-]*|qwen-mt-image[a-zA-Z0-9._-]*|qwen-image[a-zA-Z0-9._-]*|qwen-audio-[0-9.]+-tts[a-zA-Z0-9._-]*|qwen3-tts[a-zA-Z0-9._-]*|qwen-tts[a-zA-Z0-9._-]*|cosyvoice-[a-zA-Z0-9._-]*|wan[0-9x][a-zA-Z0-9._-]*|z-image[a-zA-Z0-9._-]*)\b`)
 var alibabaAmount = regexp.MustCompile(`^\$([0-9]+(?:\.[0-9]+)?)/(image|second)$`)
 
 // Preserve regional heading scope through lower-level subheadings, expand HTML
