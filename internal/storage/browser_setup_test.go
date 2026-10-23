@@ -33,7 +33,7 @@ type corsXMLRule struct {
 
 func TestBrowserSetupPreservesRulesAndHandlesPermissions(t *testing.T) {
 	for _, endpoint := range []string{"https://s3.eu-central-003.backblazeb2.com", "https://account.r2.cloudflarestorage.com", "https://s3.eu-central-1.amazonaws.com", "https://storage.example.test"} {
-		for _, scenario := range []string{"ready", "append", "absent", "read-denied", "write-denied", "read-missing-bucket", "network", "server", "redirect", "unconfirmed", "propagating"} {
+		for _, scenario := range []string{"ready", "append", "absent", "absent-b2", "read-not-found", "read-unknown-404", "read-denied", "write-denied", "read-missing-bucket", "network", "server", "redirect", "unconfirmed", "propagating"} {
 			t.Run(endpoint+"/"+scenario, func(t *testing.T) {
 				const origin = "https://gateway.example.test"
 				old := corsXMLRule{ID: "other-app", Origins: []string{"https://other.example.test"}, Methods: []string{"GET"}, Headers: []string{"range"}, Expose: []string{"ETag"}, MaxAge: 120}
@@ -81,6 +81,17 @@ func TestBrowserSetupPreservesRulesAndHandlesPermissions(t *testing.T) {
 						case scenario == "read-missing-bucket":
 							w.WriteHeader(404)
 							fmt.Fprint(w, `<Error><Code>NoSuchBucket</Code></Error>`)
+						case scenario == "read-not-found":
+							w.WriteHeader(404)
+							fmt.Fprint(w, `<Error><Code>NotFound</Code></Error>`)
+						case scenario == "read-unknown-404":
+							w.WriteHeader(404)
+							fmt.Fprint(w, `<Error><Code>UnknownError</Code></Error>`)
+						case scenario == "absent-b2" && writes == 0:
+							// Exact code/message from the user's server diagnostic.
+							// The real AWS SDK must decode this HTTP fixture.
+							w.WriteHeader(404)
+							fmt.Fprint(w, `<Error><Code>NoSuchCorsConfiguration</Code><Message>The CORS configuration does not exist.</Message></Error>`)
 						case scenario == "absent" && writes == 0:
 							w.WriteHeader(404)
 							fmt.Fprint(w, `<Error><Code>NoSuchCORSConfiguration</Code></Error>`)
@@ -113,7 +124,7 @@ func TestBrowserSetupPreservesRulesAndHandlesPermissions(t *testing.T) {
 						if err := xml.Unmarshal(data, &document); err != nil {
 							t.Fatal(err)
 						}
-						if scenario != "absent" && !reflect.DeepEqual(document.Rules[0], old) {
+						if scenario != "absent" && scenario != "absent-b2" && !reflect.DeepEqual(document.Rules[0], old) {
 							t.Fatal("foreign rule was changed", string(data))
 						}
 						added := document.Rules[len(document.Rules)-1]
@@ -136,11 +147,17 @@ func TestBrowserSetupPreservesRulesAndHandlesPermissions(t *testing.T) {
 					t.Fatalf("read-only check: %v reads=%d writes=%d", err, reads, writes)
 				}
 				settings, err := m.Update(context.Background(), input)
-				success := scenario == "ready" || scenario == "append" || scenario == "absent" || scenario == "propagating"
+				success := scenario == "ready" || scenario == "append" || scenario == "absent" || scenario == "absent-b2" || scenario == "propagating"
 				if (err == nil) != success {
 					t.Fatalf("save: %v", err)
 				}
 				if success {
+					if scenario != "ready" && (writes != 1 || reads != 2) {
+						t.Fatalf("expected one CORS update and readback, reads=%d writes=%d", reads, writes)
+					}
+					if (scenario == "absent" || scenario == "absent-b2") && len(document.Rules) != 1 {
+						t.Fatal("missing policy must create exactly the Gateway rule", document)
+					}
 					if settings.BrowserUploadsPending != (scenario != "ready") {
 						t.Fatal("propagation status", settings)
 					}
@@ -164,7 +181,7 @@ func TestBrowserSetupPreservesRulesAndHandlesPermissions(t *testing.T) {
 				if (scenario == "network" || scenario == "server" || scenario == "redirect" || scenario == "ready") && (reads != 0 || writes != 0) {
 					t.Fatal("unnecessary CORS administration", reads, writes)
 				}
-				if (scenario == "read-denied" || scenario == "read-missing-bucket") && writes != 0 {
+				if (scenario == "read-denied" || scenario == "read-missing-bucket" || scenario == "read-not-found" || scenario == "read-unknown-404") && writes != 0 {
 					t.Fatal("read failure replaced policy")
 				}
 				if options == 0 {

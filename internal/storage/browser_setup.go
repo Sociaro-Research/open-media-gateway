@@ -45,8 +45,11 @@ func (s *S3) EnsureBrowser(ctx context.Context, origin string) (bool, error) {
 		rules = result.CORSRules
 	} else {
 		var api smithy.APIError
-		if !errors.As(err, &api) || api.ErrorCode() != "NoSuchCORSConfiguration" {
-			return false, fmt.Errorf("%w: Gateway could not read bucket CORS. Allow this key to read and update bucket CORS (%s), then save again. Existing rules were not changed", ErrInvalidConfig, s.corsPermissions())
+		// S3-compatible services use both CORS and Cors in this error code.
+		// Only these explicit missing-policy codes allow creating a new policy;
+		// other 404s (including NoSuchBucket) must never be treated as empty.
+		if !errors.As(err, &api) || (api.ErrorCode() != "NoSuchCORSConfiguration" && api.ErrorCode() != "NoSuchCorsConfiguration") {
+			return false, s.corsError("read", err)
 		}
 	}
 	merged, changed, err := mergeBrowserRule(rules, origin)
@@ -60,13 +63,16 @@ func (s *S3) EnsureBrowser(ctx context.Context, origin string) (bool, error) {
 			o.APIOptions = append(o.APIOptions, corsContentMD5)
 		})
 		if err != nil {
-			return false, fmt.Errorf("%w: Gateway could not update bucket CORS. Allow this key to update bucket CORS (%s), then save again", ErrInvalidConfig, s.corsPermissions())
+			return false, s.corsError("update", err)
 		}
 	}
 	// Verify the persisted document before activating the connection. Do not wait
 	// inside a settings request for the provider's browser-facing caches to expire.
 	verified, err := s.client.GetBucketCors(ctx, &s3.GetBucketCorsInput{Bucket: aws.String(s.config.Bucket)})
-	if err != nil || !sameCORSRules(verified.CORSRules, merged) {
+	if err != nil {
+		return false, s.corsError("verify", err)
+	}
+	if !sameCORSRules(verified.CORSRules, merged) {
 		return false, fmt.Errorf("%w: bucket CORS update could not be confirmed; test the connection and save again", ErrInvalidConfig)
 	}
 	return true, nil
@@ -96,6 +102,40 @@ func sameCORSRules(a, b []types.CORSRule) bool {
 		return out
 	}
 	return reflect.DeepEqual(normalize(a), normalize(b))
+}
+
+// corsError reports only locally defined diagnostics and the HTTP status. SDK
+// errors and provider messages can contain credentials, signed URLs or key IDs.
+func (s *S3) corsError(operation string, err error) error {
+	detail := "check endpoint, region, bucket and network connectivity; the response could not be read"
+	var api smithy.APIError
+	if errors.As(err, &api) {
+		switch api.ErrorCode() {
+		case "AccessDenied":
+			detail = "AccessDenied: check this key's bucket scope and CORS permissions (" + s.corsPermissions() + ")"
+		case "InvalidAccessKeyId", "SignatureDoesNotMatch", "AuthorizationHeaderMalformed", "ExpiredToken", "InvalidToken":
+			detail = api.ErrorCode() + ": check credentials, endpoint and signing region"
+		case "NoSuchBucket":
+			detail = "NoSuchBucket: check the bucket name and endpoint"
+		case "NotImplemented", "NotSupported":
+			detail = api.ErrorCode() + ": this endpoint does not support the requested S3 CORS operation"
+		case "InvalidRequest", "InvalidArgument", "MalformedXML", "BadDigest":
+			detail = api.ErrorCode() + ": the provider rejected the CORS request format"
+		case "InternalError", "ServiceUnavailable", "SlowDown":
+			detail = api.ErrorCode() + ": the storage service is temporarily unavailable; retry later"
+		}
+	}
+	status := ""
+	var response *smithyhttp.ResponseError
+	if errors.As(err, &response) {
+		status = fmt.Sprintf(" (HTTP %d)", response.HTTPStatusCode())
+	}
+	outcome := " Existing rules were not changed."
+	if operation != "read" {
+		// A timeout can happen after the provider persisted the update.
+		outcome = " The update outcome is unconfirmed; test the connection and save again."
+	}
+	return fmt.Errorf("%w: Gateway could not %s bucket CORS%s: %s.%s", ErrInvalidConfig, operation, status, detail, outcome)
 }
 
 func (s *S3) corsPermissions() string {
