@@ -1,4 +1,4 @@
-FROM golang:1.27.2-alpine AS caddy-build
+FROM golang:1.27.3-alpine AS caddy-build
 WORKDIR /src
 # Keep the current Caddy modules/configuration; rebuild with patched Go and HTTP/2.
 RUN go mod init gateway-caddy-build && \

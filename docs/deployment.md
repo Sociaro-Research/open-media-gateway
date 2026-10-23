@@ -174,7 +174,7 @@ services:
 ```
 
 The PostgreSQL image keeps official PostgreSQL 17 and its entrypoint. It rebuilds
-the same gosu 1.19 source commit on Go 1.27.2 with updated x/sys; the upstream
+the same gosu 1.19 source commit on Go 1.27.3 with updated x/sys; the upstream
 helper was built with Go 1.24.6. Both images apply available Alpine patches.
 Build with `docker compose ... build --pull postgres redis` during planned
 security maintenance, scan the resulting images and test disposable initialization,
@@ -201,7 +201,7 @@ your particular zone. Zone-specific authenticated origin pulls, a tunnel or a
 provider firewall remain additional account-dependent protections. Refresh the
 official IP ranges before changing the policy.
 
-The UI image rebuilds Caddy 2.11.7 on Go 1.27.2 with x/net 0.60.0, retaining
+The UI image rebuilds Caddy 2.11.7 on Go 1.27.3 with x/net 0.60.0, retaining
 the upstream command and standard modules. This incorporates the October 8 Go
 security fixes without changing Caddy's version or the separate TLS proxy.
 Database/cache image replacement remains a separate maintenance operation.

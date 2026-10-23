@@ -1,6 +1,6 @@
 module github.com/Sociaro-Research/open-media-gateway
 
-go 1.27.2
+go 1.27.3
 
 require (
 	github.com/alibabacloud-go/bssopenapi-20171214/v6 v6.1.1
