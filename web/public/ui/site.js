@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   let appearance;
-  const systemOnly=document.documentElement.dataset.themeMode==='system';
+  const systemOnly=['system','docs'].includes(document.documentElement.dataset.themeMode);
   let presetPreference='';
   if(!systemOnly){try{presetPreference=localStorage.getItem('gateway-color-preset')||'';}catch{}}
   const colorRoles={'accent-text':'accent','chart-1':'accent','switch-thumb':'on-accent','switch-thumb-on':'on-accent','switch-on-border':'accent'};
@@ -70,9 +70,9 @@
       if(settings.contact_email)n.href='mailto:'+settings.contact_email;else n.removeAttribute('href');
     });
   }
-  const ready=fetch('/site.json',{credentials:'omit'}).then(async r=>{if(!r.ok)throw Error('Site configuration unavailable');const site=await r.json();if(site.branding)apply(site.branding);
+  const ready=fetch('/site.json',{credentials:'omit'}).then(async r=>{if(!r.ok)throw Error('Site configuration unavailable');const site=await r.json();window.GatewayTheme?.configure(site,r.headers.get('X-Gateway-Theme-Cookie-Domain')||'');if(site.branding)apply(site.branding);
     const meta=document.querySelector('meta[name="gateway-url"]');if(meta)meta.content=site.api_url||location.origin;
-    if(site.docs_url&&['/docs','/docs/'].includes(location.pathname)&&site.docs_url!==location.origin)location.replace(site.docs_url+'/');
+    if(site.docs_url&&['/docs','/docs/'].includes(location.pathname)&&site.docs_url!==location.origin)location.replace(window.GatewayTheme?.docsURL(site.docs_url+'/'+location.hash)||site.docs_url+'/'+location.hash);
     document.querySelectorAll('[data-console-link]').forEach(n=>n.href=(site.ui_url||'')+'/');
     return site;
   }).catch(()=>({api_url:location.origin,ui_url:location.origin}));

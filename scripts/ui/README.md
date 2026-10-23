@@ -341,3 +341,14 @@ Checks cover ReportGroup, ReportSummary, the three report endpoint responses,
 keyboard navigation, both themes and 1440/390/320px. No live API is called.
 `UI_EVIDENCE_DIR` selects the screenshots and JSON results directory;
 `UI_DOCS_SCRIPT` can select an archived renderer for a baseline regression.
+
+Run `node scripts/ui/documentation-theme.cjs`, also with
+`UI_BROWSER_ENGINE=webkit`, for same-origin, sibling-domain and unrelated-domain
+theme preferences. Intercepted HTTPS fixtures exercise explicit cookie scope,
+public-suffix rejection, invalid values, blocked storage, direct visits, redirects,
+section hashes, System changes and preference clearing. No external services are
+called. `UI_EVIDENCE_DIR` selects results/screenshots at 1440/390/320px. The existing
+`logout-security.cjs` suite checks successful versus failed sign-out through the
+real console handler, and `separation.cjs` checks the preference header through
+real Caddy while retaining public/private route isolation; both accept the same
+browser-engine setting.

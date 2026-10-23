@@ -612,7 +612,7 @@ async function updateAdminProvider(payload, successMessage, showSaved = false) {
 
 function showConsoleSection(name) {
   const navigation=++consoleNavigation;
-  if(name==='docs'){location.assign('/docs'+(location.hash.startsWith('#docs/')?location.hash:''));return;}
+  if(name==='docs'){location.assign(GatewayTheme.docsURL('/docs'+(location.hash.startsWith('#docs/')?location.hash:'')));return;}
   window.Workspace?.restore();
   if(name!=='system')window.GatewaySystem?.close();
   let page={keys:'API keys',reports:'Billing',providers:'Providers',storage:'Storage'}[name];
@@ -983,6 +983,7 @@ elements.logout.addEventListener('click', async () => {
 		const response = await fetch('/auth/logout', {method: 'POST', credentials: 'same-origin'});
 		if (!response.ok) throw new Error('Sign out could not be completed. Please try again.');
 		window.GenerationKey.signOut();
+		window.GatewayTheme.clear();
 		window.location.reload();
 	} catch (error) {
 		FormUI.message(elements.sessionMessage, error.message || 'Sign out could not be completed. Please try again.', 'error');

@@ -1,5 +1,6 @@
 // Verify real Caddy routing and the independently served UI against an isolated API fixture.
-const {chromium,webkit}=require('playwright');
+const engine=process.env.UI_BROWSER_ENGINE||'chromium';
+const {[engine]:chromium}=require('playwright');
 const assert=require('node:assert/strict'),http=require('node:http'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),{spawn}=require('node:child_process');
 const root=path.resolve(__dirname,'../..'),tmp=fs.mkdtempSync(path.join(os.tmpdir(),'gateway-ui-routing-'));
 const listen=server=>new Promise(resolve=>server.listen(0,'127.0.0.1',()=>resolve(server.address().port)));
@@ -23,11 +24,12 @@ const upstream=http.createServer((req,res)=>{
 });
 (async()=>{
  const apiPort=await listen(upstream),reservation=http.createServer(),port=await listen(reservation);await new Promise(r=>reservation.close(r));
- const env={...process.env,UI_ROOT:path.join(root,'web/public'),GATEWAY_UPSTREAM:'127.0.0.1:'+apiPort,UI_LISTEN:':'+port,DOCS_HOST:'localhost'};
+ const env={...process.env,UI_ROOT:path.join(root,'web/public'),GATEWAY_UPSTREAM:'127.0.0.1:'+apiPort,UI_LISTEN:':'+port,DOCS_HOST:'localhost',THEME_COOKIE_DOMAIN:'example.test'};
  const log=fs.openSync(path.join(tmp,'caddy.log'),'w');
  caddy=spawn(process.env.CADDY_BIN||'caddy',['run','--config',process.env.CADDY_CONFIG||path.join(root,'web/Caddyfile'),'--adapter','caddyfile'],{env,stdio:['ignore',log,log]});fs.closeSync(log);
  const base='http://127.0.0.1:'+port;
  let ready=false;for(let i=0;i<100;i++){try{const r=await fetch(base+'/ui/site.js');if(r.status===200){ready=true;break}}catch{}if(caddy.exitCode!==null)throw Error(fs.readFileSync(path.join(tmp,'caddy.log'),'utf8'));await delay(100)}assert.ok(ready,'Caddy did not start');
+ const siteResponse=await fetch(base+'/site.json');assert.equal(siteResponse.headers.get('X-Gateway-Theme-Cookie-Domain'),'example.test');
  const request=(p,code,headers={},method='GET')=>new Promise((resolve,reject)=>{
   const req=http.request(base+p,{headers,method},res=>{let body='';res.on('data',chunk=>body+=chunk);res.on('end',()=>{try{assert.equal(res.statusCode,code,p);resolve({text:async()=>body,headers:{get:name=>res.headers[name.toLowerCase()]}})}catch(error){reject(error)}})});req.on('error',reject);req.end();
  });

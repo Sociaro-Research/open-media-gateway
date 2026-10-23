@@ -116,6 +116,7 @@ services:
       GATEWAY_UPSTREAM: gateway:8080
       GRAFANA_UPSTREAM: grafana:3000
       DOCS_HOST: ${DOCS_HOST:-docs.invalid}
+      THEME_COOKIE_DOMAIN: ${THEME_COOKIE_DOMAIN:-}
     networks: [default, monitoring-ui]
     depends_on:
       gateway:

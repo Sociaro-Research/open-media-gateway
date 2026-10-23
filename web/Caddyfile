@@ -34,6 +34,8 @@
 		Referrer-Policy no-referrer
 		Cache-Control no-store
 	}
+	@themeConfiguration path /site.json
+	header @themeConfiguration X-Gateway-Theme-Cookie-Domain "{$THEME_COOKIE_DOMAIN:}"
 	# Grafana supplies its own nonce-based policy. Keep the console policy intact.
 	@consolePolicy not path /monitoring /monitoring/*
 	header @consolePolicy Content-Security-Policy "default-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self' https:; img-src 'self' data: blob: https:; media-src 'self' blob: https:; worker-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"

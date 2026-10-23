@@ -4,7 +4,7 @@
   const fields=new Map(),pending=new Set();
   const node=(tag,text,cls)=>{const e=document.createElement(tag);if(text!=null)e.textContent=text;if(cls)e.className=cls;return e;};
   function identify(value){
-    user=value.id?{...value}:{...user,...value};UserUI.remember(user);GatewayTheme.apply(user.theme||'system');window.GatewaySite?.selectPreset(user.color_preset||'');
+    user=value.id?{...value}:{...user,...value};UserUI.remember(user);GatewayTheme.apply(user.theme||'system',{share:true});window.GatewaySite?.selectPreset(user.color_preset||'');
     document.querySelector('#userName').textContent=user.name||user.email;
     document.querySelector('#userInitials').textContent=(user.name||user.email||'?').trim().split(/\s+/).map(p=>Array.from(p)[0]).slice(0,2).join('').toUpperCase();
   }
