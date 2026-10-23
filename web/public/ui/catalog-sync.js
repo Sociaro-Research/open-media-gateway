@@ -3,6 +3,11 @@
  const el=(tag,text,cls)=>{const n=document.createElement(tag);if(text!=null)n.textContent=text;if(cls)n.className=cls;return n;};
  const button=(text,fn)=>{const b=el('button',text,'secondary');b.type='button';b.onclick=fn;return b;};
  const time=v=>v?new Date(v).toLocaleString():'—';
+ const emailStatuses=new Map([
+  ['not_needed','Not required'],['pending','Awaiting delivery'],['sent','Sent'],
+  ['retry','Retry scheduled'],['failed','Delivery failed'],['disabled','No recipient configured']
+ ]);
+ const emailStatus=value=>emailStatuses.get(value)??(value==null||value===''?'Not available':`Unknown status: ${value}`);
  const parsers=['document','manifest-v1','byteplus-releases','byteplus-models','byteplus-pricing','alibaba-releases','alibaba-pricing','alibaba-retirements','alibaba-image-models','openai-pricing','openai-model'];
  const field=(label,input)=>{const wrap=el('label',label);input.setAttribute('aria-label',label);wrap.append(input);return wrap;};
  function table(headers,rows){const wrap=el('div',null,'system-table-wrap'),t=el('table',null,'docs-table'),head=el('thead'),tr=el('tr'),body=el('tbody');headers.forEach(h=>{const th=el('th',h);th.scope='col';tr.append(th)});head.append(tr);rows.forEach(row=>{const tr=el('tr');row.forEach((value,index)=>{const td=el('td'),node=value instanceof Node?value:document.createTextNode(String(value??'—'));if(headers[index]===''&&node instanceof HTMLButtonElement){const actions=el('div',null,'table-row-actions');actions.append(node);td.append(actions)}else td.append(node);tr.append(td)});body.append(tr)});t.append(head,body);wrap.append(t);return wrap;}
@@ -34,7 +39,7 @@
    if(mode.value!=='runs'&&!select.value){list.replaceChildren(el('p','Choose a provider to view warnings or versions.'));pagination.replaceChildren();last={};FormUI.message(status,'');return}
    const path=mode.value==='runs'?'/v1/system/catalog/runs?'+new URLSearchParams({provider:select.value,offset}):'/v1/system/catalog/providers/'+encodeURIComponent(select.value)+(mode.value==='versions'?'/versions?offset='+offset:'');const data=await api(path);if(!current()||request!==seq)return;last=data;download.disabled=false;
    let rows,headers;
-   if(mode.value==='runs'){headers=['Checked','Provider','Result','Version','Changes','Open warnings','Email',''];rows=data.data.map(run=>[time(run.completed_at),run.provider,run.status,run.version,run.changes.length,run.open_warnings.length,run.email_status,button('Details',()=>detail(run,'Catalogue check',api))]);}
+   if(mode.value==='runs'){headers=['Checked','Provider','Result','Version','Changes','Open warnings','Email',''];rows=data.data.map(run=>[time(run.completed_at),run.provider,run.status,run.version,run.changes.length,run.open_warnings.length,emailStatus(run.email_status),button('Details',()=>detail(run,'Catalogue check',api))]);}
    else if(mode.value==='warnings'){headers=['Model / source','Issue','First seen','Last seen','Checks',''];rows=data.warnings.map(w=>{const issue=el('span',w.reason,'report-warning');return [w.model||w.source,issue,time(w.first_seen),time(w.last_seen),w.occurrences,button('Details',()=>detail(w,'Open warning',api))]});}
    else{headers=['Version','Models',''];rows=data.data.map(v=>[v.version,Object.keys(v.models).length,button('Details',()=>detail(v,'Catalogue version '+v.version,api))]);}
    list.replaceChildren(rows.length?table(headers,rows):el('p','No records yet.'));FormUI.message(status,'');const previous=button('Previous',()=>{offset-=50;load()}),next=button('Next',()=>{offset+=50;load()});previous.disabled=offset===0;next.disabled=!data.has_more;pagination.replaceChildren(...(mode.value==='warnings'?[]:[previous,el('span','Page '+(offset/50+1)),next]));

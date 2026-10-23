@@ -1,15 +1,17 @@
 const {evidencePath} = require('./evidence.cjs');
 // Catalogue administration uses real UI files and isolated HTTP fixtures.
-const {chromium}=require('playwright');
+const {chromium,webkit}=require('playwright');
+const engine=process.env.UI_BROWSER_ENGINE||'chromium';
+if(!['chromium','webkit'].includes(engine))throw new Error('Unsupported browser engine: '+engine);
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const root=path.resolve(__dirname,'../../web/public/ui'),out=evidencePath('/tmp/gateway-catalog-ui');fs.mkdirSync(out,{recursive:true});
 const server=http.createServer((req,res)=>{const name=path.basename(req.url.split('?')[0]),file=path.join(root,name.includes('.')?name:'index.html');if(!fs.existsSync(file))return res.writeHead(404).end();res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html');res.end(fs.readFileSync(file));});
 (async()=>{
  await new Promise(r=>server.listen(0,'127.0.0.1',r));
- const browser=await chromium.launch({headless:true,...(process.env.UI_BROWSER_PATH?{executablePath:process.env.UI_BROWSER_PATH}:{})});
+ const browser=await ({chromium,webkit}[engine]).launch({headless:true,...(process.env.UI_BROWSER_PATH&&engine==='chromium'?{executablePath:process.env.UI_BROWSER_PATH}:{})});
  const page=await browser.newPage({viewport:{width:1440,height:1100}});page.setDefaultTimeout(8000);
  const errors=[],writes=[],date='2026-10-09T03:15:00Z',hash='a'.repeat(64),previousHash='b'.repeat(64);
- let conflict=false,empty=false,settings={timezone:'UTC',email:'',version:1},schedule={provider:'bytedance',enabled:true,time:'03:15',version:1,sources:[{id:'pricing',url:'https://docs.example.test/prices',parser:'byteplus-pricing'}],last_check:date,next_check:'2026-10-10T03:15:00Z'};
+ let conflict=false,empty=false,emailRuns=null,runsError=false,settings={timezone:'UTC',email:'',version:1},schedule={provider:'bytedance',enabled:true,time:'03:15',version:1,sources:[{id:'pricing',url:'https://docs.example.test/prices',parser:'byteplus-pricing'}],last_check:date,next_check:'2026-10-10T03:15:00Z'};
  const model={id:'dreamina-seedance-2-5-260628',display_name:'Seedance 2.5',media_type:'video',resolutions:['480p','720p'],ratios:['16:9'],min_duration:4,max_duration:15,default_duration:5};
  const provider={id:'bytedance',api_type:'bytedance',name:'BytePlus ModelArk',configured:true,credentials_configured:true,enabled:true,status:'connected',models:[model],model_count:1,fields:[{key:'api_key',label:'API key',secret:true,required:true}],values:{base_url:'https://ark.ap-southeast.bytepluses.com/api/v3'},hints:{api_key:'************'}};
  const warning={key:'old',model:model.id,source:'pricing',reason:'Capabilities require adapter review <script>unsafe()</script>',first_seen:date,last_seen:date,occurrences:4,evidence:{hash,previous_hash:previousHash}};
@@ -27,7 +29,8 @@ const server=http.createServer((req,res)=>{const name=path.basename(req.url.spli
   if(p==='/v1/system/catalog/schedules')return json({data:[schedule]});
   if(p==='/v1/system/catalog/schedules/bytedance/check'){writes.push({queued:true});return json({queued:true});}
   if(p==='/v1/system/catalog/schedules/bytedance'){const body=req.postDataJSON();writes.push(body);schedule={...body,version:schedule.version+1};return json(schedule);}
-  if(p==='/v1/system/catalog/runs')return json({data:empty?[]:[run],has_more:url.searchParams.get('offset')==='0'});
+  if(p==='/v1/system/catalog/runs'&&runsError)return route.fulfill({status:503,json:{error:{message:'Catalogue journal unavailable.'}}});
+  if(p==='/v1/system/catalog/runs')return json({data:empty?[]:(emailRuns||[run]),has_more:url.searchParams.get('offset')==='0'});
   if(p==='/v1/system/catalog/providers/bytedance')return json(state);
   if(p==='/v1/system/catalog/providers/bytedance/versions')return json({data:[state],has_more:false});
   if(p.startsWith('/v1/system/catalog/documents/'))return json({hash:p.split('/').at(-1),text:'Published source <script>unsafe()</script> '+hash});
@@ -37,7 +40,7 @@ const server=http.createServer((req,res)=>{const name=path.basename(req.url.spli
   return json({data:[]});
  });
  const base='http://127.0.0.1:'+server.address().port;
- async function screenshots(name){for(const width of [1440,390,320]){await page.setViewportSize({width,height:1000});for(const theme of ['dark','light']){await page.evaluate(t=>document.documentElement.dataset.theme=t,theme);await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));await page.screenshot({path:`${out}/${name}-${width}-${theme}.png`,fullPage:true});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),`${name} overflows at ${width}px ${theme}: `+JSON.stringify(await page.evaluate(()=>[...document.querySelectorAll('body *')].filter(e=>e.getBoundingClientRect().right>innerWidth+1&&e.getBoundingClientRect().width).map(e=>({tag:e.tagName,cls:e.className,width:e.getBoundingClientRect().width})).slice(0,20))));}}}
+ async function screenshots(name){for(const width of [1440,390,320]){await page.setViewportSize({width,height:1000});for(const theme of ['dark','light']){await page.evaluate(t=>document.documentElement.dataset.theme=t,theme);await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));if(name==='email-statuses')await page.locator('#systemContent tbody tr td:nth-child(7)').first().scrollIntoViewIfNeeded();await page.screenshot({path:`${out}/${name}-${width}-${theme}.png`,fullPage:true});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),`${name} overflows at ${width}px ${theme}: `+JSON.stringify(await page.evaluate(()=>[...document.querySelectorAll('body *')].filter(e=>e.getBoundingClientRect().right>innerWidth+1&&e.getBoundingClientRect().width).map(e=>({tag:e.tagName,cls:e.className,width:e.getBoundingClientRect().width})).slice(0,20))));}}}
  try{
   await page.goto(base+'/system');await page.getByRole('tab',{name:'Model catalogue',exact:true}).click();
   const form=page.locator('.catalog-sync-settings');await form.getByLabel('Report email',{exact:true}).waitFor();
@@ -64,6 +67,31 @@ const server=http.createServer((req,res)=>{const name=path.basename(req.url.spli
   await catalogNav.click();await journalOnly();
   // Reopening with the keyboard must not append a second journal.
   await catalogNav.focus();await page.keyboard.press('Enter');await journalOnly();
+  // Exercise the actual Email column; details and exports must retain the API enum.
+  const emailCases=[
+   ['not_needed','Not required'],['pending','Awaiting delivery'],['sent','Sent'],
+   ['retry','Retry scheduled'],['failed','Delivery failed'],['disabled','No recipient configured'],
+   ['future_status','Unknown status: future_status'],['__proto__','Unknown status: __proto__'],
+   ['<img src=x onerror="window.emailStatusInjected=true">','Unknown status: <img src=x onerror="window.emailStatusInjected=true">'],
+   ['', 'Not available'],[null,'Not available'],[undefined,'Not available']
+  ];
+  emailRuns=emailCases.map(([email_status],i)=>({...run,id:'email-'+i,email_status}));
+  await content.getByRole('button',{name:'Refresh',exact:true}).click();
+  const emailCells=content.locator('tbody tr td:nth-child(7)');
+  await page.waitForFunction(count=>document.querySelectorAll('#systemContent tbody tr').length===count,emailCases.length);
+  assert.deepEqual(await emailCells.allTextContents(),emailCases.map(([,label])=>label));
+  assert.equal(await content.locator('tbody img, tbody script').count(),0);
+  assert.equal(await page.evaluate(()=>window.emailStatusInjected),undefined);
+  assert.deepEqual(await content.locator('tbody tr td:nth-child(3)').allTextContents(),emailCases.map(()=>run.status));
+  const exported=page.waitForEvent('download');await content.getByRole('button',{name:'Export report',exact:true}).click();
+  assert.deepEqual(JSON.parse(fs.readFileSync(await (await exported).path(),'utf8')).data,JSON.parse(JSON.stringify(emailRuns)));
+  await content.getByRole('button',{name:'Details',exact:true}).first().focus();await page.keyboard.press('Enter');
+  await page.locator('dialog[open]').waitFor();assert.equal(JSON.parse(await page.locator('dialog[open] pre').textContent()).email_status,'not_needed');
+  await page.keyboard.press('Escape');await page.locator('dialog[open]').waitFor({state:'hidden'});
+  await screenshots('email-statuses');await page.setViewportSize({width:1440,height:1100});
+  runsError=true;await content.getByRole('button',{name:'Refresh',exact:true}).click();await content.getByText('Catalogue journal unavailable.',{exact:true}).waitFor();
+  runsError=false;emailRuns=null;await content.getByRole('button',{name:'Refresh',exact:true}).click();
+  await page.waitForFunction(()=>document.querySelectorAll('#systemContent tbody tr').length===1);
   await screenshots('journal');await page.setViewportSize({width:1440,height:1100});
   await page.locator('[data-system-page=administrators]').click();await content.getByRole('heading',{name:'Users',exact:true}).waitFor();await catalogNav.click();await journalOnly();
   await page.locator('[data-system-page=sharedProviders]').click();await page.locator('[data-provider-id=bytedance]').click();
@@ -83,6 +111,10 @@ const server=http.createServer((req,res)=>{const name=path.basename(req.url.spli
   await screenshots('warnings');await page.setViewportSize({width:1440,height:1100});
   await content.locator('select[aria-label=View]').selectOption('versions',{force:true});await content.locator('tbody tr').first().hover();await content.getByRole('button',{name:'Details',exact:true}).click();await page.getByRole('heading',{name:'Catalogue version 2'}).waitFor();await page.keyboard.press('Escape');
   empty=true;await content.locator('select[aria-label=View]').selectOption('runs',{force:true});await content.getByText('No records yet.',{exact:true}).waitFor();
-  assert.deepEqual(errors,[]);console.log('PASS: common timezone/email CAS, provider time and source edits, queued checks, history/warnings/versions, safe evidence/snapshots, JSON export, keyboard/Escape, both themes at 1440/390/320px.');
+  // WebKit also emits this layout diagnostic on the unmodified catalogue suite.
+  // Report it explicitly; every other page error still fails this regression.
+  const layoutWarnings=engine==='webkit'?errors.filter(message=>message==='ResizeObserver loop completed with undelivered notifications.'):[];
+  if(layoutWarnings.length)console.warn('KNOWN BASELINE WebKit layout diagnostics: '+layoutWarnings.length);
+  assert.deepEqual(errors.filter(message=>!layoutWarnings.includes(message)),[]);console.log('PASS ('+engine+'): readable email states and safe unknown/missing values, raw details/exports, common timezone/email CAS, provider time and source edits, queued checks, history/warnings/versions, safe evidence/snapshots, JSON export, keyboard/Escape, both themes at 1440/390/320px.');
  }finally{await browser.close();server.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;server.close();});

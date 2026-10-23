@@ -198,7 +198,9 @@ Run `node scripts/ui/catalog-sync.cjs` for common catalogue timezone/email setti
 offset-first grouped timezone labels, complete whole/fractional offsets,
 preservation of existing IANA identifiers across unrelated saves,
 provider schedules and sources, safe check/warning/version details, source
-snapshots, JSON export, keyboard/Escape and both themes at 1440/390/320px.
+snapshots, readable email states (including unknown/missing values), unchanged
+JSON details/export, keyboard/Escape and both themes at 1440/390/320px.
+Set `UI_BROWSER_ENGINE=webkit` to run the same checks in WebKit.
 It serves local UI files against isolated API fixtures, sends no email and makes
 no provider request. Screenshots are written to `/tmp/gateway-catalog-ui`.
 
