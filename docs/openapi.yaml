@@ -7554,7 +7554,7 @@ components:
         requires the same Gateway API key. No progress percentage is invented. Managers receive
         operational metadata only, with content_access false and without prompt, input, output links or provider errors.
       properties:
-        timeout_seconds: {type: integer, format: int64, description: Explicit generation HTTP timeout override, when supplied.}
+        timeout_seconds: {type: integer, format: int64, description: "Explicit generation HTTP timeout override, when supplied."}
         content_access: {type: boolean, description: Whether this viewer can inspect retained content.}
         can_delete: {type: boolean, description: Whether this viewer may delete stored result files.}
         user_id: {type: string, description: "Request recipient account, including in redacted metadata."}
