@@ -362,3 +362,9 @@ five distinct labels, numeric accuracy, unchanged bar geometry and tooltip
 amounts, keyboard tooltips, both themes and 1440/390/320px layouts.
 `UI_SOURCE_DIR` selects a baseline UI tree; `UI_EVIDENCE_DIR` selects the
 screenshots and JSON results directory. No live API or paid provider is used.
+
+Run `node scripts/ui/mock-audio.cjs` (also with `UI_BROWSER_ENGINE=webkit`) to
+decode and play the fixed MP3 returned by Mock Speech and Mock Music. It checks
+MIME type, size, duration, stereo PCM signal and playback to completion using only
+a local HTTP fixture. This does not call a provider or test physical speakers.
+JSON evidence is written through the shared evidence directory helper.
