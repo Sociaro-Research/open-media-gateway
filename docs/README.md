@@ -1,14 +1,14 @@
 # Documentation
 
-Start with [Quick start](../README.md#quick-start) for local or HTTPS installation.
+Start with [Quick Start](../README.md#quick-start) for a local release installation.
 Use the README bundled with your chosen release; installation files and images
-must come from the same version.
+must come from the same version. For HTTPS, other installation modes, updates,
+and troubleshooting, see the [installation guide](../deploy/ghcr/README.md).
 
 ## Use and operate Gateway
 
 - [Windows installation with Docker Desktop and WSL 2](windows-wsl.md)
-
-- [Configuration](configuration.md), [release installation and publishing](ghcr-release.md),
+- [Configuration](configuration.md), [release installation](../deploy/ghcr/README.md),
   [deployment and rollback](deployment.md), [GitHub Actions deployment](github-actions-deployment.md)
 - [First owner and administration](system-administration.md), [email authentication](email-authentication.md)
 - [Organizations and membership](organizations.md), [shared resources](shared-resources.md),
@@ -22,6 +22,7 @@ must come from the same version.
 
 ## Integrate with the API
 
+- [First API generation: create, poll, and download](api-quickstart.md)
 - [Asynchronous media API](openai-api.md) and [OpenAPI specification](openapi.yaml)
 - [Request limits](request-limits.md), [cost accounting](cost-accounting.md), [webhooks](webhooks.md)
 - Your running installation serves its reference at `/docs` and its specification
@@ -29,13 +30,14 @@ must come from the same version.
 
 ## Develop and verify
 
-- [Contributing](../CONTRIBUTING.md), [architecture](architecture.md),
+- [Source setup and development](development.md), [contributing](../CONTRIBUTING.md), [architecture](architecture.md),
   [frontend/headless operation](frontend-separation.md), [concurrent workers](concurrent-workers.md)
 - [Provider module contract](provider-modules.md), [provider development](provider-development.md),
   [UI design system](design-system.md)
 - [Testing](testing.md), [browser fixtures](../scripts/ui/README.md),
   [reliability/performance](performance-testing.md), [security checks](security-testing.md)
 - [Security policy](../SECURITY.md), [public release checklist](open-source-release-checklist.md)
+- [Maintainer release guide](ghcr-release.md)
 
 Store run logs, screenshots, review notes and dated investigation records in
 ignored `dist/` or `.local/`, or CI artifacts. Public documentation describes

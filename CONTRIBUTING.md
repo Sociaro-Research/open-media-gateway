@@ -17,7 +17,7 @@ contributors from investing in a direction the maintainers cannot merge.
 ## Local setup
 
 For the console and free mock provider, follow the canonical
-[README source Quick start](README.md#quick-start). It includes Docker Compose's
+[source setup guide](docs/development.md#source-setup). It includes Docker Compose's
 `ui` profile, first-owner setup, independent secrets and local browser origins.
 For an API-only development environment, use [headless operation](docs/frontend-separation.md).
 
