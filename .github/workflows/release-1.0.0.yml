@@ -32,13 +32,13 @@ jobs:
       RELEASE_ARCH: ${{ matrix.arch }}
       REGISTRY_ROOT: ghcr.io/sociaro-research/open-media-gateway
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
           ref: v1.0.0
       - name: Verify immutable release source
         run: test "$(git rev-parse HEAD)" = 99e4290496ae370f4e7df45b9bb54855d8f8403b
-      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Build all installation images on native hardware
         run: |
           mkdir -p release-evidence
@@ -62,7 +62,7 @@ jobs:
           python3 scripts/verify-release.py --version "$RELEASE_VERSION" \
             --gateway gateway-gateway:release-test --ui gateway-ui:release-test \
             --postgres gateway-postgres:release-test --redis gateway-redis:release-test
-      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -75,7 +75,7 @@ jobs:
             docker push "$candidate"
             docker inspect --format '{{index .RepoDigests 0}}' "$candidate" > "release-evidence/$name-$RELEASE_ARCH.digest"
           done
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: release-${{ matrix.arch }}
           path: release-evidence
@@ -93,19 +93,19 @@ jobs:
       REGISTRY_ROOT: ghcr.io/sociaro-research/open-media-gateway
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
           ref: v1.0.0
       - name: Verify immutable release source
         run: test "$(git rev-parse HEAD)" = 99e4290496ae370f4e7df45b9bb54855d8f8403b
-      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
-      - uses: actions/download-artifact@v4
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: actions/download-artifact@v8
         with:
           pattern: release-*
           merge-multiple: true
           path: release-evidence
-      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
