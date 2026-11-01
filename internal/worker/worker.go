@@ -3,6 +3,10 @@ package worker
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io"
+	"math"
+	"strconv"
 	"strings"
 	"time"
 
@@ -118,6 +122,9 @@ func (w *Worker) process(ctx context.Context, id string) error {
 		if err := w.storeUsage(ctx, provider, task, providerTask.Usage); err != nil {
 			return err
 		}
+		if len(providerTask.Artifacts) > 0 {
+			return w.archiveArtifacts(ctx, ctx, provider, task, providerTask.ResultURL, providerTask.LastFrameURL, providerTask.Artifacts)
+		}
 		if providerTask.ResultURL != "" {
 			return w.archiveResult(ctx, ctx, task, providerTask.ResultURL, providerTask.LastFrameURL)
 		}
@@ -157,6 +164,9 @@ func (w *Worker) process(ctx context.Context, id string) error {
 	}
 	switch result.Status {
 	case core.ProviderSucceeded:
+		if len(result.Artifacts) > 0 {
+			return w.archiveArtifacts(ctx, taskCtx, provider, task, result.ResultURL, result.LastFrameURL, result.Artifacts)
+		}
 		if strings.TrimSpace(result.ResultURL) == "" {
 			return w.repo.MarkFailed(ctx, id, "provider completed without a media URL")
 		}
@@ -243,6 +253,52 @@ func usageMetric(metrics []core.UsageMetric, name string) float64 {
 }
 
 func (w *Worker) archiveResult(ctx, archiveCtx context.Context, task core.Task, resultURL, lastFrameURL string) error {
+	return w.archiveResults(ctx, archiveCtx, task, resultURL, lastFrameURL, nil, nil)
+}
+
+func (w *Worker) archiveArtifacts(ctx, archiveCtx context.Context, provider core.MediaProvider, task core.Task, resultURL, lastFrameURL string, artifacts []core.ProviderArtifact) error {
+	if len(artifacts) == 0 || len(artifacts) > 64 {
+		return w.repo.MarkFailed(ctx, task.ID, "provider returned an invalid artifact count")
+	}
+	for _, a := range artifacts {
+		if a.MediaType != "image" && a.MediaType != "video" && a.MediaType != "audio" && a.MediaType != "speech" && a.MediaType != "music" && a.MediaType != "text" && a.MediaType != "json" {
+			return w.repo.MarkFailed(ctx, task.ID, "provider returned an unknown artifact media type")
+		}
+		sources := 0
+		for _, value := range []string{a.URL, a.SourceReference, a.Text} {
+			if value != "" {
+				sources++
+			}
+		}
+		if sources != 1 || (a.Text != "" && a.MediaType != "text" && a.MediaType != "json") || len(a.ID) > 1024 || len(a.GroupID) > 256 || len(a.Format) > 64 || a.Duration < 0 || math.IsNaN(a.Duration) || math.IsInf(a.Duration, 0) {
+			return w.repo.MarkFailed(ctx, task.ID, "provider returned malformed artifact metadata")
+		}
+	}
+	if resultURL != "" && resultURL != artifacts[0].URL {
+		return w.repo.MarkFailed(ctx, task.ID, "provider primary artifact does not match its scalar result")
+	}
+	return w.archiveResults(ctx, archiveCtx, task, artifacts[0].URL, lastFrameURL, append([]core.ProviderArtifact(nil), artifacts...), provider)
+}
+
+func artifactMatchesMedia(a core.ProviderArtifact, m core.StoredMedia) bool {
+	kind := a.MediaType
+	if kind == "json" {
+		return m.ContentType == "application/json"
+	}
+	if kind == "text" {
+		return strings.SplitN(m.ContentType, ";", 2)[0] == "text/plain"
+	}
+	if kind == "speech" || kind == "music" {
+		kind = "audio"
+	}
+	return strings.HasPrefix(m.ContentType, kind+"/")
+}
+
+func storedArtifact(a core.ProviderArtifact, m core.StoredMedia, index int) core.StoredArtifact {
+	return core.StoredArtifact{ID: strconv.Itoa(index + 1), ProviderID: a.ID, MediaType: a.MediaType, Format: a.Format, Duration: a.Duration, GroupID: a.GroupID, StorageKey: m.StorageKey, ContentType: m.ContentType, SizeBytes: m.SizeBytes, SHA256: m.SHA256}
+}
+
+func (w *Worker) archiveResults(ctx, archiveCtx context.Context, task core.Task, resultURL, lastFrameURL string, artifacts []core.ProviderArtifact, provider core.MediaProvider) error {
 	if w.archiveSlots != nil {
 		select {
 		case w.archiveSlots <- struct{}{}:
@@ -282,6 +338,9 @@ func (w *Worker) archiveResult(ctx, archiveCtx context.Context, task core.Task, 
 	var media core.StoredMedia
 	var archiveErr error
 	if task.Options.OverrideSoundID != "" {
+		if len(artifacts) > 0 && artifacts[0].URL == "" {
+			return w.repo.MarkFailed(ctx, task.ID, "Override Sound requires an archived media URL")
+		}
 		processor, ok := w.storage.(interface {
 			ArchiveOverride(context.Context, storage.Store, string, string, core.SoundOverride) (core.StoredMedia, error)
 		})
@@ -291,13 +350,51 @@ func (w *Worker) archiveResult(ctx, archiveCtx context.Context, task core.Task, 
 		}
 		media, archiveErr = processor.ArchiveOverride(archiveCtx, target, archiveID, resultURL, *task.Options.OverrideSound)
 	} else {
-		media, archiveErr = destination.Archive(archiveCtx, archiveID, resultURL)
+		if len(artifacts) > 0 {
+			media, archiveErr = archiveProviderArtifact(archiveCtx, destination, provider, archiveID, artifacts[0])
+		} else {
+			media, archiveErr = destination.Archive(archiveCtx, archiveID, resultURL)
+		}
 	}
 	if archiveErr != nil {
 		if archiveCtx.Err() != nil && ctx.Err() != nil {
 			return ctx.Err()
 		}
 		return w.repo.MarkFailed(context.WithoutCancel(ctx), task.ID, "store provider result: "+archiveErr.Error())
+	}
+
+	if len(artifacts) > 0 {
+		if !artifactMatchesMedia(artifacts[0], media) {
+			return w.repo.MarkFailed(ctx, task.ID, "stored primary artifact does not match its declared media type")
+		}
+		media.Artifacts = []core.StoredArtifact{storedArtifact(artifacts[0], media, 0)}
+		for i, a := range artifacts[1:] {
+			artifactID := archiveID + "/artifacts/" + strconv.Itoa(i+2)
+			var item core.StoredMedia
+			var err error
+			if task.Options.OverrideSoundID != "" && a.MediaType == "video" {
+				processor, ok := w.storage.(interface {
+					ArchiveOverride(context.Context, storage.Store, string, string, core.SoundOverride) (core.StoredMedia, error)
+				})
+				target, targetOK := destination.(storage.Store)
+				if !ok || !targetOK || task.Options.OverrideSound == nil {
+					return w.repo.MarkFailed(ctx, task.ID, "Override Sound processing is not available")
+				}
+				item, err = processor.ArchiveOverride(archiveCtx, target, artifactID, a.URL, *task.Options.OverrideSound)
+			} else {
+				item, err = archiveProviderArtifact(archiveCtx, destination, provider, artifactID, a)
+			}
+			if err != nil {
+				if ctx.Err() != nil {
+					return ctx.Err()
+				}
+				return w.repo.MarkFailed(context.WithoutCancel(ctx), task.ID, fmt.Sprintf("store provider artifact %d: %s", i+2, err.Error()))
+			}
+			if !artifactMatchesMedia(a, item) {
+				return w.repo.MarkFailed(ctx, task.ID, "stored artifact does not match its declared media type")
+			}
+			media.Artifacts = append(media.Artifacts, storedArtifact(a, item, i+1))
+		}
 	}
 	if lastFrameURL != "" {
 		frame, err := destination.Archive(archiveCtx, archiveID+"/last-frame", lastFrameURL)
@@ -323,4 +420,40 @@ func storageSourceForDiagnostics(resultURL string) string {
 func failureIsFree(p core.MediaProvider) bool {
 	v, ok := p.(interface{ FailureIsFree() bool })
 	return ok && v.FailureIsFree()
+}
+
+// Only the resolved adapter can turn an opaque authenticated reference into bytes.
+// Client request URLs never enter this path and the ordinary HTTP policy stays intact.
+func archiveProviderArtifact(ctx context.Context, destination ResultStorage, provider core.MediaProvider, id string, a core.ProviderArtifact) (core.StoredMedia, error) {
+	if a.URL != "" {
+		return destination.Archive(ctx, id, a.URL)
+	}
+	archiver, ok := destination.(interface {
+		ArchiveSource(context.Context, string, core.ArtifactSource) (core.StoredMedia, error)
+	})
+	if !ok {
+		return core.StoredMedia{}, errors.New("trusted artifact streams are not supported by result storage")
+	}
+	var source core.ArtifactSource
+	if a.SourceReference != "" {
+		opener, ok := provider.(core.ArtifactOpener)
+		if !ok {
+			return core.StoredMedia{}, errors.New("provider does not support authenticated artifacts")
+		}
+		var err error
+		source, err = opener.OpenArtifact(ctx, a.SourceReference)
+		if err != nil {
+			if source.Reader != nil {
+				_ = source.Reader.Close()
+			}
+			return core.StoredMedia{}, errors.New("provider artifact could not be opened")
+		}
+	} else {
+		kind := "text/plain"
+		if a.MediaType == "json" {
+			kind = "application/json"
+		}
+		source = core.ArtifactSource{Reader: io.NopCloser(strings.NewReader(a.Text)), ContentType: kind, SizeBytes: int64(len(a.Text))}
+	}
+	return archiver.ArchiveSource(ctx, id, source)
 }

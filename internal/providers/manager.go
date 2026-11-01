@@ -777,10 +777,18 @@ func (p *managedProvider) ListModels(ctx context.Context) ([]core.MediaModel, er
 }
 
 func (p *managedProvider) Generate(ctx context.Context, request core.MediaRequest) (core.ProviderTask, error) {
-	adapter, err := p.manager.resolve(ctx, p.id, request.ProviderIdentity == "", request.ProviderIdentity)
+	expected := request.ProviderIdentity
+	if pinned := core.ProviderRevision(ctx); pinned != "" {
+		if expected != "" && expected != pinned {
+			return core.ProviderTask{}, core.ErrProviderChanged
+		}
+		expected = pinned
+	}
+	adapter, err := p.manager.resolve(ctx, p.id, expected == "", expected)
 	if err != nil {
 		return core.ProviderTask{}, err
 	}
+	ctx = p.connectionScope(ctx, adapter, expected)
 	allowed, err := p.manager.referencePolicy(ctx, request.Options)
 	if err != nil {
 		return core.ProviderTask{}, err
@@ -817,17 +825,19 @@ func (p *managedProvider) GetTask(ctx context.Context, id string) (core.Provider
 	if err != nil {
 		return core.ProviderResult{}, err
 	}
-	return adapter.GetTask(ctx, id)
+	return adapter.GetTask(p.connectionScope(ctx, adapter, core.ProviderRevision(ctx)), id)
 }
 
 func (p *managedProvider) ValidateRequest(ctx context.Context, request core.MediaRequest) error {
 	if _, err := p.manager.referencePolicy(ctx, request.Options); err != nil {
 		return err
 	}
-	adapter, err := p.manager.resolve(ctx, p.id, true)
+	expected := core.ProviderRevision(ctx)
+	adapter, err := p.manager.resolve(ctx, p.id, expected == "", expected)
 	if err != nil {
 		return err
 	}
+	ctx = p.connectionScope(ctx, adapter, expected)
 	if validator, ok := adapter.(core.RequestValidator); ok {
 		return validator.ValidateRequest(ctx, request)
 	}

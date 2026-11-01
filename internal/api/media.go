@@ -74,6 +74,13 @@ func (s *Server) mediaAccess(w http.ResponseWriter, r *http.Request) {
 	if task.LastFrameStorageKey != nil {
 		response["last_frame_url"] = previewURL + "&artifact=last-frame"
 	}
+	if len(task.StoredArtifacts) > 0 {
+		artifacts := []map[string]any{}
+		for _, a := range task.StoredArtifacts {
+			artifacts = append(artifacts, map[string]any{"id": a.ID, "media_type": a.MediaType, "format": a.Format, "preview_url": previewURL + "&artifact=" + url.QueryEscape(a.ID), "download_url": previewURL + "&artifact=" + url.QueryEscape(a.ID) + "&download=1"})
+		}
+		response["artifacts"] = artifacts
+	}
 	s.writeViewerJSON(w, r, http.StatusOK, response)
 }
 
@@ -116,9 +123,30 @@ func (s *Server) serveTaskMedia(w http.ResponseWriter, r *http.Request, id strin
 		return
 	}
 	key := task.StorageKey
+	resultType, resultSHA := task.ResultType, task.ResultSHA256
 	if lastFrame {
 		key = task.LastFrameStorageKey
 	}
+	artifactID := r.PathValue("artifact")
+	if artifactID == "" && strings.HasPrefix(r.URL.Path, "/media/") {
+		artifactID = r.URL.Query().Get("artifact")
+		if artifactID == "last-frame" {
+			artifactID = ""
+		}
+	}
+	if artifactID != "" {
+		key = nil
+		for _, a := range task.StoredArtifacts {
+			if a.ID == artifactID {
+				selected := a
+				key = &selected.StorageKey
+				resultType = &selected.ContentType
+				resultSHA = &selected.SHA256
+				break
+			}
+		}
+	}
+
 	if key == nil {
 		writeError(w, http.StatusNotFound, "not_found", "stored artifact is not available")
 		return
@@ -126,8 +154,8 @@ func (s *Server) serveTaskMedia(w http.ResponseWriter, r *http.Request, id strin
 	// S3 owns byte delivery, Range handling and slow-client connections.
 	if direct, ok := s.storage.(storage.DirectReader); ok {
 		contentType := ""
-		if !lastFrame && task.ResultType != nil {
-			contentType = *task.ResultType
+		if !lastFrame && resultType != nil {
+			contentType = *resultType
 		}
 		disposition := "inline"
 		if r.URL.Query().Get("download") == "1" {
@@ -162,8 +190,8 @@ func (s *Server) serveTaskMedia(w http.ResponseWriter, r *http.Request, id strin
 	}
 	defer object.Reader.Close()
 	contentType := object.ContentType
-	if !lastFrame && task.ResultType != nil && *task.ResultType != "" {
-		contentType = *task.ResultType
+	if !lastFrame && resultType != nil && *resultType != "" {
+		contentType = *resultType
 	}
 	if contentType == "" {
 		contentType = "video/mp4"
@@ -174,8 +202,8 @@ func (s *Server) serveTaskMedia(w http.ResponseWriter, r *http.Request, id strin
 	// Media is untrusted even when its MIME type is image/* (for example SVG).
 	w.Header().Set("Content-Security-Policy", "default-src 'none'; sandbox")
 	w.Header().Set("Referrer-Policy", "no-referrer")
-	if !lastFrame && task.ResultSHA256 != nil {
-		w.Header().Set("ETag", `"sha256-`+*task.ResultSHA256+`"`)
+	if !lastFrame && resultSHA != nil {
+		w.Header().Set("ETag", `"sha256-`+*resultSHA+`"`)
 	}
 	disposition := "inline"
 	if r.URL.Query().Get("download") == "1" {

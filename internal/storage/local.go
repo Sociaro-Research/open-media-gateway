@@ -81,6 +81,13 @@ func (s *Local) Archive(ctx context.Context, taskID, sourceURL string) (core.Sto
 }
 
 func (s *Local) archiveReader(ctx context.Context, taskID string, reader io.Reader, contentType string, size int64, sourceURL string) (core.StoredMedia, error) {
+	return s.archiveReaderChecked(ctx, taskID, reader, contentType, size, sourceURL, false)
+}
+
+func (s *Local) archiveReaderChecked(ctx context.Context, taskID string, reader io.Reader, contentType string, size int64, sourceURL string, trustedStream bool) (core.StoredMedia, error) {
+	if err := ctx.Err(); err != nil {
+		return core.StoredMedia{}, err
+	}
 	if size > s.maxBytes {
 		return core.StoredMedia{}, fmt.Errorf("provider result exceeds STORAGE_MAX_BYTES (%d)", s.maxBytes)
 	}
@@ -92,7 +99,7 @@ func (s *Local) archiveReader(ctx context.Context, taskID string, reader io.Read
 			contentType = detected
 		}
 	}
-	if !supportedMediaType(contentType) && contentType != "application/octet-stream" {
+	if !supportedMediaType(contentType) && contentType != "application/octet-stream" && !(trustedStream && (contentType == "text/plain" || contentType == "application/json")) {
 		return core.StoredMedia{}, fmt.Errorf("provider returned unsupported content type %q", contentType)
 	}
 
@@ -133,6 +140,17 @@ func (s *Local) archiveReader(ctx context.Context, taskID string, reader io.Read
 	if written == 0 {
 		return core.StoredMedia{}, errors.New("provider returned an empty media file")
 	}
+	if trustedStream {
+		if size >= 0 && written != size {
+			return core.StoredMedia{}, errors.New("provider artifact stream size does not match its declared size")
+		}
+		if err := validateArtifactFile(ctx, temporary, contentType); err != nil {
+			return core.StoredMedia{}, err
+		}
+	}
+	if err := ctx.Err(); err != nil {
+		return core.StoredMedia{}, err
+	}
 	if err := temporary.Sync(); err != nil {
 		return core.StoredMedia{}, fmt.Errorf("flush media file: %w", err)
 	}
@@ -143,6 +161,9 @@ func (s *Local) archiveReader(ctx context.Context, taskID string, reader io.Read
 		if err := temporary.Close(); err != nil {
 			return core.StoredMedia{}, fmt.Errorf("close media file: %w", err)
 		}
+	}
+	if err := ctx.Err(); err != nil {
+		return core.StoredMedia{}, err
 	}
 	if err := os.Rename(temporaryName, path); err != nil {
 		return core.StoredMedia{}, fmt.Errorf("commit media file: %w", err)
@@ -160,6 +181,10 @@ func supportedMediaType(contentType string) bool {
 
 func mediaFileName(contentType string) (string, string) {
 	switch contentType {
+	case "text/plain":
+		return "text", ".txt"
+	case "application/json":
+		return "data", ".json"
 	case "video/webm":
 		return "video", ".webm"
 	case "image/png":

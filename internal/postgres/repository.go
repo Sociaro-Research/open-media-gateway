@@ -15,7 +15,7 @@ import (
 	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
 )
 
-const taskColumns = `COALESCE((SELECT o.id::text FROM organizations o WHERE o.id=tasks.owner_id),''), COALESCE(actor_id::text,''), id, status, provider, model, media_type, prompt, request_options, webhook_url, provider_task_id, result_url, provider_result_url, last_frame_url, storage_key, result_content_type, result_size_bytes, result_sha256, stored_at, error, provider_usage, created_at, updated_at, owner_id, api_key_id, last_frame_storage_key, cost, provider_identity,provider_owner_id,storage_owner_id,result_deleted_at,(result_deleted_at IS NULL AND (storage_key IS NOT NULL OR EXISTS(SELECT 1 FROM stored_objects o WHERE o.task_id=tasks.id AND o.owner_id=tasks.owner_id AND o.deleted_at IS NULL))) AS has_stored_result,worker_started_at,worker_poll_errors,public_model,minimize_request_logging,had_image_input,identity_snapshot,COALESCE(project_id::text,''),project_version,template_snapshot`
+const taskColumns = `COALESCE((SELECT o.id::text FROM organizations o WHERE o.id=tasks.owner_id),''), COALESCE(actor_id::text,''), id, status, provider, model, media_type, prompt, request_options, webhook_url, provider_task_id, result_url, provider_result_url, last_frame_url, storage_key, result_content_type, result_size_bytes, result_sha256, stored_at, error, provider_usage, created_at, updated_at, owner_id, api_key_id, last_frame_storage_key, cost, provider_identity,provider_owner_id,storage_owner_id,result_deleted_at,(result_deleted_at IS NULL AND (storage_key IS NOT NULL OR EXISTS(SELECT 1 FROM stored_objects o WHERE o.task_id=tasks.id AND o.owner_id=tasks.owner_id AND o.deleted_at IS NULL))) AS has_stored_result,worker_started_at,worker_poll_errors,public_model,minimize_request_logging,had_image_input,identity_snapshot,COALESCE(project_id::text,''),project_version,template_snapshot,result_artifacts`
 
 type TaskRepository struct {
 	db *sql.DB
@@ -272,16 +272,24 @@ func (r *TaskRepository) SetProviderResultURL(ctx context.Context, id, resultURL
 }
 
 func (r *TaskRepository) MarkSucceeded(ctx context.Context, id string, media core.StoredMedia, lastFrameURL string) error {
+	artifacts := media.Artifacts
+	if artifacts == nil {
+		artifacts = []core.StoredArtifact{}
+	}
+	encoded, err := json.Marshal(artifacts)
+	if err != nil {
+		return err
+	}
 	return r.transition(ctx, id, core.EventTaskSucceeded, `
 		UPDATE tasks
 		SET status = 'succeeded', result_url = $2, provider_result_url = CASE WHEN minimize_request_logging THEN NULL ELSE $3 END,
 			last_frame_url = $4, storage_key = $5, result_content_type = $6,
 			result_size_bytes = $7, result_sha256 = $8, stored_at = NOW(),
-			error = NULL, updated_at = NOW(), last_frame_storage_key = $9
+			error = NULL, updated_at = NOW(), last_frame_storage_key = $9, result_artifacts = $10
 		WHERE id = $1 AND status = 'running'
 		RETURNING `+taskColumns, []any{
 		"/v1/generations/" + id + "/content", nullableString(media.SourceURL), nullableString(lastFrameURL),
-		media.StorageKey, media.ContentType, media.SizeBytes, media.SHA256, nullableString(media.LastFrameStorageKey),
+		media.StorageKey, media.ContentType, media.SizeBytes, media.SHA256, nullableString(media.LastFrameStorageKey), encoded,
 	})
 }
 
@@ -434,13 +442,13 @@ type rowScanner interface {
 
 func scanTask(row rowScanner, task *core.Task) error {
 	var options []byte
-	var usage, cost, snapshot, templateSnapshot []byte
+	var usage, cost, snapshot, templateSnapshot, artifacts []byte
 	err := row.Scan(
 		&task.OrganizationID, &task.ActorID, &task.ID, &task.Status, &task.Provider, &task.Model, &task.MediaType, &task.Prompt, &options, &task.WebhookURL,
 		&task.ProviderTaskID, &task.ResultURL, &task.ProviderResultURL, &task.LastFrameURL, &task.StorageKey,
 		&task.ResultType, &task.ResultSize, &task.ResultSHA256, &task.StoredAt,
 		&task.Error, &usage, &task.CreatedAt, &task.UpdatedAt,
-		&task.OwnerID, &task.APIKeyID, &task.LastFrameStorageKey, &cost, &task.ProviderIdentity, &task.ProviderOwnerID, &task.StorageOwnerID, &task.ResultDeletedAt, &task.HasStoredResult, &task.WorkerStartedAt, &task.WorkerPollErrors, &task.PublicModel, &task.MinimizeRequestLogging, &task.HadImageInput, &snapshot, &task.ProjectID, &task.ProjectVersion, &templateSnapshot,
+		&task.OwnerID, &task.APIKeyID, &task.LastFrameStorageKey, &cost, &task.ProviderIdentity, &task.ProviderOwnerID, &task.StorageOwnerID, &task.ResultDeletedAt, &task.HasStoredResult, &task.WorkerStartedAt, &task.WorkerPollErrors, &task.PublicModel, &task.MinimizeRequestLogging, &task.HadImageInput, &snapshot, &task.ProjectID, &task.ProjectVersion, &templateSnapshot, &artifacts,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return core.ErrTaskNotFound
@@ -450,6 +458,11 @@ func scanTask(row rowScanner, task *core.Task) error {
 	}
 	task.IdentitySnapshot = snapshot
 	task.TemplateSnapshot = templateSnapshot
+	if len(artifacts) > 0 {
+		if err := json.Unmarshal(artifacts, &task.StoredArtifacts); err != nil {
+			return fmt.Errorf("decode stored artifacts: %w", err)
+		}
+	}
 	if err := json.Unmarshal(options, &task.Options); err != nil {
 		return fmt.Errorf("decode task options: %w", err)
 	}
@@ -469,13 +482,13 @@ func scanTask(row rowScanner, task *core.Task) error {
 
 func scanTaskWithHash(row rowScanner, task *core.Task, requestHash *string) error {
 	var options []byte
-	var usage, cost, snapshot, templateSnapshot []byte
+	var usage, cost, snapshot, templateSnapshot, artifacts []byte
 	err := row.Scan(
 		&task.OrganizationID, &task.ActorID, &task.ID, &task.Status, &task.Provider, &task.Model, &task.MediaType, &task.Prompt, &options, &task.WebhookURL,
 		&task.ProviderTaskID, &task.ResultURL, &task.ProviderResultURL, &task.LastFrameURL, &task.StorageKey,
 		&task.ResultType, &task.ResultSize, &task.ResultSHA256, &task.StoredAt,
 		&task.Error, &usage, &task.CreatedAt, &task.UpdatedAt,
-		&task.OwnerID, &task.APIKeyID, &task.LastFrameStorageKey, &cost, &task.ProviderIdentity, &task.ProviderOwnerID, &task.StorageOwnerID, &task.ResultDeletedAt, &task.HasStoredResult, &task.WorkerStartedAt, &task.WorkerPollErrors, &task.PublicModel, &task.MinimizeRequestLogging, &task.HadImageInput, &snapshot, &task.ProjectID, &task.ProjectVersion, &templateSnapshot,
+		&task.OwnerID, &task.APIKeyID, &task.LastFrameStorageKey, &cost, &task.ProviderIdentity, &task.ProviderOwnerID, &task.StorageOwnerID, &task.ResultDeletedAt, &task.HasStoredResult, &task.WorkerStartedAt, &task.WorkerPollErrors, &task.PublicModel, &task.MinimizeRequestLogging, &task.HadImageInput, &snapshot, &task.ProjectID, &task.ProjectVersion, &templateSnapshot, &artifacts,
 		requestHash,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -486,6 +499,11 @@ func scanTaskWithHash(row rowScanner, task *core.Task, requestHash *string) erro
 	}
 	task.IdentitySnapshot = snapshot
 	task.TemplateSnapshot = templateSnapshot
+	if len(artifacts) > 0 {
+		if err := json.Unmarshal(artifacts, &task.StoredArtifacts); err != nil {
+			return fmt.Errorf("decode stored artifacts: %w", err)
+		}
+	}
 	if err := json.Unmarshal(options, &task.Options); err != nil {
 		return fmt.Errorf("decode task options: %w", err)
 	}

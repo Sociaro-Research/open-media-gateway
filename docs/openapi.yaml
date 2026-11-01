@@ -6380,6 +6380,57 @@ paths:
           "$ref": "#/components/responses/Unauthorized"
         '403':
           "$ref": "#/components/responses/Forbidden"
+  "/v1/generations/{id}/artifacts/{artifact}/content":
+    parameters:
+    - "$ref": "#/components/parameters/TaskID"
+    - name: artifact
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Opaque local artifact ID from the completed generation.
+    get:
+      tags: [Media]
+      operationId: get_v1_generations_id_artifacts_artifact_content
+      summary: Download one archived generation artifact
+      description: Requires generation ownership. Only completely archived results are available. Supports Range and conditional requests. Provider URLs and authenticated source handles are never returned.
+      x-required-scope: generation
+      responses:
+        '200':
+          description: Archived artifact bytes
+          content:
+            application/octet-stream:
+              schema: {type: string, format: binary}
+        '206':
+          description: Requested byte range
+        '307':
+          description: Redirect to isolated storage; do not forward Gateway credentials.
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
+    head:
+      tags: [Media]
+      operationId: head_v1_generations_id_artifacts_artifact_content
+      summary: Read archived artifact headers
+      x-required-scope: generation
+      responses:
+        '200':
+          description: Archived artifact metadata without a response body
+        '307':
+          description: Redirect to isolated storage; do not forward Gateway credentials.
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '503':
+          "$ref": "#/components/responses/ServiceUnavailable"
   "/v1/generations/{id}/media-access":
     parameters:
     - "$ref": "#/components/parameters/TaskID"
@@ -8767,6 +8818,12 @@ components:
         requires the same Gateway API key. No progress percentage is invented. Managers receive
         operational metadata only, with content_access false and without prompt, input, output links or provider errors.
       properties:
+        artifacts:
+          type: array
+          maxItems: 64
+          description: Present only after every result has been archived; omitted for deleted results. IDs are local, opaque selectors. Upstream IDs, source URLs, authenticated source handles and storage keys are private.
+          items:
+            $ref: '#/components/schemas/GenerationArtifact'
         template_snapshot: {type: object, description: Server-resolved template ID/revision and immutable prompt/reference/model/options snapshot. Subject to existing content permissions and logging minimization.}
         project_version: {type: integer, format: int64, minimum: 0, default: 0, description: Optimistic version for changing the workspace project assignment.}
         can_change_project: {type: boolean, description: Whether the current role/workspace allows changing this generation's project, independently of company generation authorship.}
@@ -9931,6 +9988,20 @@ components:
         authentication check does not prove model access or funded generation; inspect
         status_message for its scope. Cached checks can expire or reset on restart.
         Separate billing credentials are used to retrieve actual generation charges.
+    GenerationArtifact:
+      type: object
+      additionalProperties: false
+      required: [id, media_type, content_url, content_type, size_bytes, sha256]
+      properties:
+        id: {type: string, description: Local artifact selector; never a provider ID or storage key.}
+        media_type: {type: string, enum: [image, video, audio, speech, music, text, json]}
+        format: {type: string}
+        duration: {type: number, exclusiveMinimum: 0}
+        group_id: {type: string, description: Opaque output grouping; never used as a path.}
+        content_url: {type: string, description: Owner-authorized Gateway archive route.}
+        content_type: {type: string}
+        size_bytes: {type: integer, minimum: 0}
+        sha256: {type: string}
     MediaAccess:
       type: object
       required:
@@ -9938,6 +10009,18 @@ components:
       - download_url
       - expires_at
       properties:
+        artifacts:
+          type: array
+          maxItems: 64
+          items:
+            type: object
+            required: [id, media_type, format, preview_url, download_url]
+            properties:
+              id: {type: string}
+              media_type: {type: string}
+              format: {type: string}
+              preview_url: {type: string}
+              download_url: {type: string}
         last_frame_url:
           type: string
           description: Signed browser URL for an archived video last frame, when available.

@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 )
 
 // Generation is the single public representation shared by HTTP and webhooks.
 type Generation struct {
+	Artifacts []GenerationArtifact `json:"artifacts,omitempty"`
 	Task
 	Prompt      string `json:"prompt"`
 	Object      string `json:"object"`
@@ -33,10 +35,16 @@ func GenerationView(task Task) Generation {
 	}
 	v := Generation{Task: task, Prompt: task.Prompt, Object: object, Status: string(task.Status), CreatedAt: task.CreatedAt.Unix(), UpdatedAt: task.UpdatedAt.Unix(), StatusURL: base, ContentURL: base + "/content"}
 	// Stored jobs may predate these routes; always derive public URLs from the ID.
+	v.ProviderTaskID = nil
 	v.ProviderResultURL = nil
 	v.ResultURL = nil
 	v.LastFrameURL = nil
 	if task.ResultDeletedAt == nil {
+		if task.Status == TaskSucceeded {
+			for _, a := range task.StoredArtifacts {
+				v.Artifacts = append(v.Artifacts, GenerationArtifact{ID: a.ID, MediaType: a.MediaType, Format: a.Format, Duration: a.Duration, GroupID: a.GroupID, ContentURL: "/v1/generations/" + task.ID + "/artifacts/" + a.ID + "/content", ContentType: a.ContentType, SizeBytes: a.SizeBytes, SHA256: a.SHA256})
+			}
+		}
 		if task.Status == TaskSucceeded && (task.ResultURL != nil || task.HasStoredResult || task.StorageKey != nil) {
 			v.ResultURL = &v.ContentURL
 		}
@@ -59,7 +67,22 @@ func GenerationView(task Task) Generation {
 		v.Error = map[string]string{"code": "generation_failed", "message": *task.Error}
 	}
 	if task.MediaType == "video" {
-		v.Seconds = strconv.Itoa(task.Options.Duration)
+		seconds := float64(task.Options.Duration)
+		if task.Status == TaskSucceeded {
+			if len(task.StoredArtifacts) > 0 && task.StoredArtifacts[0].Duration > 0 {
+				seconds = task.StoredArtifacts[0].Duration
+			} else if task.Usage != nil {
+				for _, metric := range task.Usage.Metrics {
+					if metric.Name == "output_video_duration" && metric.Quantity > 0 && !math.IsNaN(metric.Quantity) && !math.IsInf(metric.Quantity, 0) {
+						seconds = metric.Quantity
+						break
+					}
+				}
+			}
+		}
+		if seconds > 0 && !math.IsNaN(seconds) && !math.IsInf(seconds, 0) {
+			v.Seconds = strconv.FormatFloat(seconds, 'f', -1, 64)
+		}
 	}
 	v.Size = strings.ReplaceAll(task.Options.Resolution, "*", "x")
 	if task.MediaType == "video" {

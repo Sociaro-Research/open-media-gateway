@@ -57,11 +57,12 @@ func TestCompanyProjectsMigrationSharingAndIsolation(t *testing.T) {
 	if _, err := db.Exec(`INSERT INTO tasks(id,owner_id,actor_id,provider_owner_id,storage_owner_id,status,provider,model,media_type,prompt,project_id,project_version) VALUES($1,$2,$3,$2,$2,'succeeded','mock','mock-video-v1','video','Retained payload',$4,7)`, oldTask, company, alice, second); err != nil {
 		t.Fatal(err)
 	}
+	// Migration 082 adds an empty artifact list; existing payload columns must remain exact.
 	var beforeProjects, beforeTasks string
 	if err := db.QueryRow(`SELECT json_agg(x ORDER BY id)::text FROM generation_projects x`).Scan(&beforeProjects); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.QueryRow(`SELECT row_to_json(t)::text FROM tasks t WHERE id=$1`, oldTask).Scan(&beforeTasks); err != nil {
+	if err := db.QueryRow(`SELECT (to_jsonb(t)-'result_artifacts')::text FROM tasks t WHERE id=$1`, oldTask).Scan(&beforeTasks); err != nil {
 		t.Fatal(err)
 	}
 	if err := Migrate(db); err != nil {
@@ -76,7 +77,7 @@ func TestCompanyProjectsMigrationSharingAndIsolation(t *testing.T) {
 	}
 	var afterProjects, afterTasks string
 	db.QueryRow(`SELECT json_agg(x ORDER BY id)::text FROM generation_projects x`).Scan(&afterProjects)
-	db.QueryRow(`SELECT row_to_json(t)::text FROM tasks t WHERE id=$1`, oldTask).Scan(&afterTasks)
+	db.QueryRow(`SELECT (to_jsonb(t)-'result_artifacts')::text FROM tasks t WHERE id=$1`, oldTask).Scan(&afterTasks)
 	if beforeProjects != afterProjects || beforeTasks != afterTasks {
 		t.Fatal("76→77 rewrote existing project or task")
 	}

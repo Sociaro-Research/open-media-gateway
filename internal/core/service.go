@@ -285,6 +285,12 @@ func NormalizeReferenceOptions(descriptor MediaModel, options MediaOptions) (Med
 }
 
 func NormalizeModelOptions(descriptor MediaModel, options MediaOptions) (MediaOptions, error) {
+	if options.OutputCount != 0 && (descriptor.MediaType != "image" || options.OutputCount < 1 || options.OutputCount > max(1, descriptor.MaxOutputs)) {
+		return MediaOptions{}, fmt.Errorf("%w: unsupported output count", ErrOptionsInvalid)
+	}
+	if options.OutputCount == 1 {
+		options.OutputCount = 0
+	}
 	options.ReferenceMediaEvidence = maps.Clone(options.ReferenceMediaEvidence)
 	options.ReferenceVoices = maps.Clone(options.ReferenceVoices)
 	options.ImageURLs = slices.Clone(options.ImageURLs)

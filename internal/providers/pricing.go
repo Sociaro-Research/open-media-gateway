@@ -32,6 +32,7 @@ func (p *managedProvider) Quote(ctx context.Context, model core.MediaModel, requ
 	if err != nil {
 		return core.TaskCost{}, "", err
 	}
+	ctx = p.connectionScope(ctx, adapter, fingerprint)
 	state, err := p.catalogState(ctx)
 	if err != nil {
 		return core.TaskCost{}, "", err

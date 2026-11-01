@@ -6,7 +6,7 @@ import (
 )
 
 func (r *TaskRepository) StoredResultKeys(ctx context.Context, id string) ([]string, error) {
-	rows, e := r.db.QueryContext(ctx, `SELECT storage_key FROM tasks WHERE owner_id=$1 AND id=$2 AND result_deleted_at IS NULL AND storage_key IS NOT NULL UNION SELECT last_frame_storage_key FROM tasks WHERE owner_id=$1 AND id=$2 AND result_deleted_at IS NULL AND last_frame_storage_key IS NOT NULL UNION SELECT storage_key FROM stored_objects WHERE owner_id=$1 AND task_id=$2 AND deleted_at IS NULL UNION SELECT storage_key FROM result_objects WHERE owner_id=$1 AND task_id=$2 AND deleted_at IS NULL`, identity.OwnerID(ctx), id)
+	rows, e := r.db.QueryContext(ctx, `SELECT storage_key FROM tasks WHERE owner_id=$1 AND id=$2 AND result_deleted_at IS NULL AND storage_key IS NOT NULL UNION SELECT artifact->>'storage_key' FROM tasks CROSS JOIN LATERAL jsonb_array_elements(result_artifacts) artifact WHERE owner_id=$1 AND id=$2 AND result_deleted_at IS NULL AND artifact->>'storage_key' IS NOT NULL UNION SELECT last_frame_storage_key FROM tasks WHERE owner_id=$1 AND id=$2 AND result_deleted_at IS NULL AND last_frame_storage_key IS NOT NULL UNION SELECT storage_key FROM stored_objects WHERE owner_id=$1 AND task_id=$2 AND deleted_at IS NULL UNION SELECT storage_key FROM result_objects WHERE owner_id=$1 AND task_id=$2 AND deleted_at IS NULL`, identity.OwnerID(ctx), id)
 	if e != nil {
 		return nil, e
 	}

@@ -24,6 +24,7 @@ var (
 )
 
 type Task struct {
+	StoredArtifacts []StoredArtifact `json:"-"`
 	// Checked only for NEW admissions after idempotency resolution. Never stored.
 	AdmissionError         error           `json:"-"`
 	TemplateSnapshot       json.RawMessage `json:"template_snapshot,omitempty"`
@@ -75,6 +76,7 @@ type Task struct {
 // storage owned by the gateway. SourceURL is retained for diagnostics but is
 // never returned from the public task API.
 type StoredMedia struct {
+	Artifacts           []StoredArtifact
 	LastFrameStorageKey string
 	SourceURL           string
 	StorageKey          string
@@ -98,6 +100,7 @@ type SoundOverride struct {
 }
 
 type MediaOptions struct {
+	OutputCount            int                           `json:"output_count,omitempty"`
 	ReferenceMediaEvidence map[string]InputMediaEvidence `json:"_reference_media,omitempty"`
 	OverrideSoundID        string                        `json:"override_sound_id,omitempty"`
 	OverrideSound          *SoundOverride                `json:"_override_sound,omitempty"`
@@ -196,6 +199,7 @@ func (r *ReferencePromptRecommendation) Clone() *ReferencePromptRecommendation {
 }
 
 type MediaModel struct {
+	MaxOutputs int `json:"max_outputs,omitempty"`
 	// MaxPromptCharacters is an enforced character ceiling, not an upstream limit claim.
 	// Runtime API catalogues combine it with the gateway cap; zero is unspecified.
 	MaxPromptCharacters           int                            `json:"max_prompt_characters,omitempty"`
@@ -334,6 +338,7 @@ type MediaRequest struct {
 }
 
 type ProviderTask struct {
+	Artifacts    []ProviderArtifact
 	ID           string
 	ResultURL    string
 	LastFrameURL string
@@ -350,6 +355,7 @@ const (
 )
 
 type ProviderResult struct {
+	Artifacts    []ProviderArtifact
 	Status       ProviderStatus
 	ResultURL    string
 	LastFrameURL string

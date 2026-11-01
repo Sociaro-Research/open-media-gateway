@@ -49,6 +49,8 @@ func (s *Server) registerOpenAIRoutes(mux *http.ServeMux) {
 	mux.Handle("POST /v1/generations/estimate", s.authenticate(http.HandlerFunc(s.createOpenAIGeneration)))
 	mux.Handle("GET /v1/models", s.authenticate(http.HandlerFunc(s.listModels)))
 	mux.Handle("GET /v1/models/{model...}", s.authenticate(http.HandlerFunc(s.getModel)))
+	mux.Handle("GET /v1/generations/{id}/artifacts/{artifact}/content", s.authenticate(http.HandlerFunc(s.generationArtifactContent)))
+	mux.Handle("HEAD /v1/generations/{id}/artifacts/{artifact}/content", s.authenticate(http.HandlerFunc(s.generationArtifactContent)))
 	mux.Handle("GET /v1/generations/{id}/media-access", s.authenticate(http.HandlerFunc(s.mediaAccess)))
 	mux.Handle("GET /v1/generations/{id}/last-frame", s.authenticate(http.HandlerFunc(s.serveAuthorizedLastFrame)))
 	mux.Handle("HEAD /v1/generations/{id}/last-frame", s.authenticate(http.HandlerFunc(s.serveAuthorizedLastFrame)))
@@ -182,6 +184,12 @@ func (s *Server) getGeneration(w http.ResponseWriter, r *http.Request) {
 func (s *Server) generationContent(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.generationTask(w, r); ok {
 		s.serveAuthorizedMedia(w, r)
+	}
+}
+
+func (s *Server) generationArtifactContent(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.generationTask(w, r); ok {
+		s.serveTaskMedia(w, r, r.PathValue("id"), false)
 	}
 }
 
@@ -451,9 +459,10 @@ func (s *Server) openAIInput(r *http.Request, fields map[string]json.RawMessage)
 		if raw, ok := fields["n"]; ok {
 			delete(fields, "n")
 			var n int
-			if json.Unmarshal(raw, &n) != nil || n != 1 {
-				return fail("n", "one output per generation is supported; submit separate asynchronous jobs")
+			if json.Unmarshal(raw, &n) != nil || n < 1 || n > max(1, matches[0].model.MaxOutputs) {
+				return fail("n", "n exceeds the selected model output count capability")
 			}
+			input.Options.OutputCount = n
 		}
 		if raw, ok := fields["response_format"]; ok {
 			delete(fields, "response_format")
