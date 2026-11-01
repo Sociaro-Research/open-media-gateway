@@ -430,6 +430,16 @@
   promptEditor=PromptReferenceEditor.attach(prompt,{model:selected,options:promptOptions,signal,validate:false,allowBlob:true,reference:(kind,index)=>{const slot=bindings.find(s=>s.type===kind&&s.index===index+1);return slot?{name:slot.label,url:assetPreviews.get(slot.asset_id)?.url}:null;},message:()=>{const missing=ReferencePrompts.inspect(prompt.value,selected(),promptOptions()).filter(item=>item.reason==='missing');return missing.length?'Infer and review slots to bind '+[...new Set(missing.map(item=>item.label))].join(', ')+'.':ReferencePrompts.error(prompt.value,selected(),promptOptions());}});
 
  }
+ function submitted(template,trigger){
+  if(!active||view!=='use'||browseID!==template.id)return;
+  const token=epoch,signal=controller.signal,panel=el('dialog','','keys-revoke-dialog sales-dialog sales-editor-dialog'),form=el('form');panel.append(form);
+  const dismiss=()=>panel.close(),{heading}=FormUI.dialogHeading(form,'Generation submitted',dismiss);heading.id='templateSubmittedTitle';panel.setAttribute('aria-labelledby',heading.id);
+  const message=el('p','Your generation was submitted. You can see its status on the Playground page.');message.id='templateSubmittedDescription';panel.setAttribute('aria-describedby',message.id);
+  const actions=el('div','','dialog-actions'),go=button('Go to Playground',()=>{dismiss();showConsoleSection('generation');document.querySelector('#generationNav')?.focus();}),stay=button('Continue in Templates',dismiss,'primary compact');actions.append(go,stay);form.append(message,actions);form.onsubmit=event=>event.preventDefault();
+  panel.addEventListener('cancel',event=>{event.preventDefault();dismiss();});
+  panel.addEventListener('close',()=>{panel.remove();signal.removeEventListener('abort',dismiss);window.removeEventListener('popstate',dismiss);if(fresh(token)&&view==='use'){const target=trigger?.isConnected&&!trigger.disabled?trigger:selection.querySelector('button:not(:disabled)');target?.focus({preventScroll:true});}},{once:true});
+  signal.addEventListener('abort',dismiss,{once:true});window.addEventListener('popstate',dismiss);document.body.append(panel);FormUI.refresh();panel.showModal();stay.focus();
+ }
  window.addEventListener('gateway-key-change',()=>{runnerDrafts.clear();next();editing=null;browseID='';uploading=0;stopMedia(selection);emptySelection();if(active)gallery();});
- window.GatewayTemplates={section,open,currentChanged};
+ window.GatewayTemplates={section,open,currentChanged,submitted};
 })();

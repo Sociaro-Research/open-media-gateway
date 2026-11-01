@@ -860,3 +860,11 @@ manual model limits. It captures both themes at 1440/390/320 px. Reuse
 `provider-upload-context.cjs` additionally requires its sanitized actual descriptor
 export through `UI_PROVIDER_DESCRIPTOR_FILE`. Human labels are rounded; byte
 validation and the exact-byte limit tooltip remain authoritative.
+
+Run `node scripts/ui/template-submission.cjs` in Chromium and WebKit for the
+accepted-submission dialog: no automatic navigation, retained runner/settings and
+reference bindings, repeated deliberate runs/model changes, both actions, Close,
+Escape/Back/focus, validation/estimate/submission errors, pending/double clicks and
+key-change cleanup. The fixture uses synthetic loopback APIs and the existing
+journal pagination helper, captures both themes at 1440/390/320px, and never calls
+a provider. `UI_EVIDENCE_DIR` selects its retained evidence.

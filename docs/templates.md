@@ -17,7 +17,10 @@ until the key or current template content changes. Changes invalidate old inputs
 selecting or changing templates. Covers show their complete natural aspect ratio;
 video previews play on mouse hover and pause on leave. Focus the cover video and press Space/Enter, or tap it on touch devices, to play or pause. There is no separate Play/Pause preview button. Reduced-motion preferences disable hover play. The prompt
 and fixed references cannot be edited in this form. Confirming submits an ordinary
-asynchronous generation and opens its Playground journal entry. An unavailable
+asynchronous generation. After acceptance, a small dialog offers **Go to Playground**
+or **Continue in Templates**. Continuing, closing the dialog or pressing Escape
+keeps the selected template, model, reference bindings and settings for another
+deliberate generation. Only Go to Playground navigates to the Journal. An unavailable
 default requires an explicit compatible alternative; no compatible model or a
 missing fixed asset blocks generation. Choose an existing private library file or
 upload through the same completed-upload flow used by Playground.

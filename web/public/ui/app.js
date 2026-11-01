@@ -1567,7 +1567,7 @@ async function openGenerationConfirmation(source, trigger) {
    confirmStatus.hidden=false;confirmStatus.className='error';confirmStatus.textContent=error.message;
   }
 }
-async function moveRequestToJournal(task) {
+async function moveRequestToJournal(task, {reveal = true} = {}) {
   if(window.GatewayProjects && !window.GatewayProjects.matches(task)) {
     dialog.close();
     document.querySelector('#journalAnnouncement').textContent='Generation added to its project.';
@@ -1577,6 +1577,11 @@ async function moveRequestToJournal(task) {
   if (!latestTasks.some(item => item.id === task.id) && journalPage.total !== null) journalPage.total++;
   renderTasks([task, ...latestTasks.filter(item => item.id !== task.id)]);
   updateJournalPagination();
+  if (!reveal) {
+    dialog.close();
+    document.querySelector('#journalAnnouncement').textContent = 'Generation added to the journal.';
+    return;
+  }
   const article = elements.taskList.firstElementChild;
   article.classList.add('task-arriving');
   article.scrollIntoView({block: 'nearest', behavior: 'instant'});
@@ -1616,8 +1621,8 @@ confirmButton.addEventListener('click', async () => {
     if (result.status === 'rejected') throw result.reason;
     const task = {...submission.request, ...result.value};
     accepted = true; pendingSubmission = null;if(submission.request.session_action)playgroundResources?.admitted();
-    if(submission.request.template)showConsoleSection('generation');
-    await moveRequestToJournal(task);
+    await moveRequestToJournal(task, {reveal: !submission.request.template});
+    if(submission.request.template)window.GatewayTemplates?.submitted(submission.request.template, confirmationTrigger);
   } catch (error) {
     if (accepted) {
       dialog.close(); // Never offer another submission after the API accepted it.
