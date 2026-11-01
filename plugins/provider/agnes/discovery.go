@@ -3,6 +3,7 @@ package agnes
 import (
 	"context"
 	"encoding/json"
+	"github.com/Sociaro-Research/open-media-gateway/internal/core"
 	"net/http"
 )
 
@@ -23,5 +24,5 @@ func (a *Adapter) DiscoverModelIDs(ctx context.Context) ([]string, error) {
 	for _, m := range response.Data {
 		ids = append(ids, m.ID)
 	}
-	return ids, nil
+	return core.MediaDiscoveryIDs(ids, catalog()), nil
 }

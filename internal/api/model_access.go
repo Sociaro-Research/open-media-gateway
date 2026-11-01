@@ -70,6 +70,12 @@ func (s *Server) modelSettings(w http.ResponseWriter, r *http.Request) {
 		providerNames := map[string]string{}
 		providerIcons := map[string]string{}
 		providerMonochrome := map[string]bool{}
+		for _, p := range core.MediaGenerationCatalog(s.service.ListProviders(r.Context())) {
+			providerNames[p.ID] = p.Name
+			for _, m := range p.Models {
+				capabilities[modelaccess.Key(p.ID, m.ID)] = m
+			}
+		}
 		// Administrative discovery includes hidden models and all shared connections.
 		if s.providerAdmin != nil {
 			ctx := identity.WithResourceOwners(r.Context(), identity.SharedOwnerID, identity.SharedOwnerID)
@@ -84,6 +90,9 @@ func (s *Server) modelSettings(w http.ResponseWriter, r *http.Request) {
 				providerIcons[p.ID] = providerLogoForViewer(p.IconURL, r)
 				providerMonochrome[p.ID] = p.IconMonochrome
 				for _, m := range p.Models {
+					if !core.MediaGenerationModel(m) {
+						continue
+					}
 					capabilities[modelaccess.Key(p.ID, m.ID)] = m
 					refs = append(refs, modelaccess.Ref{Provider: p.ID, Model: m.ID, Name: m.DisplayName})
 				}
@@ -100,6 +109,9 @@ func (s *Server) modelSettings(w http.ResponseWriter, r *http.Request) {
 		}
 		views := make([]modelSettingView, 0, len(models))
 		for _, model := range models {
+			if _, ok := capabilities[modelaccess.Key(model.Provider, model.Model)]; !ok {
+				continue
+			}
 			view := modelSettingView{Model: model, ProviderName: providerNames[model.Provider], ProviderIconURL: providerIcons[model.Provider], ProviderIconMonochrome: providerMonochrome[model.Provider]}
 			if capability, ok := capabilities[modelaccess.Key(model.Provider, model.Model)]; ok {
 				capability.PublicID = model.PublicID
@@ -168,6 +180,7 @@ func (s *Server) modelSettings(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) applyModelAccess(ctx context.Context, catalog []core.ProviderDescriptor, includeHidden bool) ([]core.ProviderDescriptor, error) {
+	catalog = core.MediaGenerationCatalog(catalog)
 	if s.modelAccess == nil {
 		return catalog, nil
 	}

@@ -113,8 +113,12 @@ func (a *Adapter) models() []core.MediaModel {
 	}
 	return models
 }
-func (a *Adapter) ListModels(context.Context) ([]core.MediaModel, error) { return a.models(), nil }
-func (a *Adapter) ReviewedCatalogModels() []core.MediaModel              { return a.models() }
+func (a *Adapter) ListModels(context.Context) ([]core.MediaModel, error) {
+	return core.MediaGenerationModels(a.models()), nil
+}
+func (a *Adapter) ReviewedCatalogModels() []core.MediaModel {
+	return core.MediaGenerationModels(a.models())
+}
 
 func (a *Adapter) ValidateRequest(ctx context.Context, r core.MediaRequest) error {
 	if isSessionOperation(r.Model) {
@@ -294,4 +298,15 @@ func (a *Adapter) setPrices(c providerkit.Credentials) error {
 
 func frameLimits(count int, size int64) *core.ReferenceMediaLimits {
 	return &core.ReferenceMediaLimits{MaxFiles: count, Image: core.MediaFileLimits{ContentTypes: []string{"image/jpeg", "image/png"}, MaxBytes: size, MinDimension: 300, MinRatio: 0.4, MaxRatio: 2.5}}
+}
+
+// PreparationModels remains private to media-input preparation and old-task recovery.
+func (a *Adapter) PreparationModels(context.Context) ([]core.MediaModel, error) {
+	out := []core.MediaModel{}
+	for _, m := range a.models() {
+		if !core.MediaGenerationModel(m) && (len(m.ResourceOutputs) > 0 || m.ResourceOperation != nil || m.SessionOperation != nil) {
+			out = append(out, m)
+		}
+	}
+	return out, nil
 }

@@ -164,8 +164,8 @@ func TestMiniMaxPostgresArchiveRestartAndRedaction(t *testing.T) {
 			if scenario == "context_text" {
 				cap := money.USD(1000000)
 				_, err = service.CreateMediaRequest(owner, core.CreateMediaInput{Model: model, Prompt: "Prepared scene", MaxExpectedUSD: &cap}, "capped")
-				if !errors.Is(err, core.ErrPricingUnavailable) || submissions.Load() != 0 {
-					t.Fatal("unknown total satisfied explicit cap", err, submissions.Load())
+				if !errors.Is(err, core.ErrModelUnavailable) || submissions.Load() != 0 {
+					t.Fatal("retired ContextIR admitted a capped new request", err, submissions.Load())
 				}
 				var rows int
 				if err = db.QueryRowContext(ctx, "SELECT count(*) FROM tasks").Scan(&rows); err != nil || rows != 0 {
@@ -178,14 +178,36 @@ func TestMiniMaxPostgresArchiveRestartAndRedaction(t *testing.T) {
 			}
 			body, _ := json.Marshal(payload)
 			posted := workerRequest(handler, "POST", path, body, true)
-			if posted.Code != 202 {
-				t.Fatalf("admission %d: %s", posted.Code, posted.Body.String())
-			}
 			var admitted struct {
 				ID string `json:"id"`
 			}
-			if err = json.Unmarshal(posted.Body.Bytes(), &admitted); err != nil || admitted.ID == "" {
-				t.Fatal("missing admitted task", err)
+			if scenario == "context_text" {
+				if posted.Code != 400 {
+					t.Fatalf("new retired ContextIR request admitted: %d", posted.Code)
+				}
+				// Replay a previously accepted historical job, retaining native tariff
+				// and archive/restart checks without reopening public admission.
+				quote, _, quoteErr := adapter.Quote(ctx, core.MediaModel{ID: model}, core.MediaRequest{Model: model, Prompt: "Prepare this scene"})
+				if quoteErr != nil {
+					t.Fatal(quoteErr)
+				}
+				now := time.Now().UTC()
+				legacy := core.Task{ID: uuid.NewString(), OwnerID: identity.SystemOwnerID, ProviderOwnerID: identity.SystemOwnerID, StorageOwnerID: identity.SystemOwnerID, Provider: "minimax", Model: model, MediaType: "text", Prompt: "Prepare this scene", Options: core.MediaOptions{Ratio: "16:9", Duration: 5, ReferenceMode: "none"}, Cost: &quote, Status: core.TaskQueued, CreatedAt: now, UpdatedAt: now}
+				historical, _, createErr := repo.CreateOrGet(owner, legacy, "historical-context", "historical-context")
+				if createErr != nil {
+					t.Fatal(createErr)
+				}
+				if err = q.Enqueue(owner, historical.ID); err != nil {
+					t.Fatal(err)
+				}
+				admitted.ID = historical.ID
+			} else {
+				if posted.Code != 202 {
+					t.Fatalf("admission %d: %s", posted.Code, posted.Body.String())
+				}
+				if err = json.Unmarshal(posted.Body.Bytes(), &admitted); err != nil || admitted.ID == "" {
+					t.Fatal("missing admitted task", err)
+				}
 			}
 			workCtx, cancel := context.WithCancel(ctx)
 			w := worker.New(repo, q, provider, store, time.Millisecond, 2*time.Second, 2, time.Millisecond)

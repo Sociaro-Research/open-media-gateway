@@ -3,6 +3,7 @@ package sonilo
 import (
 	"context"
 	"encoding/json"
+	"github.com/Sociaro-Research/open-media-gateway/internal/core"
 	"strings"
 )
 
@@ -30,5 +31,5 @@ func (a *Adapter) DiscoverModelIDs(ctx context.Context) ([]string, error) {
 			ids = append(ids, service)
 		}
 	}
-	return ids, nil
+	return core.MediaDiscoveryIDs(ids, catalog()), nil
 }

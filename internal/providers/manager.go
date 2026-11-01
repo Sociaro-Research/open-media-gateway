@@ -871,3 +871,15 @@ func (m *Manager) definitions() []providerkit.Definition {
 	}
 	return registry.All()
 }
+
+func (p *managedProvider) PreparationModels(ctx context.Context) ([]core.MediaModel, error) {
+	adapter, err := p.manager.resolve(ctx, p.id, true)
+	if err != nil {
+		return nil, err
+	}
+	catalog, ok := adapter.(core.MediaPreparationCatalog)
+	if !ok {
+		return nil, nil
+	}
+	return catalog.PreparationModels(p.connectionScope(ctx, adapter, core.ProviderRevision(ctx)))
+}

@@ -25,7 +25,7 @@ type quantityProvider struct{}
 
 func (quantityProvider) Name() string { return "quantity" }
 func (quantityProvider) ListModels(context.Context) ([]core.MediaModel, error) {
-	return []core.MediaModel{{ID: "context-text", MediaType: "text", NoSeed: true}}, nil
+	return []core.MediaModel{{ID: "inferred-video", MediaType: "video", NoSeed: true}}, nil
 }
 func (quantityProvider) Generate(context.Context, core.MediaRequest) (core.ProviderTask, error) {
 	return core.ProviderTask{}, errors.New("fixture must not submit")
@@ -40,7 +40,7 @@ func TestQuantityUnknownAdmissionNeverSatisfiesExplicitCostCap(t *testing.T) {
 	db := auditDatabase(t, true)
 	repo := NewTaskRepository(db)
 	queue := &quantityQueue{}
-	svc := core.NewTaskServiceWithProviders(repo, queue, map[string]core.MediaProvider{"quantity": quantityProvider{}}, map[string]string{"quantity": "context-text"}, "quantity")
+	svc := core.NewTaskServiceWithProviders(repo, queue, map[string]core.MediaProvider{"quantity": quantityProvider{}}, map[string]string{"quantity": "inferred-video"}, "quantity")
 	svc.EnableAccounting()
 	ctx := identity.WithOwnerID(context.Background(), uuid.NewString())
 	for _, cap := range []money.USD{0, 1, 1000000000} {
@@ -65,7 +65,7 @@ func TestQuantityUnknownAdmissionNeverSatisfiesExplicitCostCap(t *testing.T) {
 		t.Fatal(raw, err)
 	}
 	stored, err := repo.Get(ctx, accepted.ID)
-	if err != nil || stored.MediaType != "text" || stored.Cost == nil || !stored.Cost.QuantityUnknown || len(stored.Cost.Pricing.Components) != 2 {
+	if err != nil || stored.MediaType != "video" || stored.Cost == nil || !stored.Cost.QuantityUnknown || len(stored.Cost.Pricing.Components) != 2 {
 		t.Fatal(stored, err)
 	}
 	if err = repo.MarkRunning(ctx, accepted.ID); err != nil {

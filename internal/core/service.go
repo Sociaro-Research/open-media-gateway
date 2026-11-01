@@ -95,6 +95,9 @@ func (s *TaskService) CreateMediaRequest(ctx context.Context, input CreateMediaI
 	}
 	hash := requestHash(task.Provider, task.Model, task.MediaType, task.Prompt, webhookURL, string(encodedOptions))
 	hash = requestHash(hash, identity.ActorID(ctx))
+	if workflow, ok := ctx.Value(preparationWorkflowKey{}).(preparationWorkflow); ok {
+		hash = requestHash(hash, "media-input-preparation", workflow.provider, workflow.model, workflow.operation, workflow.subtype)
+	}
 	if len(input.TemplateSnapshot) > 0 {
 		hash = requestHash(hash, string(input.TemplateSnapshot))
 	}
@@ -254,6 +257,10 @@ func (s *TaskService) prepare(ctx context.Context, input CreateMediaInput, idemp
 	}
 	if webhookURL != "" {
 		task.WebhookURL = &webhookURL
+	}
+	if workflow, ok := ctx.Value(preparationWorkflowKey{}).(preparationWorkflow); ok {
+		task.PreparationConsumer = workflow.model
+		task.PreparationConsumerPublic = workflow.publicModel
 	}
 	task.RequireCost = s.accounting
 	if s.accounting && input.AdmissionError == nil {
@@ -604,6 +611,9 @@ func validateOptionalURL(value string) error {
 }
 
 func (s *TaskService) findModel(ctx context.Context, provider, model string) (MediaModel, bool) {
+	if preparation, ok := s.preparationModel(ctx, provider, model); ok {
+		return preparation, true
+	}
 	providerAdapter, _ := s.providerFor(ctx, provider)
 	if providerAdapter == nil {
 		return fallbackMediaModel(model), true
@@ -614,7 +624,7 @@ func (s *TaskService) findModel(ctx context.Context, provider, model string) (Me
 			return MediaModel{}, false
 		}
 		for _, item := range models {
-			if item.ID == model {
+			if item.ID == model && MediaGenerationModel(item) {
 				return item, true
 			}
 		}
@@ -668,7 +678,13 @@ func (s *TaskService) ListProviders(ctx context.Context) []ProviderDescriptor {
 			}
 			models = listed
 		}
-		models = uniqueModels(models, defaultModel)
+		models = MediaGenerationModels(uniqueModels(models, ""))
+		if len(models) == 0 {
+			continue
+		}
+		if !slices.ContainsFunc(models, func(m MediaModel) bool { return m.ID == defaultModel }) {
+			defaultModel = models[0].ID
+		}
 		for i := range models {
 			if models[i].Pricing.ReferenceQuote == nil {
 				if identity.ProviderOwnerID(ctx) == identity.SharedOwnerID && !ProviderIsFree(available[id]) {

@@ -1804,6 +1804,54 @@ paths:
       tags:
       - Generations
       x-required-scope: generation
+  /v1/models/{model}/preparations:
+    get:
+      tags: [References]
+      operationId: mediaInputPreparationSchemas
+      summary: Read input-preparation schemas for one authorized media consumer
+      x-required-scope: generation
+      parameters:
+      - {name: model, in: path, required: true, schema: {type: string}}
+      - {name: provider, in: query, required: true, schema: {type: string}}
+      responses:
+        '200': {description: Workflow-scoped preparation schemas, never standalone executable models.}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /v1/media-inputs/faces:
+    post:
+      tags: [References]
+      operationId: prepareMediaFaceInput
+      summary: Prepare an inspected face input for a media consumer
+      x-required-scope: generation
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/MediaFacePreparation'}
+      responses:
+        '202': {description: Priced preparation admitted; poll the returned generation.}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '422': {description: Verified price unavailable.}
+  /v1/media-inputs/faces/estimate:
+    post:
+      tags: [References]
+      operationId: estimateMediaFaceInput
+      summary: Estimate inspected face-input preparation without submitting work
+      x-required-scope: generation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/MediaFacePreparation'}
+      responses:
+        '200': {description: Normal verified quote and budget status.}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '422': {description: Verified price unavailable.}
   /v1/models:
     get:
       description: Only enabled models visible to this API key. Raw unique model IDs,
@@ -6459,8 +6507,8 @@ paths:
     post:
       tags: [References]
       operationId: createProviderResource
-      summary: Admit a priced resource-creation generation
-      description: Uses the normal model authorization, request limits, pricing, idempotency and cost-cap gates. Inputs are inspected owner-authorized local references or an eligible archived generation; remote IDs and client metadata are rejected. Unknown tariffs return 422. A successful generation contains local resources binding IDs.
+      summary: Prepare an input for an authorized media workflow
+      description: Requires workflow_model for a current authorized media consumer whose input schema accepts this preparation. This is not standalone resource management. Uses the normal model authorization, request limits, pricing, idempotency and cost-cap gates. Inputs are inspected owner-authorized local references or an eligible archived generation; remote IDs and client metadata are rejected. Unknown tariffs return 422. A successful generation contains local resources binding IDs.
       x-required-scope: generation
       parameters:
       - $ref: '#/components/parameters/IdempotencyKey'
@@ -6573,24 +6621,7 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
-    delete:
-      tags: [References]
-      operationId: deleteProviderResource
-      summary: Start owner-authorized asynchronous deletion
-      description: Presets and resources retained by active work cannot be deleted. Pending or uncertain deletion is never treated as completed and is never automatically resubmitted. A provider without a documented deletion poll contract remains pending with a warning.
-      x-required-scope: generation
-      parameters:
-      - $ref: '#/components/parameters/IdempotencyKey'
-      responses:
-        '202':
-          description: Current deletion job, including idempotent replay.
-          content:
-            application/json:
-              schema: {$ref: '#/components/schemas/ProviderResourceJob'}
-        '401': {$ref: '#/components/responses/Unauthorized'}
-        '403': {$ref: '#/components/responses/Forbidden'}
-        '404': {$ref: '#/components/responses/NotFound'}
-        '409': {description: Resource in use or lifecycle conflict.}
+
   "/v1/provider-resource-jobs/{id}":
     get:
       tags: [References]
@@ -10217,11 +10248,21 @@ components:
         authentication check does not prove model access or funded generation; inspect
         status_message for its scope. Cached checks can expire or reset on restart.
         Separate billing credentials are used to retrieve actual generation charges.
+    MediaFacePreparation:
+      type: object
+      additionalProperties: false
+      required: [provider, workflow_model, reference_id]
+      properties:
+        provider: {type: string}
+        workflow_model: {type: string, description: Authorized media consumer requiring a face_session input.}
+        reference_id: {type: string, format: uuid, description: Owned local video reference; server inspection is mandatory.}
+        max_expected_usd: {type: number, minimum: 0}
     ProviderResourceAction:
       type: object
       additionalProperties: false
       required: [expected_revision]
       properties:
+        workflow_model: {type: string, description: Required for state mutations; currently authorized media consumer whose inputs require this session. A real video preview remains a media operation.}
         model: {type: string, description: Optional authorized session-operation model.}
         expected_revision: {type: integer, format: int64, minimum: 0}
         recover: {type: boolean, default: false, description: Explicit recovery clear only; never automatically resubmit an uncertain mutation.}
@@ -10248,10 +10289,11 @@ components:
     ProviderResourceCreate:
       type: object
       additionalProperties: false
-      required: [provider, kind, name]
+      required: [provider, workflow_model, kind, name]
       properties:
+        workflow_model: {type: string, description: Required currently authorized media consumer on this connection; preparation is not a standalone model.}
         provider: {type: string, description: Authorized concrete provider connection ID.}
-        model: {type: string, description: Optional reviewed resource-operation model from the authorized catalogue.}
+        model: {type: string, description: Optional native input-preparation operation returned for the authorized media consumer.}
         kind: {type: string}
         subtype: {type: string}
         name: {type: string}

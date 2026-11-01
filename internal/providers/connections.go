@@ -221,7 +221,7 @@ func validateConnection(d providerkit.Definition, c *providerkit.Connection, old
 		if !ok {
 			return errors.New("choose a supported API request profile")
 		}
-		if model.Model.MediaType != profile.MediaType {
+		if !core.MediaGenerationModel(profile) || !core.MediaGenerationModel(model.Model) || model.Model.MediaType != profile.MediaType {
 			return errors.New("model media type must match the selected request profile")
 		}
 		if model.Model.DisplayName == "" {

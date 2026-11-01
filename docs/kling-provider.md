@@ -28,8 +28,8 @@ concrete connection prefix, for example `kling/kling-4.0-omni-video`.
 | Images | Standard3/2.1, Omni3/O1, multi-image, outpainting, AI Multi-Shot | [Image capability map](https://kling.ai/document-api/guides/capability-map/image.md) |
 | Audio and Avatar | Text-to-audio, video-to-audio, TTS, Avatar image-to-video | [TTS](https://kling.ai/document-api/api/video/avatar/text-to-speech.md), [Avatar](https://kling.ai/document-api/api/video/avatar.md) |
 | Solutions | Effects, Apparel, Goods Studio, Video Commerce, Virtual Try-On | [Apparel](https://kling.ai/document-api/api/ecommerce-replication/apparel.md), [Goods Studio](https://kling.ai/document-api/api/ecommerce-replication/goods-studio.md), [Video Commerce](https://kling.ai/document-api/api/ecommerce-replication/video-commerce.md), [Virtual Try-On](https://kling.ai/document-api/api/ecommerce-replication/virtual-try-on.md) |
-| Analysis and editing | Image recognition, face detection, lip-sync, multi-element editing | [Recognition](https://kling.ai/document-api/api/video/image-recognition.md), [Face detection](https://kling.ai/document-api/api/video/lip-sync/face-detection.md), [Lip-sync](https://kling.ai/document-api/api/video/lip-sync.md), [Editing](https://kling.ai/document-api/api/video/multi-elements.md) |
-| Managed resources | Element/voice creation, local binding lifecycle, editing initialization and selection actions | [Elements](https://kling.ai/document-api/api/video/4-0/elements.md), [Voices](https://kling.ai/document-api/api/video/4-0/voice-customization.md) |
+| Media editing | Lip-sync and multi-element editing; inspected face inputs are prepared within those workflows | [Recognition](https://kling.ai/document-api/api/video/image-recognition.md), [Face detection](https://kling.ai/document-api/api/video/lip-sync/face-detection.md), [Lip-sync](https://kling.ai/document-api/api/video/lip-sync.md), [Editing](https://kling.ai/document-api/api/video/multi-elements.md) |
+| Internal input preparation | Element/voice creation, editing initialization and selections, scoped to an authorized media consumer | [Elements](https://kling.ai/document-api/api/video/4-0/elements.md), [Voices](https://kling.ai/document-api/api/video/4-0/voice-customization.md) |
 
 Use the authorized `/v1/models` response for exact operation IDs, controls,
 reference modes, resource schemas and price availability. Capability maps do not
@@ -87,9 +87,13 @@ models retain their existing limits. Uninspected external video duration remains
 Gateway does not fetch arbitrary remote references as a side effect of quoting.
 A required input-duration estimate cannot treat unknown metadata as zero.
 
-## Resources and session actions
+## Media-scoped input preparation
 
-`POST /v1/provider-resources/estimate` and `POST /v1/provider-resources` accept
+Standalone recognition/resource/state operations are not public generation models.
+Follow the [media-only product scope](media-scope.md).
+
+`POST /v1/provider-resources/estimate` and `POST /v1/provider-resources` require
+`workflow_model`, an authorized media consumer on the same connection, and accept
 local reference UUIDs or an eligible owned generation. The host inspects source
 bytes, pins the actual connection/revision and constructs private native inputs.
 Public bodies never accept native IDs, source URLs, hashes or duration assertions.
@@ -101,6 +105,7 @@ Read local bindings with `GET /v1/provider-resources?provider=CONNECTION` and
 {
   "provider": "kling",
   "model": "kling-selection-init",
+  "workflow_model": "kling-multi-elements-editing",
   "kind": "editing_session",
   "subtype": "selection",
   "name": "My selection",
@@ -119,6 +124,7 @@ Selection operations use
 
 ```json
 {
+  "workflow_model": "kling-multi-elements-editing",
   "expected_revision": 0,
   "frame": {
     "frame_index": 0,
@@ -136,11 +142,15 @@ same binding at revision+1. A failed or uncertain mutation leaves the binding
 unusable; only an explicit clear with `recover:true` can restore a known state.
 Never silently retry an uncertain paid provider submission.
 
-`DELETE /v1/provider-resources/{id}` revokes local face/editing bindings without
-claiming an upstream deletion or changing native expiry. Active admitted uses
-prevent revocation. Element/voice deletions use their documented native operation;
-an asynchronous handle without a documented matching poll endpoint remains
-pending/uncertain. A submitted request is not proof of deletion.
+Standalone resource deletion is not exposed. Existing bindings and previously
+admitted lifecycle jobs retain authorized read/poll access; no stored resources
+or history are deleted by this scope correction. Face-input preparation uses
+`POST /v1/media-inputs/faces` and `/estimate`, with `provider`, `workflow_model`
+and one owned `reference_id`. It is available only to a media consumer declaring
+a `face_session` input. Read eligible schemas with
+`GET /v1/models/{model}/preparations?provider=CONNECTION`. Selection preview is
+retained as a genuine media operation; state mutations require the media consumer.
+
 
 Lip-sync selects one local face index and exactly one allowed sound source. Crop
 and insertion controls are milliseconds; crops must fit inspected source duration

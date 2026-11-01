@@ -31,7 +31,7 @@ func isGenerationPath(path string) bool {
 		return true
 	}
 	switch path {
-	case "/v1/provider-resources/estimate", "/v1/provider-resources", "/v1/videos", "/v1/images/generations", "/v1/images/edits", "/v1/audio/speech", "/v1/audio/generations", "/v1/generations", "/v1/generations/estimate":
+	case "/v1/media-inputs/faces", "/v1/media-inputs/faces/estimate", "/v1/provider-resources/estimate", "/v1/provider-resources", "/v1/videos", "/v1/images/generations", "/v1/images/edits", "/v1/audio/speech", "/v1/audio/generations", "/v1/generations", "/v1/generations/estimate":
 		return true
 	}
 	return false
@@ -91,6 +91,7 @@ func (s *Server) visibleCatalog(r *http.Request) []core.ProviderDescriptor {
 	if !ok {
 		catalog = s.service.ListProviders(r.Context())
 	}
+	catalog = core.MediaGenerationCatalog(catalog)
 	// Copy descriptors before adding local effective limits; providers may cache
 	// these slices, and catalogue synchronization must keep its own evidence.
 	if catalog == nil {

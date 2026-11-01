@@ -99,7 +99,7 @@ func TestMiniMaxManagedCatalogueAcceptsEveryOfficialTariff(t *testing.T) {
 		t.Fatal("credentials were not encrypted", err)
 	}
 	capture, err := manager.CaptureCatalog(ctx, "minimax")
-	if err != nil || len(capture.Models) != 37 {
+	if err != nil || len(capture.Models) != 33 {
 		t.Fatal("registered manager catalogue", len(capture.Models), err)
 	}
 	raw, err := os.ReadFile("testdata/pricing.md")
@@ -115,6 +115,8 @@ func TestMiniMaxManagedCatalogueAcceptsEveryOfficialTariff(t *testing.T) {
 	for _, m := range capture.Models {
 		models[m.ID] = m
 	}
+	// Historical tariff parsing remains covered without restoring a public text model.
+	models[minimax.ContextIR] = core.MediaModel{ID: minimax.ContextIR, MediaType: "text"}
 	native, err := minimax.New(key, "", nil)
 	if err != nil {
 		t.Fatal(err)

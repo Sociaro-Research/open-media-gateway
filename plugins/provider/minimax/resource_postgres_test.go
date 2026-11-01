@@ -248,7 +248,7 @@ func TestMiniMaxPostgresFileResourceAPIAndGeneration(t *testing.T) {
 	service.SetAdmissionScopeResolver(pgResourceScope)
 	service.EnableAccounting()
 	handler := api.NewGateway(api.Dependencies{Service: service, Health: workerHealth{}, APIKey: "gateway-fixture", Storage: store, SigningSecret: "signing-fixture", MediaURLTTL: time.Hour, References: library, AssetPublicURL: "https://gateway.fixture", ResourceRepository: resources, ResourceScopes: pgResourceScope, ResourceDirectory: directory})
-	base := map[string]any{"provider": "minimax", "model": minimax.ResourceUpload, "kind": "file_resource", "subtype": "image", "name": "Owned input", "reference_ids": []string{ref.ID}}
+	base := map[string]any{"provider": "minimax", "model": minimax.ResourceUpload, "workflow_model": "MiniMax-H3", "kind": "file_resource", "subtype": "image", "name": "Owned input", "reference_ids": []string{ref.ID}}
 	for _, field := range []string{"remote_id", "source_url"} {
 		bad := map[string]any{}
 		for k, v := range base {
@@ -288,7 +288,7 @@ func TestMiniMaxPostgresFileResourceAPIAndGeneration(t *testing.T) {
 	}
 
 	// Public source-task regeneration resolves local archived task -> opaque binding.
-	sourceBound := resourceHTTP(handler, "POST", "/v1/provider-resources", map[string]any{"provider": "minimax", "model": minimax.ResourceSourceTask, "kind": "file_resource", "subtype": "regeneration_source", "name": "Owned H3 source", "generated_task_id": generated.ID})
+	sourceBound := resourceHTTP(handler, "POST", "/v1/provider-resources", map[string]any{"provider": "minimax", "model": minimax.ResourceSourceTask, "workflow_model": minimax.Regeneration, "kind": "file_resource", "subtype": "regeneration_source", "name": "Owned H3 source", "generated_task_id": generated.ID})
 	if sourceBound.Code != 202 {
 		t.Fatalf("H3 source binding %d:%s", sourceBound.Code, sourceBound.Body.String())
 	}
@@ -319,7 +319,7 @@ func TestMiniMaxPostgresFileResourceAPIAndGeneration(t *testing.T) {
 		t.Run("managed file "+mode, func(t *testing.T) {
 			refs := []map[string]string{{"binding_id": binding, "reference_id": "image_1"}}
 			if mode == "first_last_frame" {
-				second := resourceHTTP(handler, "POST", "/v1/provider-resources", map[string]any{"provider": "minimax", "model": minimax.ResourceUpload, "kind": "file_resource", "subtype": "image", "name": "Owned last frame", "reference_ids": []string{ref.ID}})
+				second := resourceHTTP(handler, "POST", "/v1/provider-resources", map[string]any{"provider": "minimax", "model": minimax.ResourceUpload, "workflow_model": "MiniMax-H3", "kind": "file_resource", "subtype": "image", "name": "Owned last frame", "reference_ids": []string{ref.ID}})
 				if second.Code != 202 {
 					t.Fatalf("second frame binding admission %d", second.Code)
 				}
@@ -369,7 +369,7 @@ func TestMiniMaxPostgresFileResourceAPIAndGeneration(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		posted := resourceHTTP(handler, "POST", "/v1/provider-resources", map[string]any{"provider": "minimax", "model": minimax.ResourceUpload, "kind": "file_resource", "subtype": "video", "name": "Owned inspected base", "reference_ids": []string{baseRef.ID}})
+		posted := resourceHTTP(handler, "POST", "/v1/provider-resources", map[string]any{"provider": "minimax", "model": minimax.ResourceUpload, "workflow_model": minimax.RegenerationVideo, "kind": "file_resource", "subtype": "video", "name": "Owned inspected base", "reference_ids": []string{baseRef.ID}})
 		if posted.Code != 202 {
 			t.Fatalf("base upload admission %d:%s", posted.Code, posted.Body.String())
 		}
@@ -391,7 +391,7 @@ func TestMiniMaxPostgresFileResourceAPIAndGeneration(t *testing.T) {
 
 	// Input deletion remains intentionally unavailable under the official purpose enum.
 	denied := resourceHTTP(handler, "DELETE", "/v1/provider-resources/"+binding, nil)
-	if denied.Code < 400 || deletes.Load() != 0 {
+	if denied.Code != http.StatusMethodNotAllowed || deletes.Load() != 0 {
 		t.Errorf("undocumented input deletion must reject before lifecycle mutation: status=%d native_deletes=%d", denied.Code, deletes.Load())
 	}
 	stillBound := resourceHTTP(handler, "GET", "/v1/provider-resources/"+binding, nil)
@@ -410,7 +410,7 @@ func TestMiniMaxPostgresFileResourceAPIAndGeneration(t *testing.T) {
 	if legacyTask.Status != core.TaskSucceeded {
 		t.Fatal(legacyTask.Error)
 	}
-	output := resourceHTTP(handler, "POST", "/v1/provider-resources", map[string]any{"provider": "minimax", "model": minimax.ResourceOutputFile, "kind": "file_resource", "subtype": "video", "name": "Owned output", "generated_task_id": legacyTask.ID})
+	output := resourceHTTP(handler, "POST", "/v1/provider-resources", map[string]any{"provider": "minimax", "model": minimax.ResourceOutputFile, "workflow_model": "MiniMax-H3", "kind": "file_resource", "subtype": "video", "name": "Owned output", "generated_task_id": legacyTask.ID})
 	if output.Code != 202 {
 		t.Fatalf("owned output bind %d:%s", output.Code, output.Body.String())
 	}
@@ -426,6 +426,12 @@ func TestMiniMaxPostgresFileResourceAPIAndGeneration(t *testing.T) {
 				path = "/v1/generations"
 			}
 			continued := resourceHTTP(handler, "POST", path, map[string]any{"model": "minimax/" + model, "prompt": "Continue @video1", "options": map[string]any{"reference_mode": "references", "resource_references": []map[string]string{{"binding_id": bound.StoredResourceReferences[0].BindingID, "reference_id": "video_1"}}}})
+			if model == minimax.ContextIR {
+				if continued.Code != 400 {
+					t.Fatalf("retired ContextIR reuse admitted: %d", continued.Code)
+				}
+				return
+			}
 			if continued.Code != 202 {
 				t.Fatalf("owned output admission %d:%s", continued.Code, continued.Body.String())
 			}
@@ -441,11 +447,12 @@ func TestMiniMaxPostgresFileResourceAPIAndGeneration(t *testing.T) {
 		})
 	}
 	deleted := resourceHTTP(handler, "DELETE", "/v1/provider-resources/"+bound.StoredResourceReferences[0].BindingID, nil)
-	if deleted.Code != 202 && deleted.Code != 200 {
-		t.Fatalf("owned output deletion %d:%s", deleted.Code, deleted.Body.String())
+	if deleted.Code != http.StatusMethodNotAllowed || deletes.Load() != 0 {
+		t.Fatalf("standalone deletion must be unavailable without native mutation: status=%d calls=%d", deleted.Code, deletes.Load())
 	}
-	if deletes.Load() != 1 {
-		t.Fatal("output delete not called", deletes.Load())
+	retained, readErr := resources.GetBinding(owner, bound.StoredResourceReferences[0].BindingID)
+	if readErr != nil || retained.Status != "succeeded" {
+		t.Fatal("retired deletion changed owned output", readErr)
 	}
 	if _, err = resources.GetBinding(identity.WithOwnerID(ctx, uuid.NewString()), binding); err == nil {
 		t.Fatal("foreign resource binding read")
@@ -472,7 +479,7 @@ func TestMiniMaxPostgresFileResourceAPIAndGeneration(t *testing.T) {
 		if generated.ProviderIdentity == "" {
 			t.Error("unpriced generation must persist canonical provider connection revision independently of a successful cost quote")
 		}
-		posted = resourceHTTP(handler, "POST", "/v1/provider-resources", map[string]any{"provider": "minimax", "model": minimax.ResourceOutputFile, "kind": "file_resource", "subtype": "video", "name": "Owned duration unknown", "generated_task_id": generated.ID})
+		posted = resourceHTTP(handler, "POST", "/v1/provider-resources", map[string]any{"provider": "minimax", "model": minimax.ResourceOutputFile, "workflow_model": "MiniMax-H3", "kind": "file_resource", "subtype": "video", "name": "Owned duration unknown", "generated_task_id": generated.ID})
 		if posted.Code != 202 {
 			t.Fatalf("unknown duration owned output must be bindable without fabrication: status=%d body=%s", posted.Code, posted.Body.String())
 		}
@@ -600,7 +607,7 @@ func runManagedMediaResourceRoundTrip(t *testing.T, data []byte, name, kind, mod
 			if direct.Code < 400 {
 				t.Fatal("unproved direct audio codec admitted", direct.Code)
 			}
-			upload := resourceHTTP(handler, "POST", "/v1/provider-resources", map[string]any{"provider": "minimax", "model": minimax.ResourceUpload, "kind": "file_resource", "subtype": "video", "name": "Reject unproved audio codec", "reference_ids": []string{ref.ID}})
+			upload := resourceHTTP(handler, "POST", "/v1/provider-resources", map[string]any{"provider": "minimax", "model": minimax.ResourceUpload, "workflow_model": "MiniMax-H3", "kind": "file_resource", "subtype": "video", "name": "Reject unproved audio codec", "reference_ids": []string{ref.ID}})
 			if upload.Code < 400 || submissions.Load() != 0 {
 				t.Fatal("unproved upload codec admitted or submitted", upload.Code, submissions.Load())
 			}
@@ -621,7 +628,7 @@ func runManagedMediaResourceRoundTrip(t *testing.T, data []byte, name, kind, mod
 			t.Fatal("direct inspected codec dispatch", result.Error)
 		}
 	}
-	posted := resourceHTTP(handler, "POST", "/v1/provider-resources", map[string]any{"provider": "minimax", "model": minimax.ResourceUpload, "kind": "file_resource", "subtype": kind, "name": "Owned inspected media", "reference_ids": []string{ref.ID}})
+	posted := resourceHTTP(handler, "POST", "/v1/provider-resources", map[string]any{"provider": "minimax", "model": minimax.ResourceUpload, "workflow_model": "MiniMax-H3", "kind": "file_resource", "subtype": kind, "name": "Owned inspected media", "reference_ids": []string{ref.ID}})
 	if posted.Code != 202 {
 		t.Fatalf("Managed media public upload %d:%s", posted.Code, posted.Body.String())
 	}

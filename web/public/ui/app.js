@@ -430,7 +430,7 @@ function renderTasks(tasks) {
     changeProject.addEventListener('pointerenter',event=>{if(event.pointerType==='mouse'&&changeProject.closest('.task-menu').open)window.GatewayProjects?.assign(article.taskData,changeProject,{focus:false});});
     changeProject.addEventListener('keydown',event=>{if(event.key==='ArrowRight'){event.preventDefault();window.GatewayProjects?.assign(article.taskData,changeProject);}});
     article.querySelector('.task-menu').addEventListener('toggle',event=>{if(!event.currentTarget.open)window.ControlPickers?.dismiss(changeProject);});
-    const resourceModel=providerCatalog.find(p=>p.id===task.provider)?.models.find(m=>m.id===task.model),replayable=task.media_type!=='resource'||!!ResourceControls.intent(resourceModel,task.options?.resource_intent);
+    const resourceModel=providerCatalog.find(p=>p.id===task.provider)?.models.find(m=>m.id===task.model),replayable=ModelPicker.isMediaModel(resourceModel)&&resourceModel.media_type===task.media_type;
     article.querySelector('.reuse-task').hidden=!replayable;article.querySelector('.retry-task').hidden=!replayable||!!task.options?.session_action;
     article.querySelector('.reuse-task').addEventListener('click', () => reuseTask(article.taskData));
     article.querySelector('.retry-task').addEventListener('click', event => retryTask(article.taskData, event.currentTarget));
@@ -1319,7 +1319,8 @@ function updateTimer(timer) {
 }
 function reuseTask(task, {sparse=false}={}) {
   const provider = providerCatalog.find(item => item.id === task.provider);
-  if (!provider?.models.some(item => item.id === task.model)) {
+  const model=provider?.models.find(item=>item.id===task.model);
+  if (!ModelPicker.isMediaModel(model) || model.media_type !== task.media_type) {
     setMessage('This provider or model is unavailable. Enable it in Providers before copying.', 'error');
     elements.message.scrollIntoView({block: 'center'});
     return;
@@ -1416,7 +1417,7 @@ async function openGenerationConfirmation(source, trigger) {
   if (!window.GenerationKey.value()) { setMessage('Enter a valid Gateway API key above.', 'error'); return; }
   const provider = (source.template ? source.template_catalog || providerCatalog : providerCatalog).find(item => item.id === source.provider);
   const model = provider?.models.find(item => item.id === source.model);
-  if (!model || model.media_type !== source.media_type) {
+  if (!ModelPicker.isMediaModel(model) || model.media_type !== source.media_type) {
     setMessage('This provider or model is unavailable. Choose an available model before generating.', 'error'); return;
   }
   const request = structuredClone(source);

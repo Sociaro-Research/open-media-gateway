@@ -53,10 +53,14 @@ func TestSavedWan3InheritsCombinedDurationWithoutIdentityChange(t *testing.T) {
 	if count != 2 {
 		t.Fatalf("expected both Wan 3 variants, got %d", count)
 	}
-	// Unknown profiles do not acquire provider-specific constraints.
+	// Unknown persisted profiles stay stored but are not executable.
 	adapter := connectionAdapter{definition: definition, credentials: Credentials{Connection: &providerkit.Connection{ManualCatalog: true, Models: []providerkit.ManualModel{{Profile: "unknown", Model: core.MediaModel{ID: "custom"}}}}}}
+	beforeUnknown := connectionIdentity("fixture", definition, adapter.credentials)
 	models, err := adapter.ListModels(context.Background())
-	if err != nil || len(models) != 1 || models[0].ReferenceMediaLimits != nil {
+	if connectionIdentity("fixture", definition, adapter.credentials) != beforeUnknown || len(adapter.credentials.Connection.Models) != 1 || adapter.credentials.Connection.Models[0].Profile != "unknown" || adapter.credentials.Connection.Models[0].Model.ReferenceMediaLimits != nil {
+		t.Fatal("unknown saved profile/configuration was mutated")
+	}
+	if err != nil || len(models) != 0 {
 		t.Fatal("unknown profile changed", models, err)
 	}
 }

@@ -1797,3 +1797,8 @@ input[type=color]:focus-visible { outline:none; box-shadow:none; border:2px soli
 
 .artifact-text:focus-visible {outline:none;border:2px solid var(--accent);padding:11px}
 @media(forced-colors:active){.artifact-text:focus-visible{border-color:Highlight}}
+
+/* Input preparation reuses the shared media dialog, fields and spacing scale. */
+.media-preparation-dialog[open] { display:grid; gap:16px; }
+.media-preparation-dialog > :is(p,label) { margin:0; }
+.media-preparation-dialog .reference-actions { display:flex; gap:12px; flex-wrap:wrap; }

@@ -28,7 +28,7 @@ func assertKlingContracts(t *testing.T, models []core.MediaModel) {
 		kling.OmniVideo4:          {10, true, []string{"references"}, 3, 30, 1, 26000},
 	}
 
-	additional := map[string]string{kling.SessionInit: "resource", kling.SessionAdd: "json", kling.SessionDelete: "json", kling.SessionClear: "json", kling.SessionPreview: "video", kling.OmniVideo3: "video", kling.OmniVideoO1: "video", kling.ResourceCreateElement: "resource", kling.ResourceCreateVoice: "resource", kling.ImageRecognition: "json", kling.FaceDetection: "json", kling.LipSync: "video", kling.MultiElementsEditing: "video",
+	additional := map[string]string{kling.SessionPreview: "video", kling.OmniVideo3: "video", kling.OmniVideoO1: "video", kling.LipSync: "video", kling.MultiElementsEditing: "video",
 		kling.ImageGeneration3:   "image",
 		kling.ImageGeneration21:  "image",
 		kling.ImageOmni3:         "image",

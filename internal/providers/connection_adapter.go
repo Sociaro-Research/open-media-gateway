@@ -193,6 +193,7 @@ func (a *connectionAdapter) ListModels(ctx context.Context) ([]core.MediaModel, 
 	if err != nil && len(a.connection().Models) == 0 {
 		return nil, a.redact(err)
 	}
+	invalidManual := map[string]bool{}
 	index := map[string]int{}
 	for i, m := range result {
 		index[m.ID] = i
@@ -205,6 +206,15 @@ func (a *connectionAdapter) ListModels(ctx context.Context) ([]core.MediaModel, 
 	}
 	for _, manual := range a.connection().Models {
 		model := manual.Model
+		nativePreparation, preparationErr := a.nativePreparation(ctx, model.ID)
+		if preparationErr != nil {
+			return nil, preparationErr
+		}
+		profile, validProfile := profiles[manual.Profile]
+		if nativePreparation || !validProfile || !core.MediaGenerationModel(profile) || !core.MediaGenerationModel(model) || model.MediaType != profile.MediaType {
+			invalidManual[model.ID] = true
+			continue
+		}
 		if model.ReferencePromptRecommendation == nil {
 			model.ReferencePromptRecommendation = modelcatalog.Enrich(a.definition.ID, profiles[manual.Profile]).ReferencePromptRecommendation.Clone()
 		}
@@ -236,7 +246,13 @@ func (a *connectionAdapter) ListModels(ctx context.Context) ([]core.MediaModel, 
 			result = append(result, model)
 		}
 	}
-	return result, nil
+	eligible := result[:0]
+	for _, m := range result {
+		if !invalidManual[m.ID] {
+			eligible = append(eligible, m)
+		}
+	}
+	return core.MediaGenerationModels(eligible), nil
 }
 func (a *connectionAdapter) DiscoverModelIDs(ctx context.Context) ([]string, error) {
 	if a.connection().ManualCatalog {
@@ -245,7 +261,8 @@ func (a *connectionAdapter) DiscoverModelIDs(ctx context.Context) ([]string, err
 	if d, ok := a.MediaProvider.(interface {
 		DiscoverModelIDs(context.Context) ([]string, error)
 	}); ok {
-		return d.DiscoverModelIDs(ctx)
+		ids, err := d.DiscoverModelIDs(ctx)
+		return core.MediaDiscoveryIDs(ids, a.ReviewedCatalogModels()), err
 	}
 	return []string{}, nil
 }
@@ -260,7 +277,10 @@ func (a *connectionAdapter) ReviewedCatalogModels() []core.MediaModel {
 				models = append(models, model)
 			}
 		}
-		return models
+		return core.MediaGenerationModels(models)
+	}
+	if a.definition.Profiles != nil {
+		return core.MediaGenerationModels(a.definition.Profiles())
 	}
 	return nil
 }
@@ -301,7 +321,11 @@ func (a *connectionAdapter) CredentialStatus() providerkit.CredentialCheck {
 	return providerkit.CredentialCheck{}
 }
 func (a *connectionAdapter) ValidateRequest(ctx context.Context, r core.MediaRequest) error {
-	if manual, ok := a.manual(r.Model); ok {
+	preparation, err := a.nativePreparation(ctx, r.Model)
+	if err != nil {
+		return err
+	}
+	if manual, ok := a.manual(r.Model); ok && !preparation {
 		return core.ValidateReferenceMode(manual.Model, r.Options)
 	}
 	if v, ok := a.MediaProvider.(core.RequestValidator); ok {
@@ -310,7 +334,11 @@ func (a *connectionAdapter) ValidateRequest(ctx context.Context, r core.MediaReq
 	return nil
 }
 func (a *connectionAdapter) Generate(ctx context.Context, r core.MediaRequest) (core.ProviderTask, error) {
-	if manual, ok := a.manual(r.Model); ok {
+	preparation, err := a.nativePreparation(ctx, r.Model)
+	if err != nil {
+		return core.ProviderTask{}, err
+	}
+	if manual, ok := a.manual(r.Model); ok && !preparation {
 		// The profile selects a proven serializer/parser; only the outgoing model ID is replaced.
 		body := map[string]any{}
 		mergeBody(body, manual.ExtraBody)
@@ -350,7 +378,11 @@ func (a *connectionAdapter) PreferInlineImages() bool {
 func (a *connectionAdapter) IsFree() bool        { return a.definition.Free }
 func (a *connectionAdapter) FailureIsFree() bool { return a.definition.FailureNoCharge }
 func (a *connectionAdapter) Quote(ctx context.Context, m core.MediaModel, r core.MediaRequest) (core.TaskCost, string, error) {
-	if manual, ok := a.manual(r.Model); ok {
+	preparation, err := a.nativePreparation(ctx, r.Model)
+	if err != nil {
+		return core.TaskCost{}, "", err
+	}
+	if manual, ok := a.manual(r.Model); ok && !preparation {
 		if manual.PriceUSD == nil {
 			return core.TaskCost{}, "", core.ErrPricingUnavailable
 		}
@@ -369,4 +401,33 @@ func (a *connectionAdapter) Quote(ctx context.Context, m core.MediaModel, r core
 		return cost, "", err
 	}
 	return core.TaskCost{}, "", fmt.Errorf("%w", core.ErrPricingUnavailable)
+}
+
+func (a *connectionAdapter) PreparationModels(ctx context.Context) ([]core.MediaModel, error) {
+	if a.connection().ManualCatalog {
+		return nil, nil
+	}
+	if catalog, ok := a.MediaProvider.(core.MediaPreparationCatalog); ok {
+		return catalog.PreparationModels(ctx)
+	}
+	return nil, nil
+}
+
+// Canonical internal preparation must never be intercepted by persisted manual
+// aliases. This also preserves native dispatch when an admitted helper resumes.
+func (a *connectionAdapter) nativePreparation(ctx context.Context, id string) (bool, error) {
+	catalog, ok := a.MediaProvider.(core.MediaPreparationCatalog)
+	if !ok {
+		return false, nil
+	}
+	models, err := catalog.PreparationModels(ctx)
+	if err != nil {
+		return false, err
+	}
+	for _, model := range models {
+		if model.ID == id && !model.Manual && !core.MediaGenerationModel(model) {
+			return true, nil
+		}
+	}
+	return false, nil
 }

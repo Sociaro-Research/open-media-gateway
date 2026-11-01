@@ -24,8 +24,11 @@ var (
 )
 
 type Task struct {
-	StoredResourceReferences []ResourceReference `json:"-"`
-	StoredArtifacts          []StoredArtifact    `json:"-"`
+	// Trusted ephemeral consumer identity, checked only for new input preparations.
+	PreparationConsumer       string              `json:"-"`
+	PreparationConsumerPublic string              `json:"-"`
+	StoredResourceReferences  []ResourceReference `json:"-"`
+	StoredArtifacts           []StoredArtifact    `json:"-"`
 	// Checked only for NEW admissions after idempotency resolution. Never stored.
 	AdmissionError         error           `json:"-"`
 	TemplateSnapshot       json.RawMessage `json:"template_snapshot,omitempty"`

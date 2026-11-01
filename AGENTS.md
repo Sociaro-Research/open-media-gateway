@@ -6,6 +6,12 @@ not authorize a commit, push, release, deployment or change to external services
 
 ## Project boundaries
 
+- Follow the [media-only product scope](docs/media-scope.md): public integrations
+  generate/transform video, images and audio (including speech/music). Do not add
+  standalone text/JSON, recognition, resource CRUD or state-mutation models. Keep
+  necessary input preparation scoped to an authorized media workflow, and preserve
+  existing data, accepted-job recovery and internal artifact handling.
+
 - Keep the public API and core contracts provider-neutral. Provider-specific
   behavior belongs in `plugins/provider/<id>` and the explicit registry.
 - Preserve applied PostgreSQL migrations. Add a new migration for schema changes.

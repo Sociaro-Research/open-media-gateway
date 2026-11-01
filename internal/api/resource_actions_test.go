@@ -8,6 +8,7 @@ import (
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
 	"github.com/Sociaro-Research/open-media-gateway/internal/providerresources"
+	"github.com/Sociaro-Research/open-media-gateway/plugins/provider/kling"
 )
 
 func sessionAPIBinding(f *resourceAPIFixture, actor string) providerresources.Binding {
@@ -24,7 +25,7 @@ func TestResourceSessionActionAuthenticatedAdmissionEstimateAndReplay(t *testing
 	b := sessionAPIBinding(f, "alice")
 	path := "/v1/provider-resources/" + b.ID + "/actions/add"
 	point := map[string]any{"x": .123456789012345, "y": .5}
-	body := map[string]any{"expected_revision": 0, "frame": map[string]any{"frame_index": 0, "points": []any{point}}}
+	body := map[string]any{"workflow_model": kling.MultiElementsEditing, "expected_revision": 0, "frame": map[string]any{"frame_index": 0, "points": []any{point}}}
 	estimate := resourceAPIRequest(f.h, "POST", path+"/estimate", f.alice, "", body)
 	resourceAPIAssertStatus(t, estimate, 200)
 	if f.tasks.creates != 0 || len(f.queue.ids) != 0 {
@@ -60,12 +61,12 @@ func TestResourceSessionActionRejectsSpoofingForeignScopesAndUnknownPrice(t *tes
 	f := newResourceAPIFixture(t)
 	b := sessionAPIBinding(f, "alice")
 	path := "/v1/provider-resources/" + b.ID + "/actions/clear"
-	body := map[string]any{"expected_revision": 0}
+	body := map[string]any{"workflow_model": kling.MultiElementsEditing, "expected_revision": 0}
 	resourceAPIAssertStatus(t, resourceAPIRequest(f.h, "POST", path, f.alice, "unknown-price", body), 422)
 	resourceAPIAssertStatus(t, resourceAPIRequest(f.h, "POST", path, f.bob, "foreign", body), 404)
 	resourceAPIAssertStatus(t, resourceAPIRequest(f.h, "POST", path, "", "missing-auth", body), 401)
 	for _, key := range []string{"remote_id", "session_id", "source_sha256", "duration", "_reference_resources", "source_reference"} {
-		forged := map[string]any{"expected_revision": 0, key: "client-forged"}
+		forged := map[string]any{"workflow_model": kling.MultiElementsEditing, "expected_revision": 0, key: "client-forged"}
 		resourceAPIAssertStatus(t, resourceAPIRequest(f.h, "POST", path, f.alice, key, forged), 400)
 	}
 	resourceAPIAssertStatus(t, resourceAPIRequest(f.h, "POST", path, f.alice, "missing-revision", map[string]any{}), 400)
@@ -80,7 +81,7 @@ func TestResourceSessionActionCapsBudgetRecoveryAndExactDeletion(t *testing.T) {
 	f := newResourceAPIFixtureWithPrices(t, map[string]string{"selection_clear_price": "0.1", "selection_delete_price": "0.1"})
 	b := sessionAPIBinding(f, "alice")
 	path := "/v1/provider-resources/" + b.ID + "/actions/clear"
-	body := map[string]any{"expected_revision": 0, "max_expected_usd": .01}
+	body := map[string]any{"workflow_model": kling.MultiElementsEditing, "expected_revision": 0, "max_expected_usd": .01}
 	resourceAPIAssertStatus(t, resourceAPIRequest(f.h, "POST", path, f.alice, "cap", body), 409)
 	delete(body, "max_expected_usd")
 	f.tasks.budget = true
@@ -96,7 +97,7 @@ func TestResourceSessionActionCapsBudgetRecoveryAndExactDeletion(t *testing.T) {
 	b.Session.HasSelection = true
 	b.Session.Selections = []core.FrameSelection{{FrameIndex: 0, Points: []core.SelectionPoint{{X: .123456789012345, Y: .5}}}}
 	f.resources.bindings[b.ID] = b
-	bad := map[string]any{"expected_revision": 1, "frame": map[string]any{"frame_index": 0, "points": []any{map[string]any{"x": .123457, "y": .5}}}}
+	bad := map[string]any{"workflow_model": kling.MultiElementsEditing, "expected_revision": 1, "frame": map[string]any{"frame_index": 0, "points": []any{map[string]any{"x": .123457, "y": .5}}}}
 	resourceAPIAssertStatus(t, resourceAPIRequest(f.h, "POST", strings.TrimSuffix(path, "clear")+"delete", f.alice, "rounded-deletion", bad), 400)
 	if f.tasks.creates != 1 {
 		t.Fatal("rejected request persisted", f.tasks.creates)

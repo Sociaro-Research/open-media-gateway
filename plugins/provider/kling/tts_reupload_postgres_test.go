@@ -418,8 +418,7 @@ func TestKlingTTSPostgresArchiveDownloadReuploadSoundFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	videoURL, _ := references.CanonicalReferenceURL("https://gateway.fixture", []byte("tts-reupload-signing-fixture"), identity.SystemOwnerID, videoRef.ID)
-	faceReply := ttsReuploadRequest(h, "POST", "/v1/generations", map[string]any{"model": "kling/" + kling.FaceDetection, "options": map[string]any{"reference_mode": "video", "video_urls": []string{videoURL}}}, true)
+	faceReply := ttsReuploadRequest(h, "POST", "/v1/media-inputs/faces", map[string]any{"provider": "kling", "workflow_model": kling.LipSync, "reference_id": videoRef.ID}, true)
 	ttsReuploadPrivate(t, faceReply.Body.String())
 	faceTask := ttsReuploadRun(t, ctx, repo, q, provider, store, ttsReuploadTaskID(t, faceReply))
 	if len(faceTask.StoredResourceReferences) != 1 {

@@ -18,6 +18,14 @@ Go binary: explicit composition is intentional, reviewable, and avoids implicit
 `init()` registration and runtime plugin loading. A generator could produce the
 same composition file later; it would still require rebuilding.
 
+## Product boundary
+
+Every module must follow the [media generation scope](media-scope.md). Public
+catalogs, discovery and direct admission expose media workflows only. Native
+preparation descriptors remain separate from the public model catalog and cannot
+be enabled by a manual model or a stale saved access setting. Preserve internal
+preparation and already-accepted task polling when retiring public utility models.
+
 ## Module contract
 
 `internal/providerkit.Definition` describes:

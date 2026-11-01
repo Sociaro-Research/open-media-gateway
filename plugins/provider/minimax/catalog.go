@@ -71,8 +71,12 @@ func catalog() []core.MediaModel {
 	}
 	return out
 }
-func (a *Adapter) ListModels(context.Context) ([]core.MediaModel, error) { return catalog(), nil }
-func (a *Adapter) ReviewedCatalogModels() []core.MediaModel              { return catalog() }
+func (a *Adapter) ListModels(context.Context) ([]core.MediaModel, error) {
+	return core.MediaGenerationModels(catalog()), nil
+}
+func (a *Adapter) ReviewedCatalogModels() []core.MediaModel {
+	return core.MediaGenerationModels(catalog())
+}
 func describe(op operation) core.MediaModel {
 	if op.kind == "base_regeneration" {
 		return baseRegenerationModel()
@@ -267,3 +271,14 @@ func h3Limits() *core.ReferenceMediaLimits {
 		Audio: core.MediaFileLimits{ContentTypes: []string{"audio/wav", "audio/mpeg"}, MaxBytes: 15_000_000, MaxBytesInclusive: true, MinDuration: 2, MaxDuration: 15, MaxTotalDuration: 15}}
 }
 func number(n float64) *float64 { return &n }
+
+// File handling is generation plumbing, not an independently executable model.
+func (a *Adapter) PreparationModels(context.Context) ([]core.MediaModel, error) {
+	out := []core.MediaModel{}
+	for _, m := range catalog() {
+		if m.ResourceOperation != nil {
+			out = append(out, m)
+		}
+	}
+	return out, nil
+}

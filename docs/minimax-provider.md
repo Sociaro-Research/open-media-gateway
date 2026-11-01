@@ -45,21 +45,18 @@ task used deterministic mocks, never a live account.
 
 ## Model and workflow completeness matrix
 
-The 37 capability descriptors comprise 15 upstream image/video model IDs,
-16 callable Video Agent workflows, three generation/preparation aliases
-(Context-IR and both regeneration methods), and three managed-resource operations.
-The 34 generation/preparation descriptors declare 59 modes: 20 H3, 13 legacy
-video, three image, five Context-IR, two regeneration and 16 Video Agent modes.
-The remaining three descriptors use `media_type: resource`, `ResourceOperation`
-and `POST /v1/provider-resources`; they are management operations, excluded from
-Templates and automatic generation tariffs. They are not three extra MiniMax
-image/video models. Supporting native file/task methods are listed separately.
+The public catalog contains 33 media descriptors: 15 upstream image/video model
+IDs, 16 callable Video Agent workflows and both video-regeneration methods.
+Context-IR is outside the [media-only scope](media-scope.md). The three native
+file/binding helpers remain internal input preparation, not public model choices.
+They require an authorized media consumer through `workflow_model`. Owned-task
+and inspected-source regeneration remain supported; their internal bindings,
+input inspection, task status and artifact parsers are preserved.
 
-The 62 matrix rows count those 59 generation/preparation modes and three resource
-operations. `TestEveryCatalogGenerationWorkflow` covers ordinary generation entries
-and modes; dedicated source/base regeneration and resource protocol/PostgreSQL
-tests cover the five excluded aliases. Adapter fixtures alone do not establish
-public persistence or browser acceptance.
+
+Historical matrix rows may describe internal helper contracts. They do not add
+public models or authorize execution. Model/connection entitlement remains
+separate from offline protocol and browser fixtures.
 
 | Model or operation | Implemented workflows and constraints | Price / unit | Contract and tests | Remaining limit |
 | --- | --- | --- | --- | --- |
@@ -78,7 +75,7 @@ public persistence or browser acceptance.
 | S2V-01 | One character portrait, optional prompt and optimizer. No invented duration/resolution controls. | Unknown. | [Subject reference](https://platform.minimax.io/docs/api-reference/video-generation-s2v); generation contract test. | No invented tariff. |
 | image-01 | Text-to-image or one character portrait. Eight ratios or paired 512–2048px dimensions divisible by 8. Seed and prompt optimizer. Batch size n=1–9; Gateway uses URL results. The native helper also decodes the official Base64 response. | $0.0035 / image. | [Text](https://platform.minimax.io/docs/api-reference/image-generation-t2i), [portrait](https://platform.minimax.io/docs/api-reference/image-generation-i2i); generation, all-count/all-format batch and partial-safety tests. | Single and multiple image results pass actual PostgreSQL, worker/local archival, reopened reads and authenticated public GET/HEAD in deterministic tests. |
 | image-01-live | Portrait-to-image only; one portrait, eight ratios, seed and optimizer. Custom dimensions are not advertised because width/height are documented only for image-01. | Unknown. | [Portrait enum](https://platform.minimax.io/docs/api-reference/image-generation-i2i); generation and text-only rejection tests. | No invented T2I capability or inherited image-01 tariff. |
-| H3 Context-IR | `MiniMax-H3-Context-IR` uses common generation/query and returns an archived text artifact. Same H3 inputs, 4–15s target, no resolution/audio-output control. | $0.90 / million input tokens; $3.60 / million output tokens. | [Context contract](https://platform.minimax.io/docs/api-reference/video-generation-v2-h3-context-ir); actual PostgreSQL admission, token metering, reopened reads, content GET/HEAD and redaction pass. | Preflight quantity remains unknown. Explicit cost caps reject before dispatch; uncapped work retains the tariff. Live access untested. |
+| Context-IR (retired from public generation) | `MiniMax-H3-Context-IR` uses common generation/query and returns an archived text artifact. Same H3 inputs, 4–15s target, no resolution/audio-output control. | $0.90 / million input tokens; $3.60 / million output tokens. | [Context contract](https://platform.minimax.io/docs/api-reference/video-generation-v2-h3-context-ir); actual PostgreSQL admission, token metering, reopened reads, content GET/HEAD and redaction pass. | Preflight quantity remains unknown. Explicit cost caps reject before dispatch; uncapped work retains the tariff. Live access untested. |
 | H3 regeneration by source task | `MiniMax-H3-Regeneration` accepts one local `source_task` resource binding. `MiniMax-Bind-H3-Source` creates it from an authorized archived H3 task in the same connection. Requires succeeded 768P source; targets 2K; optional AIGC watermark. | Output $0.05/s, original input video $0.05/s, original images beyond 5 cost $0.025/image again. | [Regeneration](https://platform.minimax.io/docs/api-reference/video-generation-v2-regeneration); actual PostgreSQL binding, public generation and metering sequence passes. | Whitelist access and live availability untested. Source must remain queryable within seven days. No private handle is a public parameter. |
 | H3 regeneration by base video | `MiniMax-H3-Regeneration-Video` submits original final prompt/materials plus exactly one inspected `base_video`: 24fps, audio, dimensions divisible by 32, area 589,824–1,032,192 pixels, 107–362 frames in steps of 17. Original last frame requires first frame. | Same recharge tariff; inspected source duration estimates output. | [Regeneration](https://platform.minimax.io/docs/api-reference/video-generation-v2-regeneration); protocol, pricing, ownership/evidence and boundary fixtures pass. | Reviewed 40,000-character admission and inspected local-video generation/archive/metering pass. Both local-video and file-binding base inputs pass public PostgreSQL generation/archive/metering. Live whitelist access is untested. |
 | MiniMax-Upload-File | `file_resource` creation from one inspected local reference; image/video/audio subtypes. Native multipart upload uses the trusted server source opener. | Unknown unless explicitly confirmed by the operator. | [Upload](https://platform.minimax.io/docs/api-reference/file-management-upload); real PostgreSQL/public API upload, binding and H3 consumption sequence passes. | The shared inspector implements a bounded HEVC still/grid HEIC/HEIF subset; unsupported constructs reject. Direct, rotated and grid HEIF plus canonical WAV pass real public upload/reference/archive/PostgreSQL reopen/content tests after deterministic shared storage handling. Input deletion is undocumented and rejects with 400 before job reservation or HTTP, preserving its usable binding. Signed input capabilities expire after seven days. |

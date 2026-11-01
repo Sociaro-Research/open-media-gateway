@@ -115,3 +115,10 @@ authentication errors; use fixed safe text and never retain raw provider data.
 exports at fetch time. It preserves saved schedules and custom sources while
 recording the actual fetched URL in observations. `PricingSnapshot.AccountSpecific`
 protects explicit account tariffs from replacement by synchronized public rates.
+
+## Media-only acceptance
+
+Follow [the permanent product boundary](media-scope.md). Provider completeness
+means supported image/video/audio generation, not every vendor endpoint. Cover
+all registered modules with media-only catalog/profile tests and direct admission
+rejections. Retain scoped input preparation and historical recovery fixtures.

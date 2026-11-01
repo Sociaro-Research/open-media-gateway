@@ -246,6 +246,19 @@ func (r *SystemRepository) SaveOrganization(ctx context.Context, actor, org stri
 // Lock policy alongside admission so a concurrent disable/revoke cannot race
 // between catalog resolution and reserving the customer's balance.
 func checkTaskModelAccess(ctx context.Context, tx *sql.Tx, task *core.Task) error {
+	if task.PreparationConsumer != "" {
+		consumer := *task
+		consumer.Model = task.PreparationConsumer
+		consumer.PublicModel = task.PreparationConsumerPublic
+		consumer.PreparationConsumer = ""
+		consumer.PreparationConsumerPublic = ""
+		if err := checkTaskModelAccess(ctx, tx, &consumer); err != nil {
+			return err
+		}
+		task.PublicModel = task.Provider + "/" + task.Model
+		return nil
+	}
+
 	var id, public string
 	var enabled bool
 	err := tx.QueryRowContext(ctx, `SELECT id,public_id,enabled_by_default FROM model_settings WHERE provider=$1 AND model=$2 FOR SHARE`, task.Provider, task.Model).Scan(&id, &public, &enabled)

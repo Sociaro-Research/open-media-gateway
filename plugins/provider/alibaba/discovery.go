@@ -3,6 +3,7 @@ package alibaba
 import (
 	"context"
 	"fmt"
+	"github.com/Sociaro-Research/open-media-gateway/internal/core"
 )
 
 func (a *Adapter) DiscoverModelIDs(ctx context.Context) ([]string, error) {
@@ -29,7 +30,7 @@ func (a *Adapter) DiscoverModelIDs(ctx context.Context) ([]string, error) {
 			}
 		}
 		if len(response.Output.Models) == 0 || page*200 >= response.Output.Total {
-			return ids, nil
+			return core.MediaDiscoveryIDs(ids, a.ReviewedCatalogModels()), nil
 		}
 	}
 	return nil, fmt.Errorf("model discovery exceeded pagination limit")

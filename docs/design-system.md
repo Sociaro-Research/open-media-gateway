@@ -683,3 +683,14 @@ values stay identical to the descriptor. Invalid saved pairs remain visibly bloc
 Managed voices use declared model languages and suppress the preset field. Missing
 metadata preserves the established other-provider controls and their prior selection.
 Reuse the existing field/picker typography, spacing, focus and keyboard patterns.
+
+## Media workflow scope
+
+The Playground model picker and Content Type filter represent video, image and
+audio generation/transformations, including speech and music. Follow the
+[media-only product boundary](media-scope.md). Do not expose internal text/JSON,
+resource creation or selection mutations as standalone generation choices. Keep
+necessary preparation within the selected media input group, using shared fields,
+16px resource group gaps and 12px action gaps. Review cost before any preparation
+submission; never auto-submit or auto-retry mutations. Preserve media previews,
+existing input bindings, key-change cancellation and visible keyboard focus.

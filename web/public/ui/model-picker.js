@@ -1,6 +1,7 @@
 (() => {
   'use strict';
   const filters = new WeakMap();
+ const isMediaModel = model => !!model && ["image","video","audio","speech","music"].includes(model.media_type) && !model.resource_operation && (!model.session_operation || model.media_type === "video" && model.session_operation.action === "preview" && model.session_operation.mutates === false);
   const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
   const key = (provider, model = '') => JSON.stringify([provider, model]);
   // Labels are presentation only: never change native/public IDs or selection values.
@@ -32,6 +33,7 @@
   }
   function populate(control, providers, {value = control.value, placeholder, allModels = false, label = m => m.display_name || m.name || m.public_id || m.id, optionValue = (p, m) => key(p.id, m.id)} = {}) {
     control.dataset.modelPicker = '';
+ providers=providers.map(provider=>({...provider,models:(provider.models||[]).filter(isMediaModel)}));
     const children = [];
     if (placeholder) children.push(new Option(placeholder, ''));
     for (const provider of uniqueCatalog(providers).sort((a, b) => (a.name || a.id).localeCompare(b.name || b.id))) {
@@ -124,5 +126,5 @@
     });
     api.show(state.trigger, panel); window.FormUI.refresh(); render(); search.focus();
   }
-  window.ModelPicker = {key, uniqueCatalog, populate, open};
+  window.ModelPicker = {isMediaModel,key, uniqueCatalog, populate, open};
 })();

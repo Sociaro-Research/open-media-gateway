@@ -2,6 +2,7 @@ package bytedance
 
 import (
 	"context"
+	"github.com/Sociaro-Research/open-media-gateway/internal/core"
 	"github.com/Sociaro-Research/open-media-gateway/internal/modelcatalog"
 	"net/http"
 	"strings"
@@ -27,5 +28,5 @@ func (a *Adapter) DiscoverModelIDs(ctx context.Context) ([]string, error) {
 			}
 		}
 	}
-	return ids, nil
+	return core.MediaDiscoveryIDs(ids, Definition().Profiles()), nil
 }

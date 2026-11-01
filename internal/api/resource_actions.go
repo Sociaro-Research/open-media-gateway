@@ -12,6 +12,7 @@ import (
 )
 
 type resourceActionInput struct {
+	WorkflowModel    string               `json:"workflow_model,omitempty"`
 	Model            string               `json:"model,omitempty"`
 	ExpectedRevision *int64               `json:"expected_revision"`
 	Frame            *core.FrameSelection `json:"frame,omitempty"`
@@ -42,15 +43,29 @@ func (s *Server) actOnResource(w http.ResponseWriter, r *http.Request) {
 	}
 	var model core.MediaModel
 	found := false
-	for _, provider := range s.visibleCatalog(r) {
-		if provider.ID != binding.ProviderID {
-			continue
+	// A genuine media preview remains a media model. Mutations require a media
+	// consumer whose declared input is this exact session kind.
+	if r.PathValue("action") == "preview" {
+		for _, provider := range s.visibleCatalog(r) {
+			if provider.ID == binding.ProviderID {
+				for _, candidate := range provider.Models {
+					if core.MediaGenerationModel(candidate) && candidate.SessionOperation != nil && candidate.SessionOperation.Kind == binding.Kind && candidate.SessionOperation.Action == "preview" && (body.Model == "" || body.Model == candidate.ID || body.Model == candidate.PublicID) {
+						model = candidate
+						found = true
+					}
+				}
+			}
 		}
-		for _, candidate := range provider.Models {
-			schema := candidate.SessionOperation
-			if schema != nil && schema.Kind == binding.Kind && schema.Action == r.PathValue("action") && (body.Model == "" && !candidate.Manual || body.Model == candidate.ID || body.Model == candidate.PublicID) {
-				model, found = candidate, true
-				break
+	} else {
+		consumer, preparations, err := s.mediaWorkflowPreparations(r, binding.ProviderID, body.WorkflowModel)
+		if err == nil {
+			for _, candidate := range preparations {
+				if candidate.SessionOperation != nil && candidate.SessionOperation.Kind == binding.Kind && candidate.SessionOperation.Action == r.PathValue("action") && (body.Model == "" || body.Model == candidate.ID) {
+					model = candidate
+					found = true
+					r = r.WithContext(core.WithMediaPreparationWorkflow(r.Context(), binding.ProviderID, consumer.ID, model.ID, "", consumer.PublicID))
+					break
+				}
 			}
 		}
 	}

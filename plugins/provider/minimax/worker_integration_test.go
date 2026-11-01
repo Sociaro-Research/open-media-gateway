@@ -393,6 +393,25 @@ func TestMiniMaxWorkerArchiveAndPublicContent(t *testing.T) {
 
 			data, _ := json.Marshal(payload)
 			posted := workerRequest(handler, "POST", path, data, true)
+			if scenario == "context_text" {
+				if posted.Code != 400 {
+					t.Fatalf("retired standalone text operation admitted: %d", posted.Code)
+				}
+				// An already-admitted historical task must still dispatch/archive/read.
+				id := uuid.NewString()
+				now := time.Now().UTC()
+				legacy := core.Task{ID: id, OwnerID: identity.SystemOwnerID, ProviderOwnerID: identity.SystemOwnerID, StorageOwnerID: identity.SystemOwnerID, Provider: "minimax", Model: minimax.ContextIR, MediaType: "text", Prompt: "Prepare this scene", Options: core.MediaOptions{Ratio: "16:9", Duration: 5, ReferenceMode: "none"}, Status: core.TaskQueued, CreatedAt: now, UpdatedAt: now}
+				if _, _, err := repo.CreateOrGet(context.Background(), legacy, "historical", "historical"); err != nil {
+					t.Fatal(err)
+				}
+				if err := q.Enqueue(context.Background(), id); err != nil {
+					t.Fatal(err)
+				}
+				posted = httptest.NewRecorder()
+				posted.Code = 202
+				posted.Body.WriteString(`{"id":"` + id + `"}`)
+			}
+
 			if posted.Code != http.StatusAccepted && posted.Code != http.StatusOK {
 				t.Fatalf("public admission %d: %s", posted.Code, posted.Body.String())
 			}

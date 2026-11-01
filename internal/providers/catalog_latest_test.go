@@ -54,6 +54,8 @@ func TestLatestDocumentReviewsThroughConfiguredConnections(t *testing.T) {
 			previous := catalogsync.State{Observations: map[string]catalogsync.Observation{source.ID: {Source: source, Hash: "previous"}}}
 			// Recreate the production warnings with the pre-review behaviour.
 			unreviewed := capture
+			// Explicit historical snapshot; retain all five warning-reconciliation checks.
+			unreviewed.IDs = append([]string(nil), tc.ids...)
 			unreviewed.Excluded, unreviewed.DocumentReviews = nil, nil
 			previous, old := catalogsync.Reconcile(previous, unreviewed, obs, time.Now(), func(core.MediaModel, catalogsync.Rate) error { return nil })
 			if len(old.OpenWarnings) != tc.resolved {

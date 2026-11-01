@@ -149,6 +149,13 @@ func (v Generation) MarshalJSON() ([]byte, error) {
 	delete(options, "_reference_media")
 	delete(options, "_reference_resources")
 	delete(options, "_resource_creation")
+	// Non-media jobs are historical jobs or generation-scoped input preparation.
+	// Their signed inspection inputs are dispatch evidence, not public results.
+	// Preserve the archived outputs and status without exporting those URLs.
+	if !MediaGenerationModel(MediaModel{MediaType: v.MediaType}) {
+		delete(options, "video_urls")
+		delete(options, "audio_urls")
+	}
 	if v.MediaType == "speech" {
 		delete(fields, "prompt")
 		fields["input"] = v.Prompt
@@ -173,7 +180,7 @@ func (v Generation) MarshalJSON() ([]byte, error) {
 		}
 		delete(options, "format")
 	}
-	if len(v.Options.ImageURLs) > 0 {
+	if len(v.Options.ImageURLs) > 0 && MediaGenerationModel(MediaModel{MediaType: v.MediaType}) {
 		key := "image"
 		if v.MediaType == "video" {
 			key = "input_reference"

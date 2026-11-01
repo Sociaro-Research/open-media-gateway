@@ -40,14 +40,10 @@ func (p resourceAPITransport) RoundTrip(*http.Request) (*http.Response, error) {
 type resourceAPIProvider struct{ core.MediaProvider }
 
 func (p *resourceAPIProvider) ListModels(ctx context.Context) ([]core.MediaModel, error) {
-	models, err := p.MediaProvider.(core.ModelCatalog).ListModels(ctx)
-	out := []core.MediaModel{}
-	for _, m := range models {
-		if m.ResourceOperation != nil || m.SessionOperation != nil {
-			out = append(out, m)
-		}
-	}
-	return out, err
+	return p.MediaProvider.(core.ModelCatalog).ListModels(ctx)
+}
+func (p *resourceAPIProvider) PreparationModels(ctx context.Context) ([]core.MediaModel, error) {
+	return p.MediaProvider.(core.MediaPreparationCatalog).PreparationModels(ctx)
 }
 func resourceAPIScope(ctx context.Context, _ string) (core.ProviderConnectionScope, error) {
 	return core.ProviderConnectionScope{ID: "kling", OwnerID: identity.ProviderOwnerID(ctx), Revision: resourceAPIRevision}, nil
@@ -353,7 +349,7 @@ func (f *resourceAPIFixture) upload(t *testing.T, actor, name string, data []byt
 	return ref
 }
 func resourceAPIVoice(ref string) map[string]any {
-	return map[string]any{"provider": "kling", "kind": "voice", "name": "My voice", "reference_ids": []string{ref}}
+	return map[string]any{"provider": "kling", "workflow_model": kling.TextToSpeech, "kind": "voice", "name": "My voice", "reference_ids": []string{ref}}
 }
 func resourceAPIAssertStatus(t *testing.T, w *httptest.ResponseRecorder, status int) {
 	t.Helper()
@@ -385,6 +381,9 @@ func TestProviderResourcesVoiceAdmissionCanonicalEvidenceAndReplay(t *testing.T)
 				t.Fatal("resource creation must admit exactly one queued task")
 			}
 			task := f.tasks.tasks[f.queue.ids[0]]
+			if task.PreparationConsumer != kling.TextToSpeech {
+				t.Fatalf("trusted consumer missing from actual admission: got %q", task.PreparationConsumer)
+			}
 			if task.Cost == nil || task.Cost.ExpectedUSD != 7000 || task.Cost.Pricing.Unit != "request" || task.MediaType != "resource" || task.Model != kling.ResourceCreateVoice || task.ProviderIdentity != resourceAPIRevision {
 				t.Fatalf("incorrect paid resource admission: %#v", task)
 			}
@@ -453,12 +452,12 @@ func TestProviderResourcesRejectClientEvidenceAndForeignSources(t *testing.T) {
 	// A generated task must be read through the same owner-scoped service, even if its UUID is known.
 	foreignTask := uuid.NewString()
 	f.tasks.tasks[foreignTask] = core.Task{ID: foreignTask, OwnerID: identity.OwnerID(f.context("bob"))}
-	resourceAPIAssertStatus(t, resourceAPIRequest(f.h, "POST", "/v1/provider-resources", f.alice, "foreign-task", map[string]any{"provider": "kling", "kind": "voice", "name": "voice", "generated_task_id": foreignTask}), 404)
+	resourceAPIAssertStatus(t, resourceAPIRequest(f.h, "POST", "/v1/provider-resources", f.alice, "foreign-task", map[string]any{"provider": "kling", "workflow_model": kling.TextToSpeech, "kind": "voice", "name": "voice", "generated_task_id": foreignTask}), 404)
 	voice := f.binding("bob", "voice")
 	f.resources.bindings[voice.ID] = voice
 	a := f.upload(t, "alice", "front.png", resourceAPIPNG(t, 10))
 	b := f.upload(t, "alice", "other.png", resourceAPIPNG(t, 20))
-	resourceAPIAssertStatus(t, resourceAPIRequest(f.h, "POST", "/v1/provider-resources", f.alice, "foreign-binding", map[string]any{"provider": "kling", "kind": "element", "subtype": "multi_image", "name": "person", "description": "person", "reference_ids": []string{a.ID, b.ID}, "bound_voice_binding_id": voice.ID}), 404)
+	resourceAPIAssertStatus(t, resourceAPIRequest(f.h, "POST", "/v1/provider-resources", f.alice, "foreign-binding", map[string]any{"provider": "kling", "workflow_model": kling.ImageOmni3, "kind": "element", "subtype": "multi_image", "name": "person", "description": "person", "reference_ids": []string{a.ID, b.ID}, "bound_voice_binding_id": voice.ID}), 404)
 	if f.tasks.creates != 0 || len(f.queue.ids) != 0 {
 		t.Fatal("untrusted input reached task admission")
 	}
@@ -476,7 +475,7 @@ func TestProviderResourcesVisibilityAuthenticationPricingAndBudget(t *testing.T)
 		f := newResourceAPIFixture(t)
 		ref := f.upload(t, "alice", "voice.wav", resourceAPIWAV(6))
 		policy := &modelAccessMemory{org: map[string]map[string]bool{}}
-		_ = policy.Ensure(context.Background(), []modelaccess.Ref{{Provider: "kling", Model: kling.ResourceCreateVoice}})
+		_ = policy.Ensure(context.Background(), []modelaccess.Ref{{Provider: "kling", Model: kling.TextToSpeech}})
 		policy.models[0].EnabledByDefault = false
 		f.s.modelAccess = policy
 		f.h = f.s.handler()
@@ -489,7 +488,7 @@ func TestProviderResourcesVisibilityAuthenticationPricingAndBudget(t *testing.T)
 		f := newResourceAPIFixture(t)
 		a := f.upload(t, "alice", "front.png", resourceAPIPNG(t, 30))
 		b := f.upload(t, "alice", "other.png", resourceAPIPNG(t, 40))
-		w := resourceAPIRequest(f.h, "POST", "/v1/provider-resources", f.alice, "element", map[string]any{"provider": "kling", "kind": "element", "subtype": "multi_image", "name": "person", "description": "person", "reference_ids": []string{a.ID, b.ID}})
+		w := resourceAPIRequest(f.h, "POST", "/v1/provider-resources", f.alice, "element", map[string]any{"provider": "kling", "workflow_model": kling.ImageOmni3, "kind": "element", "subtype": "multi_image", "name": "person", "description": "person", "reference_ids": []string{a.ID, b.ID}})
 		resourceAPIAssertStatus(t, w, 422)
 		if !strings.Contains(w.Body.String(), "pricing_unavailable") || f.tasks.creates != 0 {
 			t.Fatal("unknown tariff was admitted", w.Body)
@@ -544,20 +543,22 @@ func TestProviderResourcesDeletePendingReplayAndJobOwner(t *testing.T) {
 	b := f.binding("alice", "voice")
 	f.resources.bindings[b.ID] = b
 	path := "/v1/provider-resources/" + b.ID
-	w := resourceAPIRequest(f.h, "DELETE", path, f.alice, "delete-once", nil)
-	resourceAPIAssertStatus(t, w, 202)
-	var job providerresources.Job
-	if e := json.Unmarshal(w.Body.Bytes(), &job); e != nil {
+	resourceAPIAssertStatus(t, resourceAPIRequest(f.h, "DELETE", path, f.alice, "blocked", nil), 405)
+	job, e := f.s.resourceLifecycle.Delete(f.context("alice"), b.ID, "historical-delete")
+	if e != nil {
 		t.Fatal(e)
 	}
+	w := httptest.NewRecorder()
+	saferequest := httptest.NewRequest("GET", path, nil).WithContext(f.context("alice"))
+	f.s.writeViewerJSON(w, saferequest, 202, job)
 	if job.Status != providerresources.Running || f.resources.bindings[b.ID].Status != providerresources.Deleting || f.deleter.calls != 1 {
 		t.Fatal("submission was incorrectly terminal", w.Body)
 	}
 	resourceAPIAssertPrivate(t, w.Body.String(), "private-native-resource", "private-delete-handle", "private-provider-warning", resourceAPIRevision)
-	replay := resourceAPIRequest(f.h, "DELETE", path, f.alice, "delete-once", nil)
-	resourceAPIAssertStatus(t, replay, 202)
-	var again providerresources.Job
-	_ = json.Unmarshal(replay.Body.Bytes(), &again)
+	again, e := f.s.resourceLifecycle.Delete(f.context("alice"), b.ID, "historical-delete")
+	if e != nil {
+		t.Fatal(e)
+	}
 	if again.ID != job.ID || f.deleter.calls != 1 {
 		t.Fatal("delete replay resubmitted")
 	}
@@ -568,7 +569,7 @@ func TestProviderResourcesDeletePendingReplayAndJobOwner(t *testing.T) {
 	}
 	resourceAPIAssertPrivate(t, poll.Body.String(), "private-delete-handle", "private-provider-warning", resourceAPIRevision)
 	resourceAPIAssertStatus(t, resourceAPIRequest(f.h, "GET", "/v1/provider-resource-jobs/"+job.ID, f.bob, "", nil), 404)
-	resourceAPIAssertStatus(t, resourceAPIRequest(f.h, "DELETE", path, f.bob, "foreign", nil), 404)
+	resourceAPIAssertStatus(t, resourceAPIRequest(f.h, "DELETE", path, f.bob, "foreign", nil), 405)
 	if f.deleter.calls != 1 || f.deleter.polls != 1 {
 		t.Fatal("foreign lifecycle call contacted provider")
 	}
@@ -598,7 +599,7 @@ func TestProviderResourcesGeneratedVoiceUsesOwnedArchivedOutput(t *testing.T) {
 	source.StoredArtifacts[0].ID = "local-output"
 	source.StoredArtifacts[0].ProviderID = "private-native-output-video"
 	f.tasks.tasks[id] = source
-	body := map[string]any{"provider": "kling", "kind": "voice", "name": "Archived voice", "generated_task_id": id}
+	body := map[string]any{"provider": "kling", "workflow_model": kling.TextToSpeech, "kind": "voice", "name": "Archived voice", "generated_task_id": id}
 	w := resourceAPIRequest(f.h, "POST", "/v1/provider-resources", f.alice, "generated-voice", body)
 	resourceAPIAssertStatus(t, w, 202)
 	if f.tasks.creates != 1 || len(f.queue.ids) != 1 {
@@ -625,7 +626,7 @@ func TestProviderResourcesDeleteInUseIsConflict(t *testing.T) {
 	f.resources.bindings[b.ID] = b
 	f.resources.inUse = true
 	w := resourceAPIRequest(f.h, "DELETE", "/v1/provider-resources/"+b.ID, f.alice, "in-use", nil)
-	resourceAPIAssertStatus(t, w, 409)
+	resourceAPIAssertStatus(t, w, 405)
 	if f.deleter.calls != 0 || len(f.resources.jobs) != 0 || f.resources.bindings[b.ID].Status != providerresources.Succeeded {
 		t.Fatal("retained resource deletion reached provider")
 	}

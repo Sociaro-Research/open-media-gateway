@@ -310,7 +310,7 @@ func TestKlingSessionPostgresPublicWorkflowArchiveAndRestart(t *testing.T) {
 			t.Fatal(e)
 		}
 		library := references.New(postgres.NewReferenceRepository(db), store)
-		service := core.NewTaskServiceWithProviders(repo, q, map[string]core.MediaProvider{"kling": p}, map[string]string{"kling": kling.SessionInit}, "kling")
+		service := core.NewTaskServiceWithProviders(repo, q, map[string]core.MediaProvider{"kling": p}, map[string]string{"kling": kling.SessionPreview}, "kling")
 		service.EnableAccounting()
 		scopes := func(ctx context.Context, _ string) (core.ProviderConnectionScope, error) {
 			return core.ProviderConnectionScope{ID: "kling", OwnerID: identity.ProviderOwnerID(ctx), Revision: revision.Load().(string)}, nil
@@ -323,7 +323,7 @@ func TestKlingSessionPostgresPublicWorkflowArchiveAndRestart(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	initBody := map[string]any{"provider": "kling", "model": kling.SessionInit, "kind": "editing_session", "subtype": "selection", "name": "Owned selection", "reference_ids": []string{ref.ID}}
+	initBody := map[string]any{"provider": "kling", "model": kling.SessionInit, "workflow_model": kling.SessionPreview, "kind": "editing_session", "subtype": "selection", "name": "Owned selection", "reference_ids": []string{ref.ID}}
 	initReply := sessionPGRequest(h, "POST", "/v1/provider-resources", "init-once", initBody, true)
 	sessionPGPrivate(t, initReply.Body.String())
 	initID := sessionPGID(t, initReply)
@@ -340,7 +340,7 @@ func TestKlingSessionPostgresPublicWorkflowArchiveAndRestart(t *testing.T) {
 		t.Fatal("init replay duplicated")
 	}
 	action := func(h http.Handler, op string, rev int64, key string, frame bool, recover bool) *httptest.ResponseRecorder {
-		body := map[string]any{"expected_revision": rev}
+		body := map[string]any{"expected_revision": rev, "workflow_model": kling.SessionPreview}
 		if frame {
 			body["frame"] = map[string]any{"frame_index": 0, "points": []map[string]float64{{"x": exactX, "y": exactY}}}
 		}
@@ -382,7 +382,7 @@ func TestKlingSessionPostgresPublicWorkflowArchiveAndRestart(t *testing.T) {
 		t.Fatal("stale revision admitted")
 	}
 	beforeCalls := submissions.Load()
-	rounded := map[string]any{"expected_revision": 1, "frame": map[string]any{"frame_index": 0, "points": []map[string]float64{{"x": math.Nextafter(exactX, 1), "y": exactY}}}}
+	rounded := map[string]any{"workflow_model": kling.SessionPreview, "expected_revision": 1, "frame": map[string]any{"frame_index": 0, "points": []map[string]float64{{"x": math.Nextafter(exactX, 1), "y": exactY}}}}
 	bad := sessionPGRequest(h, "POST", "/v1/provider-resources/"+bindingID+"/actions/delete", "rounded", rounded, true)
 	if bad.Code != 400 || submissions.Load() != beforeCalls {
 		t.Fatal("inexact deletion dispatched", bad.Code)

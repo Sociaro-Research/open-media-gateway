@@ -64,6 +64,7 @@ func TestPromptCharacterLimitsProjectionModesAndCacheIsolation(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			svc := openAIFixture()
 			tc.model.ID = "arbitrary-upstream-name"
+			tc.model.MediaType = "video"
 			svc.catalog = []core.ProviderDescriptor{{ID: "arbitrary-connection", Models: []core.MediaModel{tc.model}}}
 			before, _ := json.Marshal(svc.catalog)
 			s := &Server{service: svc}

@@ -18,13 +18,16 @@ import (
 )
 
 func (s *Server) registerProviderResourceRoutes(mux *http.ServeMux) {
+	mux.Handle("GET /v1/models/{model}/preparations", s.providerResourceRoute(s.mediaPreparationSchemas))
+	mux.Handle("POST /v1/media-inputs/faces", s.providerResourceRoute(s.prepareFaceInput))
+	mux.Handle("POST /v1/media-inputs/faces/estimate", s.providerResourceRoute(s.prepareFaceInput))
 	mux.Handle("POST /v1/provider-resources/{id}/actions/{action}", s.providerResourceRoute(s.actOnResource))
 	mux.Handle("POST /v1/provider-resources/{id}/actions/{action}/estimate", s.providerResourceRoute(s.actOnResource))
 	mux.Handle("GET /v1/provider-resources", s.providerResourceRoute(s.listResources))
 	mux.Handle("POST /v1/provider-resources/estimate", s.providerResourceRoute(s.createResource))
 	mux.Handle("POST /v1/provider-resources", s.providerResourceRoute(s.createResource))
 	mux.Handle("GET /v1/provider-resources/{id}", s.providerResourceRoute(s.getResource))
-	mux.Handle("DELETE /v1/provider-resources/{id}", s.providerResourceRoute(s.deleteResource))
+	// Existing resource data is retained; standalone resource deletion is not a media workflow.
 	mux.Handle("GET /v1/provider-resource-jobs/{id}", s.providerResourceRoute(s.getResourceJob))
 }
 func (s *Server) providerResourceRoute(next http.HandlerFunc) http.Handler {
@@ -168,6 +171,7 @@ func (s *Server) getResourceJob(w http.ResponseWriter, r *http.Request) {
 }
 
 type resourceCreateInput struct {
+	WorkflowModel       string     `json:"workflow_model"`
 	Provider            string     `json:"provider"`
 	Model               string     `json:"model,omitempty"`
 	Kind                string     `json:"kind"`
@@ -186,17 +190,22 @@ func (s *Server) createResource(w http.ResponseWriter, r *http.Request) {
 	if !decodeSystem(w, r, &body) {
 		return
 	}
+	consumer, preparations, scopeErr := s.mediaWorkflowPreparations(r, body.Provider, body.WorkflowModel)
 	var model core.MediaModel
 	found := false
-	for _, provider := range s.visibleCatalog(r) {
-		if provider.ID != body.Provider {
-			continue
-		}
-		for _, candidate := range provider.Models {
-			if candidate.ResourceOperation != nil && candidate.ResourceOperation.Kind == body.Kind && (body.Model == "" && !candidate.Manual || body.Model == candidate.ID || body.Model == candidate.PublicID) {
-				model = candidate
-				found = true
-				break
+	if scopeErr == nil {
+		for _, candidate := range preparations {
+			if candidate.ResourceOperation != nil && candidate.ResourceOperation.Kind == body.Kind && (body.Model == "" || body.Model == candidate.ID) {
+				subtype := body.Subtype
+				if subtype == "" && len(candidate.ResourceOperation.Subtypes) == 1 {
+					subtype = candidate.ResourceOperation.Subtypes[0]
+				}
+				if core.PreparationSupportsSubtype(consumer, candidate, subtype) {
+					model = candidate
+					body.Subtype = subtype
+					found = true
+					break
+				}
 			}
 		}
 	}
@@ -207,6 +216,7 @@ func (s *Server) createResource(w http.ResponseWriter, r *http.Request) {
 	if body.Subtype == "" && len(model.ResourceOperation.Subtypes) == 1 {
 		body.Subtype = model.ResourceOperation.Subtypes[0]
 	}
+	r = r.WithContext(core.WithMediaPreparationWorkflow(r.Context(), body.Provider, consumer.ID, model.ID, body.Subtype, consumer.PublicID))
 	intent := &core.ResourceIntent{Kind: body.Kind, Subtype: body.Subtype, Name: body.Name, Description: body.Description, ReferenceIDs: body.ReferenceIDs, GeneratedTaskID: body.GeneratedTaskID, BoundVoiceBindingID: body.BoundVoiceBindingID, Tags: body.Tags}
 	options := core.MediaOptions{ResourceIntent: intent}
 	if err := core.ValidateResourceCreationIntent(model, options, true); err != nil {
@@ -222,7 +232,7 @@ func (s *Server) createResource(w http.ResponseWriter, r *http.Request) {
 			s.resourceError(w, err)
 			return
 		}
-		s.estimateGeneration(w, r, input)
+		s.estimateMediaPreparation(w, r, input)
 		return
 	}
 	// Resource creation has its own inspected inputs, not free-form media URLs.

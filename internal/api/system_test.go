@@ -123,7 +123,7 @@ func (p *policyProviderAdmin) Check(ctx context.Context, id string) (providers.A
 type policyCatalogService struct{ accountService }
 
 func (s *policyCatalogService) ListProviders(context.Context) []core.ProviderDescriptor {
-	return []core.ProviderDescriptor{{ID: "bytedance"}, {ID: "alibaba"}}
+	return []core.ProviderDescriptor{{ID: "bytedance", Models: []core.MediaModel{{ID: "fixture-video", MediaType: "video"}}}, {ID: "alibaba", Models: []core.MediaModel{{ID: "fixture-video", MediaType: "video"}}}}
 }
 
 func TestProviderConnectionsHaveNoGlobalAllowlist(t *testing.T) {
