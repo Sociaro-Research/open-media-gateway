@@ -3,7 +3,7 @@ const {chromium,webkit}=require('playwright');
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const root=path.resolve(__dirname,'../../web/public/ui');
 const defaults=()=>({shared_resources:false,generation_ui:true,personal_providers:true,allow_inline_references:true,customer_workspaces:false,setup_pending:false,markup_percent:0,version:1});
-let state=defaults(),writes=[],failProfile=false,readGate=null,profileGate=null,saveGate=null,markupGate=null,markupSaveGate=null;
+let state=defaults(),writes=[],failProfile=false,readGate=null,profileGate=null,saveGate=null,markupGate=null,markupSaveGate=null,mountGate=null,settingsReads=[];
 const gates=new Set();
 function gate(){let arrive,release;const item={arrived:new Promise(r=>arrive=r),wait:new Promise(r=>release=r),arrive,release};gates.add(item);return item;}
 const server=http.createServer(async(req,res)=>{
@@ -11,6 +11,8 @@ const server=http.createServer(async(req,res)=>{
   const url=new URL(req.url,'http://fixture.test'),p=url.pathname;
   const json=(value,status=200)=>{res.writeHead(status,{'Content-Type':'application/json'});res.end(JSON.stringify(value));};
   if(p.startsWith('/v1/')){
+   if(['/v1/system/payment-providers','/v1/system/login-providers'].includes(p))settingsReads.push(p);
+   if(p==='/v1/system/payment-notifications'&&mountGate){const held=mountGate;mountGate=null;held.arrive();await held.wait;return json({});}
    let data={};if(req.method==='POST'||req.method==='PUT'){const chunks=[];for await(const chunk of req)chunks.push(chunk);data=JSON.parse(Buffer.concat(chunks).toString()||'{}');}
    if(p==='/v1/me')return json({id:'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa',session_id:'synthetic',name:'Administrator',email:'admin@example.test',is_system_admin:true});
    if(p==='/v1/info')return json({auth_mode:'google',console:state});
@@ -47,6 +49,8 @@ const server=http.createServer(async(req,res)=>{
  const base='http://127.0.0.1:'+server.address().port,engine=process.env.UI_BROWSER_ENGINE||'chromium';
  const browser=await(engine==='webkit'?webkit:chromium).launch({headless:true,...(process.env.UI_BROWSER_PATH?{executablePath:process.env.UI_BROWSER_PATH}:{})});
  const page=await browser.newPage({viewport:{width:1440,height:1000}});page.setDefaultTimeout(10000);
+ const inFlight=new Set();page.on('request',r=>{if(new URL(r.url()).pathname.startsWith('/v1/'))inFlight.add(r);});for(const event of ['requestfinished','requestfailed'])page.on(event,r=>inFlight.delete(r));
+ async function settled(){const end=Date.now()+10000;let quiet=Date.now();while(Date.now()<end){if(inFlight.size)quiet=Date.now();else if(Date.now()-quiet>=100)return;await page.waitForTimeout(20);}assert.equal(inFlight.size,0,'previous fixture case left API requests unresolved');}
  let caseName='initial';const errors=[],results=[],externalRequests=[],failedRequests=[];page.on('requestfailed',r=>failedRequests.push({path:new URL(r.url()).pathname,error:r.failure()?.errorText}));page.on('pageerror',e=>{if(!e.message.includes('ResizeObserver loop completed'))errors.push({case:caseName,message:e.message});});
  await page.route(url=>url.origin!==base,route=>{externalRequests.push(route.request().url());return route.abort();});
  const form=()=>page.locator('form.system-settings'),dialog=()=>page.locator('dialog.setup-dialog[open]');
@@ -54,12 +58,12 @@ const server=http.createServer(async(req,res)=>{
  const input=name=>form().locator('input[name='+name+']');
  const summary=()=>page.locator('.setup-section > p').first();
  const external=patch=>{state={...state,...patch,version:state.version+1};};
- async function open(){await page.goto(base+'/system');await form().waitFor();await page.waitForLoadState('networkidle');}
- async function fresh(patch={}){state={...defaults(),...patch};writes=[];failProfile=false;readGate=profileGate=saveGate=null;await open();}
+ async function open(){await page.goto(base+'/system');await form().waitFor();await settled();}
+ async function fresh(patch={}){state={...defaults(),...patch};writes=[];failProfile=false;readGate=profileGate=saveGate=null;settingsReads=[];await open();}
  async function choose(profile='operator',personal=false){await page.getByRole('button',{name:'Change Mode',exact:true}).click();await dialog().waitFor();await dialog().locator('input[value='+profile+']').check();if(profile==='operator')await dialog().locator('input[type=checkbox]').setChecked(personal);}
  async function apply(){const response=page.waitForResponse(r=>r.url().endsWith('/v1/system/setup-profile')&&r.request().method()==='POST');await dialog().getByRole('button',{name:'Apply',exact:true}).click();const r=await response;assert.equal(r.status(),200);await dialog().waitFor({state:'hidden'});return r.json();}
  async function saveAdvanced(status=200){const response=page.waitForResponse(r=>r.url().endsWith('/v1/system/settings')&&r.request().method()==='PUT');await save().click();const r=await response;assert.equal(r.status(),status);if(status===200)await save().filter({hasText:'Saved'}).waitFor();return r;}
- async function check(name,run){if(process.env.UI_CASE_FILTER&&!name.includes(process.env.UI_CASE_FILTER))return;caseName=name;await fresh();await run();await page.waitForLoadState('networkidle');assert.deepEqual(errors,[]);results.push({name,version:state.version,writes:[...writes]});console.log('PASS '+engine+': '+name);}
+ async function check(name,run){if(process.env.UI_CASE_FILTER&&!name.includes(process.env.UI_CASE_FILTER))return;caseName=name;await fresh();await run();await settled();assert.deepEqual(errors,[]);results.push({name,version:state.version,writes:[...writes]});console.log('PASS '+engine+': '+name);}
  try{
   if(process.env.UI_MODE_BASELINE){await fresh();await choose('personal');for(const theme of ['light','dark'])for(const width of [1440,390,320]){await page.setViewportSize({width,height:1000});await page.evaluate(t=>{document.documentElement.dataset.theme=t;document.documentElement.style.setProperty('--accent','#b5e21d');},theme);await dialog().screenshot({path:evidencePath(`/tmp/mode-before-${engine}-${theme}-${width}.png`)});}return;}
   await check('Settings actions show only a changed mode',async()=>{
@@ -126,6 +130,9 @@ const server=http.createServer(async(req,res)=>{
    const held=markupGate=gate();await page.locator('[data-system-page=settings]').click();await held.arrived;external({markup_percent:20});await choose();await apply();held.release();
    await page.getByRole('tab',{name:'Markups',exact:true}).click();await page.getByLabel('Default markup (%)',{exact:true}).fill('10');await page.getByRole('tab',{name:'System',exact:true}).click();await choose('personal');await apply();
    await page.getByRole('tab',{name:'Markups',exact:true}).click();const response=page.waitForResponse(r=>r.url().endsWith('/v1/system/markups')&&r.request().method()==='PUT');await page.locator('.markup-settings').getByRole('button',{name:'Save',exact:true}).click();assert.equal((await response).status(),409);assert.equal(writes.at(-1).data.version,1);assert.equal(state.markup_percent,20);
+  });
+  await check('obsolete Settings mounts stop before later reads',async()=>{
+   const held=mountGate=gate(),before=settingsReads.length;await page.locator('[data-system-page=settings]').click();await held.arrived;await page.locator('[data-system-page=administrators]').click();await page.getByRole('heading',{name:'Users',exact:true}).waitFor();held.release();await settled();assert.equal(settingsReads.length,before,'obsolete Settings must not initiate payment/login reads');assert.equal(writes.length,0);await page.locator('#systemView').screenshot({path:evidencePath('/tmp/obsolete-settings-after.png')});
   });
   await check('late chooser read cannot reopen a replaced settings view',async()=>{
    const held=readGate=gate();await page.getByRole('button',{name:'Change Mode',exact:true}).click();await held.arrived;

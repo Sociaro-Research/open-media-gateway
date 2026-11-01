@@ -37,14 +37,14 @@
         catch(error){if(token!==epoch)return;if(error.status===409){refreshing=true;void recover();}else FormUI.message(status,error.message,'error');}
         finally{saving=false;update();}
       });
-      await window.SalesBonuses.settings(sections.sales.panel,api,()=>token===epoch);
-	  await window.BrandingSettings.mount(sections.appearance.panel,api,()=>token===epoch);
-	  markupEditor=await window.MarkupSettings.mount(sections.markups.panel,api,{current:()=>token===epoch,onSystemSaved:version=>{data.version=Math.max(data.version,version);syncMarkup();}});markupMounted=true;syncMarkup();
-      await window.RequestLimits.mount(sections.limits.panel,api,{current:()=>token===epoch});
-      await window.EmailDeliverySettings.mount(sections.email.panel,api,()=>token===epoch);
-      await window.CatalogSync?.settings(sections.catalog.panel,api,()=>token===epoch);
-      await window.PaymentNotificationSettings.mount(sections.payments.panel,api,()=>token===epoch);
-      await window.PaymentProviderSettings.mount(sections.payments.panel,api,()=>token===epoch);
+      await window.SalesBonuses.settings(sections.sales.panel,api,()=>token===epoch);if(token!==epoch)return;
+	  await window.BrandingSettings.mount(sections.appearance.panel,api,()=>token===epoch);if(token!==epoch)return;
+	  markupEditor=await window.MarkupSettings.mount(sections.markups.panel,api,{current:()=>token===epoch,onSystemSaved:version=>{data.version=Math.max(data.version,version);syncMarkup();}});if(token!==epoch)return;markupMounted=true;syncMarkup();
+      await window.RequestLimits.mount(sections.limits.panel,api,{current:()=>token===epoch});if(token!==epoch)return;
+      await window.EmailDeliverySettings.mount(sections.email.panel,api,()=>token===epoch);if(token!==epoch)return;
+      await window.CatalogSync?.settings(sections.catalog.panel,api,()=>token===epoch);if(token!==epoch)return;
+      await window.PaymentNotificationSettings.mount(sections.payments.panel,api,()=>token===epoch);if(token!==epoch)return;
+      await window.PaymentProviderSettings.mount(sections.payments.panel,api,()=>token===epoch);if(token!==epoch)return;
       await window.LoginMethodSettings.mount(sections.login.panel,api,()=>token===epoch);
     }catch(error){if(token===epoch)FormUI.message(status,error.message,'error');}
   }
