@@ -21,7 +21,7 @@
       const form=el('form',undefined,'system-settings');
       form.innerHTML=`<label class="system-toggle"><input type="checkbox" name="generation"><span><strong>Show Playground / Templates</strong><small>Show the Playground and Templates screens. Turning this off hides both sections; API generation stays available.</small></span></label>
       <label class="system-toggle"><input type="checkbox" name="inlineReferences"><span><strong>Allow reference files in generation requests</strong><small>Allow supported providers to receive reference image contents with the request. When off, providers receive only HTTP(S) links or supported registered asset references. Applies to shared and personal connections when generation starts.</small></span></label>
-      <label class="system-toggle"><input type="checkbox" name="customerWorkspaces"><span><strong>Allow customer workspace onboarding</strong><small>Opt in to browser-authorized installation connections and one self-service company per account. Requires shared resources and working sign-in; grants no credit or provider access without consent.</small></span></label>
+      <label class="system-toggle"><input type="checkbox" name="customerWorkspaces"><span><strong>Allow customer workspace onboarding</strong><small>Allow external installations to create dedicated companies. Each initiating customer manages their installation’s company as Supermanager. Requires shared resources and working sign-in; creates no credit.</small></span></label>
       <button class="primary compact" type="submit">Save</button>`;
       form.elements.customerWorkspaces.checked=!!data.customer_workspaces;
       form.elements.inlineReferences.checked=data.allow_inline_references!==false;

@@ -134,6 +134,10 @@ func (s *Server) createAPIKey(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid_request", "send one JSON object with name, scopes and optional expires_at")
 		return
 	}
+	if centralInstallation(r) && (input.OrganizationID == "" || input.ResourceMode == "personal" || input.StorageMode == "personal") {
+		centralModeError(w)
+		return
+	}
 	if bound := credentialOrganization(r.Context()); bound != "" && input.OrganizationID != bound {
 		writeError(w, 403, "organization_mismatch", "the calling key cannot issue keys for another organization")
 		return

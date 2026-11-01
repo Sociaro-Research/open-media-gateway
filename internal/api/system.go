@@ -32,6 +32,15 @@ func (s *Server) systemAdmin(ctx context.Context) (bool, error) {
 }
 func (s *Server) systemPolicy(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if centralInstallation(r) {
+			path := r.URL.Path
+			personalConfiguration := path == "/v1/admin/providers" || strings.HasPrefix(path, "/v1/admin/providers/") || strings.HasPrefix(path, "/v1/admin/storage")
+			generation := (r.Method == http.MethodPost && isGenerationPath(path)) || isModelCatalogPath(path)
+			if personalConfiguration || generation && (identity.ProviderOwnerID(r.Context()) != identity.SharedOwnerID || identity.OrganizationFromContext(r.Context()).ID == "") || centralNewCompanyContent(r) && identity.OrganizationFromContext(r.Context()).ID == "" {
+				centralModeError(w)
+				return
+			}
+		}
 		if s.system == nil {
 			next.ServeHTTP(w, r)
 			return
@@ -131,7 +140,7 @@ func (s *Server) systemSettings(w http.ResponseWriter, r *http.Request) {
 			systemError(w, err)
 			return
 		}
-		s.writeViewerJSON(w, r, 200, settings)
+		s.writeInstallationSettings(w, r, settings)
 		return
 	}
 	var input struct {
@@ -173,6 +182,10 @@ func (s *Server) systemSettings(w http.ResponseWriter, r *http.Request) {
 	if input.SharedResources != nil {
 		next.SharedResources = *input.SharedResources
 	}
+	if centralInstallation(r) && (!next.SharedResources || next.PersonalProviders) {
+		centralModeError(w)
+		return
+	}
 	if err := next.Validate(); err != nil {
 		writeError(w, 400, "invalid_request", err.Error())
 		return
@@ -182,7 +195,7 @@ func (s *Server) systemSettings(w http.ResponseWriter, r *http.Request) {
 		systemError(w, err)
 		return
 	}
-	s.writeViewerJSON(w, r, 200, saved)
+	s.writeInstallationSettings(w, r, saved)
 }
 func systemPage(w http.ResponseWriter, r *http.Request) (int, bool) {
 	offset := 0

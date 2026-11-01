@@ -74,6 +74,7 @@
     const meta=document.querySelector('meta[name="gateway-url"]');if(meta)meta.content=site.api_url||location.origin;
     if(site.docs_url&&['/docs','/docs/'].includes(location.pathname)&&site.docs_url!==location.origin)location.replace(window.GatewayTheme?.docsURL(site.docs_url+'/'+location.hash)||site.docs_url+'/'+location.hash);
     document.querySelectorAll('[data-console-link]').forEach(n=>n.href=(site.ui_url||'')+'/');
+    if(window.GatewaySite)window.GatewaySite.current=site;
     return site;
   }).catch(()=>({api_url:location.origin,ui_url:location.origin}));
   new MutationObserver(()=>{if(appearance)apply(appearance);}).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});

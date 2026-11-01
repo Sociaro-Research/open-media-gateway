@@ -382,7 +382,7 @@ func (s *Server) info(w http.ResponseWriter, r *http.Request) {
 	s.writeViewerJSON(w, r, http.StatusOK, struct {
 		core.ServiceInfo
 		Console any `json:"console"`
-	}{info, settings.Public()})
+	}{info, installationConsolePolicy(r, settings)})
 }
 
 func (s *Server) me(w http.ResponseWriter, r *http.Request) {

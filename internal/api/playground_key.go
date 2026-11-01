@@ -62,6 +62,10 @@ func (s *Server) playgroundKey(w http.ResponseWriter, r *http.Request) {
 		}
 		in.OrganizationID = parsed.String()
 	}
+	if centralInstallation(r) && in.OrganizationID == "" {
+		centralModeError(w)
+		return
+	}
 	if allowed, e := s.keyOrganization(r.Context(), user.ID, in.OrganizationID); e != nil || !allowed {
 		if e != nil {
 			orgError(w, e)

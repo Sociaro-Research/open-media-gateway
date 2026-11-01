@@ -11,6 +11,7 @@ import (
 
 	"github.com/Sociaro-Research/open-media-gateway/docs"
 	"github.com/Sociaro-Research/open-media-gateway/internal/branding"
+	"github.com/Sociaro-Research/open-media-gateway/internal/installation"
 )
 
 type storageBrowserOriginKey struct{}
@@ -26,11 +27,7 @@ func WithPublicAPI(next http.Handler, apiURL, uiURL, docsURL string, readers ...
 		if raw == "" {
 			return "", nil
 		}
-		u, e := url.Parse(raw)
-		if e != nil || u.Host == "" || (u.Scheme != "https" && !(u.Scheme == "http" && (u.Hostname() == "localhost" || u.Hostname() == "127.0.0.1" || u.Hostname() == "::1"))) || u.User != nil || (u.Path != "" && u.Path != "/") || u.RawQuery != "" || u.Fragment != "" {
-			return "", fmt.Errorf("public URL must be an HTTPS origin (HTTP is allowed only on localhost)")
-		}
-		return strings.TrimRight(u.String(), "/"), nil
+		return installation.NormalizeOrigin(raw)
 	}
 	var err error
 	if apiURL, err = origin(apiURL); err != nil {
@@ -45,15 +42,29 @@ func WithPublicAPI(next http.Handler, apiURL, uiURL, docsURL string, readers ...
 	if docsURL, err = origin(docsURL); err != nil {
 		return nil, err
 	}
+	metadata, err := installation.Describe(uiURL)
+	if err != nil {
+		return nil, err
+	}
 	host := func(raw string) string { u, _ := url.Parse(raw); return u.Host }
+	matchesHost := func(requestHost, configured string) bool {
+		u, e := url.Parse(configured)
+		if e != nil || configured == "" {
+			return false
+		}
+		candidate, e := installation.NormalizeOrigin(u.Scheme + "://" + requestHost)
+		return e == nil && candidate == configured
+	}
+
 	if docsURL != "" && (apiURL == "" || strings.EqualFold(host(docsURL), host(apiURL)) || strings.EqualFold(host(docsURL), host(uiURL))) {
 		return nil, fmt.Errorf("separate documentation requires a distinct origin and a configured API origin")
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r = r.WithContext(installation.WithContext(r.Context(), metadata))
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "no-referrer")
-		documentation := docsURL != "" && strings.EqualFold(r.Host, host(docsURL))
-		if apiURL != "" && !documentation && !strings.EqualFold(r.Host, host(apiURL)) && r.URL.Path != "/healthz" {
+		documentation := docsURL != "" && matchesHost(r.Host, docsURL)
+		if apiURL != "" && !documentation && !matchesHost(r.Host, apiURL) && r.URL.Path != "/healthz" {
 			http.Error(w, "unknown host", http.StatusMisdirectedRequest)
 			return
 		}
@@ -73,6 +84,10 @@ func WithPublicAPI(next http.Handler, apiURL, uiURL, docsURL string, readers ...
 		if uiURL != "" {
 			r = r.WithContext(context.WithValue(r.Context(), storageBrowserOriginKey{}, uiURL))
 		}
+		if metadata.Role == "central" && centralRemoteClientRequest(r) {
+			centralModeError(w)
+			return
+		}
 		next.ServeHTTP(w, r)
 	}), nil
 }
@@ -86,7 +101,8 @@ func serveSiteConfiguration(w http.ResponseWriter, r *http.Request, apiURL, uiUR
 		assets[key] = branding.Asset{MIME: asset.MIME}
 	}
 	settings.Assets = assets
-	writeJSON(w, 200, map[string]any{"api_url": apiURL, "ui_url": uiURL, "docs_url": docsURL, "branding": settings})
+	meta := installation.FromContext(r.Context())
+	writeJSON(w, 200, map[string]any{"api_url": apiURL, "ui_url": uiURL, "docs_url": docsURL, "branding": settings, "installation_role": meta.Role, "central_origin": meta.CentralOrigin})
 }
 func (s *Server) siteConfiguration(w http.ResponseWriter, r *http.Request) {
 	serveSiteConfiguration(w, r, "", "", "", s.brandingReader())

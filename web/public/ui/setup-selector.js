@@ -2,9 +2,12 @@
  'use strict';
  let actor=null,dialog=null,busy=false,opening=0;
  const sections=new Set();
- function published(state,previous){for(const section of sections){if(!section.summary.isConnected){sections.delete(section);continue;}section.summary.textContent=profile(state);if(section.current())section.onSaved?.(state,previous);}}
+ const central=s=>s.installation_role==='central';
+ const needsCompanySetup=s=>!!s.setup_pending||!s.shared_resources||s.personal_providers;
+ function reflectSection(section,state){section.summary.textContent=profile(state);section.button.textContent=central(state)?'Configure company service':'Change Mode';section.button.hidden=central(state)&&!needsCompanySetup(state);}
+ function published(state,previous){for(const section of sections){if(!section.summary.isConnected){sections.delete(section);continue;}reflectSection(section,state);if(section.current())section.onSaved?.(state,previous);}}
  const node=(tag,text,cls)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;};
- const profile=s=>s.shared_resources?(s.personal_providers?'Mixed: shared and personal providers':'Service for companies'):(s.personal_providers?'For myself':'Custom: personal and shared access disabled');
+ const profile=s=>central(s)?'Central server · Service for companies':s.shared_resources?(s.personal_providers?'Mixed: shared and personal providers':'Service for companies'):(s.personal_providers?'For myself':'Custom: personal and shared access disabled');
  const scenario=s=>s.shared_resources?'operator':s.personal_providers?'personal':'';
  function dismissal(user=actor){return 'gateway-setup-dismissed-'+user.id+':'+(user.session_id||'session');}
  function dismissed(){try{return !!sessionStorage.getItem(dismissal());}catch{return false;}}
@@ -12,9 +15,10 @@
   if(!actor?.is_system_admin||busy||dialog?.open)return;
   const user=actor,ticket=++opening;let settings=await api('/v1/system/settings');
   if(ticket!==opening||actor!==user||!actor?.is_system_admin||busy||!current())return;
+  const isCentral=central(settings);
   dialog?.remove();const modal=node('dialog',undefined,'keys-revoke-dialog sales-dialog setup-dialog');dialog=modal;const form=node('form'),status=node('p');status.setAttribute('role','status');
   function dismiss(){if(busy)return;try{sessionStorage.setItem(dismissal(user),'1');}catch{}modal.close();}
-  modal.append(form);document.body.append(modal);const {heading,close}=FormUI.dialogHeading(form,'Choose how to use this installation',dismiss);heading.id='setup-dialog-title';modal.setAttribute('aria-labelledby',heading.id);
+  modal.append(form);document.body.append(modal);const {heading,close}=FormUI.dialogHeading(form,isCentral?'Configure company service':'Choose how to use this installation',dismiss);heading.id='setup-dialog-title';modal.setAttribute('aria-labelledby',heading.id);
   const active=()=>actor===user&&dialog===modal&&modal.open&&current();let reconciling=false,retry;
   modal.addEventListener('close',()=>clearTimeout(retry));
   const currentSummary=node('p',undefined,'field-explanation');form.append(currentSummary);
@@ -23,16 +27,17 @@
    ['personal','For myself','Use your own provider accounts and personal storage. No company billing is required.'],
    ['operator','Service for companies','Configure shared providers and storage, then company membership, funding and limits.'],
    ['sociaro','Sociaro','A new connection creates a dedicated company for this installation on the remote Sociaro server. Reconnecting uses that same company. Its catalogue, jobs, balance and files stay on that server.']
-  ]){const label=node('label',undefined,'storage-choice-header setup-option'),radio=node('input');radio.type='radio';radio.name='scenario';radio.value=value;const copy=node('span');copy.append(node('strong',title),node('small',description));label.append(radio,copy);choices.append(label);}
-  const own=node('label',undefined,'system-toggle'),allow=node('input');allow.type='checkbox';allow.checked=settings.personal_providers;own.append(allow,node('span','Also allow users’ own provider connections'));own.hidden=true;
+  ]){if(isCentral&&value!=='operator')continue;const label=node('label',undefined,'storage-choice-header setup-option'),radio=node('input');radio.type='radio';radio.name='scenario';radio.value=value;const copy=node('span');copy.append(node('strong',title),node('small',description));label.append(radio,copy);choices.append(label);}
+  const own=node('label',undefined,'system-toggle'),allow=node('input');allow.type='checkbox';allow.checked=!isCentral&&settings.personal_providers;own.append(allow,node('span','Also allow users’ own provider connections'));own.hidden=true;
   const preview=node('p','Select a scenario to review its changes.','field-explanation');preview.setAttribute('aria-live','polite');
-  const actions=node('div',undefined,'dialog-actions'),skip=node('button','Skip for now','secondary'),apply=node('button','Apply','primary compact');skip.type='button';skip.hidden=!onboarding;apply.type='submit';skip.onclick=dismiss;actions.append(skip,apply);
+  const actions=node('div',undefined,'dialog-actions'),skip=node('button','Skip for now','secondary'),apply=node('button','Apply','primary compact');skip.type='button';skip.hidden=!onboarding||isCentral;apply.type='submit';skip.onclick=dismiss;actions.append(skip,apply);
+  choices.hidden=isCentral;
   form.append(choices,own,preview,status,actions);
   function draft(){return JSON.stringify([form.elements.scenario.value,form.elements.scenario.value==='operator'&&allow.checked]);}
-  function baseline(){return JSON.stringify([onboarding&&settings.setup_pending?'':scenario(settings),scenario(settings)==='operator'&&settings.personal_providers]);}
-  function sync(){currentSummary.textContent='Current configuration: '+profile(settings)+'. Existing companies, credentials, balances and files are preserved.';allow.checked=settings.personal_providers;for(const radio of choices.querySelectorAll('input'))radio.checked=radio.value===scenario(settings);FormUI.watch(form,apply,{placement:'footer',hideWhenClean:true,read:draft,valid:()=>!!form.elements.scenario.value&&!busy&&!reconciling});FormUI.commit(form,baseline());update();}
-  function update(){const value=form.elements.scenario.value;own.hidden=value!=='operator';apply.textContent=value==='sociaro'?'Open Sociaro workspace':'Apply';for(const control of [choices,allow])control.disabled=busy||reconciling;for(const control of [skip,close])control.disabled=busy;FormUI.update(form);
-   preview.textContent=value==='personal'?`Personal provider configuration: on. Shared resources: off${settings.shared_resources?' — existing shared keys will stop accepting new work':''}. No data is moved or deleted.`:value==='operator'?`Shared resources: on. Personal provider configuration: ${allow.checked?'on':'off'}. Shared credentials, company funding and member allowances must be configured separately.`:value==='sociaro'?'Local policies remain unchanged. Sign in or register on the trusted server and explicitly authorize this installation. A new connection creates its dedicated company with you as Supermanager; reconnecting uses that same company. Hosting must enable customer onboarding; credit is configured separately.':'Select a scenario to review its changes.';
+  function baseline(){return JSON.stringify([(onboarding&&settings.setup_pending)||isCentral&&needsCompanySetup(settings)?'':scenario(settings),scenario(settings)==='operator'&&settings.personal_providers]);}
+  function sync(){currentSummary.textContent='Current configuration: '+profile(settings)+'. Existing companies, credentials, balances and files are preserved.';allow.checked=!isCentral&&settings.personal_providers;for(const radio of choices.querySelectorAll('input'))radio.checked=radio.value===(isCentral?'operator':scenario(settings));FormUI.watch(form,apply,{placement:'footer',hideWhenClean:true,read:draft,valid:()=>!!form.elements.scenario.value&&!busy&&!reconciling});FormUI.commit(form,baseline());update();}
+  function update(){const value=form.elements.scenario.value;own.hidden=isCentral||value!=='operator';apply.textContent=value==='sociaro'?'Open Sociaro workspace':'Apply';for(const control of [choices,allow])control.disabled=busy||reconciling;for(const control of [skip,close])control.disabled=busy;FormUI.update(form);
+   preview.textContent=isCentral?'This central server serves companies. Shared providers, storage, company funding and member allowances are configured separately. Personal provider connections and connecting to another central server are unavailable.':value==='personal'?`Personal provider configuration: on. Shared resources: off${settings.shared_resources?' — existing shared keys will stop accepting new work':''}. No data is moved or deleted.`:value==='operator'?`Shared resources: on. Personal provider configuration: ${allow.checked?'on':'off'}. Shared credentials, company funding and member allowances must be configured separately.`:value==='sociaro'?'Local policies remain unchanged. Sign in or register on the trusted server and explicitly authorize this installation. A new connection creates its dedicated company with you as Supermanager; reconnecting uses that same company. Hosting must enable customer onboarding; credit is configured separately.':'Select a scenario to review its changes.';
   }
   choices.onchange=update;allow.onchange=update;
   async function reconcile(){try{const next=await api('/v1/system/settings');if(!active())return;settings=next;reconciling=false;sync();published(next);FormUI.message(status,'Settings changed. Current configuration has been loaded. Choose and review your changes before applying again.','error');}catch{if(!active())return;FormUI.message(status,'Could not load the changed settings. Retrying automatically…','error');retry=setTimeout(reconcile,1500);}}
@@ -45,11 +50,11 @@
    finally{busy=false;modal.removeAttribute('aria-busy');update();}
   };
   function dismissAfterSave(){busy=false;dismiss();}
-  sync();modal.showModal();FormUI.refresh();(choices.querySelector('input:checked')||choices.querySelector('input')).focus();
+  sync();modal.showModal();FormUI.refresh();(isCentral?(apply.disabled?close:apply):(choices.querySelector('input:checked')||choices.querySelector('input'))).focus();
  }
  window.SetupSelector={
   async initialize(user){opening++;if(actor!==user)dialog?.close();actor=user;window.RemoteWorkspace?.setActor(user);if(!user?.is_system_admin)return;try{const settings=await api('/v1/system/settings');if(actor===user&&settings.setup_pending&&!dismissed())await open({onboarding:true});}catch(error){console.warn('Setup guide is available from Settings.');}},
-  mount(parent,state,onSaved,current=()=>true){const block=node('section',undefined,'setup-section'),summary=node('p',profile(state),'field-explanation');block.append(node('h2','Installation Mode'),summary);sections.add({summary,onSaved,current});const button=node('button','Change Mode','secondary');button.type='button';button.onclick=()=>open({current}).catch(e=>{if(current())FormUI.message(message,e.message,'error');});const message=node('p');message.setAttribute('role','status');block.append(button,message);parent.append(block);return button;},
+  mount(parent,state,onSaved,current=()=>true){const block=node('section',undefined,'setup-section'),summary=node('p',profile(state),'field-explanation');block.append(node('h2',central(state)?'Company service':'Installation Mode'),summary);const button=node('button','Change Mode','secondary');const section={summary,button,onSaved,current};sections.add(section);reflectSection(section,state);button.type='button';button.onclick=()=>open({current}).catch(e=>{if(current())FormUI.message(message,e.message,'error');});const message=node('p');message.setAttribute('role','status');block.append(button,message);parent.append(block);return button;},
   open,reflect:published
  };
 })();

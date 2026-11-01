@@ -11,6 +11,7 @@ and troubleshooting, see the [installation guide](../deploy/ghcr/README.md).
 - [Configuration](configuration.md), [release installation](../deploy/ghcr/README.md),
   [deployment and rollback](deployment.md), [GitHub Actions deployment](github-actions-deployment.md)
 - [First owner and administration](system-administration.md), [email authentication](email-authentication.md)
+- [Installation roles and the central server](installation-role.md)
 - [Organizations and membership](organizations.md), [shared resources](shared-resources.md),
   [payments](payments.md), [audit history](audit-log.md)
 - [Provider connections](provider-connections.md), [provider asset libraries](provider-asset-library.md),

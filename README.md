@@ -109,6 +109,7 @@ and the [outbound security policy](SECURITY.md#known-preview-limitations).
 
 - [Installation options, HTTPS, troubleshooting, and updates](deploy/ghcr/README.md)
 - [Provider, storage, and account configuration](docs/configuration.md)
+- [Installation roles and the central server](docs/installation-role.md)
 - [API integration and webhooks](docs/openai-api.md)
 - [Build from source and run checks](docs/development.md) · [Contribute](CONTRIBUTING.md)
 - [All documentation](docs/README.md) · [Security](SECURITY.md) · [Support](SUPPORT.md)

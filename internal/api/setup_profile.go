@@ -16,6 +16,10 @@ func (s *Server) setupProfile(w http.ResponseWriter, r *http.Request) {
 	if !decodeSystem(w, r, &in) {
 		return
 	}
+	if centralInstallation(r) && (in.Profile != "operator" || in.AllowPersonal) {
+		centralModeError(w)
+		return
+	}
 	if in.Profile != "personal" && in.Profile != "operator" {
 		writeError(w, 400, "invalid_profile", "choose personal or operator; connect Sociaro separately")
 		return
@@ -34,5 +38,5 @@ func (s *Server) setupProfile(w http.ResponseWriter, r *http.Request) {
 		systemError(w, err)
 		return
 	}
-	s.writeViewerJSON(w, r, 200, saved)
+	s.writeInstallationSettings(w, r, saved)
 }

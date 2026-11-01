@@ -153,15 +153,15 @@ let providerLogoSession=0;
 let consoleInitialized=false;
 let consolePolicy={generation_ui:true,personal_providers:true};
 window.applySystemAccess=function(settings,admin=systemAdministrator){
- consolePolicy={...consolePolicy,...settings};serviceInfo.console=consolePolicy;systemAdministrator=admin;
+ consolePolicy={...consolePolicy,...settings};const central=consolePolicy.installation_role==='central';if(central)consolePolicy.personal_providers=false;const personalConfiguration=!central&&(admin||consolePolicy.personal_providers);serviceInfo.console=consolePolicy;systemAdministrator=admin;
  document.querySelector('#systemNav').hidden=!admin;
  document.querySelector('#createGenerationKey').disabled=!admin&&!consolePolicy.personal_providers&&!consolePolicy.shared_resources;
  if(window.Workspace?.ready())Workspace.refresh().catch(()=>{});
- elements.generationNav.hidden=clientManager||!consolePolicy.generation_ui;document.querySelector('#templatesNav').hidden=clientManager||!consolePolicy.generation_ui;elements.providersNav.hidden=clientManager||(!consolePolicy.personal_providers&&!admin);
- document.querySelector('#storageNav').hidden=clientManager||(!consolePolicy.personal_providers&&!admin);
+ elements.generationNav.hidden=clientManager||!consolePolicy.generation_ui;document.querySelector('#templatesNav').hidden=clientManager||!consolePolicy.generation_ui;elements.providersNav.hidden=clientManager||!personalConfiguration;
+ document.querySelector('#storageNav').hidden=clientManager||!personalConfiguration;
  document.querySelector('#keysNav').hidden=clientManager;
  if(clientManager){document.querySelector('#createGenerationKey').disabled=true;lastConfigurationSection='organizations';}
- if((currentConsoleSection==='generation'&&!consolePolicy.generation_ui)||(['providers','storage'].includes(currentConsoleSection)&&!consolePolicy.personal_providers&&!admin)||(currentConsoleSection==='system'&&!admin))showConsoleSection(consoleAuthenticated?'keys':'docs');
+ if((currentConsoleSection==='generation'&&!consolePolicy.generation_ui)||(['providers','storage'].includes(currentConsoleSection)&&!personalConfiguration)||(currentConsoleSection==='system'&&!admin))showConsoleSection(consoleAuthenticated?'keys':'docs');
 };
 const configurationSections = ['providers', 'storage', 'keys', 'reports', 'organizations'];
 if (location.pathname === '/configuration') currentConsoleSection = configurationSections.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'providers';

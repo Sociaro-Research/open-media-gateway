@@ -9,12 +9,12 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"net"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
+	"github.com/Sociaro-Research/open-media-gateway/internal/installation"
 	"github.com/Sociaro-Research/open-media-gateway/internal/providerconfig"
 	"github.com/google/uuid"
 )
@@ -91,19 +91,11 @@ func New(repo Repository, cipher *providerconfig.Cipher, client *http.Client) *M
 	return &Manager{Repo: repo, Cipher: cipher, client: &copied, download: client}
 }
 func Origin(raw string) (string, error) {
-	u, e := url.Parse(strings.TrimSpace(raw))
-	if e != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || (u.Path != "" && u.Path != "/") {
+	origin, err := installation.NormalizeOrigin(strings.TrimSpace(raw))
+	if err != nil || !strings.HasPrefix(origin, "https://") {
 		return "", errors.New("use the HTTPS server origin without a path, query or credentials")
 	}
-	// Equivalent URL spellings must retain the same durable installation proof.
-	host := strings.ToLower(strings.TrimSuffix(u.Hostname(), "."))
-	port := u.Port()
-	if port != "" && port != "443" {
-		host = net.JoinHostPort(host, port)
-	} else if strings.Contains(host, ":") {
-		host = "[" + host + "]"
-	}
-	return "https://" + host, nil
+	return origin, nil
 }
 
 type KeyInfo struct {

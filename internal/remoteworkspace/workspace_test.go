@@ -218,7 +218,7 @@ func TestProductionTransportRejectsPrivateTargetsAndMethods(t *testing.T) {
 }
 
 func TestCentralOriginCanonicalization(t *testing.T) {
-	for _, test := range []struct{ input, want string }{{"https://CENTRAL.Example:443/", "https://central.example"}, {"https://central.example./", "https://central.example"}, {"https://central.example:8443/", "https://central.example:8443"}, {"https://[::1]:443/", "https://[::1]"}} {
+	for _, test := range []struct{ input, want string }{{"https://CENTRAL.Example:443/", "https://central.example"}, {"https://central.example:0443/", "https://central.example"}, {"https://central.example./", "https://central.example"}, {"https://central.example:8443/", "https://central.example:8443"}, {"https://[::1]:443/", "https://[::1]"}} {
 		got, err := Origin(test.input)
 		if err != nil || got != test.want {
 			t.Fatalf("origin %q normalized to %q: %v", test.input, got, err)

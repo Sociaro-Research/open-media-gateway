@@ -47,7 +47,7 @@
     const form=node('form',undefined,'keys-form');
     form.innerHTML='<h3>Create a key</h3><div class="keys-fields"><div><label for="newKeyName">Name</label><input id="newKeyName" name="name" required maxlength="80" autocomplete="off"></div><div><label for="newKeyExpiry">Expiration</label><select id="newKeyExpiry"><option value="90">90 days</option><option value="30">30 days</option><option value="365">1 year</option><option value="">No expiration</option></select></div></div><fieldset><legend>Permissions</legend><label><input type="checkbox" checked disabled> Generation and results</label><label><input type="checkbox" name="providers"> Manage providers</label><label><input type="checkbox" name="storage"> Manage storage</label><label><input type="checkbox" name="keys"> Manage API keys</label></fieldset><button class="primary compact" type="submit">Create</button><p class="docs-form-status" role="status"></p>';
     if(systemAdministrator){const label=node('label');label.innerHTML='<input type="checkbox" name="system"> Manage system';form.querySelector('fieldset').append(label);}
-    const personalAllowed=systemAdministrator || serviceInfo.console?.personal_providers!==false;
+    const personalAllowed=serviceInfo.console?.installation_role!=='central'&&(systemAdministrator||serviceInfo.console?.personal_providers!==false);
     const sharedAllowed=!!serviceInfo.console?.shared_resources;
     const membershipRequired=!!organizationID&&!organizationMember;
     const unavailable=membershipRequired||(organizationID?!sharedAllowed:!personalAllowed);

@@ -210,7 +210,7 @@ paths:
     post:
       operationId: applySetupProfile
       summary: Apply a confirmed local setup profile without migrating data
-      description: Administrator plus system:manage for API keys. Preserves unrelated settings, clears setup_pending and rejects disabling access with active jobs. Skip does not call this endpoint.
+      description: Administrator plus system:manage for API keys. Preserves unrelated settings, clears setup_pending and rejects disabling access with active jobs. Skip does not call this endpoint. A trusted central installation accepts only operator with allow_personal false; role/origin metadata is read-only and does not enable hosting or add credit.
       requestBody:
         required: true
         content:
@@ -229,6 +229,7 @@ paths:
           content:
             application/json:
               schema: {'$ref': '#/components/schemas/SystemSettings'}
+        '403': {description: Central installation supports companies-service mode only}
         '409': {description: Stale version or active work prevents disabling access}
   /v1/system/remote-workspace:
     get:
@@ -365,10 +366,10 @@ paths:
       summary: Read public site origins and appearance
       operationId: get_site_configuration
       security: []
-      description: Public metadata used by independently served frontends. Assets include MIME metadata; download image bytes from /branding/assets/{asset}.
+      description: Public metadata used by independently served frontends. installation_role is central or ordinary, derived only from the configured UI public origin (AUTH_PUBLIC_URL fallback). central_origin is the public release destination https://console.sociaro.ai. Request Host/forwarded headers do not assign role. Assets include MIME metadata; download image bytes from /branding/assets/{asset}.
       responses:
         '200':
-          description: API, UI and documentation origins plus branding settings. Empty origins use the current origin.
+          description: API, UI and documentation origins, installation_role, central_origin and branding settings. Empty display origins use the current origin; missing trusted own identity never grants central role.
   "/auth/session":
     get:
       tags: [Account]
@@ -5419,7 +5420,7 @@ paths:
       operationId: get_v1_info
       description: Authenticated deployment defaults and console authentication mode (public only in local API-key development mode). Defaults
         may not be configured for your account; GET /v1/providers is the authoritative
-        account catalog.
+        account catalog. The console object includes read-only installation_role and central_origin; central console policy disables personal providers.
   "/v1/providers":
     get:
       tags:
@@ -9255,10 +9256,12 @@ components:
       additionalProperties: false
       required: [generation_ui, version]
       properties:
+        installation_role: {type: string, enum: [central, ordinary], readOnly: true, description: Trusted configured own public-origin role; cannot be supplied by a settings/profile request.}
+        central_origin: {type: string, format: uri, readOnly: true, description: Public release central destination; currently https://console.sociaro.ai.}
         markup_percent:
           allOf: [{"$ref": "#/components/schemas/MarkupPercent"}]
           description: Administrator setting; omitted from public console policy. Defaults to zero. Omission on update preserves the current rate. Applies only to new shared-provider tasks.
-        customer_workspaces: {type: boolean, default: false, description: "Explicit host opt-in to customer installation authorization and bounded self-service own-company creation; also requires shared_resources. Existing credentials/billing remain independent."}
+        customer_workspaces: {type: boolean, default: false, description: "Explicit host opt-in to dedicated installation-company provisioning; also requires shared_resources. Role detection never enables this setting. Existing credentials/billing remain independent."}
         setup_pending: {type: boolean, readOnly: true, description: Administrator-only first-owner guide state; upgrades default false and Skip never writes settings.}
         shared_storage_limit_bytes: {type: [integer, 'null'], description: Set through /v1/system/storage/quota; preserved by ordinary settings updates.}
         shared_resources: {type: boolean, default: false, description: "Enable shared providers and storage. Omission on update preserves the current policy. The console changes this only through the setup scenario. Disabling blocks new shared work; accepted tasks and existing files remain available."}
