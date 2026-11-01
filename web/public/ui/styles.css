@@ -1772,7 +1772,8 @@ input[type=color]:focus-visible { outline:none; box-shadow:none; border:2px soli
 /* Resource descriptors use the existing field, card and dialog spacing. */
 .resource-controls,.resource-controls-content,.resource-create-fields,.resource-variant,.resource-sources,.resource-input-group,.resource-list { display:grid; gap:16px; min-width:0; }
 .resource-item { display:grid; gap:12px; min-width:0; padding:16px; border:1px solid var(--line); border-radius:12px; background:var(--panel); }
-:is(.resource-controls,.resource-library) :is(h3,p,label) { margin:0; }
+/* Component gaps own the rhythm, including inside generation section headings. */
+:is(.resource-controls,.resource-library) :is(h3,p,label),#generationView .resource-controls h3 { margin:0; }
 .resource-item .reference-actions { justify-content:flex-start; }
 .resource-delete-confirm { display:flex; flex-wrap:wrap; align-items:center; gap:12px; }
 .resource-delete-confirm p { flex-basis:100%; }
