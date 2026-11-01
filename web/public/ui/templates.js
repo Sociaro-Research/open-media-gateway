@@ -96,13 +96,14 @@
    else say('');
   }catch(error){if(valid()&&error.name!=='AbortError')say(error.message,'error');}
  }
- async function chooseLibrary(kind,administrator,onSelect,validationContext=null,selectedID=()=>null,onClear=null){
-  const token=epoch,parentSignal=controller.signal,operation=new AbortController(),signal=operation.signal,previousFocus=document.activeElement;
+ async function chooseLibrary(kind,administrator,onSelect,validationContext=null,selectedID=()=>null,onClear=null,returnTarget=null){
+  const token=epoch,parentSignal=controller.signal,operation=new AbortController(),signal=operation.signal,previousFocus=returnTarget||document.activeElement;
   let busy=false,uploadPending=false,offset=0,hasMore=false,items=[],sequence=0;
   const kinds=kind?[kind]:administrator&&onSelect?['image','video']:['image','video','audio'],previousSlot=previousFocus?.closest('[data-slot-id]')?.dataset.slotId;
   const compatible=item=>kinds.some(type=>(item.content_type||'').startsWith(type+'/'));
   const endpoint=administrator?'/v1/system/template-references':'/v1/references';
-  const close=()=>{view.stop();operation.abort();dialog.close();dialog.remove();const focus=previousFocus?.isConnected?previousFocus:previousSlot?document.querySelector(`[data-slot-id="${CSS.escape(previousSlot)}"] [data-reference-upload] .reference-actions button:nth-child(2)`):null;if(focus&&!focus.disabled)focus.focus();};
+  const previousUpload=previousFocus?.closest('[data-reference-upload]');
+  const close=()=>{view.stop();operation.abort();dialog.close();dialog.remove();const host=previousUpload?.isConnected?previousUpload:previousSlot?document.querySelector(`[data-slot-id="${CSS.escape(previousSlot)}"] [data-reference-upload]`):null;const focus=host?.querySelector('[data-upload-remove]:not([hidden]):not(:disabled)')||host?.querySelector('[data-upload-picker]:not([hidden]):not(:disabled)')||(previousFocus?.isConnected&&!previousFocus.hidden&&!previousFocus.disabled?previousFocus:null);if(focus){focus.focus();requestAnimationFrame(()=>{if(fresh(token)&&!parentSignal.aborted&&focus.isConnected&&!focus.disabled&&!focus.hidden&&(document.activeElement===document.body||document.activeElement===previousFocus))focus.focus({preventScroll:true});});}};
   const view=ReferenceLibrary.create({title:administrator?'Template references':'Reference library',description:administrator?'Shared template files. Administrators manage this library. Upload a file, then select it to assign a fixed slot.':'Choose a reference for this slot.',onClose:close});
   const {dialog,status:message,more}=view;dialog.classList.add('template-reference-library');
   function render(){view.render(items.filter(compatible),{
@@ -175,7 +176,7 @@
      limits:kind=>{const [p,m]=model.value?JSON.parse(model.value):[];return view.catalog.find(x=>x.id===p)?.models.find(x=>x.id===m)?.reference_media_limits?.[kind]||{};},
      onBusy:value=>{pending+=value?1:-1;ready();},
      onFile:async(file,signal)=>{const op=begin();op.signal=AbortSignal.any([op.signal,signal]);const ref=await uploadReference(file,op.signal,target(),text=>{if(current(op))widget.message(text);});await bind(ref,op,file);return 'Assigned '+file.name+' to '+slot.label+'.';},
-     onLibrary:()=>chooseLibrary(slot.type,false,async(item,signal)=>{const op=begin();op.signal=AbortSignal.any([op.signal,signal]);pending++;ready();try{await bind(item,op);}finally{pending--;if(fresh(token))ready();}},target,()=>inputs[slot.id],clear)
+     onRemove:clear,onLibrary:picker=>chooseLibrary(slot.type,false,async(item,signal)=>{const op=begin();op.signal=AbortSignal.any([op.signal,signal]);pending++;ready();try{await bind(item,op);}finally{pending--;if(fresh(token))ready();}},target,()=>inputs[slot.id],clear,picker.root)
     });if(draft.files[slot.id]){const item=draft.files[slot.id];widget.setPreview({url:item.url,type:item.content_type,name:item.name||slot.label});widget.message('Assigned '+(item.name||slot.label)+'.');}row.append(widget.root);form.append(row);
 
    }
@@ -302,11 +303,11 @@
    if(slot)slots.querySelector(`[data-slot-id="${CSS.escape(slot.id)}"] .reference-status`).textContent='Assigned '+name+' to '+slot.label+'.';
   }
   function uploadControl(slot){
-   const kind=slot?.type,label=slot?.label||'Cover',widget=ReferenceUpload.create({label,title:slot?(slot.asset_id?'Replace the fixed '+kind:'Drop '+(kind==='audio'?'an audio file':'an '+kind)+' here'):'Drop a separate cover here',uploadLabel:slot?(slot.asset_id?'Replace '+kind:'Upload '+kind):'Upload cover',kinds:slot?[kind]:['image','video'],limits:slot?inputLimits:()=>({}),signal,locked:()=>writing||uploading>0,
-    onRemove:!slot?()=>{coverID='';cache();renderSlots();checkMedia();showPreview(coverUpload,'','image','Cover');}:undefined,
-    onBusy:(busy,{restoreFocus=false}={})=>{if(!fresh(token))return;uploading+=busy?1:-1;lock(uploading>0);if(!busy&&restoreFocus&&slot)slots.querySelector(`[data-slot-id="${CSS.escape(slot.id)}"] [data-upload-picker]`)?.focus({preventScroll:true});},
+   const kind=slot?.type,label=slot?.label||'Cover',widget=ReferenceUpload.create({label,title:slot?'Drop '+(kind==='audio'?'an audio file':'an '+kind)+' here':'Drop an image or video cover here',uploadLabel:slot?'Upload '+kind:'Upload cover',kinds:slot?[kind]:['image','video'],limits:slot?inputLimits:()=>({}),signal,locked:()=>writing||uploading>0,
+    onRemove:()=>{if(slot)slot.asset_id='';else coverID='';cache();renderSlots();checkMedia();if(!slot)showPreview(coverUpload,'','image','Cover');else slots.querySelector(`[data-slot-id="${CSS.escape(slot.id)}"] :is([data-upload-remove],[data-upload-picker]):not([hidden])`)?.focus({preventScroll:true});},
+    onBusy:(busy,{restoreFocus=false}={})=>{if(!fresh(token))return;uploading+=busy?1:-1;lock(uploading>0);if(!busy&&restoreFocus&&slot)slots.querySelector(`[data-slot-id="${CSS.escape(slot.id)}"] :is([data-upload-remove],[data-upload-picker]):not([hidden])`)?.focus({preventScroll:true});},
     onFile:async(file,operationSignal)=>{const started=intent(),a=await copyFile(file,slot,operationSignal);await acceptAsset(slot,a,file.name,file,started,operationSignal);return slot?'Assigned '+file.name+' to '+slot.label+'.':'Cover ready: '+file.name;},
-    ...({onLibrary:()=>chooseLibrary(kind,true,async(item,selectionSignal)=>{const started=intent(),a=await api(`/v1/system/templates/${record.id}/assets`,{method:'POST',body:JSON.stringify({library_reference_id:item.id,...(slot?{validation:validation()}:{})}),signal:selectionSignal});await acceptAsset(slot,a,item.name,null,started,selectionSignal);},slot?validation:null,()=>slot?slot.asset_id:coverID,()=>{if(slot)slot.asset_id='';else coverID='';cache();renderSlots();checkMedia();if(!slot)showPreview(coverUpload,'','image','Cover');})})
+    ...({onLibrary:picker=>chooseLibrary(kind,true,async(item,selectionSignal)=>{const started=intent(),a=await api(`/v1/system/templates/${record.id}/assets`,{method:'POST',body:JSON.stringify({library_reference_id:item.id,...(slot?{validation:validation()}:{})}),signal:selectionSignal});await acceptAsset(slot,a,item.name,null,started,selectionSignal);},slot?validation:null,()=>slot?slot.asset_id:coverID,()=>{if(slot)slot.asset_id='';else coverID='';cache();renderSlots();checkMedia();if(!slot)showPreview(coverUpload,'','image','Cover');},picker.root)})
    });widgets.add(widget);showPreview(widget,slot?.asset_id||(!slot&&coverID),kind||'image',slot?'Fixed '+label:'Cover');return widget;
   }
   function renderSlots(){
@@ -316,7 +317,7 @@
     const label=field(row,'Input label','text',slot.label);label.oninput=()=>{slot.label=label.value;heading.querySelector('h3').textContent=slot.label;widget.setLabel(slot.label);cache();};
     row.append(el('p',slot.asset_id?'Fixed reference. Users cannot replace it.':'Required reference. The user supplies this input when generating.','field-hint'));
     const widget=uploadControl(slot);row.append(widget.root);
-    if(slot.asset_id)row.append(button('Leave for user',()=>{slot.asset_id='';cache();renderSlots();checkMedia();}));slots.append(row);
+    slots.append(row);
    }
    FormUI.refresh();promptEditor?.refresh();
   }

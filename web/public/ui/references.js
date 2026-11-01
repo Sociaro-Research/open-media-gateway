@@ -121,8 +121,8 @@ function hashReferenceFile(file,signal){
       const name = !url?'Choose reference':metadata.get(url)?.name || (url.startsWith('asset://') ? url.slice(8) : `Reference ${index + 1}`);
       if(url)preview(card,url,name);else{const choose=button('Choose reference',`Choose ${kind} reference ${index+1}`,()=>{missingTarget=index;returnFocus=choose;previousFocus=document.activeElement;library.showModal();renderLibrary();load();});card.append(choose);}
       const title = document.createElement('span'); title.className = 'reference-name'; const spec=window.ReferencePrompts?.contract(selectedModel(),{reference_mode:document.querySelector('#referenceMode').value});const offset=image&&mode()?.id==='first_frame_references'?1:0;const address=spec?.types.includes(kind)&&index>=offset?ReferencePrompts.label(spec.syntax,kind,index-offset):'';title.textContent = `${address||mode()?.image_roles?.[image?index:-1]||index+1}. ${name}`; title.title = name;
-      const remove = button('×', `Remove ${name} from generation`, () => write(urls().filter((_, i) => i !== index)));
-      remove.classList.add('reference-remove'); remove.disabled = busy;
+      const remove = button('Remove', `Remove ${name} from generation`, () => write(urls().filter((_, i) => i !== index)));
+      remove.classList.add('reference-selection-remove'); remove.disabled = busy;
       card.draggable = !busy; card.tabIndex = 0; card.title = 'Drag to reorder. Use Alt + Left or Right Arrow with the keyboard.';
       card.addEventListener('dragstart', event => {
         if (busy || event.target.closest('button')) { event.preventDefault(); return; }
@@ -278,7 +278,7 @@ function hashReferenceFile(file,signal){
     target.addEventListener('dragover', event => {
       const internal = draggedURL !== null || event.dataTransfer.types.includes(dragType);
       if (!internal && !event.dataTransfer.types.includes('Files')) return;
-      event.preventDefault(); event.stopPropagation(); event.dataTransfer.dropEffect = internal ? 'move' : 'copy'; target.classList.add('dragover');
+      event.preventDefault(); event.stopPropagation(); event.dataTransfer.dropEffect = internal ? 'move' : index!==null&&urls()[index] ? 'none' : 'copy'; if(internal||index===null||!urls()[index])target.classList.add('dragover');
     });
     target.addEventListener('dragleave', event => { if (!target.contains(event.relatedTarget)) target.classList.remove('dragover'); });
     target.addEventListener('drop', event => {
@@ -287,6 +287,7 @@ function hashReferenceFile(file,signal){
       if (source) { draggedURL = null; reorder(source, index === null ? urls().length - 1 : index); return; }
       // Browser-native URL/image drags are not file uploads.
       if (event.dataTransfer.types.includes('text/uri-list') || event.dataTransfer.types.includes('text/html')) return;
+      if(index!==null&&urls()[index]){message('Remove this reference before choosing another file.');return;}
       upload([...event.dataTransfer.files], index);
     });
   }

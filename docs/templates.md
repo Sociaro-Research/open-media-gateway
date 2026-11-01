@@ -272,8 +272,7 @@ deadlines also stop the work.
 ### Reference identity and previews
 
 Authoring previews support image, video and audio files. Completed files
-retain their filename and immutable asset ID. A failed or cancelled replacement
-keeps the previous assignment and says so; it never binds the rejected attempt.
+retain their filename and immutable asset ID. A selected single-file block exposes only internal Remove. Remove clears the assignment before a new Upload or library selection. Failed or cancelled new selections remain empty and never bind the rejected attempt.
 The gallery cover is separate from generation inputs and does not change when a
 fixed slot is replaced. Saving a draft retains the published revision until an
 explicit Publish. Published detail includes `fixed_references` previews for that revision's bound files. Consumers can select shared files for missing inputs, but cannot replace fixed slots.
@@ -337,3 +336,5 @@ the disposable-service wrapper described in [testing](testing.md).
 ## Shared field and panel presentation
 
 Duration puts the selected model's actual bounds or discrete step in its label, without a detached duplicate caption.
+
+Selection blocks show only internal Remove while selected; empty blocks show Upload and Choose from library where that scope supports it. Removing a fixed binding leaves its slot for the user and never deletes the library file.

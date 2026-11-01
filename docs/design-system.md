@@ -493,14 +493,21 @@ model/slot validation. Never reconstruct media paths from the current owner;
 render the URL returned by the authorized library response.
 
 Playground keeps its multiple-reference selection and provider-specific library
-adapter. Template user slots select one compatible organization reference;
-choosing another replaces only that slot and choosing the selected file clears
-it. Template editing uses the instance template library and administrator
+adapter. Template user slots select one compatible organization reference. Remove clears the current binding before another file is chosen. Template editing uses the instance template library and administrator
 mutation endpoints. Uploading to that library does not assign a slot. Delete
 cancellation or rejection retains the selection; confirmed organization-file
 deletion clears matching retained selections in both screens. Native audio/video
 preview controls sit outside the selection button so playback cannot assign a
 reference. Preview failures offer a retry without changing the binding.
+Single-file selection controls reuse `ReferenceUpload` with `onRemove`. Empty
+blocks show Upload and Choose from library when that scope has a library. Selected
+blocks show only Remove as a selection action, inside the block; hide upload,
+library and replacement actions until removal. Remove clears the binding, never
+the library file. For a fixed Template reference this makes the slot available to
+the template user. Playback is separate from selection. Keep upload/validation
+feedback, pending guards and keyboard focus through remove/select/retry and
+navigation. Playground's multiple-reference input retains a separate empty block
+for adding files; each selected file card has its own internal Remove action.
 
 ## Templates
 
