@@ -728,6 +728,7 @@ submission state. Evidence stays under `.local/editing/`.
 
 Run each fixture with Node/Playwright, then repeat with `UI_BROWSER_ENGINE=webkit`. Set `UI_BROWSER_PATH` when using an installed browser outside Playwright's default cache, and `UI_EVIDENCE_DIR` to a new ignored run directory. All APIs and media are synthetic and local; these checks never authorize live writes or paid providers.
 
+- `button-alignment.cjs`: primary/secondary glyph geometry in normal, compact, icon, disabled, pending and dialog contexts.
 
 
 Inspect the resulting pixels and compare with the design-system spacing gate. Passing geometry assertions does not replace visual acceptance. Keep previous failures alongside successful reruns; report the exact executed browser/state matrix and any unexecuted limits.

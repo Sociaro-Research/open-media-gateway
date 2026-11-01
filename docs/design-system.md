@@ -552,3 +552,8 @@ Template editor. Its separate removal action clears the assignment; uploaded
 library media retains its existing lifecycle. It adds no independent library
 picker. The section is available for video output and remains visible when an
 existing template assignment needs removal after a model change.
+
+## Shared interaction perimeter and alignment
+
+
+Primary buttons center their content vertically through the shared flex alignment, including text, icons, pending and disabled states. Do not fix individual labels with transforms or per-screen offsets.
