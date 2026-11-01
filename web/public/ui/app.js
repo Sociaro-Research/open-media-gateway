@@ -814,7 +814,7 @@ function setAuthState(state) {
 }
 
 function modelOptionLabel(model) {
-  if (model.pricing?.known) {
+  if (model.pricing?.known && Number.isFinite(model.pricing.reference_price_usd)) {
     if (model.pricing.reference_price_usd === 0) return `${model.display_name} — free`;
     return `${model.display_name} — ≈ ${new Intl.NumberFormat(undefined, {style:"currency",currency:"USD",maximumFractionDigits:5}).format(model.pricing.reference_price_usd)}`;
   }
@@ -825,7 +825,7 @@ function fillSelect(select, values, preferred) {
   select.replaceChildren(...values.map(value => new Option(value, value, false, value === preferred)));
 }
 
-let playgroundSound=null;
+let playgroundSound=null,modelParameterEditor=null,durationChoice=null;
 window.addEventListener('gateway-reference-deleted',event=>{
  const {id,scope,keyVersion}=event.detail;
  if(['organization','template'].includes(scope)&&keyVersion===generationKeyVersion&&playgroundSound?.value===id)playgroundSound.clear();
@@ -861,13 +861,14 @@ function updateModelUI() {
   FormUI.setLabel(elements.duration,durationLabel);
   elements.duration.setAttribute('aria-label',durationLabel);
   if (model.resolutions?.length) fillSelect(elements.resolution, model.resolutions, model.resolutions[0]);
-  if (model.ratios?.length) fillSelect(elements.ratio, model.ratios, isVideo && model.ratios.includes('16:9') ? '16:9' : model.ratios[0]);
+  if (model.ratios?.length) ModelControls.ratios(elements.ratio,model,model.ratios,model.ratio_may_be_inferred?undefined:isVideo&&model.ratios.includes('16:9')?'16:9':model.ratios[0]);
   if (!elements.durationField.hidden) {
     elements.duration.min = model.min_duration;
     elements.duration.step = model.duration_step || 1;
     elements.duration.max = model.max_duration;
     elements.duration.value = model.default_duration;
   }
+  durationChoice=ModelControls.inferredDuration(elements.durationField,elements.duration,model,undefined,()=>{pendingSubmission=null;updatePrice();});
   elements.imageURLsField.hidden = !model.supports_image_input;
   elements.videoURLField.hidden = !model.supports_video_input;
   document.querySelector('#inputDurationHint').hidden = !model.duration_from_input;
@@ -891,7 +892,7 @@ function updateModelUI() {
   elements.seed.closest('div').hidden = !!model.no_seed;
   elements.seed.max = model.max_seed || (isVideo ? 4294967295 : 2147483647);
   document.querySelectorAll('#commonMediaFields > div').forEach(field => {
-    field.querySelectorAll('input, select, textarea').forEach(input => { input.disabled = field.hidden; });
+    field.querySelectorAll('input, select, textarea').forEach(input => { input.disabled = field.hidden || !!input.closest('[hidden]'); });
   });
   [elements.generateAudio, elements.cameraFixed, elements.draft, elements.returnLastFrame]
     .forEach(element => { element.checked = false; });
@@ -1001,7 +1002,8 @@ function updatePrice() {
   try {
    const quote=await fetchEstimate(request);
    if(sequence!==quoteSequence) return;
-   elements.priceValue.textContent=formatPrice((quote.cost.customer_expected_usd ?? quote.cost.expected_usd));
+   const amount=quote.cost?.customer_expected_usd??quote.cost?.expected_usd;if(quote.cost?.quantity_unknown||!Number.isFinite(amount)||amount<0)throw Error('Verified estimate unavailable.');
+   elements.priceValue.textContent=formatPrice(amount);
    elements.priceCard.classList.toggle('unknown',!quote.can_generate);
    FormUI.message(elements.priceDetails,quote.can_generate ? (quote.cost.pricing?.estimate_description || 'Final generation cost may differ.') : `Exceeds the available organization or weekly allowance (${formatUSD(quote.remaining_usd)}).`,quote.can_generate?'':'error');
   } catch(error) {
@@ -1065,13 +1067,13 @@ async function loadProviders() {
 function requestOptions(model) {
   const options = {};
   if(model.media_type==='video'&&playgroundSound?.value)options.override_sound_id=playgroundSound.value;
-  const parameters={};for(const field of model.parameters||[]){const input=document.getElementById('model-param-'+field.key);if(!input)continue;if(input.type==='checkbox')parameters[field.key]=input.checked;else if(input.value!=='')parameters[field.key]=['number','integer'].includes(field.type)?Number(input.value):input.value;}if(Object.keys(parameters).length)options.parameters=parameters;
+  const parameters=modelParameterEditor?.read()||{};if(Object.keys(parameters).length)options.parameters=parameters;
 
   if (model.media_type !== 'speech' && !model.no_watermark) options.watermark = elements.watermark.checked;
   if (['video', 'image'].includes(model.media_type) && model.resolutions?.length) options.resolution = elements.resolution.value;
-  if (['video', 'image'].includes(model.media_type) && model.ratios?.length) options.ratio = elements.ratio.value;
+  if (['video', 'image'].includes(model.media_type) && model.ratios?.length&&elements.ratio.value) options.ratio = elements.ratio.value;
   if (model.max_duration > 0 && !model.duration_from_input) {
-    options.duration = Number(elements.duration.value);
+    const value=durationChoice?.read()??(model.duration_may_be_inferred?undefined:Number(elements.duration.value));if(value!==undefined)options.duration=value;
   }
   if (model.supports_audio) options.generate_audio = model.audio_always_on || elements.generateAudio.checked;
   if (model.supports_camera_fixed) options.camera_fixed = elements.cameraFixed.checked;
@@ -1093,6 +1095,7 @@ function requestOptions(model) {
   if (model.qualities?.length) options.quality = elements.quality.value;
   if (model.backgrounds?.length) options.background = elements.background.value;
   if (model.formats?.length) options.format = elements.format.value;
+  const roles=window.referencePicker?.roles();if(roles)options.reference_roles=roles;
   const voices=window.referencePicker?.voices();if(voices&&Object.keys(voices).length)options.reference_voices=voices;
   return options;
 }
@@ -1278,6 +1281,8 @@ function reuseTask(task, {sparse=false}={}) {
   renderModelParameters(selectedModel(),options.parameters);
   window.referencePicker?.restoreMode(options);
   window.referencePicker?.restoreVoices(options.reference_voices);
+  window.referencePicker?.restoreRoles(options.reference_roles);
+  durationChoice?.restore(options.duration);if(selectedModel()?.ratio_may_be_inferred&&!options.ratio)elements.ratio.value='';
   elements.prompt.value = task.prompt || promptHistory[task.id] || '';
   window.referencePicker?.render();
   elements.prompt.dispatchEvent(new Event('input'));
@@ -1318,6 +1323,7 @@ elements.form.addEventListener('change', updatePrice);
 elements.form.addEventListener('submit', async event => {
   event.preventDefault();
   if (submitting || dialog.open) return;
+  if(modelParameterEditor&&!modelParameterEditor.valid()){setMessage('Complete the model parameters.','error');return;}
   if (window.referencePicker && !window.referencePicker.validate()) return;
   if (window.PromptReferences && !window.PromptReferences.validate()) return;
   const provider = selectedProvider();
@@ -1371,7 +1377,8 @@ async function openGenerationConfirmation(source, trigger) {
   try {
    const quote=await fetchEstimate(request);
    if(pendingSubmission!==submission || !dialog.open) return;
-   document.querySelector('#confirmPrice').textContent=formatPrice((quote.cost.customer_expected_usd ?? quote.cost.expected_usd));
+   const amount=quote.cost?.customer_expected_usd??quote.cost?.expected_usd;if(quote.cost?.quantity_unknown||!Number.isFinite(amount)||amount<0)throw Error('Verified estimate unavailable.');
+   document.querySelector('#confirmPrice').textContent=formatPrice(amount);
    submission.request.max_expected_cost_usd=(quote.cost.customer_expected_usd ?? quote.cost.expected_usd);
    submission.canGenerate = quote.can_generate === true;
    confirmButton.disabled=!submission.canGenerate;
@@ -1584,13 +1591,8 @@ function renderProviderFields(provider){
 }
 
 function renderModelParameters(model,values={}){
- let area=document.querySelector('#modelParameters');if(!area){area=document.createElement('div');area.id='modelParameters';document.querySelector('#commonMediaFields').append(area);}area.replaceChildren();area.hidden=!(model.parameters||[]).length;
- for(const field of model.parameters||[]){const label=document.createElement('label'),input=document.createElement(field.type==='select'?'select':'input');label.textContent=field.label;input.id='model-param-'+field.key;
- if(field.type==='select'){for(const value of field.choices||[])input.append(new Option(value,value));}else{input.type=field.type==='boolean'?'checkbox':['number','integer'].includes(field.type)?'number':'text';}
- if(field.min!=null)input.min=field.min;if(field.max!=null)input.max=field.max;if(field.type==='integer')input.step=1;else if(field.type==='number')input.step='any';if(field.max_length)input.maxLength=field.max_length;
- if(field.type!=='boolean')input.required=!!field.required;const value=values[field.key]??field.default??'';if(input.type==='checkbox')input.checked=value===true;else input.value=value;
- input.addEventListener('change',()=>{pendingSubmission=null;updatePrice();});label.append(input);area.append(label);}
- FormUI.refresh();
+ let area=document.querySelector('#modelParameters');if(!area){area=document.createElement('div');area.id='modelParameters';document.querySelector('#commonMediaFields').append(area);}
+ modelParameterEditor=ModelControls.parameters(area,model,values,()=>{pendingSubmission=null;updatePrice();});
 }
 
 window.addEventListener('model-settings-change',()=>{if(window.GenerationKey?.value())loadProviders().catch(()=>{});});

@@ -801,7 +801,7 @@ table .floating-field > .select-trigger { min-height:44px; padding:9px 42px 9px 
 :is(#workspaceMenu,#userDropdown) button:hover, :is(#workspaceMenu,#userDropdown) button:focus-visible { background:var(--panel-2); }
 #workspaceMenu button[aria-checked=true] { color:var(--accent-text,var(--accent)); background:color-mix(in srgb,var(--accent) 5.1%,transparent); }
 #generationFields { min-width:0; }
-#generationFields > .floating-field + .floating-field { margin-top:20px; }
+#generationFields > :is(.floating-field,.prompt-policy-group) + :is(.floating-field,.prompt-policy-group) { margin-top:20px; }
 .settings-grid > div { min-width:0; }
 /* Capability labels remain readable in the narrow Playground settings panel. */
 #generationSettings > .settings-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
@@ -1740,3 +1740,27 @@ input[type=color]:focus-visible { outline:none; box-shadow:none; border:2px soli
 .provider-logo-editor .reference-status:empty { display:none; }
 .provider-logo-editor .reference-dropzone:has(> .provider-logo-preview[hidden]) { grid-template-columns:minmax(0,1fr); }
 .provider-logo-editor .reference-dropzone:has(> .provider-logo-preview[hidden]) > :is(p,.reference-actions,small) { grid-column:1; }
+
+/* Descriptor parameters reuse shared field frames and spacing. */
+.model-parameters,.parameter-list,.parameter-list-rows { display:grid; gap:12px; min-width:0; }
+.parameter-list { margin:0; padding:0; border:0; }
+.parameter-list > legend { padding:0; margin-bottom:16px; font-size:16px; font-weight:700; }
+.parameter-list-rows > label { margin:0; min-width:0; }
+.parameter-list .floating-field { display:block; }
+.parameter-list .floating-field > input { padding-right:80px; }
+.parameter-list .parameter-remove { position:absolute; right:8px; top:50%; transform:translateY(-50%); min-height:44px; padding:8px; }
+.parameter-list .reference-actions { justify-content:flex-start; }
+.parameter-list .field-hint:empty { display:none; }
+[data-duration-mode] { min-width:0; }
+.selected-references.has-reference-roles { grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr)); gap:12px; }
+.reference-role { display:block; margin:12px 0 0; }
+
+.prompt-policy-group { display:grid; gap:12px; min-width:0; }
+.prompt-policy-group > :is(label,.floating-field,.field-hint) { margin:0; }
+.model-parameters > label { margin:0; }
+.parameter-list .reference-actions button { min-height:44px; }
+
+.inferred-duration-group { display:grid; grid-column:1/-1; gap:12px; min-width:0; }
+.inferred-duration-group > :is(label,div),[data-duration-mode] > label { margin:0; }
+
+@media(max-width:400px) { #generationSettings > .settings-grid:has(#ratio[data-inference="true"]) { grid-template-columns:minmax(0,1fr); } }

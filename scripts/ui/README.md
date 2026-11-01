@@ -16,6 +16,17 @@ ignored `.local/` or `dist/`; record limits explicitly.
 
 ## Available fixtures
 
+`provider-capabilities.cjs` exercises descriptor-declared media roles (including
+identical URLs in distinct ordered slots), Auto duration/aspect-ratio omission,
+ordered text-list parameters, Unicode prompt budgets, unknown/zero/known prices,
+Template Save/reopen and Advanced editing. It measures shared field spacing and
+role-picker legibility in both themes at 1440/390/320px.
+
+Run this suite with `UI_BROWSER_ENGINE=chromium` and
+`UI_BROWSER_ENGINE=webkit`; select evidence with `UI_EVIDENCE_DIR`. It uses local
+synthetic services, never paid generation or provider resource mutations.
+Inspect screenshots against the visual gate above.
+
 Run `node scripts/ui/duration-labels.cjs` (also with `UI_BROWSER_ENGINE=webkit`)
 for actual Templates/Playground model changes, bounded/stepped/fixed/one-sided
 Duration labels, unknown/input-derived/unsupported capabilities, native validation

@@ -230,15 +230,22 @@
   for(const event of ['input','change','focusin','focusout'])document.addEventListener(event,e=>{if(e.target.matches('input,select,textarea')){sync(e.target);sizeMultiline(e.target);if(e.target.form)update(e.target.form);}},true);
   document.addEventListener('reset',event=>{event.target.querySelectorAll('.password-field input').forEach(hidePassword);setTimeout(refresh,0);},true);
   window.addEventListener('resize',schedule);document.fonts?.ready.then(schedule);
+  const promptHints=new WeakMap();
   function promptState(value,model){
-    const count=Array.from(String(value||'')).length,known=Number.isInteger(model?.max_prompt_characters)&&model.max_prompt_characters>0?Math.min(10000,model.max_prompt_characters):null;
+    const policy=!model?.manual?model?.prompt_policy:null,reviewed=Number.isSafeInteger(policy?.max_characters)&&policy.max_characters>0;
+    const count=Array.from(String(value||'')).length,declared=Number.isSafeInteger(model?.max_prompt_characters)&&model.max_prompt_characters>0?model.max_prompt_characters:null,known=declared?reviewed?Math.min(policy.max_characters,declared):declared:reviewed?policy.max_characters:null;
     const number=n=>n.toLocaleString('en-US'),label=model?.no_prompt?'Prompt':known?count?'Prompt ('+number(count)+' / '+number(known)+' characters)':'Prompt ('+number(known)+' characters max)':count?'Prompt ('+number(count)+' characters)':'Prompt';
-    const maximum=known||10000,error=!model?.no_prompt&&Array.from(String(value||'').trim()).length>maximum?'Prompt must not exceed '+number(maximum)+' characters.':'';
-    return {count,limit:known,label,error};
+    const characters=Array.from(String(value||'').trim()),maximum=known||10000,ascii=characters.filter(c=>c.codePointAt(0)<128).length,other=characters.length-ascii;
+    let error=!model?.no_prompt&&characters.length>maximum?'Prompt must not exceed '+number(maximum)+' characters.':'';
+    const weighted=reviewed&&Number.isSafeInteger(policy.ascii_budget)&&Number.isSafeInteger(policy.non_ascii_budget)&&policy.ascii_budget>0&&policy.non_ascii_budget>0;
+    if(!error&&!model?.no_prompt&&weighted&&ascii*policy.non_ascii_budget+other*policy.ascii_budget>policy.ascii_budget*policy.non_ascii_budget)error='The mixed ASCII/non-ASCII prompt exceeds this model’s Gateway budget.';
+    const budget=weighted?'Gateway budget: ASCII / '+number(policy.ascii_budget)+' + other characters / '+number(policy.non_ascii_budget)+' ≤ 1.':'';
+    return {count,limit:known,label,error,budget};
   }
   function updatePrompt(control,model){
     control.removeAttribute('maxlength');const previous=control.dataset.promptLimitError||'',state=promptState(control.value,model);
-    control.dataset.promptLimitError=state.error;setLabel(control,state.label);control.setAttribute('aria-description',(model?.prompt_optional?'Optional. ':'')+state.label);
+    let hint=promptHints.get(control);if(state.budget&&!hint){hint=document.createElement('p');hint.className='field-hint prompt-policy';const owner=control.closest('label')||control.closest('.floating-field')||control,group=document.createElement('div');group.className='prompt-policy-group';owner.before(group);group.append(owner,hint);promptHints.set(control,hint);}if(hint){if(hint.textContent!==state.budget)hint.textContent=state.budget;const hidden=!state.budget||!!model?.no_prompt;if(hint.hidden!==hidden)hint.hidden=hidden;}
+    control.dataset.promptLimitError=state.error;setLabel(control,state.label);control.setAttribute('aria-description',(model?.prompt_optional?'Optional. ':'')+state.label+(state.budget?' '+state.budget:''));
     if(state.error||previous&&control.validationMessage===previous)control.setCustomValidity(state.error);
     return state;
   }

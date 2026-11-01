@@ -31,11 +31,11 @@
   fact('Model ID',model.id);fact('Released',date(m.release_date));if(m.version_date)fact('Version date',date(m.version_date));fact('Current snapshot',m.snapshot);
   if(m.api_created)fact('API object created',new Date(m.api_created*1000).toLocaleString());
   fact('Publisher',m.owned_by);if(m.shutdown_date)fact('Scheduled retirement',date(m.shutdown_date));
-  fact('Example estimate',p.known?usd(p.reference_price_usd):'Unavailable');fact('Calculation assumptions',p.reference_description);
+  fact('Example estimate',p.known&&Number.isFinite(p.reference_price_usd)?usd(p.reference_price_usd):'Unavailable');fact('Calculation assumptions',p.reference_description);
   const q=p.reference_quote;
   if(q?.pricing){
    fact('Billing region',q.pricing.region);
-   if(q.pricing.unit!=='multi_metric')fact('Calculation',q.estimated_units+' '+q.pricing.unit+' × '+usd(q.pricing.price)+' / '+q.pricing.per+(q.pricing.fixed_usd?' + '+usd(q.pricing.fixed_usd)+' input cost':'')+' = '+usd(q.expected_usd));
+   if(q.pricing.unit!=='multi_metric'){const tariff=usd(q.pricing.price)+' / '+q.pricing.per+' '+q.pricing.unit+(q.pricing.fixed_usd?' + '+usd(q.pricing.fixed_usd)+' input cost':'');if(q.quantity_unknown||!Number.isFinite(q.estimated_units)||!Number.isFinite(q.expected_usd)){fact('Verified tariff',tariff);fact('Estimate','Unavailable until input quantity is known.');}else fact('Calculation',q.estimated_units+' '+q.pricing.unit+' × '+tariff+' = '+usd(q.expected_usd));}
    for(const c of q.pricing.components||[])fact(c.metric.replaceAll('_',' '),usd(c.price)+' / '+c.per+' tokens');
    if(q.pricing.estimate_description)fact('Calculation',q.pricing.estimate_description);
   }
@@ -50,7 +50,7 @@
   fact('Voices',model.voices);
   const features=[['supports_draft','Draft mode'],['supports_camera_fixed','Fixed camera'],['supports_last_frame','Last-frame output'],['supports_negative_prompt','Negative prompt'],['supports_lyrics','Lyrics'],['supports_gender','Vocal gender']].filter(([key])=>model[key]).map(([,label])=>label);
   fact('Other gateway controls',features);
-  for(const param of model.parameters||[])fact('Gateway parameter: '+(param.label||param.key),[param.type,param.description,...(param.choices||[]),param.required?'required':'',param.default!=null?'default '+param.default:'',param.min!=null?'min '+param.min:'',param.max!=null?'max '+param.max:'',param.max_length?'max length '+param.max_length:''].filter(Boolean).join('; '));
+  for(const param of model.parameters||[])fact('Gateway parameter: '+(param.label||param.key),[param.type,param.description,...(param.choices||[]),param.required?'required':'',param.default!=null?'default '+param.default:'',param.min!=null?'min '+param.min:'',param.max!=null?'max '+param.max:'',param.max_length?'max length '+param.max_length:'',param.max_items?'max items '+param.max_items:''].filter(Boolean).join('; '));
   for(const f of m.facts||[])fact(f.label,f.value);
   if(m.checked_at)fact('Metadata checked',date(m.checked_at));panel.append(dl);
   const sources=node('div','model-info-sources');
