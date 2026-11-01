@@ -425,7 +425,7 @@ func (s *Server) listProviders(w http.ResponseWriter, r *http.Request) {
 func (s *Server) submitGeneration(w http.ResponseWriter, r *http.Request, input core.CreateMediaInput) {
 	input.AdmissionError = s.resolveOverrideSound(r, &input)
 	if input.AdmissionError == nil {
-		input.AdmissionError = s.validateGenerationReferences(r, input)
+		input.AdmissionError = s.prepareGenerationReferences(r, &input)
 	}
 	task, err := s.service.CreateMediaRequest(r.Context(), input, r.Header.Get("Idempotency-Key"))
 	if err != nil && input.AdmissionError != nil && errors.Is(err, input.AdmissionError) {

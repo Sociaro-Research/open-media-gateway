@@ -91,7 +91,7 @@ func TestVideoMultipartAdmissionAndValidation(t *testing.T) {
 					store = &brokenVideoReferenceStore{Local: local}
 				}
 				library := references.New(libraryRepo, store)
-				h = NewWithReferenceLibrary(service, healthStub{}, "secret", local, "signature-secret", time.Hour, nil, nil, library)
+				h = NewGateway(Dependencies{Service: service, Health: healthStub{}, APIKey: "secret", Storage: local, SigningSecret: "signature-secret", MediaURLTTL: time.Hour, References: library, AssetPublicURL: "https://gateway.example"})
 				if tc.storage == "no_signer" {
 					h = (&Server{service: service, health: healthStub{}, apiKey: "secret", references: library}).handler()
 				}

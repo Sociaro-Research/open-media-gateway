@@ -67,7 +67,7 @@ func run() error {
 	}
 
 	referenceLibrary := references.New(postgres.NewReferenceRepository(db), mediaStorage)
-	providerManager := providers.NewManager(postgres.NewProviderSettingsRepository(db), credentialsCipher, cfg, references.NewResolver(referenceLibrary, cfg.MediaURLSigningSecret))
+	providerManager := providers.NewManager(postgres.NewProviderSettingsRepository(db), credentialsCipher, cfg, references.NewResolver(referenceLibrary, cfg.MediaURLSigningSecret, cfg.AuthPublicURL))
 	providerManager.SetCatalog(postgres.NewCatalogRepository(db))
 	providerManager.SetSystemSettings(postgres.NewSystemRepository(db))
 	if err := providerManager.Bootstrap(ctx); err != nil {

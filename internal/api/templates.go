@@ -688,6 +688,7 @@ func (s *Server) resolveTemplate(r *http.Request, item templates.Record, in temp
 	}
 	input = core.CreateMediaInput{Prompt: d.Prompt, Provider: in.Provider, Model: in.Model, MediaType: d.MediaType, PublicModel: model.PublicID, ProjectID: in.ProjectID, MaxExpectedUSD: in.MaxExpectedUSD, Options: options}
 	input.Options.OverrideSoundID = d.OverrideSoundID
+	input.ReferenceEvidence = map[string]core.InputMediaEvidence{}
 	remaining := map[string]string{}
 	for k, v := range in.Inputs {
 		remaining[k] = v
@@ -730,6 +731,7 @@ func (s *Server) resolveTemplate(r *http.Request, item templates.Record, in temp
 		if !strings.HasPrefix(value, "https://") && !strings.HasPrefix(value, "http://") {
 			return input, fmt.Errorf("%w: public media origin is not configured", templates.ErrInvalid)
 		}
+		input.ReferenceEvidence[value] = core.InputMediaEvidence{Type: slot.Type, Duration: files[len(files)-1].Info.Duration}
 		switch slot.Type {
 		case "image":
 			input.Options.ImageURLs = append(input.Options.ImageURLs, value)

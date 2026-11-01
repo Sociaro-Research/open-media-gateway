@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net/url"
 	"slices"
 	"strings"
@@ -79,6 +80,7 @@ func (s *TaskService) CreateMediaRequest(ctx context.Context, input CreateMediaI
 	}
 	hashOptions := task.Options
 	hashOptions.OverrideSound = nil // Resolved storage is not client request identity.
+	hashOptions.ReferenceMediaEvidence = nil
 	encodedOptions, _ := json.Marshal(hashOptions)
 	webhookURL := ""
 	if task.WebhookURL != nil {
@@ -165,6 +167,7 @@ func (s *TaskService) prepare(ctx context.Context, input CreateMediaInput, idemp
 	if input.Options.OverrideSoundID != "" && mediaType != "video" {
 		return Task{}, fmt.Errorf("%w: Override Sound requires video output", ErrOptionsInvalid)
 	}
+	input.Options.ReferenceMediaEvidence = maps.Clone(input.ReferenceEvidence)
 	options, err := s.normalizeOptions(descriptor, input.Options)
 	if err != nil {
 		return Task{}, err
@@ -282,6 +285,11 @@ func NormalizeReferenceOptions(descriptor MediaModel, options MediaOptions) (Med
 }
 
 func NormalizeModelOptions(descriptor MediaModel, options MediaOptions) (MediaOptions, error) {
+	options.ReferenceMediaEvidence = maps.Clone(options.ReferenceMediaEvidence)
+	options.ReferenceVoices = maps.Clone(options.ReferenceVoices)
+	options.ImageURLs = slices.Clone(options.ImageURLs)
+	options.VideoURLs = slices.Clone(options.VideoURLs)
+	options.AudioURLs = slices.Clone(options.AudioURLs)
 	if err := ValidateTimeoutSeconds(options.TimeoutSeconds); err != nil {
 		return MediaOptions{}, fmt.Errorf("%w: %v", ErrOptionsInvalid, err)
 	}

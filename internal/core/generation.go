@@ -109,6 +109,7 @@ func (v Generation) MarshalJSON() ([]byte, error) {
 		delete(options, key)
 	}
 	delete(options, "_override_sound")
+	delete(options, "_reference_media")
 	if v.MediaType == "speech" {
 		delete(fields, "prompt")
 		fields["input"] = v.Prompt

@@ -103,7 +103,7 @@ func TestResolveStorageFailuresAndPayloadBudget(t *testing.T) {
 	// Bounded encoded payload: subsequent large references retain their URLs.
 	o := &openerStub{owner: resolverOwner, data: bytes.Repeat([]byte{1}, 20<<20)}
 	raw := resolverURL("https://gateway.example")
-	got, err := NewResolver(o, "secret").Resolve(identity.WithOwnerID(context.Background(), resolverOwner), []string{raw, raw})
+	got, err := NewResolver(o, "secret", "https://gateway.example").Resolve(identity.WithOwnerID(context.Background(), resolverOwner), []string{raw, raw})
 	if err != nil {
 		t.Fatal(err)
 	}

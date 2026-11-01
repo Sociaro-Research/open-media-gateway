@@ -8,14 +8,13 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"net/url"
-	"strings"
+	"maps"
+	"slices"
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
 	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
 	"github.com/Sociaro-Research/open-media-gateway/internal/storage"
 	"github.com/Sociaro-Research/open-media-gateway/internal/templates"
-	"github.com/google/uuid"
 )
 
 // Signature identifies a Gateway reference independently of its public hostname.
@@ -32,15 +31,20 @@ type ImageOpener interface {
 type Resolver struct {
 	library ImageOpener
 	secret  []byte
+	origin  string
 }
 
-func NewResolver(library ImageOpener, secret string) *Resolver {
-	return &Resolver{library: library, secret: []byte(secret)}
+func NewResolver(library ImageOpener, secret string, canonicalOrigin ...string) *Resolver {
+	r := &Resolver{library: library, secret: []byte(secret)}
+	if len(canonicalOrigin) > 0 {
+		r.origin = canonicalOrigin[0]
+	}
+	return r
 }
 
 // Resolve reads signed references from owner-scoped storage, never from a supplied
 // host. External URLs remain provider-fetched. Keep the encoded payload bounded;
-// references beyond this budget retain their original capability URLs.
+// references beyond this budget use the configured canonical capability URL.
 func (r *Resolver) Resolve(ctx context.Context, images []string) ([]string, error) {
 	return r.resolve(ctx, images, true)
 }
@@ -49,30 +53,19 @@ func (r *Resolver) resolve(ctx context.Context, images []string, inline bool) ([
 	remaining := 48 << 20
 	directCache := map[string]string{}
 	for i, raw := range images {
-		if cached, ok := directCache[raw]; ok {
-			result[i] = cached
-			continue
-		}
-		parsed, err := url.Parse(raw)
-		if err != nil {
-			continue
-		}
-		parts := strings.Split(strings.TrimPrefix(parsed.Path, "/"), "/")
-		if len(parts) != 3 || parts[0] != "references" {
-			continue
-		}
-		owner, id := parts[1], parts[2]
-		if _, err := uuid.Parse(owner); err != nil {
-			continue
-		}
-		if _, err := uuid.Parse(id); err != nil {
-			continue
-		}
-		if len(r.secret) == 0 || !hmac.Equal([]byte(parsed.Query().Get("signature")), []byte(Signature(r.secret, owner, id))) {
+		owner, id, ok := ParseSignedReference(raw, r.secret)
+		if !ok {
 			continue
 		}
 		if owner != identity.OwnerID(ctx) && owner != templates.LibraryOwnerID {
 			return nil, fmt.Errorf("reference belongs to another account")
+		}
+		// Host/query aliases identify the same authorized object. Resolve it
+		// once so time-varying direct signatures cannot split one source.
+		source := owner + "/" + id
+		if cached, ok := directCache[source]; ok {
+			result[i] = cached
+			continue
 		}
 		readContext := ctx
 		if owner == templates.LibraryOwnerID {
@@ -89,11 +82,23 @@ func (r *Resolver) resolve(ctx context.Context, images []string, inline bool) ([
 			}
 			if target != "" {
 				result[i] = target
-				directCache[raw] = target
+				directCache[source] = target
 				continue
 			}
 		}
+		canonical := func() error {
+			target, err := CanonicalReferenceURL(r.origin, r.secret, owner, id)
+			if err != nil {
+				return err
+			}
+			result[i] = target
+			directCache[source] = target
+			return nil
+		}
 		if !inline {
+			if err := canonical(); err != nil {
+				return nil, err
+			}
 			continue
 		}
 		item, object, err := r.library.Open(readContext, id)
@@ -106,6 +111,9 @@ func (r *Resolver) resolve(ctx context.Context, images []string, inline bool) ([
 		}
 		if base64.StdEncoding.EncodedLen(int(item.SizeBytes))+64 > remaining {
 			object.Reader.Close()
+			if err := canonical(); err != nil {
+				return nil, err
+			}
 			continue
 		}
 		data, err := io.ReadAll(io.LimitReader(object.Reader, MaxBytes+1))
@@ -127,23 +135,29 @@ func (r *Resolver) resolve(ctx context.Context, images []string, inline bool) ([
 	return result, nil
 }
 
-// ResolveDirect signs S3 references immediately before provider submission. Stable
-// library URLs remain in persisted tasks, so queue delays and retries do not expire them.
+// ResolveDirect binds local capability URLs to the configured Gateway origin or
+// an owner-scoped direct storage URL immediately before provider submission.
+// Stable library URLs remain persisted, so queue delays do not expire them.
 func (r *Resolver) ResolveDirect(ctx context.Context, o core.MediaOptions) (core.MediaOptions, error) {
 	all := append([]string{}, o.ImageURLs...)
 	all = append(all, o.VideoURLs...)
 	all = append(all, o.AudioURLs...)
 	all = append(all, o.VideoURL, o.AudioURL)
-	for visual, voice := range o.ReferenceVoices {
-		all = append(all, visual, voice)
+	visualKeys := slices.Sorted(maps.Keys(o.ReferenceVoices))
+	for _, visual := range visualKeys {
+		all = append(all, visual, o.ReferenceVoices[visual])
 	}
 	resolved, err := r.resolve(ctx, all, false)
 	if err != nil {
 		return o, err
 	}
 	replacements := make(map[string]string, len(all))
+	capabilityTargets := make(map[string]string)
 	for i, u := range all {
 		replacements[u] = resolved[i]
+		if owner, id, ok := ParseSignedReference(u, r.secret); ok {
+			capabilityTargets[owner+"/"+id] = resolved[i]
+		}
 	}
 	replace := func(values []string) []string {
 		if values == nil {
@@ -155,17 +169,45 @@ func (r *Resolver) ResolveDirect(ctx context.Context, o core.MediaOptions) (core
 		}
 		return out
 	}
+	var voices map[string]string
+	if o.ReferenceVoices != nil {
+		voices = make(map[string]string, len(o.ReferenceVoices))
+		for _, visual := range visualKeys {
+			target, voice := replacements[visual], replacements[o.ReferenceVoices[visual]]
+			if previous, exists := voices[target]; exists && previous != voice {
+				return o, fmt.Errorf("%w: conflicting voices for the same reference", core.ErrOptionsInvalid)
+			}
+			voices[target] = voice
+		}
+	}
+	var evidence map[string]core.InputMediaEvidence
+	if o.ReferenceMediaEvidence != nil {
+		evidence = make(map[string]core.InputMediaEvidence, len(o.ReferenceMediaEvidence))
+		for _, raw := range slices.Sorted(maps.Keys(o.ReferenceMediaEvidence)) {
+			inspected := o.ReferenceMediaEvidence[raw]
+			target, replaced := replacements[raw]
+			if !replaced {
+				target = raw
+				if owner, id, ok := ParseSignedReference(raw, r.secret); ok {
+					if resolved, exists := capabilityTargets[owner+"/"+id]; exists {
+						target = resolved
+					}
+				}
+			}
+			if previous, exists := evidence[target]; exists && previous != inspected {
+				return o, fmt.Errorf("%w: conflicting evidence for the same reference", core.ErrOptionsInvalid)
+			}
+			evidence[target] = inspected
+		}
+	}
 	o.ImageURLs = replace(o.ImageURLs)
 	o.VideoURLs = replace(o.VideoURLs)
 	o.AudioURLs = replace(o.AudioURLs)
 	o.VideoURL = replacements[o.VideoURL]
 	o.AudioURL = replacements[o.AudioURL]
-	if o.ReferenceVoices != nil {
-		voices := make(map[string]string, len(o.ReferenceVoices))
-		for visual, voice := range o.ReferenceVoices {
-			voices[replacements[visual]] = replacements[voice]
-		}
-		o.ReferenceVoices = voices
-	}
+	o.ReferenceVoices = voices
+	// Dispatch uses transient direct URLs; accepted canonical evidence stays
+	// untouched while provider validation retains its trusted duration lookup.
+	o.ReferenceMediaEvidence = evidence
 	return o, nil
 }

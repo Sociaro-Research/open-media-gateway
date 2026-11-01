@@ -13,7 +13,7 @@ func (s *Server) estimateGeneration(w http.ResponseWriter, r *http.Request, inpu
 		s.referenceError(w, err)
 		return
 	}
-	if err := s.validateGenerationReferences(r, input); err != nil {
+	if err := s.prepareGenerationReferences(r, &input); err != nil {
 		s.referenceError(w, err)
 		return
 	}
