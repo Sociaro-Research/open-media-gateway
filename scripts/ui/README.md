@@ -22,10 +22,15 @@ ordered text-list parameters, Unicode prompt budgets, unknown/zero/known prices,
 Template Save/reopen and Advanced editing. It measures shared field spacing and
 role-picker legibility in both themes at 1440/390/320px.
 
-Run this suite with `UI_BROWSER_ENGINE=chromium` and
-`UI_BROWSER_ENGINE=webkit`; select evidence with `UI_EVIDENCE_DIR`. It uses local
-synthetic services, never paid generation or provider resource mutations.
-Inspect screenshots against the visual gate above.
+`generation-artifacts.cjs` renders every archived output/format variant through
+authorized media-access links, including scalar last-frame compatibility,
+expiry renewal, missing-link popup cleanup, retry, deletion and context disposal.
+Generate its disposable video with `python3 scripts/ui/template-video-fixtures.py
+--output .local/video-workflow/clips` first. Run both suites with
+`UI_BROWSER_ENGINE=chromium` and `UI_BROWSER_ENGINE=webkit`; select evidence with
+`UI_EVIDENCE_DIR`. They use local synthetic services, never paid generation or
+provider resource registration/deletion. Inspect their screenshots against the
+visual gate above; assertions alone are insufficient.
 
 Run `node scripts/ui/duration-labels.cjs` (also with `UI_BROWSER_ENGINE=webkit`)
 for actual Templates/Playground model changes, bounded/stepped/fixed/one-sided

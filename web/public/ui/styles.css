@@ -1752,13 +1752,17 @@ input[type=color]:focus-visible { outline:none; box-shadow:none; border:2px soli
 .parameter-list .reference-actions { justify-content:flex-start; }
 .parameter-list .field-hint:empty { display:none; }
 [data-duration-mode] { min-width:0; }
+.generation-outputs { display:grid; gap:20px; }
+.generation-output { display:grid; gap:12px; min-width:0; }
+.generation-output > :is(h4,p) { margin:0; }
 .selected-references.has-reference-roles { grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr)); gap:12px; }
 .reference-role { display:block; margin:12px 0 0; }
 
 .prompt-policy-group { display:grid; gap:12px; min-width:0; }
 .prompt-policy-group > :is(label,.floating-field,.field-hint) { margin:0; }
 .model-parameters > label { margin:0; }
-.parameter-list .reference-actions button { min-height:44px; }
+.parameter-list .reference-actions button,.generation-output .media-actions button { min-height:44px; }
+.generation-output .media-actions { gap:12px; margin:0; }
 
 .inferred-duration-group { display:grid; grid-column:1/-1; gap:12px; min-width:0; }
 .inferred-duration-group > :is(label,div),[data-duration-mode] > label { margin:0; }

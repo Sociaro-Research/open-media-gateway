@@ -233,6 +233,7 @@ function usageSummary(usage, provider) {
 }
 
 async function attachStoredMedia(article, task) {
+  if(task.artifacts?.length)return GenerationArtifacts.attach(article,task,{api,context:()=>generationKeyVersion,bytes:formatBytes});
   const controller = new AbortController();
   article.mediaController = controller;
   const result = article.querySelector('.task-result');
@@ -443,8 +444,8 @@ function renderTasks(tasks) {
     badge.classList.add(task.status);
 	const result = article.querySelector('.task-result');
  if(task.result_deleted_at) result.textContent='Stored result files deleted.';
-	if (!task.result_deleted_at && task.status === 'completed' && task.content_url) {
-	  if (task.stored_at) {
+	if (!task.result_deleted_at && task.status === 'completed' && (task.content_url||task.artifacts?.length)) {
+	  if (task.stored_at||task.artifacts?.length) {
 		storedMedia.push({article, task});
 	  } else {
 		const unavailable = new URL(task.content_url,location.origin).hostname.endsWith('.invalid');

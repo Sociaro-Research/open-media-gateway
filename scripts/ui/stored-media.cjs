@@ -5,12 +5,12 @@ const {evidencePath}=require('./evidence.cjs');
 const engine=process.env.UI_BROWSER_ENGINE||'chromium',root=process.env.UI_SOURCE_DIR||path.resolve(__dirname,'../../web/public/ui');
 const output=evidencePath('/tmp/gateway-stored-media/'+engine+'/');fs.mkdirSync(output,{recursive:true});
 const deferred=()=>{let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve};};
-let requests=0,now=0,gate=null,unavailable=0,unauthorized=false;
+let requests=0,now=0,gate=null,unavailable=0,unauthorized=false,journal=[];
 const previewAccesses=new Set(),reads=[],accessKeys=[],results=[],errors=[],external=[];
 const server=http.createServer(async(req,res)=>{
  const url=new URL(req.url,'http://fixture');
  if(url.pathname.startsWith('/v1/')){
-  let body={data:[]};
+  let body={data:url.pathname==='/v1/generations'&&req.headers.authorization==='Bearer fixture-key-a'?journal:[]};
   if(url.pathname==='/v1/info')body={auth_mode:'api_key',provider:'mock'};
   if(url.pathname==='/v1/key')body={key:{name:'Fixture',resource_mode:'personal'}};
   if(url.pathname==='/v1/providers')body={data:[{id:'mock',name:'Mock',default_model:'image',models:[{id:'image',display_name:'Image',media_type:'image'}]}]};
@@ -26,10 +26,10 @@ const server=http.createServer(async(req,res)=>{
  }
  if(url.pathname==='/media/result'){
   const expired=Number(url.searchParams.get('expires'))<now;
-  reads.push({expired,access:Number(url.searchParams.get('access')),download:url.searchParams.has('download'),frame:url.searchParams.has('artifact'),referrer:req.headers.referer||''});
+  reads.push({expired,access:Number(url.searchParams.get('access')),download:url.searchParams.has('download'),frame:url.searchParams.has('artifact'),destination:req.headers['sec-fetch-dest']||'',referrer:req.headers.referer||''});
   if(expired)return res.writeHead(403,{'Content-Type':'application/json'}).end('{"error":"expired"}');
   if(url.searchParams.has('download'))res.setHeader('Content-Disposition','attachment; filename="result.png"');
-  res.setHeader('Content-Type','image/png');return res.end(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a5S0AAAAASUVORK5CYII=','base64'));
+  res.setHeader('Content-Type','image/png');return res.end(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGNoaGgAAAMEAYFL09IQAAAAAElFTkSuQmCC','base64'));
  }
  const file=path.join(root,url.pathname==='/'?'index.html':path.basename(url.pathname));
  if(!fs.existsSync(file))return res.writeHead(404).end();
@@ -39,19 +39,24 @@ const server=http.createServer(async(req,res)=>{
  await new Promise(r=>server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+server.address().port;
  const browser=await ({chromium,webkit}[engine]).launch({headless:true,...(process.env.UI_BROWSER_PATH?{executablePath:process.env.UI_BROWSER_PATH}:{})});
  const context=await browser.newContext({viewport:{width:1440,height:1000},reducedMotion:'reduce'}),page=await context.newPage();page.setDefaultTimeout(10000);
+ context.setDefaultTimeout(10000);
  context.on('page',p=>p.on('pageerror',e=>errors.push(e.message)));
  page.on('pageerror',e=>errors.push(e.message));
  await context.route('**/*',route=>{if(new URL(route.request().url()).origin===base)return route.continue();external.push('External request blocked');return route.abort();});
  const record=name=>{results.push(name);console.log('PASS:',name);};
  async function key(value){await page.locator('#apiKey').fill(value);await page.locator('#apiKey').press('Tab');await page.waitForFunction(v=>GenerationKey.value()===v,value);if(value)await page.waitForFunction(()=>selectedModel()?.id==='image');}
  async function card(type='image'){
-  await page.evaluate(type=>renderTasks([{id:'result',provider:'mock',model:'mock/image',media_type:type,prompt:'Stored result',status:'completed',created_at:1,updated_at:2,has_stored_result:true,stored_at:'2026-10-26T00:00:00Z',content_url:'/v1/generations/result/content',result_content_type:type==='image'?'image/png':type==='audio'?'audio/wav':'video/mp4'}]),type);
+  journal=[{id:'result',provider:'mock',model:'mock/image',media_type:type,prompt:'Stored result',status:'completed',created_at:1,updated_at:2,has_stored_result:true,stored_at:'2026-10-26T00:00:00Z',content_url:'/v1/generations/result/content',result_content_type:type==='image'?'image/png':type==='audio'?'audio/wav':'video/mp4'}];
+  // Polling must return the same synthetic journal as the manually rendered card.
+  await page.evaluate(tasks=>renderTasks(tasks),journal);
   await page.waitForFunction(()=>document.querySelector('.task-media')?.getAttribute('src'));
   await page.waitForFunction(()=>[...document.querySelectorAll('.media-actions button')].every(b=>!b.disabled));
   previewAccesses.add(Number(new URL(await page.locator('.task-media').getAttribute('src'),base).searchParams.get('access')));
  }
  const action=name=>page.locator('.media-actions').getByText(name,{exact:true});
- async function open(name){const event=context.waitForEvent('page');await action(name).click();const tab=await event;await tab.waitForURL('**/media/result?**');assert.equal(await tab.evaluate(()=>opener===null),true);await tab.close();}
+ async function open(name){const event=context.waitForEvent('page');await action(name).click();const tab=await event;await tab.waitForURL('**/media/result?**',{waitUntil:'commit'});assert.equal(await tab.evaluate(()=>opener===null),true);// WebKit can stall its per-page close RPC after a standalone image.
+ // Park the now-blank owned tab and close it with this fixture's browser.
+ await tab.goto('about:blank',{waitUntil:'commit',timeout:8000});await page.bringToFront();}
  async function download(){const event=page.waitForEvent('download');await action('Download ↓').click();await event;}
  async function arm(){const held={used:deferred(),release:deferred()};gate=held;return held;}
  try{
@@ -69,21 +74,24 @@ const server=http.createServer(async(req,res)=>{
   for(const code of [404,503]){unavailable=code;await action('Download ↓').click();await page.locator('.media-note [role=status]').filter({hasText:code===404?'no longer available':'Try again'}).waitFor();assert.equal(await action('Download ↓').isEnabled(),true);unavailable=0;await download();}
   unauthorized=true;await action('Download ↓').click();await page.locator('.media-note [role=status]').filter({hasText:'Try again'}).waitFor();unauthorized=false;await download();record('Deleted media, access denial and temporary errors show feedback and allow an explicit retry');
   for(const change of ['switch','forget','remove','return']){
-   await card();held=await arm();const event=context.waitForEvent('page');await action('Open ↗').click();const tab=await event;const closed=tab.waitForEvent('close');await held.used.promise;const count=reads.length;
-   if(change==='remove')await page.evaluate(()=>renderTasks([]));
+   await card();held=await arm();const event=context.waitForEvent('page');await action('Open ↗').click();const tab=await event;const closed=tab.waitForEvent('close');await held.used.promise;const count=reads.length,heldAccess=requests;
+   if(change==='remove'){journal=[];await page.evaluate(()=>renderTasks([]));}
    else if(change==='forget')await page.locator('#forgetGenerationKey').click();
    else {await key('fixture-key-b');if(change==='return')await key('fixture-key-a');}
-   held.release.resolve();await closed;assert.equal(reads.length,count,'Late response navigated after context changed');if(change!=='return'&&change!=='remove')await key('fixture-key-a');
+   held.release.resolve();await closed;assert.equal(reads.slice(count).some(read=>read.access===heldAccess),false,'Late response navigated after context changed');if(change!=='return'&&change!=='remove')await key('fixture-key-a');
   }
   record('Late responses after key switch, Forget, A→B→A or card removal close the reserved tab without navigation');
   await card();
   for(const theme of ['light','dark'])for(const width of [1440,390,320]){
    await page.setViewportSize({width,height:1000});await page.evaluate(t=>document.documentElement.dataset.theme=t,theme);await action('Download ↓').scrollIntoViewIfNeeded();await action('Download ↓').focus();const event=page.waitForEvent('download');await page.keyboard.press('Enter');await event;
    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
-   for(const button of await page.locator('.media-actions button').all())assert.equal(await button.evaluate(b=>b.scrollWidth<=b.clientWidth),true);await page.screenshot({path:path.join(output,theme+'-'+width+'.png'),fullPage:true});
+   // The shared perimeter pseudo-element extends 1px outside the layout border.
+   // Check the actual text box instead of counting that border as text overflow.
+   for(const button of await page.locator('.media-actions button:visible').all())assert.equal(await button.evaluate(b=>{const range=document.createRange();range.selectNodeContents(b);const style=getComputedStyle(b);return range.getBoundingClientRect().width<=b.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight)+1;}),true);await page.screenshot({path:path.join(output,theme+'-'+width+'.png'),fullPage:true});
   }
+  assert.equal(await page.evaluate(()=>{const button=document.createElement('button');button.className='secondary';button.textContent='A deliberately overflowing action label';Object.assign(button.style,{width:'20px',maxWidth:'20px',whiteSpace:'nowrap'});document.body.append(button);const range=document.createRange();range.selectNodeContents(button);const style=getComputedStyle(button),fits=range.getBoundingClientRect().width<=button.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight)+1;button.remove();return fits;}),false,'The geometry assertion must reject real text overflow');
   record('Keyboard activation, both themes and 1440/390/320px layouts');
-  assert.ok(accessKeys.every(k=>k==='Bearer fixture-key-a'));assert.ok(reads.filter(r=>r.download||!previewAccesses.has(r.access)).every(r=>!r.expired));assert.ok(reads.filter(r=>!r.download&&!previewAccesses.has(r.access)).every(r=>!r.referrer));assert.deepEqual(errors,[]);assert.deepEqual(external,[]);
+  assert.ok(reads.some(r=>r.destination==='document'),'Navigation requests must be observed before checking referrer privacy');assert.ok(accessKeys.every(k=>k==='Bearer fixture-key-a'));assert.ok(reads.filter(r=>r.download||r.destination==='document').every(r=>!r.expired));assert.ok(reads.filter(r=>!r.download&&r.destination==='document').every(r=>!r.referrer));assert.deepEqual(errors,[]);assert.deepEqual(external,[]);
   fs.writeFileSync(path.join(output,'results.json'),JSON.stringify({engine,results,errors,external,requests},null,2));
  }catch(error){await page.screenshot({path:path.join(output,'failure.png'),fullPage:true});throw error;}
  finally{gate?.release.resolve();await browser.close();await new Promise(r=>server.close(r));}
