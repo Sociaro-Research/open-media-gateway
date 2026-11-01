@@ -189,7 +189,7 @@ func run() error {
 		LoginProviders: loginProviders, EmailDelivery: emailSender,
 		Onboarding: onboarding,
 	})
-	handler, err = api.WithPublicAPI(handler, cfg.AuthPublicURL, cfg.UIPublicURL, cfg.DocsPublicURL, postgres.NewSystemRepository(db))
+	handler, err = api.WithPublicAPIAndLegacyOrigin(handler, cfg.AuthPublicURL, cfg.UIPublicURL, cfg.DocsPublicURL, cfg.LegacyAPIOrigin, postgres.NewSystemRepository(db))
 	if err != nil {
 		return fmt.Errorf("configure API origins: %w", err)
 	}

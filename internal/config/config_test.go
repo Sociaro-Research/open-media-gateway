@@ -127,3 +127,34 @@ func TestMetricsListenerConfiguration(t *testing.T) {
 		}
 	}
 }
+
+func TestLegacyAPIOriginConfiguration(t *testing.T) {
+	for _, name := range []string{"DATABASE_URL", "REDIS_URL", "CLIENT_API_KEY", "WEBHOOK_SIGNING_SECRET", "MEDIA_URL_SIGNING_SECRET"} {
+		t.Setenv(name, "synthetic")
+	}
+	for _, name := range []string{"GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET", "GOOGLE_OAUTH_REDIRECT_URL", "RESEND_API_KEY", "EMAIL_FROM", "SESSION_SIGNING_SECRET", "UI_PUBLIC_URL"} {
+		t.Setenv(name, "")
+	}
+	t.Setenv("AUTH_PUBLIC_URL", "https://console-staging.sociaro.ai")
+	t.Setenv("LEGACY_API_ORIGIN", "")
+	cfg, err := Load()
+	if err != nil || cfg.LegacyAPIOrigin != "" {
+		t.Fatal("legacy host enabled by default", err)
+	}
+	t.Setenv("LEGACY_API_ORIGIN", "https://MEDIA-GATEWAY-DEV.SOCIARO.AI:443/")
+	cfg, err = Load()
+	if err != nil || cfg.LegacyAPIOrigin != "https://media-gateway-dev.sociaro.ai" || cfg.AuthPublicURL != "https://console-staging.sociaro.ai" || cfg.UIPublicURL != cfg.AuthPublicURL {
+		t.Fatal("canonical settings changed", err)
+	}
+	for _, raw := range []string{"http://localhost", "https://old.example.test:8443", "https://old.example.test/path", "https://a.test,https://b.test"} {
+		t.Setenv("LEGACY_API_ORIGIN", raw)
+		if _, err = Load(); err == nil || !strings.Contains(err.Error(), "LEGACY_API_ORIGIN") {
+			t.Fatal("invalid legacy configuration accepted")
+		}
+	}
+	t.Setenv("AUTH_PUBLIC_URL", "")
+	t.Setenv("LEGACY_API_ORIGIN", "https://old.example.test")
+	if _, err = Load(); err == nil {
+		t.Fatal("legacy host enabled without canonical origin")
+	}
+}

@@ -19,6 +19,13 @@ type storageBrowserOriginKey struct{}
 // WithPublicAPI configures public resource origins without serving frontend files.
 // The documentation origin exposes only its contract and appearance resources.
 func WithPublicAPI(next http.Handler, apiURL, uiURL, docsURL string, readers ...branding.Reader) (http.Handler, error) {
+	return WithPublicAPIAndLegacyOrigin(next, apiURL, uiURL, docsURL, "", readers...)
+}
+
+// WithPublicAPIAndLegacyOrigin preserves one retired HTTPS API origin's host
+// admission. It never changes request Host, authentication, browser trust,
+// signed capabilities, canonical links or the configured installation role.
+func WithPublicAPIAndLegacyOrigin(next http.Handler, apiURL, uiURL, docsURL, legacyURL string, readers ...branding.Reader) (http.Handler, error) {
 	var reader branding.Reader
 	if len(readers) > 0 {
 		reader = readers[0]
@@ -42,6 +49,13 @@ func WithPublicAPI(next http.Handler, apiURL, uiURL, docsURL string, readers ...
 	if docsURL, err = origin(docsURL); err != nil {
 		return nil, err
 	}
+	if legacyURL, err = installation.NormalizeLegacyAPIOrigin(legacyURL); err != nil {
+		return nil, err
+	}
+	if legacyURL != "" && apiURL == "" {
+		return nil, fmt.Errorf("legacy API origin requires a configured canonical API origin")
+	}
+
 	metadata, err := installation.Describe(uiURL)
 	if err != nil {
 		return nil, err
@@ -59,14 +73,27 @@ func WithPublicAPI(next http.Handler, apiURL, uiURL, docsURL string, readers ...
 	if docsURL != "" && (apiURL == "" || strings.EqualFold(host(docsURL), host(apiURL)) || strings.EqualFold(host(docsURL), host(uiURL))) {
 		return nil, fmt.Errorf("separate documentation requires a distinct origin and a configured API origin")
 	}
+	if legacyURL != "" && (strings.EqualFold(host(legacyURL), host(apiURL)) || strings.EqualFold(host(legacyURL), host(uiURL)) || strings.EqualFold(host(legacyURL), host(docsURL))) {
+		return nil, fmt.Errorf("legacy API origin must be distinct from canonical API, UI and documentation origins")
+	}
+
+	var applicationHosts []string
+	if legacyURL != "" {
+		canonical, _ := url.Parse(apiURL)
+		legacy, _ := url.Parse(legacyURL)
+		applicationHosts = []string{canonical.Hostname(), legacy.Hostname()}
+	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		original := r
 		defer func() { original.Pattern = r.Pattern }()
 		r = r.WithContext(installation.WithContext(r.Context(), metadata))
+		if len(applicationHosts) > 0 {
+			r = r.WithContext(context.WithValue(r.Context(), mediaApplicationHostsKey{}, applicationHosts))
+		}
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "no-referrer")
 		documentation := docsURL != "" && matchesHost(r.Host, docsURL)
-		if apiURL != "" && !documentation && !matchesHost(r.Host, apiURL) && r.URL.Path != "/healthz" {
+		if apiURL != "" && !documentation && !matchesHost(r.Host, apiURL) && !matchesHost(r.Host, legacyURL) && r.URL.Path != "/healthz" {
 			http.Error(w, "unknown host", http.StatusMisdirectedRequest)
 			return
 		}

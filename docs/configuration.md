@@ -21,7 +21,8 @@ For first-administrator setup, global settings and access recovery, see [System 
 | `GOOGLE_OAUTH_CLIENT_SECRET` | optional Google login | — | Google OpenID Connect client secret |
 | `GOOGLE_OAUTH_REDIRECT_URL` | optional Google login | — | Absolute callback URL ending in `/auth/google/callback` |
 | `SESSION_SIGNING_SECRET` | internet UI | — | Signs short-lived OAuth state and protects the login flow |
-| `AUTH_PUBLIC_URL` | cookie login or separate docs | — | Public API and OAuth callback origin |
+| `AUTH_PUBLIC_URL` | cookie login or separate docs | — | Canonical public API and OAuth callback origin |
+| `LEGACY_API_ORIGIN` | no | empty | One retired HTTPS API origin on port 443; host admission only, requires canonical `AUTH_PUBLIC_URL` |
 | `UI_PUBLIC_URL` | no | API origin | Email links and OAuth/checkout return origin |
 | `DOCS_PUBLIC_URL` | no | — | Separate documentation origin |
 | `UI_PORT` | no | `8088` | Published local UI port in the optional Compose profile |
@@ -422,3 +423,27 @@ processing goroutine between polls. `ARCHIVE_CONCURRENCY` separately bounds
 result transfers within that operation budget. Saturation delays further
 dequeues while reconciliation and active ownership heartbeats continue. Existing
 leases, durable acceptance and recovery remain enabled.
+
+### Retired API hostname compatibility
+
+`LEGACY_API_ORIGIN` optionally admits one exact retired HTTPS origin during a
+hostname migration. It defaults to empty. Only the default HTTPS port is accepted
+(explicit443normalizes away); credentials, non-origin paths, queries, fragments,
+wildcards, lists and nonstandard ports are rejected. It must differ from the
+canonical API, UI and documentation hosts.
+
+This setting changes only host admission. Authentication, authorization,
+capability signatures and cross-origin browser mutation checks remain unchanged.
+Requests retain their original Host; forwarded-host headers are never trusted.
+Direct media/storage redirects must remain separate from both API hostnames.
+The retired origin does not become a CORS/CSRF trusted origin, cookie domain or
+central installation. Canonical links, OAuth/email configuration, OpenAPI server
+URLs and installation role continue to use the canonical configured origins.
+Host-only login cookies do not move between domains: users sign in on the new UI.
+
+Keep the retired DNS, TLS and exact-host reverse proxy route while existing
+capability URLs require it. Media links expire normally, but reference links
+authenticate their owner and local ID without expiry. Do not assume an hour
+alone makes the old hostname removable. This option does not configure DNS, TLS,
+proxies or replace stored references. Redirects are not a substitute for handling
+provider fetches and API POST requests on the original host.

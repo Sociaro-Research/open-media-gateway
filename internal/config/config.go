@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/Sociaro-Research/open-media-gateway/internal/installation"
 	"github.com/Sociaro-Research/open-media-gateway/internal/providerkit"
 	registry "github.com/Sociaro-Research/open-media-gateway/plugins/provider"
 	"math"
@@ -53,6 +54,7 @@ type Config struct {
 	SessionTTL              time.Duration
 	DocsPublicURL           string
 	AuthPublicURL           string
+	LegacyAPIOrigin         string
 	UIPublicURL             string
 	ResendAPIKey            string
 	EmailFrom               string
@@ -78,6 +80,7 @@ func Load() (Config, error) {
 		SessionSigningSecret:    os.Getenv("SESSION_SIGNING_SECRET"),
 		DocsPublicURL:           os.Getenv("DOCS_PUBLIC_URL"),
 		AuthPublicURL:           os.Getenv("AUTH_PUBLIC_URL"),
+		LegacyAPIOrigin:         os.Getenv("LEGACY_API_ORIGIN"),
 		UIPublicURL:             os.Getenv("UI_PUBLIC_URL"),
 		ResendAPIKey:            os.Getenv("RESEND_API_KEY"),
 		EmailFrom:               os.Getenv("EMAIL_FROM"),
@@ -201,6 +204,13 @@ func Load() (Config, error) {
 		}
 		c.AuthPublicURL = u.Scheme + "://" + u.Host
 	}
+	if c.LegacyAPIOrigin, err = installation.NormalizeLegacyAPIOrigin(c.LegacyAPIOrigin); err != nil {
+		return Config{}, fmt.Errorf("LEGACY_API_ORIGIN: %w", err)
+	}
+	if c.LegacyAPIOrigin != "" && c.AuthPublicURL == "" {
+		return Config{}, errors.New("LEGACY_API_ORIGIN requires AUTH_PUBLIC_URL")
+	}
+
 	if c.UIPublicURL == "" {
 		c.UIPublicURL = c.AuthPublicURL
 	}

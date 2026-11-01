@@ -25,3 +25,17 @@ func TestTrustedOriginRoleBoundaries(t *testing.T) {
 		t.Fatal("missing metadata granted central role")
 	}
 }
+
+func TestNormalizeLegacyAPIOrigin(t *testing.T) {
+	for _, tc := range []struct{ in, want string }{{"", ""}, {"https://EXAMPLE.test:443/", "https://example.test"}, {"https://old.example.test", "https://old.example.test"}} {
+		got, err := NormalizeLegacyAPIOrigin(tc.in)
+		if err != nil || got != tc.want {
+			t.Fatal(got, err)
+		}
+	}
+	for _, raw := range []string{"http://localhost", "https://a.test:8443", "https://a.test:0", "https://a.test:65536", "https://a.test:", "https://a.test:abc", "https://a.test/path", "https://a.test?x=1", "https://a.test#", "https://user@a.test", "https://*.test", "https://a.test https://b.test", " https://a.test"} {
+		if _, err := NormalizeLegacyAPIOrigin(raw); err == nil {
+			t.Errorf("invalid legacy origin accepted: %q", raw)
+		}
+	}
+}

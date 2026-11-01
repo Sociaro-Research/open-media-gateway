@@ -86,6 +86,24 @@ func NormalizeOrigin(raw string) (string, error) {
 	}
 	return u.Scheme + "://" + host, nil
 }
+
+// NormalizeLegacyAPIOrigin admits one explicitly configured HTTPS origin for a
+// hostname migration. It is not a browser trusted-origin or role setting.
+func NormalizeLegacyAPIOrigin(raw string) (string, error) {
+	if raw == "" {
+		return "", nil
+	}
+	normalized, err := NormalizeOrigin(raw)
+	if err != nil {
+		return "", fmt.Errorf("legacy API origin must be one HTTPS origin on port 443")
+	}
+	u, err := url.Parse(normalized)
+	if err != nil || u.Scheme != "https" || u.Port() != "" {
+		return "", fmt.Errorf("legacy API origin must be one HTTPS origin on port 443")
+	}
+	return normalized, nil
+}
+
 func Describe(ownOrigin string) (Metadata, error) {
 	value := Metadata{Role: "ordinary", CentralOrigin: DefaultCentralOrigin}
 	if ownOrigin == "" {

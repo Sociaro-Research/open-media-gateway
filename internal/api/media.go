@@ -19,6 +19,10 @@ import (
 	"github.com/Sociaro-Research/open-media-gateway/internal/storage"
 )
 
+// mediaApplicationHostsKey preserves direct-storage isolation across an explicit
+// API hostname migration. It does not affect authorization or browser trust.
+type mediaApplicationHostsKey struct{}
+
 type mediaURLSigner struct {
 	secret []byte
 	ttl    time.Duration
@@ -222,5 +226,15 @@ func isolatedMediaDestination(r *http.Request, location string) bool {
 		return false
 	}
 	app := &url.URL{Host: r.Host}
-	return !strings.EqualFold(strings.TrimSuffix(u.Hostname(), "."), strings.TrimSuffix(app.Hostname(), "."))
+	if strings.EqualFold(strings.TrimSuffix(u.Hostname(), "."), strings.TrimSuffix(app.Hostname(), ".")) {
+		return false
+	}
+	if hosts, ok := r.Context().Value(mediaApplicationHostsKey{}).([]string); ok {
+		for _, host := range hosts {
+			if strings.EqualFold(strings.TrimSuffix(u.Hostname(), "."), strings.TrimSuffix(host, ".")) {
+				return false
+			}
+		}
+	}
+	return true
 }

@@ -302,3 +302,17 @@ before treating the worker drain as clean. This protection does not make an old
 adapter able to process newly supported synchronous models. A failure before the
 receipt commit remains uncertain acceptance and must not be retried as a new
 provider submission. Follow the existing backup and clean-drain gates.
+
+### Preserve an old API origin during hostname migration
+
+An operator can set the optional `LEGACY_API_ORIGIN` to one retired HTTPS origin
+after configuring the new canonical `AUTH_PUBLIC_URL`/`UI_PUBLIC_URL`. The default
+is empty; see [configuration](configuration.md#retired-api-hostname-compatibility).
+Keep the original Host through its exact-host proxy route. This option only
+admits that Host at the API boundary; retain valid TLS/DNS and verify signed
+GET/HEAD/Range, API POST, browser sign-in and unchanged cross-origin rejection.
+It does not configure frontend hosting or broaden cookie/CSRF trust. Canonical
+OAuth/email/return URLs must use the new origin. Preserve signing secrets and
+user data throughout. Existing non-expiring reference capabilities require an
+explicit dependency review before removing the retired DNS/route; no automatic
+retirement or replacement is performed.
