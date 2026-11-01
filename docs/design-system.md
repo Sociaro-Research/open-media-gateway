@@ -589,3 +589,5 @@ Templates have one current content and a Published visibility switch. Save appli
 Nested sidebar tabs retain their established 20px hierarchy inset, 12px text inset and one straight active rail marker. They are borderless navigation, so shared secondary-button perimeter paint must not frame each row. Keyboard focus uses a visible text underline; mobile tabs keep their existing horizontal style. Preserve this scoped exception when changing shared button paint.
 
 The **Show Playground / Templates** setting controls both console sections together. Its help text states that disabling it hides both screens while API generation remains available. This is a visibility explanation, not a separate Template permission.
+
+Installation mode choices retain the native unselected radio and a thin configured-accent filled selected dot. Skip for now belongs only to initial onboarding. Settings Apply appears only for a valid changed choice, hides on revert or success, and remains available after failure.

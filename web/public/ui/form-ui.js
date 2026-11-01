@@ -64,7 +64,7 @@
     const unchanged=state.initial===state.read();
     if(state.discard)state.discard.hidden=unchanged;
     if(state.feedback&&!unchanged)clearSaved(state);
-    if(state.placement==='footer'){state.button.hidden=false;state.button.disabled=!!state.feedback||unchanged||!state.valid();}
+    if(state.placement==='footer'){state.button.hidden=state.hideWhenClean&&unchanged;state.button.disabled=!!state.feedback||unchanged||!state.valid();}
     else state.button.hidden=state.feedback?false:unchanged||!state.valid();
     if(state.feedback&&!state.button.disabled)state.button.disabled=true;
   }
@@ -81,7 +81,7 @@
     state.feedback.timer=setTimeout(()=>{clearSaved(state);update(form);},3000);
     update(form);
   }
-  function watch(form,button,{read=()=>values(form),valid=()=>true,heading,discard,placement='heading'}={}){const previous=watches.get(form);if(previous)clearSaved(previous);if(placement==='heading')placeAction(form,button,heading);if(discard)placeDiscard(button,discard);watches.set(form,{button,discard,read,valid,placement,initial:read()});update(form);}
+  function watch(form,button,{read=()=>values(form),valid=()=>true,heading,discard,placement='heading',hideWhenClean=false}={}){const previous=watches.get(form);if(previous)clearSaved(previous);if(placement==='heading')placeAction(form,button,heading);if(discard)placeDiscard(button,discard);watches.set(form,{button,discard,read,valid,placement,hideWhenClean,initial:read()});update(form);}
   function placeDiscard(button,discard){
     const row=button.closest('.form-heading');if(!row)return;
     const old=discard.parentElement;let actions=button.closest('.form-heading-actions');
