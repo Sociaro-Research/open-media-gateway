@@ -16,6 +16,16 @@ ignored `.local/` or `dist/`; record limits explicitly.
 
 ## Available fixtures
 
+`provider-resources.cjs` exercises descriptor-driven resource variants, local
+source uploads/library reuse, owned generated sources, explicit unknown-duration
+permission, tags/bound voices, preset/managed voice exclusivity, binding aliases,
+Template Save/Advanced editing, typed creation confirmation and cost caps,
+Copy/Retry, Journal results, asynchronous deletion recovery and key-change races.
+Run both browser engines, prepare the disposable clips below, and select evidence
+with `UI_EVIDENCE_DIR`. Every creation/deletion is a synthetic localhost fixture;
+no provider resource or live account is mutated. Inspect both themes at
+1440/390/320px against the visual review gate.
+
 `provider-capabilities.cjs` exercises descriptor-declared media roles (including
 identical URLs in distinct ordered slots), Auto duration/aspect-ratio omission,
 ordered text-list parameters, Unicode prompt budgets, unknown/zero/known prices,

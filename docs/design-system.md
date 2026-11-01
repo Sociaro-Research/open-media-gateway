@@ -612,3 +612,33 @@ Typed text-list parameters use ordered floating text fields with internal border
 A declared prompt policy is a Gateway admission constraint. Its ASCII and non-ASCII counts share the weighted budget defined by the descriptor; it is not a vendor tokenizer or Unicode guarantee. Keep the normal dynamic Prompt label, with any additional policy explanation in a shared 12px field group. Update hint text only when it changes to preserve native textarea/reference-editor behavior.
 
 Archived result artifacts reuse shared media/actions and display every output and format variant. Group labels describe local outputs, never upstream handles. Obtain preview/download links through the authorized media-access response and use those URLs unchanged; refresh access on activation. Keep scalar result and last-frame compatibility. A deleted result or disposed context clears all media sources and video posters; failed/pending generations do not present partial completed outputs. Cards use 20px group separation and 12px content/action gaps, existing theme tokens and 44px controls.
+
+
+## Managed provider resources
+
+Playground and Template binding fields share `ResourceControls`. Render only
+resource kinds, variants, source types and limits declared by the selected model.
+Keep the existing 16px group and 12px card/action rhythm, floating fields, shared
+44px actions and one configured accent selection edge. Resource dialogs reuse
+the common header, plain close icon, reference cards and keyboard behavior.
+
+Selected source blocks retain only Remove as their selection action; empty
+blocks use Upload and Choose from library. Keep ordered source identities and
+any declared first-source label. Generated sources come from owned archived
+results in the actual connection. An unknown duration is eligible only when the
+specific descriptor permits it, and is displayed as unknown. The server remains
+responsible for ownership, inspected bytes, age, model and connection validation;
+never submit client media evidence or expose upstream resource identifiers.
+
+Resource aliases must be distinct and must not overlap ordinary image/video/audio
+addresses. Preserve binding/alias pairs through Template Save and Advanced editing.
+A selected managed speech voice replaces the preset-voice input and request value.
+Resource creation and repeated jobs use the existing priced confirmation and the
+typed resource API. An absent verified price remains unavailable.
+
+Visible resource/source libraries and deletion jobs use the shared automatic read watcher. Retry read failures without replacing an active draft or player, and stop on close, navigation or key changes. Owned-generation sources use the job picker rather than raw-file upload; after selection retain Remove and a separate authorized preview.
+
+A deletion submission is pending until its job confirms completion. Closing and
+reopening the library retains status recovery without another mutation. Keep
+known rejections distinct from uncertain network/server outcomes; never turn an
+unconfirmed deletion into success or an automatic retry.

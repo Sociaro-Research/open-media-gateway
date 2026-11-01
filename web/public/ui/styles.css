@@ -1768,3 +1768,20 @@ input[type=color]:focus-visible { outline:none; box-shadow:none; border:2px soli
 .inferred-duration-group > :is(label,div),[data-duration-mode] > label { margin:0; }
 
 @media(max-width:400px) { #generationSettings > .settings-grid:has(#ratio[data-inference="true"]) { grid-template-columns:minmax(0,1fr); } }
+
+/* Resource descriptors use the existing field, card and dialog spacing. */
+.resource-controls,.resource-controls-content,.resource-create-fields,.resource-variant,.resource-sources,.resource-input-group,.resource-list { display:grid; gap:16px; min-width:0; }
+.resource-item { display:grid; gap:12px; min-width:0; padding:16px; border:1px solid var(--line); border-radius:12px; background:var(--panel); }
+:is(.resource-controls,.resource-library) :is(h3,p,label) { margin:0; }
+.resource-item .reference-actions { justify-content:flex-start; }
+.resource-delete-confirm { display:flex; flex-wrap:wrap; align-items:center; gap:12px; }
+.resource-delete-confirm p { flex-basis:100%; }
+.resource-controls .reference-status:empty { display:none; }
+.resource-controls button { min-height:44px; }
+
+.resource-item :is(h3,h4,strong,p) { overflow-wrap:anywhere; }
+
+.resource-library .generation-output img.task-media { height:auto; }
+
+.resource-library[open] { display:grid; gap:16px; }
+.resource-library > .reference-status:empty { display:none; }

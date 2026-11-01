@@ -45,7 +45,7 @@ function hashReferenceFile(file,signal){
  function picker(kind) {
   const image=kind==='image',plural=kind==='image'?'images':kind+'s',displayPlural=kind==='audio'?'audio files':plural;
   const maxBytes=(image?30:kind==='video'?200:50)*1024*1024;
-  const accept=image?'image/png,image/jpeg,image/webp,image/gif':kind==='video'?'video/mp4,video/quicktime,video/webm': 'audio/mpeg,audio/wav,audio/x-wav,audio/ogg,audio/flac';
+  const accept=image?'image/png,image/jpeg,image/webp,image/gif':kind==='video'?'video/mp4,video/quicktime,video/webm': 'audio/mpeg,audio/aac,audio/mp4,audio/wave,audio/wav,audio/x-wav,audio/ogg,audio/flac';
   if(!image){
     const container=document.querySelector(`#${kind}URLField`),input=document.querySelector(`#${kind}URL`);
     const label=container.querySelector('label'),control=input.closest('.floating-field')||input;

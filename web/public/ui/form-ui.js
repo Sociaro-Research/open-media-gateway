@@ -244,7 +244,7 @@
   }
   function updatePrompt(control,model){
     control.removeAttribute('maxlength');const previous=control.dataset.promptLimitError||'',state=promptState(control.value,model);
-    let hint=promptHints.get(control);if(state.budget&&!hint){hint=document.createElement('p');hint.className='field-hint prompt-policy';const owner=control.closest('label')||control.closest('.floating-field')||control,group=document.createElement('div');group.className='prompt-policy-group';owner.before(group);group.append(owner,hint);promptHints.set(control,hint);}if(hint){if(hint.textContent!==state.budget)hint.textContent=state.budget;const hidden=!state.budget||!!model?.no_prompt;if(hint.hidden!==hidden)hint.hidden=hidden;}
+    let hint=promptHints.get(control);if(state.budget&&!hint){hint=document.createElement('p');hint.className='field-hint prompt-policy';const owner=control.closest('label')||control.closest('.floating-field')||control,group=document.createElement('div');group.className='prompt-policy-group';owner.before(group);group.append(owner,hint);promptHints.set(control,hint);}if(hint){if(hint.parentElement.hidden!==!!model?.no_prompt)hint.parentElement.hidden=!!model?.no_prompt;if(hint.textContent!==state.budget)hint.textContent=state.budget;const hidden=!state.budget||!!model?.no_prompt;if(hint.hidden!==hidden)hint.hidden=hidden;}
     control.dataset.promptLimitError=state.error;setLabel(control,state.label);control.setAttribute('aria-description',(model?.prompt_optional?'Optional. ':'')+state.label+(state.budget?' '+state.budget:''));
     if(state.error||previous&&control.validationMessage===previous)control.setCustomValidity(state.error);
     return state;

@@ -3,7 +3,7 @@
 (() => {
  'use strict';
  let sequence=0;
- const types={image:['image/png','image/jpeg','image/webp','image/gif'],video:['video/mp4','video/quicktime','video/webm'],audio:['audio/mpeg','audio/wave','audio/wav','audio/x-wav','audio/ogg','audio/flac']};
+ const types={image:['image/png','image/jpeg','image/webp','image/gif'],video:['video/mp4','video/quicktime','video/webm'],audio:['audio/mpeg','audio/aac','audio/mp4','audio/wave','audio/wav','audio/x-wav','audio/ogg','audio/flac']};
  const equivalent=type=>['audio/wav','audio/x-wav'].includes(type)?'audio/wave':type;
  const el=(tag,text='',cls='')=>{const node=document.createElement(tag);node.textContent=text;node.className=cls;return node;};
  function formatLimit(bytes,unit='MB'){const value=bytes/(unit==='MiB'?1024*1024:1_000_000),digits=value>=1?2:Math.min(6,Math.max(2,Math.ceil(-Math.log10(value))+1));return new Intl.NumberFormat('en-US',{maximumFractionDigits:digits}).format(value)+' '+unit;}
