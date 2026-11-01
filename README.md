@@ -48,7 +48,7 @@ poll or handle webhooks before downloading results.
 
 ## Quick Start
 
-Run a new local installation with the published **v1.0.1** bundle. It contains
+Run a new local installation with the **v1.0.2** release bundle. It contains
 configuration for Linux AMD64/ARM64 images; no source checkout, Go, Node, or image
 build is needed.
 
@@ -59,14 +59,14 @@ commands in Ubuntu. No provider account or paid key is needed for `mock`.
 
 ### 1. Download and verify
 
-Download the [installation archive](https://github.com/Sociaro-Research/open-media-gateway/releases/download/v1.0.1/media-gateway-v1.0.1.tar.gz)
-and [SHA-256 file](https://github.com/Sociaro-Research/open-media-gateway/releases/download/v1.0.1/media-gateway-v1.0.1.tar.gz.sha256)
+Download the [installation archive](https://github.com/Sociaro-Research/open-media-gateway/releases/download/v1.0.2/media-gateway-v1.0.2.tar.gz)
+and [SHA-256 file](https://github.com/Sociaro-Research/open-media-gateway/releases/download/v1.0.2/media-gateway-v1.0.2.tar.gz.sha256)
 into a new, empty directory. Then run there:
 
 ```sh
-sha256sum -c media-gateway-v1.0.1.tar.gz.sha256
-tar -xzf media-gateway-v1.0.1.tar.gz
-cd media-gateway-v1.0.1
+sha256sum -c media-gateway-v1.0.2.tar.gz.sha256
+tar -xzf media-gateway-v1.0.2.tar.gz
+cd media-gateway-v1.0.2
 ```
 
 On macOS, use `shasum -a 256 -c` instead of `sha256sum -c`. Stop if verification
