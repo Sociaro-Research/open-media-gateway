@@ -1719,7 +1719,6 @@ input[type=color]:focus-visible { outline:none; box-shadow:none; border:2px soli
 .setup-option input[type=radio]:checked { appearance:none; -webkit-appearance:none; border:1px solid var(--accent); border-radius:50%; background:var(--accent); }
 @media(forced-colors:active) { .setup-option input[type=radio]:checked { forced-color-adjust:none; border-color:Highlight; background:Highlight; } }
 
-
 /* The group's grid gap owns spacing; inherited heading/paragraph margins must not stack. */
 :is(#systemView,#configurationView) .setup-section > :is(h2,p) { margin:0; }
 
@@ -1730,3 +1729,14 @@ input[type=color]:focus-visible { outline:none; box-shadow:none; border:2px soli
 .icon-close:hover:not(:disabled) { background:var(--panel-2); color:var(--text); }
 .icon-close:focus-visible { outline:none!important; background:color-mix(in srgb,var(--accent) 16%,var(--field)); color:var(--text); box-shadow:none; }
 @media(forced-colors:active) { .icon-close { forced-color-adjust:none; color:CanvasText; background:Canvas; } .icon-close:hover:not(:disabled),.icon-close:focus-visible { color:HighlightText; background:Highlight; } }
+
+/* Compact provider logos use the same selected/empty file action contract. */
+.provider-logo-editor .reference-dropzone { display:grid; grid-template-columns:96px minmax(0,1fr); align-items:center; gap:12px 16px; text-align:left; }
+.provider-logo-editor .provider-logo-preview { grid-column:1; grid-row:1/4; width:96px; height:96px; margin:0; }
+.provider-logo-editor .reference-dropzone > :is(p:not(.reference-status),.reference-actions,small) { grid-column:2; margin:0; }
+.provider-logo-editor .reference-actions { justify-content:flex-start; }
+.provider-logo-editor .reference-actions button { min-height:44px; }
+.provider-logo-editor .reference-status { grid-column:1/-1; margin:0; }
+.provider-logo-editor .reference-status:empty { display:none; }
+.provider-logo-editor .reference-dropzone:has(> .provider-logo-preview[hidden]) { grid-template-columns:minmax(0,1fr); }
+.provider-logo-editor .reference-dropzone:has(> .provider-logo-preview[hidden]) > :is(p,.reference-actions,small) { grid-column:1; }

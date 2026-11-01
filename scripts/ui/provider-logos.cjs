@@ -3,6 +3,7 @@ const {chromium,webkit}=require('playwright'),{PNG}=require('pngjs');
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),http=require('node:http'),{spawn}=require('node:child_process');
 const fixtures=require('./provider-logo-fixtures.cjs');
 const listen=s=>new Promise(r=>s.listen(0,'127.0.0.1',()=>r(s.address().port)));
+const cleanup=[];
 (async()=>{
  const [upstream,token,owner,phase,foreignToken]=process.argv.slice(2),engine=process.env.UI_BROWSER_ENGINE||'chromium';
  assert.equal(new URL(upstream).hostname,'127.0.0.1');
@@ -15,11 +16,11 @@ const listen=s=>new Promise(r=>s.listen(0,'127.0.0.1',()=>r(s.address().port)));
    caddy=spawn(process.env.CADDY_BIN,['run','--config',path.resolve('web/Caddyfile'),'--adapter','caddyfile'],{env:{...process.env,UI_ROOT:path.resolve('web/public'),GATEWAY_UPSTREAM:new URL(upstream).host,UI_LISTEN:':'+port,DOCS_HOST:'docs.invalid'},stdio:['ignore',log,log]});fs.closeSync(log);base='http://127.0.0.1:'+port;
    let ready=false;for(let i=0;i<100;i++){try{const r=await fetch(base+'/site.json');if(r.ok){ready=true;break}}catch{}await new Promise(r=>setTimeout(r,50));}assert.ok(ready,'isolated Caddy did not start');
   }
-  browser=await ({chromium,webkit}[engine]).launch({headless:true,...(engine==='chromium'&&process.env.UI_BROWSER_PATH?{executablePath:process.env.UI_BROWSER_PATH}:{})});
+  browser=await ({chromium,webkit}[engine]).launch({headless:true,...(process.env.UI_BROWSER_PATH?{executablePath:process.env.UI_BROWSER_PATH}:{})});
   const context=await browser.newContext({viewport:{width:1440,height:1050}}),errors=[];
   await context.route('**/*',route=>new URL(route.request().url()).origin===base?route.continue():route.abort());
   await context.addCookies([{name:'media_gateway_session',value:token,url:base,httpOnly:true,sameSite:'Lax'}]);
-  const page=await context.newPage();page.setDefaultTimeout(12000);page.on('pageerror',e=>{if(!e.message.includes('ResizeObserver loop'))errors.push(e.message)});
+  const page=await context.newPage();page.setDefaultTimeout(12000);const logoResponses=[];page.on('response',r=>{const p=new URL(r.url()).pathname;if(p.includes('/logo')||p.includes('/provider-assets/'))logoResponses.push({status:r.status(),asset:p.includes('/provider-assets/'),own:r.request().headers().authorization==='Bearer '+secret});});page.on('pageerror',e=>{if(!e.message.includes('ResizeObserver loop'))errors.push(e.message)});
   const keyResponse=await context.request.post(base+'/v1/api-keys',{data:{name:'Synthetic logo browser key',resource_mode:'personal',scopes:['generation','providers:manage','system:manage']}});
   assert.equal(keyResponse.status(),201,await keyResponse.text());const {secret}=await keyResponse.json();
   await page.goto(base+'/profile');await page.waitForFunction(()=>consoleInitialized&&window.Workspace?.ready());
@@ -30,11 +31,12 @@ const listen=s=>new Promise(r=>s.listen(0,'127.0.0.1',()=>r(s.address().port)));
   const generationDraft=await page.evaluate(()=>[elements.quality.value,elements.resolution.value,elements.background.value,elements.format.value]);
   await page.getByRole('tab',{name:'Providers',exact:true}).click();
   const row=id=>page.locator(`[data-provider-id="${id}"]`),editor=()=>page.locator('#providerLogoEditor'),input=()=>editor().locator('input[type=file]');
-  async function select(id){await row(id).click();await editor().getByRole('button',{name:/^Upload logo/}).waitFor();}
-  async function upload(buffer,name='logo.png',mimeType='image/png'){await input().setInputFiles({name,mimeType,buffer});await editor().getByRole('status').filter({hasText:'Logo uploaded.'}).waitFor();await editor().locator('img').evaluate(img=>img.decode());}
-  async function drop(files){
+  async function select(id){await row(id).click();await editor().getByRole('group',{name:({openai:'OpenAI',sonilo:'Sonilo'})[id]+' logo',exact:true}).waitFor();}
+  async function removeCurrent(){const action=editor().getByRole('button',{name:/^Remove logo for /});if(await action.isVisible()){await action.press('Enter');await editor().getByRole('status').filter({hasText:'Logo removed.'}).waitFor();}}
+  async function upload(buffer,name='logo.png',mimeType='image/png'){await removeCurrent();await input().setInputFiles({name,mimeType,buffer});await editor().getByRole('status').filter({hasText:'Logo uploaded.'}).waitFor();await editor().locator('img').evaluate(img=>img.decode());}
+  async function drop(files,allowed=true){
    const transfer=await page.evaluateHandle(files=>{const data=new DataTransfer();for(const f of files)data.items.add(new File([new Uint8Array(f.bytes)],f.name,{type:f.type}));return data;},files.map(f=>({name:f.name||'logo.png',type:f.type||'image/png',bytes:[...f.buffer]})));
-   const zone=editor().locator('.reference-dropzone');await zone.dispatchEvent('dragenter',{dataTransfer:transfer});assert.ok((await zone.getAttribute('class')).includes('dragover'));await zone.dispatchEvent('dragover',{dataTransfer:transfer});await zone.dispatchEvent('drop',{dataTransfer:transfer});await transfer.dispose();
+   const zone=editor().locator('.reference-dropzone');await zone.dispatchEvent('dragenter',{dataTransfer:transfer});assert.equal((await zone.getAttribute('class')).includes('dragover'),allowed);await zone.dispatchEvent('dragover',{dataTransfer:transfer});await zone.dispatchEvent('drop',{dataTransfer:transfer});await transfer.dispose();
   }
   const iconURL=async id=>{const r=await context.request.get(base+'/v1/admin/providers/'+id);assert.equal(r.status(),200);return (await r.json()).icon_url;};
   if(phase==='upload'){
@@ -58,21 +60,24 @@ const listen=s=>new Promise(r=>s.listen(0,'127.0.0.1',()=>r(s.address().port)));
     const r=await context.request.put(base+'/v1/admin/providers/openai/logo',{data:buffer,headers:{'Content-Type':mimeType}});assert.equal(r.status(),400);assert.match(await r.text(),new RegExp(message));assert.equal(await iconURL('openai'),undefined);
    }
    // Valid16-bit near-opaque alpha must pass both validators.
-   const chooserReady=page.waitForEvent('filechooser');await editor().getByRole('button',{name:/^Upload logo/}).press('Space');await (await chooserReady).setFiles({name:'logo.png',mimeType:'image/png',buffer:fixtures.nearOpaque16});await editor().getByRole('status').filter({hasText:'Logo uploaded.'}).waitFor();let previous=await iconURL('openai');assert.ok(previous);
+   const chooserReady=page.waitForEvent('filechooser');await editor().getByRole('button',{name:/^Upload [Ll]ogo/}).press('Space');await (await chooserReady).setFiles({name:'logo.png',mimeType:'image/png',buffer:fixtures.nearOpaque16});await editor().getByRole('status').filter({hasText:'Logo uploaded.'}).waitFor();let previous=await iconURL('openai');assert.ok(previous);
    await upload(fixtures.valid);assert.notEqual(await iconURL('openai'),previous);previous=await iconURL('openai');
    await select('sonilo');await drop([{buffer:fixtures.palette}]);await editor().getByRole('status').filter({hasText:'Logo uploaded.'}).waitFor();const second=await iconURL('sonilo');assert.ok(second);assert.equal(await iconURL('openai'),previous);
-   await select('openai');await drop([{buffer:fixtures.valid},{buffer:fixtures.palette}]);await editor().getByRole('status').filter({hasText:'Choose one file'}).waitFor();assert.equal(await iconURL('openai'),previous);
-   await select('openai');const draft=page.locator('[data-provider-field=api_key]');await draft.fill('synthetic-unsaved-draft');
-   let entered,release;const gate=new Promise(r=>release=r),arrived=new Promise(r=>entered=r);
+   fs.appendFileSync(path.join(out,'phases.log'),'Logo phase: selected drop\n');await select('openai');const beforeBlocked=writes;await drop([{buffer:fixtures.valid},{buffer:fixtures.palette}],false);assert.equal(writes,beforeBlocked);assert.equal(await iconURL('openai'),previous,'selected logo cannot be replaced before Remove');
+   await select('openai');await removeCurrent();previous=undefined;const draft=page.locator('[data-provider-field=api_key]');await draft.fill('synthetic-unsaved-draft');
+   let entered,release;const gate=new Promise(r=>{release=r;cleanup.push(r);}),arrived=new Promise(r=>entered=r);
    await page.route('**/v1/admin/providers/openai/logo',async route=>{entered();await gate;await route.fulfill({status:503,json:{error:{message:'Synthetic storage interruption'}}});},{times:1});
    await input().setInputFiles({name:'logo.png',mimeType:'image/png',buffer:fixtures.valid});await arrived;
    assert.equal(await input().isDisabled(),true);assert.match(await editor().getByRole('status').innerText(),/Uploading/);release();await editor().getByRole('status').filter({hasText:'Synthetic storage interruption'}).waitFor();assert.equal(await iconURL('openai'),previous);assert.equal(await draft.inputValue(),'synthetic-unsaved-draft');
+   fs.appendFileSync(path.join(out,'phases.log'),'Logo phase: upload errors\n');
    // A transport abort keeps the confirmed preview and supports same-file retry.
    await page.route('**/v1/admin/providers/openai/logo',route=>route.abort(),{times:1});await input().setInputFiles({name:'logo.png',mimeType:'image/png',buffer:fixtures.valid});await editor().getByRole('status').filter({hasText:'retry'}).waitFor();assert.equal(await iconURL('openai'),previous);
    await upload(fixtures.palette);assert.equal(await draft.inputValue(),'synthetic-unsaved-draft');assert.equal(await iconURL('sonilo'),second);await upload(fixtures.valid);
+   fs.appendFileSync(path.join(out,'phases.log'),'Logo phase: pending upload\n');
    // A pending write remains locked across A -> B -> A; its success reconciles
    // the new editor and list without replacing newer drafts or issuing twice.
-   let enterWrite,finishWrite;const writeEntered=new Promise(r=>enterWrite=r),writeGate=new Promise(r=>finishWrite=r);
+   await removeCurrent();
+   let enterWrite,finishWrite;const writeEntered=new Promise(r=>enterWrite=r),writeGate=new Promise(r=>{finishWrite=r;cleanup.push(r);});
    await page.route('**/v1/admin/providers/openai/logo',async route=>{enterWrite();await writeGate;await route.continue();},{times:1});
    await input().setInputFiles({name:'logo.png',mimeType:'image/png',buffer:fixtures.palette});await writeEntered;
    const beforeCount=writes;await select('sonilo');await select('openai');assert.equal(await input().isDisabled(),true);assert.match(await editor().getByRole('status').innerText(),/Uploading/);
@@ -83,10 +88,11 @@ const listen=s=>new Promise(r=>s.listen(0,'127.0.0.1',()=>r(s.address().port)));
    await page.getByRole('button',{name:'Add model',exact:true}).click();const profileDialog=page.locator('dialog[open]');await profileDialog.locator('button[role=combobox][aria-label="API request profile"]').click();
    await page.locator('.model-select-popup img').evaluate(img=>img.decode());assert.equal(await page.locator('.model-select-popup img').getAttribute('data-logo-url'),finalURL,'API profile dialog uses newly uploaded connection logo');
    await page.keyboard.press('Escape');if(await profileDialog.count())await profileDialog.getByRole('button',{name:'Cancel',exact:true}).press('Enter');
+   fs.appendFileSync(path.join(out,'phases.log'),'Logo phase: cache invalidation\n');
    // Hold a real old image body across a successful replacement. Refresh must
    // invalidate pending reads too, before any img element has been appended.
    const stale=await page.evaluate(()=>providerCatalog.find(p=>p.id==='openai').icon_url.replace(/v=[^&]+/,'v=held-old'));
-   let gotOld,releaseOld,deliveredOld;const oldReady=new Promise(r=>gotOld=r),oldGate=new Promise(r=>releaseOld=r),oldDone=new Promise(r=>deliveredOld=r);
+   let gotOld,releaseOld,deliveredOld;const oldReady=new Promise(r=>gotOld=r),oldGate=new Promise(r=>{releaseOld=r;cleanup.push(r);}),oldDone=new Promise(r=>deliveredOld=r);
    await page.route(url=>url.href===base+stale,async route=>{const old=await route.fetch();gotOld();await oldGate;try{await route.fulfill({response:old});}catch{}finally{deliveredOld();}},{times:1});
    await page.evaluate(url=>{const mark=document.createElement('div');mark.id='pendingLogoProof';document.body.append(mark);ProviderLogos.image(mark,{name:'OpenAI',icon_url:url});},stale);await oldReady;
    await upload(fixtures.palette);const replacement=await iconURL('openai');await page.waitForFunction(url=>document.querySelector('#pendingLogoProof img')?.dataset.logoUrl.includes(new URL(url,location.origin).searchParams.get('v')),replacement);
@@ -98,22 +104,27 @@ const listen=s=>new Promise(r=>s.listen(0,'127.0.0.1',()=>r(s.address().port)));
   } else {
    await select('openai');assert.equal(await iconURL('openai'),undefined);assert.equal(await editor().locator('img').count(),0);assert.equal(await editor().getByRole('button',{name:/^Remove logo/}).count(),0);await upload(fixtures.valid);await select('sonilo');await editor().locator('img').evaluate(img=>img.decode());assert.ok((await iconURL('sonilo')).includes('/'+owner+'/sonilo/icon.png?v='));
   }
+  fs.appendFileSync(path.join(out,'phases.log'),'Logo phase: read isolation\n');
   // Cookie, bearer-only (through real Caddy), anonymous and foreign-owner reads.
   const logo=await iconURL('openai');let response=await context.request.get(base+logo);assert.equal(response.status(),200);assert.deepEqual(await response.body(),fixtures.valid);
   const bearer=await browser.newContext();response=await bearer.request.get(base+logo,{headers:{Authorization:'Bearer '+secret}});assert.equal(response.status(),200);assert.deepEqual(await response.body(),fixtures.valid);
   assert.equal((await bearer.request.get(base+logo)).status(),401);assert.equal((await context.request.get(base+logo.replace(owner,'11111111-1111-4111-8111-111111111111'))).status(),404);await bearer.close();
+  fs.appendFileSync(path.join(out,'phases.log'),'Logo phase: auth cache\n');
   // API-key-only mode must isolate memory even when a URL has no generation hint.
   // All keys/users are disposable; no screenshots include key input fields.
-  const foreignContext=await browser.newContext();await foreignContext.addCookies([{name:'media_gateway_session',value:foreignToken,url:base,httpOnly:true,sameSite:'Lax'}]);
-  const foreignKeyResponse=await foreignContext.request.post(base+'/v1/api-keys',{data:{name:'Other synthetic logo owner',resource_mode:'personal',scopes:['generation']}});assert.equal(foreignKeyResponse.status(),201);const foreignSecret=(await foreignKeyResponse.json()).secret;await foreignContext.close();
-  const accessPage=await context.newPage();await accessPage.goto(base+'/profile');await accessPage.waitForFunction(()=>consoleInitialized&&Workspace.ready());
+  async function tracked(label,operation){fs.appendFileSync(path.join(out,'phases.log'),label+' start\n');let deadline;try{return await Promise.race([operation,new Promise((_,reject)=>{deadline=setTimeout(()=>reject(Error('Fixture timeout: '+label)),20000);})]);}finally{clearTimeout(deadline);fs.appendFileSync(path.join(out,'phases.log'),label+' settled\n');}}
+  const foreignContext=await tracked('foreign context',browser.newContext());await foreignContext.addCookies([{name:'media_gateway_session',value:foreignToken,url:base,httpOnly:true,sameSite:'Lax'}]);
+  const foreignKeyResponse=await foreignContext.request.post(base+'/v1/api-keys',{data:{name:'Other synthetic logo owner',resource_mode:'personal',scopes:['generation']}});assert.equal(foreignKeyResponse.status(),201);const foreignSecret=(await foreignKeyResponse.json()).secret;await tracked('foreign context close',foreignContext.close());
+  const accessPage=await tracked('access page',context.newPage());await tracked('access goto',accessPage.goto(base+'/profile'));await tracked('access initialized',accessPage.waitForFunction(()=>consoleInitialized&&Workspace.ready()));
   await accessPage.evaluate(()=>{authMode='api_key';GenerationKey.initialize(null);});
   async function connectAccess(key){await accessPage.evaluate(key=>{const input=document.querySelector('#apiKey');input.value=key;input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));},key);await accessPage.waitForFunction(key=>GenerationKey.value()===key,key);}
-  await connectAccess(secret);let ownReads=0,foreignReads=0;accessPage.on('request',r=>{if(r.url()===base+logo){if(r.headers().authorization==='Bearer '+secret)ownReads++;if(r.headers().authorization==='Bearer '+foreignSecret)foreignReads++;}});
+  await tracked('connect own',connectAccess(secret));let ownReads=0,foreignReads=0;accessPage.on('request',r=>{if(r.url()===base+logo){if(r.headers().authorization==='Bearer '+secret)ownReads++;if(r.headers().authorization==='Bearer '+foreignSecret)foreignReads++;}});
   const accessMount=()=>accessPage.evaluate(url=>{let mark=document.querySelector('#accessLogoProof');if(!mark){mark=document.createElement('div');mark.id='accessLogoProof';document.body.append(mark);}ProviderLogos.image(mark,{name:'Private logo',icon_url:url});},logo);
   await accessMount();await accessPage.waitForFunction(()=>document.querySelector('#accessLogoProof img')?.naturalWidth);await accessMount();assert.equal(ownReads,1,'same key reuses decoded no-hint resource');
   await connectAccess(foreignSecret);assert.equal(await accessPage.locator('#accessLogoProof img').count(),0,'key change clears old visible bytes');await accessMount();await accessPage.waitForFunction(()=>document.querySelector('#accessLogoProof').dataset.logoState==='error');assert.equal(foreignReads,1);assert.equal(await accessPage.locator('#accessLogoProof img').count(),0,'foreign key cannot reuse other owner bytes');
-  await connectAccess(secret);await accessMount();await accessPage.waitForFunction(()=>document.querySelector('#accessLogoProof img')?.naturalWidth);assert.equal(ownReads,2,'returning key must authorize a fresh resource');await accessPage.close();
+  await connectAccess(secret);await accessMount();await accessPage.waitForFunction(()=>document.querySelector('#accessLogoProof img')?.naturalWidth);assert.equal(ownReads,2,'returning key must authorize a fresh resource');// WebKit can stall closing this secondary page after auth-context swaps.
+  // Navigation disposes its application/media; final browser.close owns all pages.
+  await tracked('access dispose',accessPage.goto('about:blank'));await page.bringToFront();
   // All actual list/preview/picker surfaces share the same computed rendering.
   await select('openai');
   const catalogLogo=await page.evaluate(()=>providerCatalog.find(p=>p.id==='openai').icon_url);assert.match(catalogLogo,/generation=1/);
@@ -132,7 +143,7 @@ const listen=s=>new Promise(r=>s.listen(0,'127.0.0.1',()=>r(s.address().port)));
    document.body.replaceChildren();document.documentElement.style.background='transparent';document.body.style.background='transparent';document.body.style.margin='0';
    const img=new Image();img.className='provider-logo';img.style.cssText='width:3px;height:1px;display:block;position:absolute;left:0;top:0;';img.src='data:image/png;base64,'+data;document.body.append(img);await img.decode();
   },fixtures.valid.toString('base64'));
-  for(const theme of ['dark','light','dark']){await pixels.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);const shot=PNG.sync.read(await pixels.locator('img').screenshot({omitBackground:true}));assert.deepEqual([...shot.data].filter((_,i)=>i%4===3),[0,127,255]);for(const index of [1,2])for(let channel=0;channel<3;channel++)assert.equal(shot.data[index*4+channel],theme==='light'?0:255);fs.writeFileSync(path.join(out,'pixels-'+theme+'.png'),PNG.sync.write(shot));}await pixels.close();
+  for(const theme of ['dark','light','dark']){await pixels.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);const shot=PNG.sync.read(await pixels.locator('img').screenshot({omitBackground:true}));assert.deepEqual([...shot.data].filter((_,i)=>i%4===3),[0,127,255]);for(const index of [1,2])for(let channel=0;channel<3;channel++)assert.equal(shot.data[index*4+channel],theme==='light'?0:255);fs.writeFileSync(path.join(out,'pixels-'+theme+'.png'),PNG.sync.write(shot));}await pixels.close();await page.bringToFront();
   // Shared picker is used by Playground, Templates, org grants, markup rules and API profiles.
   await page.evaluate(()=>{
    const label=document.createElement('label');label.textContent='Logo proof';const select=document.createElement('select');select.id='logoPickerProof';label.append(select);document.querySelector('#providerLogoEditor').append(label);
@@ -144,7 +155,7 @@ const listen=s=>new Promise(r=>s.listen(0,'127.0.0.1',()=>r(s.address().port)));
   await page.keyboard.press('Escape');
   for(const width of [1440,390,320])for(const theme of ['dark','light']){
    await page.setViewportSize({width,height:1050});await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);await select('openai');
-   await editor().getByRole('button',{name:/^Upload logo/}).focus();assert.equal(await editor().getByRole('button',{name:/^Upload logo/}).evaluate(i=>document.activeElement===i),true);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'horizontal overflow '+width);if(width<=390){assert.equal(await input().isVisible(),false,'native file control stays hidden');assert.equal(await editor().locator('small').evaluate(h=>getComputedStyle(h).fontSize),'11px','format hint matches shared upload typography');assert.ok((await editor().locator('small').boundingBox()).width<=width,'small hint remains within viewport');}await editor().screenshot({path:path.join(out,`${phase}-${theme}-${width}.png`)});
+   const visibleAction=editor().getByRole('button',{name:/^(Upload [Ll]ogo|Remove logo for)/}).filter({visible:true});await visibleAction.focus();assert.equal(await visibleAction.evaluate(i=>document.activeElement===i),true);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'horizontal overflow '+width);if(width<=390){assert.equal(await input().isVisible(),false,'native file control stays hidden');assert.equal(await editor().locator('small').evaluate(h=>getComputedStyle(h).fontSize),'11px','format hint matches shared upload typography');if(await editor().locator('small').isVisible())assert.ok((await editor().locator('small').boundingBox()).width<=width,'small hint remains within viewport');}await editor().screenshot({path:path.join(out,`${phase}-${theme}-${width}.png`)});
   }
   if(phase==='upload'){
    // The reused component's ordinary template/reference defaults still support
@@ -155,19 +166,21 @@ const listen=s=>new Promise(r=>s.listen(0,'127.0.0.1',()=>r(s.address().port)));
    });
    const defaults=page.locator('#defaultUploadProof');await defaults.locator('input[type=file]').setInputFiles({name:'reference.png',mimeType:'image/png',buffer:fixtures.valid});await page.waitForFunction(()=>window.defaultUploadAttempt===1);assert.equal(await defaults.locator('input[type=file]').isDisabled(),true);await defaults.getByRole('button',{name:'Cancel upload',exact:true}).click();await defaults.getByRole('button',{name:'Retry upload',exact:true}).click();await defaults.getByRole('status').filter({hasText:'Ready'}).waitFor();assert.equal(await page.evaluate(()=>defaultUploadAttempt),2);await defaults.evaluate(node=>node.remove());
   }
+  fs.appendFileSync(path.join(out,'phases.log'),'Logo phase: remove recovery\n');
   if(phase==='upload'){
-   await select('openai');const before=await iconURL('openai'),second=await iconURL('sonilo');const remove=()=>editor().getByRole('button',{name:'Remove logo for OpenAI',exact:true});
-   assert.equal(await remove().evaluate(b=>getComputedStyle(b).borderRadius),'50%');
+   await select('openai');let before=await iconURL('openai');const second=await iconURL('sonilo');const remove=()=>editor().getByRole('button',{name:'Remove logo for OpenAI',exact:true});
+   assert.equal(await remove().innerText(),'Remove');assert.ok((await remove().boundingBox()).height>=44);await removeCurrent();
    await page.route('**/v1/admin/providers/openai/logo',route=>route.abort(),{times:1});await input().setInputFiles({name:'pending.png',mimeType:'image/png',buffer:fixtures.palette});await editor().getByRole('status').filter({hasText:'retry'}).waitFor();
-   await page.route('**/v1/admin/providers/openai/logo',async route=>{if(route.request().method()!=='PUT')return route.continue();await route.fetch();await route.abort();},{times:1});await input().setInputFiles({name:'committed.png',mimeType:'image/png',buffer:fixtures.palette});await editor().getByRole('status').filter({hasText:'Current server logo is shown'}).waitFor();assert.equal(await editor().locator('img').getAttribute('data-logo-url'),await iconURL('openai'),'lost upload response reconciles actual persisted logo');await upload(fixtures.valid);
-   let enter,release;const entered=new Promise(r=>enter=r),gate=new Promise(r=>release=r);
+   await page.route('**/v1/admin/providers/openai/logo',async route=>{if(route.request().method()!=='PUT')return route.continue();const accepted=await route.fetch({postData:fixtures.palette,headers:{...route.request().headers(),'content-type':'image/png'}});assert.equal(accepted.status(),200,'synthetic committed upload must reach the server');await route.abort();},{times:1});await input().setInputFiles({name:'committed.png',mimeType:'image/png',buffer:fixtures.palette});await editor().getByRole('status').filter({hasText:'Current server logo is shown'}).waitFor();await page.waitForTimeout(100);fs.writeFileSync(path.join(out,'reconcile-state.json'),JSON.stringify({serverLogo:!!(await iconURL('openai')),keyMatches:await page.evaluate(key=>GenerationKey.value()===key,secret),mark:await editor().locator('.provider-logo-mark').evaluateAll(ns=>ns.map(n=>({state:n.dataset.logoState,present:n.dataset.logoPresent,images:n.querySelectorAll('img').length}))),responses:logoResponses.slice(-8)},null,2));assert.equal(await editor().locator('img').getAttribute('data-logo-url'),await iconURL('openai'),'lost upload response reconciles actual persisted logo');await upload(fixtures.valid);
+   before=await iconURL('openai');
+   let enter,release;const entered=new Promise(r=>enter=r),gate=new Promise(r=>{release=r;cleanup.push(r);});
    await page.route('**/v1/admin/providers/openai/logo',async route=>{if(route.request().method()!=='DELETE')return route.continue();enter();await gate;await route.fulfill({status:503,json:{error:{message:'Synthetic removal failure'}}});},{times:1});
    await remove().press('Enter');await entered;assert.equal(await remove().isDisabled(),true);assert.equal(await input().isDisabled(),true);await select('sonilo');await select('openai');assert.equal(await remove().isDisabled(),true);release();await editor().getByRole('status').filter({hasText:'Synthetic removal failure'}).waitFor();assert.equal(await editor().getByRole('button',{name:'Retry upload',exact:true}).isVisible(),false,'remove cannot retry a previous upload');assert.equal(await iconURL('openai'),before);
    await page.route('**/v1/admin/providers/openai/logo',route=>route.abort(),{times:1});await remove().press('Enter');await editor().getByRole('status').filter({hasText:'retry'}).waitFor();assert.equal(await iconURL('openai'),before);
    await page.route('**/v1/admin/providers/openai/logo',async route=>{if(route.request().method()!=='DELETE')return route.continue();await route.fetch();await route.abort();},{times:1});await remove().press('Enter');await editor().getByRole('status').filter({hasText:'Current server logo is shown'}).waitFor();assert.equal(await iconURL('openai'),undefined);assert.equal(await editor().locator('img').count(),0);assert.equal(await page.locator('#refreshLogoProof img').count(),0,'visible logo slot clears after removal');await upload(fixtures.valid);await page.locator('#refreshLogoProof img').evaluate(img=>img.decode());assert.ok((await page.locator('#refreshLogoProof img').getAttribute('data-logo-url')).includes('generation=1'),'re-upload restores existing slot and its key context');
-   let deletes=0;page.on('request',r=>{if(r.method()==='DELETE'&&r.url().includes('/openai/logo'))deletes++});await remove().press('Enter');await editor().getByRole('status').filter({hasText:'Logo removed.'}).waitFor();assert.equal(deletes,1);assert.equal(await iconURL('openai'),undefined);assert.equal(await iconURL('sonilo'),second);assert.equal(await row('openai').locator('img').count(),0);assert.equal((await context.request.get(base+before)).status(),404);assert.equal(await editor().locator('img').count(),0);assert.equal(await remove().count(),0);await page.reload();await page.waitForFunction(()=>consoleInitialized&&Workspace.ready());await page.getByRole('tab',{name:'Providers',exact:true}).click();await select('openai');assert.equal(await iconURL('openai'),undefined);
+   let deletes=0;page.on('request',r=>{if(r.method()==='DELETE'&&r.url().includes('/openai/logo'))deletes++});await remove().press('Enter');await editor().getByRole('status').filter({hasText:'Logo removed.'}).waitFor();assert.equal(deletes,1);assert.equal(await iconURL('openai'),undefined);assert.equal(await iconURL('sonilo'),second);assert.equal(await row('openai').locator('img').count(),0);assert.equal((await context.request.get(base+before)).status(),404);assert.equal(await editor().locator('img').count(),0);assert.equal(await remove().isVisible(),false);await page.reload();await page.waitForFunction(()=>consoleInitialized&&Workspace.ready());await page.getByRole('tab',{name:'Providers',exact:true}).click();await select('openai');assert.equal(await iconURL('openai'),undefined);
   }
   assert.deepEqual(errors,[]);fs.writeFileSync(path.join(out,phase+'-results.json'),JSON.stringify({engine,phase,proxy:!!caddy,pixels:'exact RGB and alpha',layouts:[1440,390,320],errors},null,2));
   console.log('PASS '+engine+' '+phase+': real authenticated upload/API/database, PNG validation, alpha pixels, provider isolation, responsive keyboard/themes'+(caddy?', Caddy bearer reads':''));
- } finally {if(browser)await browser.close();if(caddy){caddy.kill();await new Promise(r=>caddy.once('exit',r));}}
+ } catch(error){fs.writeFileSync(path.join(out,'failure-location.json'),JSON.stringify({name:error.name,location:error.stack?.match(/provider-logos\.cjs:\d+:\d+/)?.[0]},null,2));throw error;} finally {for(const release of cleanup)release();if(browser)await browser.close();if(caddy){caddy.kill();await new Promise(r=>caddy.once('exit',r));}}
 })().catch(e=>{console.error(e);process.exitCode=1});

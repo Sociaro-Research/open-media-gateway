@@ -185,10 +185,8 @@
     host.replaceChildren(); host.className = 'provider-logo-editor';
     FormUI.sectionHeading(host,'Provider logo','h3');
     let operationState, intent='upload', shown=Symbol('initial');
-    const remove=document.createElement('button');remove.type='button';remove.className='reference-remove';remove.textContent='×';
-    remove.setAttribute('aria-label','Remove logo for '+provider.name);remove.title='Remove logo';
     const upload=ReferenceUpload.create({
-      label:provider.name+' logo', title:'No logo. Drop a PNG here', uploadLabel:'Upload logo', kinds:['image'],
+      label:provider.name+' logo', title:'No logo. Drop a PNG here',selectedTitle:provider.name+' logo',uploadLabel:'Upload Logo',kinds:['image'],onRemove:removeLogo,
       hint:'PNG with transparency · up to 1 MiB · maximum 2048 × 2048 px',
       limits:()=>({content_types:['image/png']}), locked:()=>uploads.has(identity), cancelable:()=>false,
       retainedMessage:()=>provider.icon_url?' Current logo retained.':' No logo installed.',
@@ -214,6 +212,7 @@
         } catch(error){await failure(error,true);throw error;}
       }
     });
+    const remove=upload.root.querySelector('[data-upload-remove]');remove.setAttribute('aria-label','Remove logo for '+provider.name);
     async function failure(error,sent=false){
       operationState.error=true;
       const retry=operationState.kind==='remove'?' Use Remove logo to retry.':' Choose a file to retry.';
@@ -227,8 +226,7 @@
       if(shown===provider.icon_url)return;shown=provider.icon_url;
       upload.setPreview(provider.icon_url?{name:'Current logo'}:null);
       const preview=upload.root.querySelector('.template-reference-preview');preview.classList.add('provider-logo-preview');
-      if(provider.icon_url){const mark=document.createElement('span');mark.className='provider-logo-mark';image(mark,provider);preview.replaceChildren(mark,remove);}
-      upload.root.querySelector('p').textContent=provider.icon_url?'Drop a PNG to replace the logo':'No logo. Drop a PNG here';
+      if(provider.icon_url){const mark=document.createElement('span');mark.className='provider-logo-mark';image(mark,provider);preview.replaceChildren(mark);}
     }
     function update(state){
       if(!isCurrent())return;
@@ -237,7 +235,7 @@
       host.setAttribute('aria-busy',String(!!state&&!state.done));
       if(state)upload.message(state.message,!!state.error);
     }
-    remove.onclick=()=>{
+    function removeLogo(){
       if(uploads.has(identity)||!provider.icon_url||!isCurrent())return;
       upload.clearRetry();intent='remove';upload.run(async signal=>{
         try{await api(`/v1/admin/providers/${encodeURIComponent(provider.id)}/logo`,{method:'DELETE',signal});saved('');operationState.iconURL='';operationState.message='Logo removed.';return 'Logo removed.';}

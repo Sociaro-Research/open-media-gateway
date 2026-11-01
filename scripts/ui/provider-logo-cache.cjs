@@ -10,7 +10,7 @@ const server=http.createServer((req,res)=>{
  if(p==='/')return res.end(html);const file=path.join(ui,path.basename(p));if(!fs.existsSync(file))return res.writeHead(404).end();res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':'text/css');res.end(fs.readFileSync(file));
 });
 (async()=>{
- await new Promise(r=>server.listen(0,'127.0.0.1',r));const browser=await ({chromium,webkit}[engine]).launch({headless:true});
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));const browser=await ({chromium,webkit}[engine]).launch({headless:true,...(process.env.UI_BROWSER_PATH?{executablePath:process.env.UI_BROWSER_PATH}:{})});
  try{
   const page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[];page.on('pageerror',e=>errors.push(e.message));page.setDefaultTimeout(10000);
   await page.addInitScript(()=>{

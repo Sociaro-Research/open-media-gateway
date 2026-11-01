@@ -596,3 +596,5 @@ The Installation Mode summary uses Change Mode and the shared 16px heading-to-co
 Library Play uses a translucent overlay with a larger shared play glyph. Playback replaces the poster in the same card media area; it never adds a second preview region. Keep native controls separate from selection, restore the poster and retry on failure, and dispose playback on close, filter, deletion and navigation.
 
 Dialog and popover close actions use the shared icon-close class: a plain normal-state glyph without border chrome, a 44px target, an accessible Close label and a non-border keyboard focus fill. Forced colors use system Canvas/Highlight colors. Standalone buttons retain their shared border.
+
+The provider-logo picker places its preview left of the text and action using existing 12px/16px gaps. A selected logo exposes only Remove; the empty state exposes only Upload Logo. Reuse ReferenceUpload validation, focus recovery, pending guards and existing logo cache/theme processing.
