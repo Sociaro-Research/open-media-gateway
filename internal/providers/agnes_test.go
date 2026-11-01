@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
+	"github.com/Sociaro-Research/open-media-gateway/internal/providerkit"
 	"github.com/Sociaro-Research/open-media-gateway/plugins/provider/agnes"
 )
 
@@ -55,7 +56,7 @@ func TestAgnesEncryptedConfigurationPublicStatusAndQuotes(t *testing.T) {
 		}
 	}
 	checked, err := m.Check(ctx, "agnes")
-	if err != nil || checked.Status != "unverified" || submissions != 0 {
+	if err != nil || checked.Status != "authenticated" || submissions != 0 {
 		t.Fatal(checked, err, submissions)
 	}
 	list, err := m.List(ctx)
@@ -63,7 +64,7 @@ func TestAgnesEncryptedConfigurationPublicStatusAndQuotes(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, item := range list {
-		if item.ID == "agnes" && item.Status != "unverified" {
+		if item.ID == "agnes" && item.Status != "authenticated" {
 			t.Fatal(item)
 		}
 	}
@@ -75,5 +76,49 @@ func TestAgnesEncryptedConfigurationPublicStatusAndQuotes(t *testing.T) {
 	result, err := provider.Generate(core.WithProviderRevision(ctx, identity), r)
 	if err != nil || result.ResultURL != "https://cdn.example/result.png" || submissions != 1 {
 		t.Fatal(result, err)
+	}
+}
+
+func TestAgnesExplicitCheckManualCatalogAndCredentialInvalidation(t *testing.T) {
+	m, _, ctx := fixtureConnection(t)
+	calls := 0
+	m.client.Transport = roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		calls++
+		if r.Method != "GET" || r.URL.Path != "/v1/models" || r.Header.Get("X-Discovery") != "" {
+			t.Fatal("auth query used discovery override", r.URL)
+		}
+		return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": {"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"data":[]}`))}, nil
+	})
+	key, enabled := "synthetic-key-one", true
+	p, err := m.Update(ctx, "agnes", ProviderUpdate{APIKey: &key, Enabled: &enabled, Connection: &providerkit.Connection{ManualCatalog: true, Endpoints: map[string]string{"models": "/wrong"}, Headers: []providerkit.Header{{Name: "X-Discovery", Value: pointer("fixture"), Operation: "models"}}}})
+	if err != nil || p.Status == "authenticated" || calls != 0 {
+		t.Fatal(p.Status, err, calls)
+	}
+	p, err = m.Check(ctx, "agnes")
+	if err != nil || p.Status != "authenticated" || calls != 1 {
+		t.Fatal(p.Status, err, calls)
+	}
+	p, err = m.Get(ctx, "agnes")
+	if err != nil || p.Status != "authenticated" || calls != 1 {
+		t.Fatal(p.Status, err, calls)
+	}
+	key = "synthetic-key-two"
+	p, err = m.Update(ctx, "agnes", ProviderUpdate{APIKey: &key})
+	if err != nil || p.Status == "authenticated" || calls != 1 {
+		t.Fatal("stale verification", p.Status, err, calls)
+	}
+	enabled = false
+	p, err = m.Update(ctx, "agnes", ProviderUpdate{Enabled: &enabled})
+	if err != nil || p.Enabled {
+		t.Fatal(p, err)
+	}
+	p, err = m.Check(ctx, "agnes")
+	if err != nil || p.Enabled || p.Status != "authenticated" || calls != 2 {
+		t.Fatal(p, err, calls)
+	}
+	key = ""
+	p, err = m.Update(ctx, "agnes", ProviderUpdate{APIKey: &key})
+	if err != nil || p.Configured || p.Status == "authenticated" {
+		t.Fatal(p, err)
 	}
 }

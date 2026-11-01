@@ -59,3 +59,7 @@ textarea.reference-hover { cursor:pointer; }
 .reference-preview-popup p { margin:6px 0; font-size:12px; color:var(--muted); }
 .reference-preview-popup :is(img,video,audio) { display:block; width:100%; max-height:200px; object-fit:contain; border-radius:8px; }
 .reference-preview-popup .model-info-close { position:absolute; right:2px; top:2px; }
+
+.reference-library-grid .reference-card video { display:block; width:100%; height:120px; object-fit:contain; background:var(--bg); }
+.reference-library-grid .reference-card [data-player] { display:block; width:100%; max-width:100%; }
+.reference-library-grid .reference-size { display:block; color:var(--muted); }

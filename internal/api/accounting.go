@@ -9,6 +9,10 @@ import (
 )
 
 func (s *Server) estimateGeneration(w http.ResponseWriter, r *http.Request, input core.CreateMediaInput) {
+	if err := s.resolveOverrideSound(r, &input); err != nil {
+		s.referenceError(w, err)
+		return
+	}
 	if err := s.validateGenerationReferences(r, input); err != nil {
 		s.referenceError(w, err)
 		return

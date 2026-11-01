@@ -20,6 +20,7 @@ import (
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
 	"github.com/Sociaro-Research/open-media-gateway/internal/httpclient"
+	"github.com/Sociaro-Research/open-media-gateway/internal/providerkit"
 )
 
 const maxResponseBytes = 64 << 20
@@ -31,6 +32,9 @@ type Adapter struct {
 	mu                sync.Mutex
 	models            []core.MediaModel
 	modelsAt          time.Time
+	checkGate         chan struct{}
+	checkMu           sync.Mutex
+	check             providerkit.CredentialCheck
 }
 
 func New(key, base string, client *http.Client, timeout time.Duration) (*Adapter, error) {
@@ -52,7 +56,7 @@ func New(key, base string, client *http.Client, timeout time.Duration) (*Adapter
 	if timeout <= 0 {
 		timeout = 6 * time.Minute
 	}
-	return &Adapter{apiKey: strings.TrimSpace(key), baseURL: u.String(), client: &copied, generationTimeout: timeout}, nil
+	return &Adapter{apiKey: strings.TrimSpace(key), baseURL: u.String(), client: &copied, generationTimeout: timeout, checkGate: make(chan struct{}, 1)}, nil
 }
 
 func (*Adapter) Name() string { return "agnes" }

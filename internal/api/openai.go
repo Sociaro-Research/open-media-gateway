@@ -351,7 +351,7 @@ func (s *Server) openAIInput(r *http.Request, fields map[string]json.RawMessage)
 		}
 	}
 	allowedOptions := map[string]bool{}
-	for _, name := range []string{"parameters", "ratio", "generate_audio", "watermark", "camera_fixed", "draft", "seed", "return_last_frame", "negative_prompt", "reference_mode", "reference_voices", "video_urls", "audio_urls", "language", "lyrics", "gender"} {
+	for _, name := range []string{"override_sound_id", "parameters", "ratio", "generate_audio", "watermark", "camera_fixed", "draft", "seed", "return_last_frame", "negative_prompt", "reference_mode", "reference_voices", "video_urls", "audio_urls", "language", "lyrics", "gender"} {
 		allowedOptions[name] = true
 	}
 	if input.MediaType == "music" || input.MediaType == "audio" || input.MediaType == "video" {

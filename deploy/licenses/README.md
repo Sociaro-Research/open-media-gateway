@@ -30,3 +30,13 @@ go test web/collect-licenses.go web/collect-licenses_test.go
 Local source images use `unversioned-source` UI metadata; publication tooling
 provides the actual release version/revision labels. These notices do not replace
 review of third-party artwork rights or inherited operating-system terms.
+
+Override Sound invokes the Alpine FFmpeg executable as a separate process. The
+application runtime now includes the Alpine FFmpeg and FFmpeg documentation
+packages, their shared libraries and package notices, and records exact installed
+package versions in `/licenses/alpine-packages.txt`. Distribution source recipes
+and source archives are available via https://gitlab.alpinelinux.org/alpine/aports
+and https://distfiles.alpinelinux.org/. FFmpeg licensing/build configuration is
+reported by `ffmpeg -L` and `ffmpeg -buildconf`; review these alongside the image
+SBOM before redistributing a release. The gateway's video path uses stream copy,
+not FFmpeg video encoders.

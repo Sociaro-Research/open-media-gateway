@@ -39,6 +39,7 @@ func (s *Server) registerTemplateRoutes(mux *http.ServeMux) {
 	mux.Handle("GET /v1/system/template-references/{id}/content", s.authenticate(http.HandlerFunc(s.sharedTemplateReferences)))
 	mux.Handle("GET /v1/templates", s.authenticate(http.HandlerFunc(s.templateGallery)))
 	mux.Handle("GET /v1/templates/{template}", s.authenticate(http.HandlerFunc(s.templateUse)))
+	mux.Handle("POST /v1/templates/{template}/editing", s.authenticate(http.HandlerFunc(s.templateEditing)))
 	mux.Handle("POST /v1/templates/{template}/estimate", s.authenticate(http.HandlerFunc(s.templateGenerate)))
 	mux.Handle("POST /v1/templates/{template}/validate-media", s.authenticate(http.HandlerFunc(s.templateValidateInputs)))
 	mux.Handle("POST /v1/templates/{template}/generations", s.authenticate(http.HandlerFunc(s.templateGenerate)))
@@ -194,8 +195,26 @@ func (s *Server) templateAdmin(w http.ResponseWriter, r *http.Request) {
 			templateError(w, err)
 			return
 		}
+		if err := in.Draft.ValidateGenerationOptions(model); err != nil {
+			templateError(w, err)
+			return
+		}
 		if in.Draft.MediaType != model.MediaType {
 			templateError(w, templates.ErrInvalid)
+			return
+		}
+	}
+	if in.Draft.Options.OverrideSound != nil || in.Draft.Options.OverrideSoundID != "" {
+		templateError(w, templates.ErrInvalid)
+		return
+	}
+	if in.Draft.OverrideSoundID != "" {
+		if in.Draft.MediaType != "video" {
+			templateError(w, templates.ErrInvalid)
+			return
+		}
+		if _, err := s.templateAsset(r.Context(), in.Draft.OverrideSoundID, id, "audio"); err != nil {
+			templateError(w, err)
 			return
 		}
 	}
@@ -441,6 +460,14 @@ func (s *Server) templateAsset(ctx context.Context, id, templateID, kind string)
 	return a, nil
 }
 func (s *Server) checkTemplateAssets(ctx context.Context, id string, d templates.Definition) error {
+	if d.OverrideSoundID != "" {
+		if d.MediaType != "video" {
+			return templates.ErrInvalid
+		}
+		if _, err := s.templateAsset(ctx, d.OverrideSoundID, id, "audio"); err != nil {
+			return err
+		}
+	}
 	cover, e := s.templateAsset(ctx, d.CoverID, id, "")
 	if e != nil {
 		return e
@@ -583,6 +610,7 @@ func (s *Server) resolveTemplate(r *http.Request, item templates.Record, in temp
 		return input, e
 	}
 	input = core.CreateMediaInput{Prompt: d.Prompt, Provider: in.Provider, Model: in.Model, MediaType: d.MediaType, PublicModel: model.PublicID, ProjectID: in.ProjectID, MaxExpectedUSD: in.MaxExpectedUSD, Options: options}
+	input.Options.OverrideSoundID = d.OverrideSoundID
 	remaining := map[string]string{}
 	for k, v := range in.Inputs {
 		remaining[k] = v

@@ -23,7 +23,7 @@ media across providers.
   assignment does not depend on the generation author. Existing role/content
   permissions still apply. Profile projects remain private. Projects require
   a key for the matching workspace.
-- **Use administrator-prepared prompts.** The instance-wide [Templates gallery](docs/templates.md) shares published image/video covers and immutable prompts. Supply missing references, choose a compatible model and confirm the existing estimate with your Playground key.
+- **Use administrator-prepared prompts.** The instance-wide [Templates gallery](docs/templates.md) shares published image/video covers and immutable prompts. Supply missing references, choose a compatible model and confirm the existing estimate with your Playground key. Optional Override Sound replaces generated video audio while preserving the compressed video stream.
 - **Keep Playground access across browsers.** Explicitly create an [account-managed Playground key](docs/playground-keys.md), encrypted for your selected workspace and shared with Templates. Ordinary generation API authentication and permissions still apply.
 - **Keep results in your storage.** Archive generated files locally or in
   S3-compatible storage, with authenticated downloads and signed preview URLs.
@@ -37,7 +37,7 @@ Included adapters: [OpenAI](docs/openai-provider.md),
 [Agnes AI](docs/agnes-provider.md), [Sonilo](docs/sonilo-provider.md), and
 [direct Kling AI](docs/kling-provider.md), plus `mock`.
 Media types and controls depend on the selected provider and model. Administrators
-can upload [transparent PNG provider logos](docs/provider-modules.md#provider-logos)
+can upload or remove [transparent PNG provider logos](docs/provider-modules.md#provider-logos)
 from provider settings; logos follow the active light/dark display mode.
 The Playground highlights [supported prompt references](docs/prompt-reference-syntax.md)
 and previews their selected files without rewriting submitted text. Real generation

@@ -282,7 +282,9 @@ func (a *connectionAdapter) CatalogExclusions() []catalogsync.Exclusion {
 	return nil
 }
 func (a *connectionAdapter) CheckCredentials(ctx context.Context) error {
-	if a.connection().ManualCatalog {
+	if _, authenticated := a.MediaProvider.(interface {
+		CredentialStatus() providerkit.CredentialCheck
+	}); a.connection().ManualCatalog && !authenticated {
 		return errors.New("catalog discovery is disabled; use an explicit model generation to verify access")
 	}
 	return a.redact(validateAdapter(ctx, a.MediaProvider))

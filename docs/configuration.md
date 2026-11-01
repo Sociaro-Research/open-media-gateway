@@ -71,7 +71,7 @@ them.
 | `OPENAI_API_KEY` | OpenAI | Project inference key; model-list read access is required |
 | `OPENAI_BASE_URL` | OpenAI | Fixed official API base, `https://api.openai.com/v1` |
 | `OPENAI_MODEL` | OpenAI | Initial default model, `gpt-image-2.5-flare` |
-| `AGNES_API_KEY` | Agnes AI | Inference key; the public model catalog does not verify key access |
+| `AGNES_API_KEY` | Agnes AI | Inference key; explicit Check connection verifies authentication through a read-only model query |
 | `AGNES_BASE_URL` | Agnes AI | Fixed international API base, `https://apihub.agnes-ai.com/v1` |
 | `AGNES_MODEL` | Agnes AI | Initial default model, `agnes-image-2.5-flash` |
 | `SONILO_API_KEY` | Sonilo | Platform inference key; authenticated account-services access verifies it |

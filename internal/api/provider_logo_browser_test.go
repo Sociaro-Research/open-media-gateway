@@ -125,6 +125,15 @@ func TestProviderLogoBrowserPersistence(t *testing.T) {
 	if err = people.CreateSession(ctx, hash[:], user.ID, time.Now().Add(time.Hour)); err != nil {
 		t.Fatal(err)
 	}
+	foreign, err := people.UpsertGoogleUser(ctx, uuid.NewString(), uuid.NewString()+"@example.test", "Other logo owner", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	foreignToken := uuid.NewString()
+	foreignHash := sha256.Sum256([]byte(foreignToken))
+	if err = people.CreateSession(ctx, foreignHash[:], foreign.ID, time.Now().Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
 	repo := postgres.NewProviderSettingsRepository(db)
 	cipher, _ := providerconfig.NewCipher("logo-browser-fixture-secret")
 	before := map[string]providerconfig.Record{}
@@ -188,7 +197,7 @@ func TestProviderLogoBrowserPersistence(t *testing.T) {
 	for _, phase := range []string{"upload", "restart"} {
 		start()
 		runCtx, cancel := context.WithTimeout(ctx, 4*time.Minute)
-		cmd := exec.CommandContext(runCtx, node, script, "http://"+addr, token, user.ID, phase)
+		cmd := exec.CommandContext(runCtx, node, script, "http://"+addr, token, user.ID, phase, foreignToken)
 		cmd.Dir = filepath.Dir(filepath.Dir(filepath.Dir(script)))
 		output, err := cmd.CombinedOutput()
 		cancel()

@@ -119,12 +119,6 @@ func cloneModels(models []core.MediaModel) []core.MediaModel {
 	return result
 }
 
-func (*Adapter) CheckCredentials(context.Context) error {
-	// /models returns HTTP 200 without authentication. Never present that as
-	// proof of access, and never submit a billable generation from a key check.
-	return errors.New("Agnes model discovery is public and cannot verify an API key; verify access with an explicit generation")
-}
-
 func (a *Adapter) ValidateRequest(ctx context.Context, r core.MediaRequest) error {
 	invalid := func(message string) error { return errors.Join(core.ErrOptionsInvalid, errors.New(message)) }
 	if !slices.Contains(modelIDs, r.Model) {

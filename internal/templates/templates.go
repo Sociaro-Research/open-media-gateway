@@ -33,6 +33,7 @@ type Slot struct {
 	AssetID string `json:"asset_id,omitempty"`
 }
 type Definition struct {
+	OverrideSoundID string            `json:"override_sound_id,omitempty"`
 	ReferenceCounts map[string]int    `json:"reference_counts,omitempty"`
 	Title           string            `json:"title"`
 	Description     string            `json:"description,omitempty"`
@@ -295,9 +296,41 @@ func PromptSyntax(model core.MediaModel, mode string) string {
 	return model.ReferencePromptSyntax
 }
 
+// ValidateGenerationOptions validates explicit author settings without requiring
+// completed slots or media. Missing legacy values retain model admission defaults.
+func (d Definition) ValidateGenerationOptions(model core.MediaModel) error {
+	o := d.Options
+	ratios := model.Ratios
+	if mode, ok := Mode(model, o.ReferenceMode); ok && len(mode.Ratios) > 0 {
+		ratios = mode.Ratios
+	}
+	invalid := func(name string) error {
+		return fmt.Errorf("%w: unsupported %s for the selected model", ErrInvalid, name)
+	}
+	if o.Resolution != "" && !slices.Contains(model.Resolutions, o.Resolution) {
+		return invalid("resolution")
+	}
+	if o.Ratio != "" && !slices.Contains(ratios, o.Ratio) {
+		return invalid("aspect ratio")
+	}
+	if o.Duration != 0 && (model.MediaType != "video" || model.DurationFromInput || model.MaxDuration <= 0 || o.Duration < model.MinDuration || o.Duration > model.MaxDuration || model.DurationStep > 0 && (o.Duration-model.MinDuration)%model.DurationStep != 0) {
+		return invalid("video duration")
+	}
+	if o.GenerateAudio != nil && (model.MediaType != "video" || !model.SupportsAudio || !*o.GenerateAudio && model.AudioAlwaysOn) {
+		return invalid("generated audio")
+	}
+	return nil
+}
+
 // OptionsFor preserves the explicitly reviewed reference workflow and settings.
 // Empty and frame-based legacy recipes are never mapped to another meaning.
 func (d Definition) OptionsFor(model core.MediaModel) (core.MediaOptions, error) {
+	if err := d.ValidateGenerationOptions(model); err != nil {
+		return core.MediaOptions{}, err
+	}
+	if d.Options.OverrideSoundID != "" || d.Options.OverrideSound != nil || d.OverrideSoundID != "" && model.MediaType != "video" {
+		return core.MediaOptions{}, fmt.Errorf("%w: Override Sound must be a separate audio asset on a video template", ErrInvalid)
+	}
 	if err := d.WorkflowError(); err != nil {
 		return core.MediaOptions{}, err
 	}

@@ -77,7 +77,9 @@ func (s *TaskService) CreateMediaRequest(ctx context.Context, input CreateMediaI
 	if err != nil {
 		return Task{}, err
 	}
-	encodedOptions, _ := json.Marshal(task.Options)
+	hashOptions := task.Options
+	hashOptions.OverrideSound = nil // Resolved storage is not client request identity.
+	encodedOptions, _ := json.Marshal(hashOptions)
 	webhookURL := ""
 	if task.WebhookURL != nil {
 		webhookURL = *task.WebhookURL
@@ -160,12 +162,15 @@ func (s *TaskService) prepare(ctx context.Context, input CreateMediaInput, idemp
 	if descriptor.NoPrompt && prompt != "" {
 		return Task{}, fmt.Errorf("%w: this model does not accept a prompt", ErrOptionsInvalid)
 	}
+	if input.Options.OverrideSoundID != "" && mediaType != "video" {
+		return Task{}, fmt.Errorf("%w: Override Sound requires video output", ErrOptionsInvalid)
+	}
 	options, err := s.normalizeOptions(descriptor, input.Options)
 	if err != nil {
 		return Task{}, err
 	}
 	if validator, ok := providerAdapter.(RequestValidator); ok {
-		if err := validator.ValidateRequest(ctx, MediaRequest{Prompt: prompt, Model: model, Options: options}); err != nil {
+		if err := validator.ValidateRequest(ctx, MediaRequest{Prompt: prompt, Model: model, Options: options.ProviderOptions()}); err != nil {
 			return Task{}, err
 		}
 	}
@@ -206,7 +211,7 @@ func (s *TaskService) prepare(ctx context.Context, input CreateMediaInput, idemp
 	task.RequireCost = s.accounting
 	if s.accounting && input.AdmissionError == nil {
 		if quoter, ok := providerAdapter.(CostQuoter); ok {
-			cost, fingerprint, err := quoter.Quote(ctx, descriptor, MediaRequest{TaskID: task.ID, Prompt: prompt, Model: model, Options: options})
+			cost, fingerprint, err := quoter.Quote(ctx, descriptor, MediaRequest{TaskID: task.ID, Prompt: prompt, Model: model, Options: options.ProviderOptions()})
 			// A missing quote is rejected transactionally only for a NEW task, so an
 			// idempotent retry can still return its original acceptance after a tariff change.
 			if err != nil && !errors.Is(err, ErrPricingUnavailable) {

@@ -107,6 +107,13 @@ func (r *ReferenceRepository) DeleteWithGuard(ctx context.Context, id string, re
 	if err = sourceAssetLock(ctx, tx, identity.OwnerID(ctx), id); err != nil {
 		return err
 	}
+	var activeSound bool
+	if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM tasks WHERE status IN ('queued','running') AND request_options->'_override_sound'->>'owner_id'=$1 AND request_options->'_override_sound'->>'reference_id'=$2)`, identity.OwnerID(ctx), id).Scan(&activeSound); err != nil {
+		return err
+	}
+	if activeSound {
+		return references.ErrInUse
+	}
 	var pending bool
 	if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM provider_assets WHERE owner_id=$1 AND source_id=$2 AND status IN ('Creating','Unknown','Processing','Disconnected'))`, identity.OwnerID(ctx), id).Scan(&pending); err != nil {
 		return err
@@ -118,7 +125,7 @@ func (r *ReferenceRepository) DeleteWithGuard(ctx context.Context, id string, re
 		if _, err = tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(199079)`); err != nil {
 			return err
 		}
-		rows, e := tx.QueryContext(ctx, `SELECT id,COALESCE(NULLIF(draft->>'title',''),NULLIF(published->>'title',''),'Untitled template') FROM generation_templates WHERE removed_at IS NULL AND (draft->>'cover_id'=$1 OR published->>'cover_id'=$1 OR EXISTS(SELECT 1 FROM jsonb_array_elements(COALESCE(NULLIF(draft->'slots','null'::jsonb),'[]')) s WHERE s->>'asset_id'=$1) OR EXISTS(SELECT 1 FROM jsonb_array_elements(COALESCE(NULLIF(published->'slots','null'::jsonb),'[]')) s WHERE s->>'asset_id'=$1)) ORDER BY id`, id)
+		rows, e := tx.QueryContext(ctx, `SELECT id,COALESCE(NULLIF(draft->>'title',''),NULLIF(published->>'title',''),'Untitled template') FROM generation_templates WHERE removed_at IS NULL AND (draft->>'cover_id'=$1 OR published->>'cover_id'=$1 OR draft->>'override_sound_id'=$1 OR published->>'override_sound_id'=$1 OR EXISTS(SELECT 1 FROM jsonb_array_elements(COALESCE(NULLIF(draft->'slots','null'::jsonb),'[]')) s WHERE s->>'asset_id'=$1) OR EXISTS(SELECT 1 FROM jsonb_array_elements(COALESCE(NULLIF(published->'slots','null'::jsonb),'[]')) s WHERE s->>'asset_id'=$1)) ORDER BY id`, id)
 		if e != nil {
 			return e
 		}

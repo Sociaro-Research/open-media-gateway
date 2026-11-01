@@ -8,8 +8,14 @@ Forgetting, switching or revoking a key invalidates pending reads and inputs.
 
 Select a template title in the gallery. Its details, missing typed references and
 generation action appear in the left panel beneath the Playground key control.
-Expand **View prompt** to read its plain text and review the existing generation
-estimate after supplying the missing references. The gallery stays visible while
+Fixed references appear as a compact preview strip below the description. Only
+the model and free reference slots are editable. Review the existing generation
+estimate after supplying the missing references. **Advanced editing** explicitly
+replaces the Playground draft with the published prompt, settings, selected model
+and current references. Empty positions and repeated references retain their
+order. Fill or remove empty references before generation. This action neither
+changes the template nor starts generation; returning retains the runner inputs
+until the key or published revision changes. The gallery stays visible while
 selecting or changing templates. Covers show their complete natural aspect ratio;
 video previews play on mouse hover and pause on leave. Focus the cover video and press Space/Enter, or tap it on touch devices, to play or pause. There is no separate Play/Pause preview button. Reduced-motion preferences disable hover play. The prompt
 and fixed references cannot be edited in this form. Confirming submits an ordinary
@@ -39,7 +45,12 @@ generation or library access.
 
 1. Select **Create template** and choose its default model and
    References workflow. Only eligible models are offered. Enter a title, optional
-   short description and prompt.
+   short description and prompt. Configure aspect ratio, resolution, video duration
+   and synchronized generated audio in Output settings. Controls use the same
+   model catalog values, duration bounds/steps and design elements as Playground.
+   Models with mandatory audio show it locked on; input-derived duration is not
+   configurable. Unsupported saved choices remain visible and block saving until
+   corrected or a compatible model is selected.
    Changing the authoring model or workflow resets draft generation defaults;
    the published revision is preserved until explicit publication.
 2. Use **Infer and review slots**. Each stable typed slot has its own index and
@@ -52,14 +63,17 @@ generation or library access.
    slots and one fixed video slot. The shared file keeps its identity and bytes.
 4. Choose an existing fixed image/video as the cover, or upload a separate
    image/video cover. A separate cover never becomes a generation input.
-5. **Save draft** permits incomplete work within a selected References workflow.
+5. **Save** appears only for unsaved changes and permits incomplete work within a selected References workflow.
    Known fixed-media incompatibilities are rejected before saving.
    Creation and draft saves require an available reference-capable default model.
-   **Publish** requires at least one slot and validates the grammar,
+   The **Published** switch requires at least one slot and validates the grammar,
    binding order, default model, complete reference contract, available fixed
    media and cover, then freezes the existing admission defaults.
 
-Draft saves do not alter the current published revision. Every write requires the
+Save hides after success; failures and edits made during a save remain unsaved.
+The Published switch is on for published templates and off for unpublished ones.
+Save pending edits before changing the switch. Draft saves do not alter the current
+published revision; turn publication off and on to publish a newer saved draft. Every write requires the
 current version; concurrent edits return a conflict and retain the browser draft.
 Unpublish prevents new template submissions. Removal is a soft operation through
 the API. Neither operation deletes original library files, durable copies or
@@ -273,3 +287,50 @@ preview operation, never an automatic relay fallback after a storage error.
 Canonical asset authorization precedes applying the trusted physical storage
 owner retained by migration 079; private namespaces and storage key guards are
 unchanged.
+
+Generation settings are stored in the existing recipe options and frozen on
+publication. Both estimates and submitted jobs use that published snapshot; no
+fixed five-second duration is substituted. Existing recipes with missing options
+retain the selected model's admission defaults. Changing models resets settings
+to the new model's supported defaults and requires explicit saving/publication.
+Generated audio controls the model output and does not replace its soundtrack.
+
+### Override Sound
+
+Playground and template authors can select or drop an audio file into **Override
+Sound**, and remove the assignment independently of provider audio generation.
+Template authors save `override_sound_id` as a shared audio asset; the published
+revision automatically applies it to every template API generation. Ordinary
+video requests accept `options.override_sound_id`, an accessible reference-library
+ID. Storage keys, owner IDs and URLs are not accepted as override inputs.
+
+After the provider completes, the worker replaces every original audio track with
+one supplied track. It copies the compressed video stream and verifies packet
+hashes, timestamps, codec, dimensions and frame rate before publishing the result.
+The video timeline is retained; long audio is trimmed and short audio is padded
+with silence. Container metadata and file bytes can change. This is separate from
+`generate_audio`, which controls provider generation and its pricing.
+
+Supported outputs are MP4/MOV and WebM containing exactly one video stream,
+optional audio streams and no subtitle/data/attachment streams, with a zero video
+presentation origin. Other containers/timelines or an unverifiable remux fail
+explicitly. Audio is encoded as AAC for MP4 or Opus for WebM. Invalid, unavailable
+or changed sources, missing FFmpeg, incompatible codecs and processing failures
+fail the generation; the original audio is never returned as a successful override.
+The task remains in progress during processing. Interrupted worker attempts retain
+normal lease recovery and repeat processing without resubmitting the provider;
+terminal processing failures are not automatically retried as paid generations.
+
+The immutable source snapshot is protected against library deletion while a job
+is queued/running, and shared files remain protected while used by a template's
+draft or published revision. Removing a control assignment does not delete the
+library file. Final results use the existing storage accounting, authorization,
+playback, download and retention paths. Processing uses locked, bounded temporary
+files and a ten-minute timeout; normal staging cleanup recovers interrupted files.
+
+Native workers require `ffmpeg` and `ffprobe` on PATH with AAC and Opus support.
+The application image installs Alpine's FFmpeg/runtime/documentation packages;
+release image checks and dependency notices apply to this added runtime. Local
+fixture checks are `go test ./internal/soundoverride` and the Override Sound tests
+in `internal/api`, `internal/postgres` and `internal/worker`; database checks require
+the disposable-service wrapper described in [testing](testing.md).

@@ -26,3 +26,8 @@ func (r *ProviderSettingsRepository) SaveLogo(ctx context.Context, id string, da
 		ON CONFLICT (owner_id, provider_id) DO UPDATE SET data=EXCLUDED.data`, identity.ProviderOwnerID(ctx), id, data)
 	return err
 }
+
+func (r *ProviderSettingsRepository) RemoveLogo(ctx context.Context, id string) error {
+	_, err := r.db.ExecContext(ctx, `DELETE FROM provider_logos WHERE owner_id=$1 AND provider_id=$2`, identity.ProviderOwnerID(ctx), id)
+	return err
+}

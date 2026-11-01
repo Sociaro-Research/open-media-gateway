@@ -3,14 +3,14 @@
   const input = document.querySelector('#apiKey'), status = document.querySelector('#connectionState');
   const create = document.querySelector('#createGenerationKey'), forgetButton = document.querySelector('#forgetGenerationKey');
   const restore = document.querySelector('#restoreGenerationKey');
-  const managedHelp=document.querySelector('#managedGenerationHelp'),keyPolicy=document.querySelector('#generationKeyPolicy');
+  const managedHelp=document.querySelector('#managedGenerationHelp');
   const storageKey = 'gateway-generation-key', ttl = 24 * 60 * 60 * 1000;
   let cache={},paused={},requests={},validation=0,managedFlight=0;let saved = null, binding = '', google = false, checkedAt = 0, checking = null, expiryTimer;
   const setStatus = (message,type='') => { FormUI.message(status,message,type); status.hidden = !message; };
   const notify = () => window.dispatchEvent(new Event('gateway-key-change'));
   function persist(){try{sessionStorage.setItem(storageKey,JSON.stringify({binding,keys:cache,paused,requests}))}catch{}}
   const workspaceID=()=>window.Workspace?.id()||'personal';
-  function syncActions(){const active=saved?.source==='managed'&&saved.workspaceID===workspaceID();create.textContent=active?'Playground key saved':'Create Playground key';create.disabled=active||(!systemAdministrator&&serviceInfo.console?.personal_providers===false&&!serviceInfo.console?.shared_resources);managedHelp.hidden=!google||active;}
+  function syncActions(){const active=!!saved&&saved.workspaceID===workspaceID();create.hidden=!google||active;create.disabled=active||(!systemAdministrator&&serviceInfo.console?.personal_providers===false&&!serviceInfo.console?.shared_resources);managedHelp.hidden=!google||active;}
   function forget(message = '', pause = true) {
     validation++;if(saved)delete cache[saved.workspaceID];persist();
     if(pause&&google){paused[workspaceID()]=true;persist();}
@@ -24,7 +24,6 @@
   function remember(secret, expiresAt = Date.now() + ttl, source='manual') {
     saved = {secret, expiresAt, binding,workspaceID:workspaceID(),source};cache[saved.workspaceID]=saved;delete paused[saved.workspaceID]; input.value = secret; forgetButton.disabled = false;
     syncActions();
-    keyPolicy.textContent=source==='managed'?'Playground key saved in your account for this workspace. Forget clears this tab only; sign-out clears local access.':'Pasted keys stay in this tab for 24h; cleared on sign-out. Forget clears this tab without revoking the key.';
     let persisted = true;
     try { sessionStorage.setItem(storageKey, JSON.stringify({binding,keys:cache,paused,requests})); } catch { persisted = false; }
     setStatus(persisted ? '' : 'Browser storage unavailable. This key will be forgotten on reload.');

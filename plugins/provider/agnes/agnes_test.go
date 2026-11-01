@@ -282,7 +282,7 @@ func TestValidationRejectsUnsupportedCombinationsBeforeHTTP(t *testing.T) {
 	}
 }
 
-func TestCatalogDiscoveryFallbackAndPublicCredentialCheck(t *testing.T) {
+func TestCatalogDiscoveryFallbackAndExplicitCredentialCheck(t *testing.T) {
 	calls := 0
 	a := adapter(t, func(r *http.Request) (*http.Response, error) {
 		calls++
@@ -300,8 +300,8 @@ func TestCatalogDiscoveryFallbackAndPublicCredentialCheck(t *testing.T) {
 	if err != nil || models[0].Resolutions[0] != "1K" || calls != 1 {
 		t.Fatal(models, err, calls)
 	}
-	if err = a.CheckCredentials(context.Background()); err == nil || calls != 1 {
-		t.Fatal("public catalog falsely verified credentials", err, calls)
+	if err = a.CheckCredentials(context.Background()); err != nil || calls != 2 {
+		t.Fatal("explicit authenticated query failed", err, calls)
 	}
 	a = adapter(t, func(*http.Request) (*http.Response, error) { return nil, errors.New("offline fixture-secret") })
 	models, err = a.ListModels(context.Background())

@@ -105,3 +105,14 @@ Run `scripts/ui/provider-connections.cjs` with the environment described in
 [UI checks](../scripts/ui/README.md), and `make verify-ci` with isolated PostgreSQL
 and Redis. Live access to customer-only endpoints still requires their actual
 credentials and an explicitly initiated generation.
+
+## Connection and verification labels
+
+Provider lists and details show both states: **Connected, Verified** or
+**Connected, Unverified**. Connected means the connection is enabled and required
+configuration is present; it does not promise network reachability. Disabled,
+archived and missing-configuration states remain explicit. Verified requires a
+fresh explicit authenticated check, not catalog availability. Check failures keep
+the connection state and show the reason separately. A pending check displays
+Checking connection; late results from older configuration or scopes are ignored.
+Kling resource-package warnings remain visible after successful authentication.

@@ -2,7 +2,7 @@ FROM golang:1.27.3-alpine AS caddy-build
 WORKDIR /src
 # Keep the current Caddy modules/configuration; rebuild with patched Go and HTTP/2.
 RUN go mod init gateway-caddy-build && \
-    go get github.com/caddyserver/caddy/v2/cmd/caddy@v2.11.7 golang.org/x/net@v0.60.0 && \
+    go get github.com/caddyserver/caddy/v2/cmd/caddy@v2.11.7 golang.org/x/net@v0.60.0 github.com/go-jose/go-jose/v4@v4.1.6 && \
     CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X github.com/caddyserver/caddy/v2.CustomVersion=v2.11.7" -o /out/caddy github.com/caddyserver/caddy/v2/cmd/caddy
 
 COPY collect-licenses.go collect-licenses_test.go /tmp/
@@ -10,8 +10,8 @@ RUN go test /tmp/collect-licenses.go /tmp/collect-licenses_test.go && \
     go run /tmp/collect-licenses.go /out/licenses
 
 FROM caddy:2.11.7-alpine
-# Require the patched zlib revision without upgrading unrelated OS packages.
-RUN apk add --no-cache 'zlib>=1.3.2-r1'
+# Require patched compression and HTTP libraries without upgrading unrelated OS packages.
+RUN apk add --no-cache 'zlib>=1.3.2-r1' 'brotli-libs>=1.2.1-r0' 'curl>=8.23.0-r0'
 # This fresh binary has no bind capability; the internal UI listens on 8080.
 COPY --from=caddy-build /out/caddy /usr/bin/caddy
 COPY --from=caddy-build /out/licenses /licenses

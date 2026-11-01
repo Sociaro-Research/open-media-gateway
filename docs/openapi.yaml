@@ -4874,6 +4874,25 @@ paths:
         '400': {description: Incompatible media with actual and allowed values}
         '403': {description: Administrator permission required}
         '404': {description: Template or its fixed asset is unavailable}
+  /v1/templates/{template}/editing:
+    parameters:
+    - {in: path, name: template, required: true, schema: {type: string, format: uuid}}
+    post:
+      operationId: prepareTemplateEditing
+      tags: [Templates]
+      summary: Resolve an editable Playground snapshot
+      description: Requires generation scope. Fixed slots cannot be replaced; only declared variable slots accept owned reference IDs. Uses published settings and authorized model capabilities. Returns prompt, provider, model, media_type and normalized options with signed library URLs. Empty string reference positions and duplicates are preserved. No files are copied. Does not change the recipe, estimate, or create work.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/TemplateGenerationRequest'}
+      responses:
+        '200': {description: Editable snapshot; empty reference positions must be filled or removed before ordinary generation}
+        '400': {description: Invalid or incompatible input}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {description: Template or owned input unavailable}
+        '409': {description: Published revision changed}
   /v1/templates/{template}/validate-media:
     parameters:
     - {in: path, name: template, required: true, schema: {type: string, format: uuid}}
@@ -7625,6 +7644,26 @@ paths:
   "/v1/admin/providers/{providerId}/logo":
     parameters:
     - "$ref": "#/components/parameters/ProviderID"
+    delete:
+      tags: [Providers admin]
+      summary: Personal — Remove a provider logo
+      description: Administrator only. Idempotently remove only this resource owner's provider logo. Credentials, settings, other provider logos and media remain unchanged. Read URLs return 404 afterward; shared renderers show the intentional no-logo fallback.
+      security:
+      - bearerAuth: []
+      - sessionAuth: []
+      responses:
+        '200':
+          description: Logo removed or already absent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  icon_url: {type: string, enum: ['']}
+        '401': {description: Authentication required}
+        '403': {description: Administrator permission and applicable API-key scopes required}
+        '404': {description: Provider not found}
+        '503': {description: Logo storage unavailable}
     put:
       tags: [Providers admin]
       summary: Personal — Upload or replace a provider logo
@@ -7655,6 +7694,26 @@ paths:
   "/v1/system/providers/{providerId}/logo":
     parameters:
     - "$ref": "#/components/parameters/ProviderID"
+    delete:
+      tags: [Providers admin]
+      summary: Shared — Remove a provider logo
+      description: Administrator only. Idempotently remove only this resource owner's provider logo. Credentials, settings, other provider logos and media remain unchanged. Read URLs return 404 afterward; shared renderers show the intentional no-logo fallback.
+      security:
+      - bearerAuth: []
+      - sessionAuth: []
+      responses:
+        '200':
+          description: Logo removed or already absent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  icon_url: {type: string, enum: ['']}
+        '401': {description: Authentication required}
+        '403': {description: Administrator permission and applicable API-key scopes required}
+        '404': {description: Provider not found}
+        '503': {description: Logo storage unavailable}
     put:
       tags: [Providers admin]
       summary: Shared — Upload or replace a provider logo
@@ -7830,6 +7889,7 @@ components:
             video: {type: integer, minimum: 0, maximum: 64}
             audio: {type: integer, minimum: 0, maximum: 64}
         options: {$ref: '#/components/schemas/MediaOptions'}
+        override_sound_id: {type: string, description: Optional shared audio asset ID. Video templates only; replaces all generated sound without video transcoding.}
         cover_id: {type: string, description: Template-owned fixed image/video or separately uploaded cover ID}
         slots:
           type: array
@@ -9347,6 +9407,9 @@ components:
       type: object
       additionalProperties: false
       properties:
+        override_sound_id:
+          type: string
+          description: Optional accessible audio reference ID for video output. Replaces all generated audio after generation. Longer audio is trimmed and shorter audio is padded with silence; video packets and timing are preserved. Not a provider input or audio-generation toggle. Internal storage source fields are rejected.
         parameters:
           type: [object, "null"]
           additionalProperties: true
@@ -9354,10 +9417,10 @@ components:
         duration:
           type: [integer, "null"]
           minimum: 0
-          description: Music or audio output duration in seconds, when advertised by the model. Video requests use the top-level seconds field. Fractional effects may declare a number parameter instead.
+          description: Music or audio output duration in seconds, when advertised by the model. Template definitions also store video duration here; ordinary video requests use the top-level seconds field. Fractional effects may declare a number parameter instead.
         ratio:
           type: [string, "null"]
-          description: Video aspect ratio from the catalog, for example 16:9.
+          description: Image or video aspect ratio from the model catalog, for example 16:9.
         generate_audio:
           type: [boolean, "null"]
           description: Request synchronized audio when supports_audio is true.

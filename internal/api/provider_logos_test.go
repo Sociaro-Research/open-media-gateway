@@ -27,6 +27,64 @@ type logoAdminFixture struct {
 	writes int
 }
 
+func (f *logoAdminFixture) RemoveLogo(ctx context.Context, id string) error {
+	if f.fail {
+		return errors.New("storage unavailable; retry")
+	}
+	f.writes++
+	delete(f.logos, identity.ProviderOwnerID(ctx)+":"+id)
+	return nil
+}
+
+func TestProviderLogoRemovalAuthorizationScopeFailureAndIdempotency(t *testing.T) {
+	s, _ := newPersonalTestServer()
+	settings := system.Defaults()
+	settings.SharedResources = true
+	s.system = &systemFixture{settings: settings, admins: map[string]bool{"alice": true}}
+	f := &logoAdminFixture{logos: map[string][]byte{"alice:mock": {1}, "alice:openai": {2}, identity.SharedOwnerID + ":mock": {3}}}
+	s.providerAdmin = f
+	h := s.handler()
+	for _, prefix := range []string{"/v1/admin/providers", "/v1/system/providers"} {
+		for _, actor := range []string{"", "bob"} {
+			w := sendTest(h, "DELETE", prefix+"/mock/logo", "", actor, "")
+			if w.Code != 401 && w.Code != 403 {
+				t.Fatal("unauthorized removal", w.Code, w.Body)
+			}
+		}
+	}
+	if f.writes != 0 {
+		t.Fatal("unauthorized delete reached repository")
+	}
+	f.fail = true
+	if w := sendTest(h, "DELETE", "/v1/admin/providers/mock/logo", "", "alice", ""); w.Code != 400 {
+		t.Fatal(w.Code, w.Body)
+	}
+	f.fail = false
+	if len(f.logos) != 3 {
+		t.Fatal("failed removal changed persisted artwork")
+	}
+	for i := 0; i < 2; i++ {
+		if w := sendTest(h, "DELETE", "/v1/admin/providers/mock/logo?owner="+identity.SharedOwnerID, "", "alice", ""); w.Code != 200 {
+			t.Fatal(w.Code, w.Body)
+		}
+	}
+	if _, ok := f.logos["alice:mock"]; ok {
+		t.Fatal("private logo retained")
+	}
+	if len(f.logos) != 2 {
+		t.Fatal("other owner/provider changed")
+	}
+	if w := sendTest(h, "GET", "/provider-assets/alice/mock/icon.png?v=old", "", "alice", ""); w.Code != 404 {
+		t.Fatal("old image remains visible", w.Code)
+	}
+	if w := sendTest(h, "DELETE", "/v1/system/providers/mock/logo", "", "alice", ""); w.Code != 200 {
+		t.Fatal(w.Code, w.Body)
+	}
+	if len(f.logos) != 1 || f.logos["alice:openai"][0] != 2 {
+		t.Fatal("shared deletion changed other provider")
+	}
+}
+
 func TestProviderLogoReadResourceModesAndRevokedVisibility(t *testing.T) {
 	s, keys := newPersonalTestServer()
 	settings := system.Defaults()

@@ -173,7 +173,10 @@ supported model families, retirements and pricing limitations.
 
 ### Provider logos
 
-Administrators upload or replace each connection's logo in its provider settings.
+Administrators upload or replace each connection's logo in its provider settings
+using the shared click/keyboard and drag-and-drop upload area. A round × beside
+installed artwork removes it immediately and persistently without changing
+provider credentials or settings; uploading again remains available.
 Only PNG images with at least one partially or fully transparent pixel are accepted,
 including palette transparency and 16-bit PNG. The upload limit is 1 MiB, with
 1–2048 pixels per side (at most 4,194,304 decoded pixels). SVG, other formats,
@@ -194,6 +197,22 @@ separately from credentials, and use content-versioned authenticated URLs. Faile
 replacement keeps the previous logo. Serving uses private no-store caching and
 nosniff/sandbox headers. Ordinary users cannot replace logos; display follows the
 existing provider/model and commercial-access permissions.
+
+The shared renderer retains decoded logos in memory within the current tab.
+Reopening or filtering a model picker reuses the same resource synchronously;
+concurrent cold renders share one authenticated fetch and decode. Cache identity
+includes the complete versioned URL (owner, connection and access query) and the
+current sign-in/key/workspace epoch. Confirmed replacement or deletion invalidates
+all URL variants for that connection, including pending reads. Known authorization
+failures, sign-out and context changes clear prior resources; failures retry on the
+next render. No logo bytes are written to browser persistent storage.
+
+The least-recently-used cache retains at most 32 decoded resources, 8 MiB of PNG
+data and 16 million decoded pixels. At most four cold fetch/decode operations
+run concurrently; other pending renders queue without fetching bytes. Entries revalidate after five minutes on their
+next use. A warm memory hit reuses its prior authorization; it cannot detect an
+unknown server-side revocation until another request reports it or revalidation
+occurs. HTTP responses retain their authenticated private no-store policy.
 
 Uploaded artwork remains subject to its owner's branding permissions; the project
 license does not establish rights to third-party marks. Keep provenance and notices

@@ -227,7 +227,7 @@ func applyCredentialStatus(info *AdminProvider, adapter core.MediaProvider) {
 		info.Status, info.StatusMessage = "error", check.Err.Error()
 	} else {
 		info.Status = "authenticated"
-		info.StatusMessage = "Account query authenticated. Model access, available funds and generation output are not verified."
+		info.StatusMessage = "API authentication verified. Model access, available funds and generation output are not verified."
 		if check.Warning != "" {
 			info.StatusMessage += " " + check.Warning
 		}
@@ -400,7 +400,7 @@ func (m *Manager) describe(ctx context.Context, id string, checkProvider bool) (
 			result.StatusMessage = "Provider enabled."
 			if spec.PublicCatalog {
 				result.Status = "unverified"
-				result.StatusMessage = "Public catalog. API key and model access are not verified; run a generation to test."
+				result.StatusMessage = "Catalog availability does not verify the API key or model access."
 			}
 		} else {
 			result.Status = "disabled"
@@ -445,7 +445,7 @@ func (m *Manager) describe(ctx context.Context, id string, checkProvider bool) (
 		result.StatusMessage = "Catalog loaded. Provider enabled."
 		if spec.PublicCatalog {
 			result.Status = "unverified"
-			result.StatusMessage = "Public catalog loaded. API key and model access are not verified; run a generation to test."
+			result.StatusMessage = "Catalog loaded. API key and model access are not verified."
 		}
 		if credentials.Connection != nil && (credentials.Connection.ManualCatalog || len(credentials.Connection.Models) > 0) {
 			result.Status = "unverified"
@@ -456,6 +456,7 @@ func (m *Manager) describe(ctx context.Context, id string, checkProvider bool) (
 		result.StatusMessage = "Configuration saved. Provider is disabled."
 	}
 	if spec.AuthenticatedCheck {
+		result.StatusMessage = "API key not verified. Use Check connection to authenticate without generation. Model access and funds remain unverified."
 		applyCredentialStatus(&result, adapter)
 	}
 	return result, nil

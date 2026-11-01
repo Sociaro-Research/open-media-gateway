@@ -85,7 +85,21 @@ type StoredMedia struct {
 
 // MediaOptions contains provider-neutral media-generation controls. Provider
 // adapters translate only the supported values into vendor-specific payloads.
+// SoundOverride is an immutable, server-resolved source snapshot. Public requests
+// supply only OverrideSoundID; storage identities are never accepted from clients.
+type SoundOverride struct {
+	DataOwnerID    string `json:"data_owner_id"`
+	ReferenceID    string `json:"reference_id"`
+	OwnerID        string `json:"owner_id"`
+	StorageOwnerID string `json:"storage_owner_id"`
+	StorageKey     string `json:"storage_key"`
+	SHA256         string `json:"sha256"`
+	SizeBytes      int64  `json:"size_bytes"`
+}
+
 type MediaOptions struct {
+	OverrideSoundID string            `json:"override_sound_id,omitempty"`
+	OverrideSound   *SoundOverride    `json:"_override_sound,omitempty"`
 	TimeoutSeconds  *int64            `json:"timeout_seconds,omitempty"`
 	Parameters      map[string]any    `json:"parameters,omitempty"`
 	Quality         string            `json:"quality,omitempty"`
@@ -376,4 +390,11 @@ type ProviderAvailability interface {
 // RequestValidator checks provider-specific combinations before quoting or accepting a task.
 type RequestValidator interface {
 	ValidateRequest(context.Context, MediaRequest) error
+}
+
+// ProviderOptions excludes gateway-only post-processing source identities.
+func (o MediaOptions) ProviderOptions() MediaOptions {
+	o.OverrideSoundID = ""
+	o.OverrideSound = nil
+	return o
 }

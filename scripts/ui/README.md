@@ -21,8 +21,8 @@ the dedicated managed-key fixture covers account creation and restoration.
 
 Run `node scripts/ui/generation-key-panel.cjs` (also with
 `UI_BROWSER_ENGINE=webkit`) for the shared Playground/Templates key panel:
-session restoration, paired key actions, keyboard focus after Forget, invalid
-keys, long names, personal billing and API-key mode. It captures both themes at
+session restoration, compact key actions, keyboard focus after Forget, invalid
+keys, long names, limit-error recovery, Manage keys navigation and API-key mode. It captures both themes at
 1440/390/320px with synthetic keys and blocks external requests and API writes.
 WebKit uses Option+Tab for full control navigation. `UI_EVIDENCE_DIR` selects the
 output directory; `UI_SOURCE_DIR` with `UI_BASELINE=1` captures an older layout.
@@ -565,11 +565,11 @@ prove one actual TaskRepository admission after key rotation and actual issued-k
 revocation before an expired local cancellation proof is cleared.
 
 Run `node scripts/ui/templates.cjs` (also with `UI_BROWSER_ENGINE=webkit`) for
-instance Templates: immutable collapsed/literal prompts, missing typed slots,
+instance Templates: hidden immutable prompts, missing typed slots,
 fully fixed templates, exact slot-ID payloads, shared key/reset and late responses,
 existing estimate/confirmation/journal transfer, duplicate-click protection,
 unavailable models, administrator draft/publication/conflict states, keyboard
-expansion and both themes at 1440/390/320 px. The localhost fixture blocks all
+actions and both themes at 1440/390/320 px. The localhost fixture blocks all
 external requests. Evidence goes to `.local/gw172/ui-<engine>` by default;
 `UI_EVIDENCE_DIR` overrides it. Run the affected Playground, response-context,
 reference-parser and storage fixtures alongside it.
@@ -620,7 +620,9 @@ All requests remain on loopback; the fixture submits no generation.
 
 Run `node scripts/ui/kling-connection.cjs` (also with
 `UI_BROWSER_ENGINE=webkit`) for explicit connection authentication, cached status
-after navigation, permission failures and optional empty price overrides. It
+after navigation, permission failures and optional empty price overrides. It also
+checks combined connection/verification labels and ignores late responses after
+configuration reload or personal/shared scope changes. It
 checks keyboard activation, both themes and 1440/390/320 px, blocks external
 requests and uses synthetic localhost APIs only. `UI_EVIDENCE_DIR` selects output.
 
@@ -651,3 +653,52 @@ validation failures, retries/interruptions, live theme changes, exact rendered R
 and alpha, keyboard access and 1440/390/320px layouts. With `CADDY_BIN`, it runs the
 production proxy configuration and verifies bearer-only image reads. All traffic
 is loopback; no provider, payment or identity service is contacted.
+
+The provider-logo fixture also exercises the shared ReferenceUpload picker and
+dropzone, multiple-file rejection, round remove action, failure/retry/navigation
+locks, removal persistence across the owned API process restart, and re-upload.
+It also switches real synthetic owners' keys in API-key mode, using a logo URL
+without a generation hint, and verifies that memory cannot expose the first
+owner's private logo to the second key.
+
+Run `node scripts/ui/provider-logo-cache.cjs` and repeat with
+`UI_BROWSER_ENGINE=webkit` for the production shared picker's cache lifecycle.
+The loopback fixture counts actual image requests, blob URLs and decode calls:
+two initial providers remain at two requests/decodes across repeated opens,
+search rebuilds and content-type filters, with no warm placeholder frames.
+It covers concurrent slow responses, request/decode errors and retry, hidden
+marks, content A→B→A and delete/re-upload invalidation, delayed account A→B→A
+responses, resource eviction, both themes and responsive popup screenshots.
+All images are generated fixtures; captures exclude credential fields.
+Screenshots are cropped to the logo control and synthetic pixel proof; provider
+credential fields are never included. The optional validated-file hook leaves
+the existing reference/template upload defaults unchanged.
+
+Run `node scripts/ui/override-sound.cjs` in Chromium and WebKit for Playground
+request binding, drag/drop, replacement failures, cancellation, template
+save/reload/removal, keyboard actions, both themes and 1440/390/320px layouts.
+These use local synthetic uploads; actual media remux and permissions are tested
+in the Go fixture suites. `UI_EVIDENCE_DIR` selects screenshot/result output.
+
+The reference and template fixtures also cover the shared `ReferenceLibrary`
+component. `references.cjs` checks the Playground multiple-selection adapter;
+`templates.cjs` checks administrator-library upload/rename/protected deletion,
+organization-only slot selection/replacement/deselection and confirmed deletion
+versus cancellation/rejection. Run both engines with the existing local fixture
+settings. `reference-validation.cjs` verifies slot compatibility and late upload
+cancellation; `template-gallery.cjs` retains real hover, keyboard and touch media
+coverage. These checks use synthetic files and do not mutate live libraries.
+
+`shared-reference-library.cjs` exercises the common image/audio/video card and
+native playback lifecycle directly, including preview retry, keyboard selection,
+Delete/Keep, Escape/reopen and both themes at 1440/390/320 px. Generate clips with
+`template-video-fixtures.py` first and set `GATEWAY_TEMPLATE_CLIP_DIR` as above.
+
+Run `node scripts/ui/template-editing.cjs` in Chromium and WebKit after generating
+the synthetic template video fixtures. It checks compact fixed-media previews,
+real video/audio playback, both themes at 1440/390/320px, partial and duplicate
+reference positions, reorder, settings preservation, cancelled/repeated handoff,
+return to the runner and key-reset cancellation without generation or template
+mutation. Backend `TestTemplateEditingPreservesPartialBindingsAndIsolation` checks
+published revisions, shared/private access, fixed-slot protection and unchanged
+submission state. Evidence stays under `.local/editing/`.

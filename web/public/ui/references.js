@@ -65,7 +65,7 @@ function hashReferenceFile(file,signal){
   const status = document.querySelector(image?'#referenceStatus':`#${kind}ReferenceStatus`);
   const metadata = new Map();
   let draggedURL = null;
-  const dragType = 'application/x-gateway-reference';
+  const dragType = 'application/x-gateway-reference-'+kind;
   let items = [], offset = 0, hasMore = false, busy = false, loading = false, epoch = 0;
   let controller = new AbortController();
   let checkedSignature='',checking=false,validationError='';
@@ -73,14 +73,9 @@ function hashReferenceFile(file,signal){
   const selectionSignature=()=>JSON.stringify([validationTarget(),urls(),kind==='audio'?activeVoices():null]);
   const candidateIDs=values=>[...new Set([...(validationTarget()?.reference_ids||[]).filter(id=>!ReferenceValidation.ids(urls()).includes(id)),...ReferenceValidation.ids(values)])];
  let remote,returnFocus=null,previousFocus=null;
-  const library = document.createElement('dialog');
-  library.className = 'reference-library'; library.id = image?'referenceLibrary':`${kind}ReferenceLibrary`;
-  library.setAttribute('aria-labelledby', `${kind}ReferenceLibraryTitle`);
-  library.innerHTML = `<div class="reference-library-header"><h2 id="${kind}ReferenceLibraryTitle">Reference library</h2><button type="button" class="secondary" data-close aria-label="Close library">✕</button></div>
-    <p>Choose ${displayPlural} for this generation.</p>
-    <div class="reference-dropzone" id="libraryDropzone"><p>Drop ${displayPlural} to add them to your library</p><button type="button" class="secondary" data-upload>Upload ${displayPlural}</button><small>Up to ${maxBytes/1024/1024} MB each</small></div>
-    <p class="reference-status" role="status" data-status></p><div class="reference-library-grid" data-grid></div>
-    <div class="reference-library-footer"><button type="button" class="secondary" data-more hidden>Load more</button></div>`;
+  const libraryView=ReferenceLibrary.create({id:image?'referenceLibrary':`${kind}ReferenceLibrary`,description:`Choose ${displayPlural} for this generation.`});
+  const library=libraryView.dialog;
+  libraryView.intro.insertAdjacentHTML('afterend',`<div class="reference-dropzone" id="libraryDropzone"><p>Drop ${displayPlural} to add them to your library</p><button type="button" class="secondary" data-upload>Upload ${displayPlural}</button><small>Up to ${maxBytes/1024/1024} MB each</small></div>`);
   document.body.append(library);
   let sharedLibrary=false,lastRemoteSource='local',listSequence=0,listController=null;
   const sourceLabel=document.createElement('label');sourceLabel.textContent='Library';const source=document.createElement('select');source.append(new Option('My references','private'),new Option('Template references','shared'));sourceLabel.append(source);library.querySelector('p').after(sourceLabel);
@@ -88,10 +83,11 @@ function hashReferenceFile(file,signal){
   const grid = library.querySelector('[data-grid]');
   const libraryStatus = library.querySelector('[data-status]');
   const more = library.querySelector('[data-more]');
-  const urls = () => field.value.split('\n').map(s => s.trim()).filter(Boolean);
+  let sparse=false,missingTarget=null;
+  const urls = () => {const values=field.value.split('\n').map(s=>s.trim());return sparse?values:values.filter(Boolean);};
+  const insert = (values,url) => {const next=[...values],hole=sparse?(missingTarget!==null&&next[missingTarget]===''?missingTarget:next.indexOf('')):-1;if(hole>=0)next[hole]=url;else next.push(url);return next;};
   const absolute = url => new URL(url, location.origin).href;
   const limit = () => mode()?.['max_'+plural] ?? (image ? selectedModel()?.max_image_inputs || Infinity : 1);
- const size = value => value == null ? '' : value<1024 ? `${value} B` : value<1024*1024 ? `${(value/1024).toFixed(1).replace(/\.0$/, '')} KB` : `${(value/1024/1024).toFixed(1).replace(/\.0$/, '')} MB`;
   function message(text = '', error = false) {
     for (const target of [status, libraryStatus]) { target.textContent = text; target.classList.toggle('error', error); }
   }
@@ -99,7 +95,7 @@ function hashReferenceFile(file,signal){
     const node = document.createElement('button'); node.type = 'button'; node.className = 'secondary'; node.textContent = text;
     node.setAttribute('aria-label', label); node.addEventListener('click', action); return node;
   }
-  function write(values,validated=false) { field.value = [...new Set(values)].join('\n');if(validated){checkedSignature=selectionSignature();checking=false;validationError='';} field.dispatchEvent(new Event('input', {bubbles:true})); }
+  function write(values,validated=false) { if(!values.length)sparse=false;field.value = (sparse?values:[...new Set(values)]).join('\n');if(validated){checkedSignature=selectionSignature();checking=false;validationError='';} field.dispatchEvent(new Event('input', {bubbles:true})); }
   function preview(card, url, name) {
     const providerPreview=metadata.get(url)?.preview_url;
     if(url.startsWith('asset://')&&providerPreview&&window.ProviderReferenceLibrary?.safeURL(providerPreview)){const n=document.createElement(image?'img':kind==='video'?'video':'div');if(image||kind==='video'){n.src=providerPreview;n.alt=name;n.referrerPolicy='no-referrer';n.preload='metadata';n.muted=true;}else n.textContent='Audio';card.append(n);return;}
@@ -122,23 +118,23 @@ function hashReferenceFile(file,signal){
     const values = urls();
     selected.replaceChildren(...values.map((url, index) => {
       const card = document.createElement('div'); card.className = 'reference-card';
-      const name = metadata.get(url)?.name || (url.startsWith('asset://') ? url.slice(8) : `Reference ${index + 1}`);
-      preview(card, url, name);
+      const name = !url?'Choose reference':metadata.get(url)?.name || (url.startsWith('asset://') ? url.slice(8) : `Reference ${index + 1}`);
+      if(url)preview(card,url,name);else{const choose=button('Choose reference',`Choose ${kind} reference ${index+1}`,()=>{missingTarget=index;returnFocus=choose;previousFocus=document.activeElement;library.showModal();renderLibrary();load();});card.append(choose);}
       const title = document.createElement('span'); title.className = 'reference-name'; const spec=window.ReferencePrompts?.contract(selectedModel(),{reference_mode:document.querySelector('#referenceMode').value});const offset=image&&mode()?.id==='first_frame_references'?1:0;const address=spec?.types.includes(kind)&&index>=offset?ReferencePrompts.label(spec.syntax,kind,index-offset):'';title.textContent = `${address||mode()?.image_roles?.[image?index:-1]||index+1}. ${name}`; title.title = name;
       const remove = button('×', `Remove ${name} from generation`, () => write(urls().filter((_, i) => i !== index)));
       remove.classList.add('reference-remove'); remove.disabled = busy;
       card.draggable = !busy; card.tabIndex = 0; card.title = 'Drag to reorder. Use Alt + Left or Right Arrow with the keyboard.';
       card.addEventListener('dragstart', event => {
         if (busy || event.target.closest('button')) { event.preventDefault(); return; }
-        draggedURL = url; event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData(dragType, url); card.classList.add('dragging');
+        draggedURL = String(index); event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData(dragType, String(index)); card.classList.add('dragging');
       });
       card.addEventListener('dragend', () => { draggedURL = null; card.classList.remove('dragging'); document.querySelectorAll('.dragover').forEach(el => el.classList.remove('dragover')); });
       card.addEventListener('keydown', event => {
         if (!event.altKey || !['ArrowLeft','ArrowRight'].includes(event.key) || busy) return;
-        event.preventDefault(); reorder(url, index + (event.key === 'ArrowLeft' ? -1 : 1));
+        event.preventDefault(); reorder(index, index + (event.key === 'ArrowLeft' ? -1 : 1));
       });
       card.append(title, remove);
-      if(kind!=='audio'&&mode()?.supports_reference_voice&&!(image&&index<(mode()?.voice_image_start||0))){
+      if(url&&kind!=='audio'&&mode()?.supports_reference_voice&&!(image&&index<(mode()?.voice_image_start||0))){
         const voice=button(voices[url]?'Change voice reference':'Add voice reference',`Voice reference for ${name}`,()=>{voiceTarget={url};pickers[2].open(voice);});voice.classList.add('reference-voice');card.append(voice);
         if(voices[url]) card.append(button('Clear voice',`Clear voice for ${name}`,()=>{delete voices[url];render();updatePrice();}));
       }
@@ -150,17 +146,17 @@ function hashReferenceFile(file,signal){
   }
   async function select(item) {
     const values=urls(),url=absolute(item.url),voiceIntent=kind==='audio'?voiceTarget:null;
-    if(!voiceIntent&&values.includes(url)){write(values.filter(value=>value!==url));message();return;}
+    if(!voiceIntent&&values.includes(url)&&!(sparse&&values.includes(''))){write(values.filter(value=>value!==url));message();return;}
     if(busy)return;
-    if(!voiceIntent&&values.length>=limit()){message(`This model accepts up to ${limit()} ${plural}. Remove one first.`,true);return;}
+    if(!voiceIntent&&values.length>=limit()&&!(sparse&&values.includes(''))){message(`This model accepts up to ${limit()} ${plural}. Remove one first.`,true);return;}
     const token=epoch,validation=validationTarget(),intent=ReferenceValidation.signature(validation),selection=selectionSignature();
     busy=true;message(`Checking ${item.name}…`);renderLibrary();
     try{
-      await ReferenceValidation.check(voiceIntent?ReferenceValidation.ids([url]):candidateIDs([...values,url]),validation,{signal:controller.signal});
+      await ReferenceValidation.check(voiceIntent?ReferenceValidation.ids([url]):candidateIDs(insert(values,url)),validation,{signal:controller.signal});
       if(token!==epoch)return;
       if(intent!==ReferenceValidation.signature(validationTarget())||selection!==selectionSignature()){message('Selection, model or workflow changed. Choose the file again.',true);return;}
       if(voiceIntent){if(voiceTarget===voiceIntent){voices[voiceIntent.url]=url;voiceTarget=null;library.close();pickers.forEach(p=>p.render());updatePrice();}return;}
-      metadata.set(url,item);write([...values,url],true);message();
+      metadata.set(url,item);write(insert(values,url),true);missingTarget=null;message();
     }catch(error){if(token===epoch&&error.name!=='AbortError')message(error.message,true);}
     finally{if(token===epoch){busy=false;render();}}
   }
@@ -178,25 +174,10 @@ function hashReferenceFile(file,signal){
   function renderLibrary() {
     if(remote?.active()){remote.render();return;}
     const values = urls();
-    grid.replaceChildren(...items.filter(item=>(item.content_type||"image/png").startsWith(kind+"/")).map(item => {
-      const url = absolute(item.url), name = item.name;
-      const card = document.createElement('div'); card.className = 'reference-card';
-      card.dataset.id = item.id; card.dataset.selected = String(values.includes(url));
-      const choose = button('', `Use ${name} in generation`, () => select(item)); choose.className = 'reference-choice';
-      choose.setAttribute('aria-pressed', String(values.includes(url))); choose.disabled = busy;
-      preview(choose, url, name);
-      const title = document.createElement('span'); title.className = 'reference-name'; title.textContent = name; title.title = name;
-      const bytes=document.createElement("small");bytes.className="reference-size";bytes.textContent=size(item.size_bytes);title.append(bytes);
-      choose.append(title);
-      const remove = button('Delete', `Delete ${name} from library`, () => {
-        const warning = document.createElement('p'); warning.className = 'reference-delete-warning';
-        warning.textContent = 'Delete this file permanently? Pending generations using it may fail.';
-        const actions = document.createElement('div'); actions.className = 'reference-card-actions';
-        actions.append(button('Cancel', `Keep ${name}`, renderLibrary), button('Delete file', `Confirm delete ${name}`, () => deleteItem(item)));
-        remove.disabled = true; card.append(warning, actions);
-      });
-      remove.classList.add('reference-delete'); remove.disabled = busy; choose.disabled=choose.disabled||!!item.deleting;card.append(choose);if(!sharedLibrary)card.append(remove); if(!sharedLibrary)remote?.decorate(card,item); return card;
-    }));
+    libraryView.render(items.filter(item=>(item.content_type||'image/png').startsWith(kind+'/')).map(item=>({...item,url:absolute(item.url)})),{
+      selected:item=>values.includes(item.url),onSelect:select,busy,
+      onDelete:sharedLibrary?null:deleteItem,decorate:sharedLibrary?null:(card,item)=>remote?.decorate(card,item)
+    });
     more.hidden = !hasMore; more.disabled = busy || loading;
   }
   async function load(append = false) {
@@ -246,14 +227,14 @@ function hashReferenceFile(file,signal){
             else unattached++;
             continue;
           }
-          if (values.includes(url)) continue;
+          if (values.includes(url)&&!(sparse&&values.includes(''))) continue;
           if (expectedSelection!==selectionSignature() || intent !== ReferenceValidation.signature(validationTarget()) || modelID !== selectedModel()?.id || !selectedModel()?.[`supports_${kind}_input`]) { unattached++; continue; }
-          const candidate=replaceIndex!==null&&replaceIndex<values.length?values.map((v,i)=>i===replaceIndex?url:v):[...values,url];
+          const candidate=replaceIndex!==null&&replaceIndex<values.length?values.map((v,i)=>i===replaceIndex?url:v):insert(values,url);
           await ReferenceValidation.check(candidateIDs(candidate),validation,{signal,expectedKey});
           if(currentEpoch!==epoch)return;
           if(expectedSelection!==selectionSignature()||intent!==ReferenceValidation.signature(validationTarget())){unattached++;continue;}
           if (replaceIndex !== null && replaceIndex < values.length) { values[replaceIndex] = url; replaceIndex = null; write(values,true); }
-          else if (values.length < limit()) write([...values, url],true);
+          else if (values.length < limit() || sparse&&values.includes('')) write(insert(values,url),true);
           else unattached++;
           expectedSelection=selectionSignature();
         } catch (error) { if (currentEpoch === epoch) failures.push(`${file.name}: ${error.message}`); }
@@ -273,16 +254,24 @@ function hashReferenceFile(file,signal){
     try {
       await api(`/v1/references/${encodeURIComponent(item.id)}`, {method:'DELETE', signal:controller.signal});
       if (currentEpoch !== epoch) return;
+      ReferenceLibrary.deleted(item,'organization');
       for(const [visual,audio] of Object.entries(voices)){if(visual===absolute(item.url)||audio===absolute(item.url))delete voices[visual];}
       metadata.delete(absolute(item.url)); items = items.filter(old => old.id !== item.id);
-      write(urls().filter(url => url !== absolute(item.url))); offset = Math.max(0, offset-1); message('File deleted.');window.dispatchEvent(new Event('gateway-storage-change'));
+      write(sparse?urls().map(url=>url===absolute(item.url)?'':url):urls().filter(url=>url!==absolute(item.url))); offset = Math.max(0, offset-1); message('File deleted.');window.dispatchEvent(new Event('gateway-storage-change'));
     } catch (error) { if (currentEpoch === epoch) message(`Could not delete file: ${error.message}`, true); }
     finally { if (currentEpoch === epoch) { busy = false; render();window.dispatchEvent(new Event('gateway-storage-change')); } }
   }
-  function reorder(url, targetIndex) {
-    const values = urls(), source = values.indexOf(url);
-    if (busy || source < 0 || targetIndex < 0 || targetIndex >= values.length || source === targetIndex) return;
-    values.splice(source, 1); values.splice(targetIndex, 0, url); write(values); message('Reference order updated.');
+  window.addEventListener('gateway-reference-deleted',event=>{
+    const detail=event.detail;if(!['organization','template'].includes(detail.scope)||detail.keyVersion!==generationKeyVersion)return;
+    const matches=url=>url===absolute(detail.url)||ReferenceValidation.ids([url]).includes(detail.id);
+    for(const [visual,audio] of Object.entries(voices))if(matches(visual)||matches(audio))delete voices[visual];
+    for(const [url,item] of metadata)if(item.id===detail.id||matches(url))metadata.delete(url);
+    items=items.filter(item=>item.id!==detail.id);write(sparse?urls().map(url=>matches(url)?'':url):urls().filter(url=>!matches(url)));
+  });
+  function reorder(source, targetIndex) {
+    const values = urls();source=Number(source);
+    if (busy || !Number.isInteger(source) || source >= values.length || source < 0 || targetIndex < 0 || targetIndex >= values.length || source === targetIndex) return;
+    const [value]=values.splice(source, 1); values.splice(targetIndex, 0, value); write(values); message('Reference order updated.');
     selected.children[targetIndex]?.focus();
   }
   function bindDrop(target, index = null) {
@@ -309,12 +298,13 @@ function hashReferenceFile(file,signal){
     const model = selectedModel(); if (!model?.[`supports_${kind}_input`]) return true;
     const count = urls().length, minimum = mode()?.["min_"+plural] ?? (image?Math.max(model.min_image_inputs || 0, model.requires_image_input ? 1 : 0):model[`requires_${kind}_input`]?1:0);
  if(limit()===0)return true;
+    if(sparse&&urls().some(url=>!url)){message('Choose a file for each empty reference, or remove the empty references before generating.',true);return false;}
     if (count < minimum) { message(`This model needs at least ${minimum} ${kind} reference${minimum === 1 ? '' : 's'}.`, true); return false; }
     if (count > limit()) { message(`This model accepts up to ${limit()} ${plural}. Remove the extra files.`, true); return false; }
     return true;
   }
   function reset() {
-    remote?.reset();
+    sparse=false;missingTarget=null;remote?.reset();
     draggedURL = null; epoch++; controller.abort(); controller = new AbortController(); busy = false; loading = false;
     checkedSignature='';checking=false;validationError='';
     items = []; metadata.clear(); offset = 0; hasMore = false; library.close(); files.value = ''; write([]); message();
@@ -328,7 +318,7 @@ function hashReferenceFile(file,signal){
   library.querySelector('[data-upload]').addEventListener('click', () => { if (!busy) files.click(); });
   files.addEventListener('change', () => upload([...files.files]));
   document.querySelector(image?'#chooseReferences':`#${kind}ChooseReferences`).addEventListener('click', event => { returnFocus=event.currentTarget;previousFocus=document.activeElement;library.showModal(); renderLibrary(); load(); });
-  function cancelVoice(){if(kind==='audio'){voiceTarget=null;syncFileInput();}}
+  function cancelVoice(){missingTarget=null;if(kind==='audio'){voiceTarget=null;syncFileInput();}}
   library.querySelectorAll('[data-close]').forEach(node => node.addEventListener('click', () => {cancelVoice();library.close();}));
   library.addEventListener('cancel',cancelVoice);
   // Native close events may be queued until after the picker has reopened.
@@ -341,10 +331,10 @@ function hashReferenceFile(file,signal){
     return url;
   }
   remote=window.ProviderReferenceLibrary?.mount({kind,library,field,metadata,more,message,urls,write,select,renderSelected:render,loadLocal:()=>load(),onSourceChange:value=>{if(value!==lastRemoteSource){lastRemoteSource=value;listSequence++;listController?.abort();loading=false;items=[];offset=0;hasMore=false;}sourceLabel.hidden=value==='provider';if(value==='provider'){sharedLibrary=false;source.value='private';library.querySelector('.reference-dropzone').hidden=false;}}});
-  return {render,validate,describe,reset,values:urls,info:url=>metadata.get(url),issue:()=>validationError,open(trigger){returnFocus=trigger||document.activeElement;previousFocus=document.activeElement;library.showModal();render();load();},has:url=>metadata.has(url)};
+  return {render,validate,describe,reset,restoreSlots(values){sparse=!!values?.length;missingTarget=null;},values:urls,info:url=>metadata.get(url),issue:()=>validationError,open(trigger){returnFocus=trigger||document.activeElement;previousFocus=document.activeElement;library.showModal();render();load();},has:url=>metadata.has(url)};
  }
  for(const kind of ["image","video","audio"])pickers.push(picker(kind));
- window.referencePicker={configure,get(kind,index){const p=pickers[['image','video','audio'].indexOf(kind)];const url=p?.values()[index];return url?{url,name:p.describe(url,index),...p.info(url)}:null;},restoreMode(options){
+ window.referencePicker={configure,values(kind){return pickers[['image','video','audio'].indexOf(kind)].values();},restoreSlots(options){pickers.forEach((p,i)=>p.restoreSlots(options?.[['image_urls','video_urls','audio_urls'][i]]));},get(kind,index){const p=pickers[['image','video','audio'].indexOf(kind)];const url=p?.values()[index];return url?{url,name:p.describe(url,index),...p.info(url)}:null;},restoreMode(options){
    const model=selectedModel(),modes=model?.reference_modes||[];
    let value=options.reference_mode;
    if(!value){

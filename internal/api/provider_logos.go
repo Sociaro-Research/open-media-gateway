@@ -20,6 +20,25 @@ type providerLogos interface {
 	SaveLogo(context.Context, string, []byte) (string, error)
 }
 
+func (s *Server) removeProviderLogo(w http.ResponseWriter, r *http.Request) {
+	admin, err := s.systemAdmin(r.Context())
+	if err != nil || !admin {
+		writeError(w, 403, "forbidden", "administrator access is required to remove provider logos")
+		return
+	}
+	store, ok := s.providerAdmin.(interface {
+		RemoveLogo(context.Context, string) error
+	})
+	if !ok {
+		writeError(w, 503, "unavailable", "provider logo storage is unavailable")
+		return
+	}
+	if writeProviderError(w, store.RemoveLogo(r.Context(), r.PathValue("id"))) {
+		return
+	}
+	s.writeViewerJSON(w, r, 200, map[string]string{"icon_url": ""})
+}
+
 func providerLogoForViewer(icon string, r *http.Request) string {
 	if icon == "" || r.PathValue("org") == "" {
 		return icon

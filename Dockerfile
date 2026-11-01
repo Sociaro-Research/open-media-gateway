@@ -12,7 +12,11 @@ RUN python3 deploy/ghcr/collect-licenses.py /out/licenses
 RUN mkdir -p /out/media && chown 65532:65532 /out/media
 RUN mkdir -p /out/rootfs/tmp && chmod 1777 /out/rootfs/tmp
 
-FROM scratch
+# The worker invokes FFmpeg as a separate process; the video codec is always copied.
+# Ship the tools and their runtime libraries through the distribution packages.
+FROM alpine:3.23
+RUN apk add --no-cache ca-certificates ffmpeg ffmpeg-doc
+
 LABEL org.opencontainers.image.title="Media Gateway" \
       org.opencontainers.image.description="Provider-neutral asynchronous API for image, video, speech, and music generation" \
       org.opencontainers.image.licenses="Apache-2.0"
@@ -26,5 +30,6 @@ COPY --from=build --chown=65532:65532 /out/rootfs/ /
 COPY LICENSE /LICENSE
 COPY NOTICE /NOTICE
 COPY --from=build /out/licenses /licenses
+RUN apk info -v > /licenses/alpine-packages.txt
 USER 65532:65532
 ENTRYPOINT ["/gateway"]

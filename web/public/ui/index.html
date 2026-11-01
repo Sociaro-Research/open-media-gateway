@@ -5,11 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title data-page-title="">Media gateway</title>
   <script src="/ui/theme.js"></script>
-  <script src="/ui/console-entry.js?v=20260916-sites" defer></script>
-  <link rel="stylesheet" href="/ui/styles.css?v=20261027-project-menu">
-  <link rel="stylesheet" href="/ui/docs.css?v=20260911-login-spacing">
-  <link rel="stylesheet" href="/ui/references.css?v=20261025-typed">
-  <link rel="stylesheet" href="/ui/templates.css?v=20261028-editor">
+  <script src="/ui/console-entry.js?v=20261030-recovered-batch" defer></script>
+  <link rel="stylesheet" href="/ui/styles.css?v=20261030-recovered-batch">
+  <link rel="stylesheet" href="/ui/docs.css?v=20261030-recovered-batch">
+  <link rel="stylesheet" href="/ui/references.css?v=20261030-recovered-batch">
+  <link rel="stylesheet" href="/ui/templates.css?v=20261030-recovered-batch">
 <script src="/ui/site.js" defer></script></head>
 <body>
   <div class="shell">
@@ -248,21 +248,21 @@
             <section class="generation-key" id="connectionPanel" aria-label="Generation API key and budget">
               <div class="generation-key-input">
                 <label for="apiKey">Gateway API key</label>
-                <input id="apiKey" type="text" class="secret-input" aria-describedby="generationKeyHelp" data-1p-ignore data-lpignore="true" data-bwignore="true" autocapitalize="off" autocorrect="off" spellcheck="false" autocomplete="off">
+                <input id="apiKey" type="text" class="secret-input" data-1p-ignore data-lpignore="true" data-bwignore="true" autocapitalize="off" autocorrect="off" spellcheck="false" autocomplete="off">
               </div>
               <div class="generation-key-actions form-actions">
                 <button class="secondary" id="createGenerationKey" type="button">Create Playground key</button>
-                <button class="secondary" id="forgetGenerationKey" type="button" aria-describedby="generationKeyHelp">Forget key</button>
+                <button class="secondary" id="forgetGenerationKey" type="button">Forget key</button>
+                <button class="secondary" id="manageGenerationKeys" type="button">Manage keys</button>
               </div>
-              <p id="generationKeyHelp"><span id="generationKeyPolicy">Pasted keys stay in this tab for 24h; cleared on sign-out. Forget clears this tab without revoking the key.</span> <a href="/organizations" id="manageGenerationKeys">Manage keys</a></p>
-              <p id="managedGenerationHelp" hidden>Save an encrypted key for this workspace to use Playground and Templates on any signed-in browser. <button type="button" class="secondary" id="restoreGenerationKey">Use saved key</button></p>
+              <div id="managedGenerationHelp" hidden><button type="button" class="secondary" id="restoreGenerationKey">Use saved key</button></div>
               <p id="connectionState" role="status" hidden></p>
               <div id="generationKeyBudget" aria-live="polite" hidden></div>
-              <div class="price-card" id="priceCard" hidden>
+            </section>
+            <div class="price-card" id="priceCard" hidden>
                 <div><span>Estimated cost</span><strong id="priceValue">Key required</strong></div>
                 <p id="priceDetails"></p>
-              </div>
-            </section>
+            </div>
 
             <button class="primary" id="submitButton" type="submit" hidden>
               <span id="submitLabel">Generate</span>
@@ -441,62 +441,64 @@
     </article>
   </template>
 
-  <script src="/ui/user-ui.js?v=20261013-sales-team-ui" defer></script>
-  <script src="/ui/model-info.js?v=20261002-organization-roles" defer></script>
-  <script src="/ui/provider-logos.js?v=20261030"></script>
+  <script src="/ui/user-ui.js?v=20261030-recovered-batch" defer></script>
+  <script src="/ui/model-info.js?v=20261030-recovered-batch" defer></script>
+  <script src="/ui/provider-logos.js?v=20261030-recovered-batch"></script>
   <script src="/ui/model-picker.js" defer></script>
-  <script src="/ui/control-pickers.js?v=20261027-project-lifetime" defer></script>
-  <script src="/ui/form-ui.js?v=20261013-sales-team-ui" defer></script>
+  <script src="/ui/control-pickers.js?v=20261030-recovered-batch" defer></script>
+  <script src="/ui/form-ui.js?v=20261030-recovered-batch" defer></script>
   <script src="/ui/layout.js" defer></script>
   <script src="/ui/auto-update.js" defer></script>
-  <script src="/ui/contacts.js?v=20261018-contact-save" defer></script>
-  <script src="/ui/profile.js?v=20261019-pending-edits" defer></script>
-  <script src="/ui/workspace.js?v=20261018-navigation" defer></script>
-  <script src="/ui/storage-settings.js?v=20260915-direct-storage"></script>
-  <script src="/ui/organization-storage.js?v=20260911-provider-icons"></script>
+  <script src="/ui/contacts.js?v=20261030-recovered-batch" defer></script>
+  <script src="/ui/profile.js?v=20261030-recovered-batch" defer></script>
+  <script src="/ui/workspace.js?v=20261030-recovered-batch" defer></script>
+  <script src="/ui/storage-settings.js?v=20261030-recovered-batch"></script>
+  <script src="/ui/organization-storage.js?v=20261030-recovered-batch"></script>
   <script src="/ui/limits.js" defer></script>
   <script src="/ui/model-access.js" defer></script>
-  <script src="/ui/markups.js?v=20261013-sales-permissions" defer></script>
-  <script src="/ui/payment-notifications.js?v=20260916" defer></script>
+  <script src="/ui/markups.js?v=20261030-recovered-batch" defer></script>
+  <script src="/ui/payment-notifications.js?v=20261030-recovered-batch" defer></script>
   <script src="/ui/legal.js" defer></script>
-  <script src="/ui/vat-settings.js?v=20261019-company-settings" defer></script>
-  <script src="/ui/invoice.js?v=20261017-terms" defer></script>
-  <script src="/ui/stablecoin-payments.js?v=20261019-network-removal" defer></script>
-  <script src="/ui/payments.js?v=20261019-payment-actions" defer></script>
-  <script src="/ui/organization-roles.js?v=20261002-roles" defer></script>
-  <script src="/ui/audit-log.js?v=20261013-sales-team-ui" defer></script>
-  <script src="/ui/organization-journal.js?v=20261013-sales-team-ui" defer></script>
+  <script src="/ui/vat-settings.js?v=20261030-recovered-batch" defer></script>
+  <script src="/ui/invoice.js?v=20261030-recovered-batch" defer></script>
+  <script src="/ui/stablecoin-payments.js?v=20261030-recovered-batch" defer></script>
+  <script src="/ui/payments.js?v=20261030-recovered-batch" defer></script>
+  <script src="/ui/organization-roles.js?v=20261030-recovered-batch" defer></script>
+  <script src="/ui/audit-log.js?v=20261030-recovered-batch" defer></script>
+  <script src="/ui/organization-journal.js?v=20261030-recovered-batch" defer></script>
   <script src="/ui/invitation-feedback.js" defer></script>
-  <script src="/ui/client-onboarding.js?v=20261013-sales-team-ui" defer></script>
-  <script src="/ui/organizations.js?v=20261018-invitation-roles" defer></script>
- <script src="/ui/generation-key.js?v=20260911-provider-icons" defer></script>
-  <script src="/ui/email-login.js?v=20261018-invitation-continuation" defer></script>
-  <script src="/ui/provider-connections.js?v=20261019-timeouts-header-draft" defer></script>
-  <script src="/ui/playground-projects.js?v=20261027-project-lifetime" defer></script>
+  <script src="/ui/client-onboarding.js?v=20261030-recovered-batch" defer></script>
+  <script src="/ui/organizations.js?v=20261030-recovered-batch" defer></script>
+ <script src="/ui/generation-key.js?v=20261030-recovered-batch" defer></script>
+  <script src="/ui/email-login.js?v=20261030-recovered-batch" defer></script>
+  <script src="/ui/provider-connections.js?v=20261030-recovered-batch" defer></script>
+  <script src="/ui/playground-projects.js?v=20261030-recovered-batch" defer></script>
   <script src="/ui/workspace-authorization.js" defer></script><script src="/ui/remote-authorization.js" defer></script><script src="/ui/setup-selector.js" defer></script>
   <script src="/ui/remote-workspace.js" defer></script>
-  <script src="/ui/reference-validation.js?v=20261028" defer></script>
-  <script src="/ui/reference-prompts.js?v=20261025" defer></script>
-  <script src="/ui/prompt-reference-editor.js?v=20261028-editor" defer></script>
-  <script src="/ui/reference-upload.js?v=20261028-editor" defer></script>
-  <script src="/ui/templates.js?v=20261028-integrated" defer></script>
-  <script src="/ui/app.js?v=20261027-project-lifetime" defer></script>
-  <script src="/ui/email-delivery.js?v=20260914-credential-fields" defer></script>
+  <script src="/ui/reference-validation.js?v=20261030-recovered-batch" defer></script>
+  <script src="/ui/reference-prompts.js?v=20261030-recovered-batch" defer></script>
+  <script src="/ui/prompt-reference-editor.js?v=20261030-recovered-batch" defer></script>
+  <script src="/ui/reference-upload.js?v=20261030-recovered-batch" defer></script>
+  <script src="/ui/reference-library.js?v=20261030-recovered-batch" defer></script>
+  <script src="/ui/templates.js?v=20261030-recovered-batch" defer></script>
+  <script src="/ui/override-sound.js?v=20261030-recovered-batch" defer></script>
+  <script src="/ui/app.js?v=20261030-recovered-batch" defer></script>
+  <script src="/ui/email-delivery.js?v=20261030-recovered-batch" defer></script>
   <script src="/ui/login-methods.js" defer></script>
   <script src="/ui/branding.js" defer></script>
-  <script src="/ui/timezones.js?v=20261009" defer></script>
-  <script src="/ui/catalog-sync.js?v=20261009-timezones" defer></script>
-  <script src="/ui/sales-bonuses.js?v=20261013-sales-settings" defer></script>
-  <script src="/ui/sales-permissions.js?v=20261013-sales-team-ui" defer></script>
-  <script src="/ui/sales.js?v=20261014-sales-role-transitions" defer></script>
-  <script src="/ui/system.js?v=20261018-registered-assets" defer></script>
-  <script src="/ui/report-summary.js?v=20261013bonus"></script>
-  <script src="/ui/report-details.js?v=20261013-sales-team-ui"></script>
-  <script src="/ui/reports.js?v=20261013-sales-team-ui"></script>
-  <script src="/ui/keys.js?v=20261013-sales-team-ui"></script>
-  <script src="/ui/storage-usage.js?v=20260911-provider-icons"></script>
-  <script src="/ui/prompt-references.js?v=20261028-editor" defer></script>
-  <script src="/ui/provider-reference-library.js?v=20261018-assets" defer></script>
-  <script src="/ui/references.js?v=20261028-validation" defer></script>
+  <script src="/ui/timezones.js?v=20261030-recovered-batch" defer></script>
+  <script src="/ui/catalog-sync.js?v=20261030-recovered-batch" defer></script>
+  <script src="/ui/sales-bonuses.js?v=20261030-recovered-batch" defer></script>
+  <script src="/ui/sales-permissions.js?v=20261030-recovered-batch" defer></script>
+  <script src="/ui/sales.js?v=20261030-recovered-batch" defer></script>
+  <script src="/ui/system.js?v=20261030-recovered-batch" defer></script>
+  <script src="/ui/report-summary.js?v=20261030-recovered-batch"></script>
+  <script src="/ui/report-details.js?v=20261030-recovered-batch"></script>
+  <script src="/ui/reports.js?v=20261030-recovered-batch"></script>
+  <script src="/ui/keys.js?v=20261030-recovered-batch"></script>
+  <script src="/ui/storage-usage.js?v=20261030-recovered-batch"></script>
+  <script src="/ui/prompt-references.js?v=20261030-recovered-batch" defer></script>
+  <script src="/ui/provider-reference-library.js?v=20261030-recovered-batch" defer></script>
+  <script src="/ui/references.js?v=20261030-recovered-batch" defer></script>
 </body>
 </html>

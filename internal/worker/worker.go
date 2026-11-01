@@ -94,7 +94,7 @@ func (w *Worker) process(ctx context.Context, id string) error {
 			return err
 		}
 		providerTask, err := provider.Generate(ctx, core.MediaRequest{
-			TaskID: task.ID, Prompt: task.Prompt, Model: task.Model, Options: task.Options, ProviderIdentity: task.ProviderIdentity,
+			TaskID: task.ID, Prompt: task.Prompt, Model: task.Model, Options: task.Options.ProviderOptions(), ProviderIdentity: task.ProviderIdentity,
 		})
 		if err != nil {
 			if ctx.Err() != nil {
@@ -279,7 +279,20 @@ func (w *Worker) archiveResult(ctx, archiveCtx context.Context, task core.Task, 
 	if token := core.ClaimToken(ctx); token != "" {
 		archiveID += "/attempts/" + token
 	}
-	media, archiveErr := destination.Archive(archiveCtx, archiveID, resultURL)
+	var media core.StoredMedia
+	var archiveErr error
+	if task.Options.OverrideSoundID != "" {
+		processor, ok := w.storage.(interface {
+			ArchiveOverride(context.Context, storage.Store, string, string, core.SoundOverride) (core.StoredMedia, error)
+		})
+		target, targetOK := destination.(storage.Store)
+		if !ok || !targetOK || task.Options.OverrideSound == nil || task.MediaType != "video" {
+			return w.repo.MarkFailed(ctx, task.ID, "Override Sound processing is not available")
+		}
+		media, archiveErr = processor.ArchiveOverride(archiveCtx, target, archiveID, resultURL, *task.Options.OverrideSound)
+	} else {
+		media, archiveErr = destination.Archive(archiveCtx, archiveID, resultURL)
+	}
 	if archiveErr != nil {
 		if archiveCtx.Err() != nil && ctx.Err() != nil {
 			return ctx.Err()

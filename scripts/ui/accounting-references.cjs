@@ -3,7 +3,7 @@ const {evidencePath} = require('./evidence.cjs');
 // Exercise account reports and model-specific media selection without paid calls.
 const {chromium}=require('playwright');
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
-const root=path.resolve(__dirname,'../../web/public/ui');
+const root=process.env.UI_SOURCE_DIR||path.resolve(__dirname,'../../web/public/ui');
 const server=http.createServer((req,res)=>{const file=path.join(root,req.url==='/'?'index.html':path.basename(req.url.split('?')[0]));if(!fs.existsSync(file))return res.writeHead(404).end();res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html');res.end(fs.readFileSync(file));});
 (async()=>{
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));

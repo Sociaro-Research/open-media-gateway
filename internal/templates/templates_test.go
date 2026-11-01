@@ -207,3 +207,51 @@ func TestZeroReferenceTemplatesCannotMapToAnotherWorkflow(t *testing.T) {
 		t.Fatal("zero-reference switch silently introduced a marker")
 	}
 }
+
+func TestGenerationSettingsLegacyAndModelCapabilities(t *testing.T) {
+	model := danceModel()
+	model.DefaultDuration = 9
+	d := Definition{MediaType: "video", Slots: []Slot{{ID: "image:1", Type: "image", Index: 1, Role: "reference"}}, Options: core.MediaOptions{ReferenceMode: "references"}}
+	options, err := d.OptionsFor(model)
+	if err != nil {
+		t.Fatal(err)
+	}
+	normalized, err := core.NormalizeModelOptions(model, options)
+	if err != nil || normalized.Duration != 9 {
+		t.Fatal("legacy must use model default, not five seconds", normalized, err)
+	}
+	model.DurationStep = 2
+	d.Options.Duration = 5
+	if d.ValidateGenerationOptions(model) == nil {
+		t.Fatal("off-step duration accepted")
+	}
+	d.Options.Duration = 6
+	if err := d.ValidateGenerationOptions(model); err != nil {
+		t.Fatal(err)
+	}
+	model.DurationFromInput = true
+	if d.ValidateGenerationOptions(model) == nil {
+		t.Fatal("input-derived duration overridden")
+	}
+	d.Options.Duration = 0
+	model.SupportsAudio, model.AudioAlwaysOn = true, true
+	disabled := false
+	d.Options.GenerateAudio = &disabled
+	if d.ValidateGenerationOptions(model) == nil {
+		t.Fatal("mandatory audio disabled")
+	}
+	enabled := true
+	d.Options.GenerateAudio = &enabled
+	if err := d.ValidateGenerationOptions(model); err != nil {
+		t.Fatal(err)
+	}
+	model.ReferenceModes[0].Ratios = []string{"9:16"}
+	d.Options.Ratio = "16:9"
+	if d.ValidateGenerationOptions(model) == nil {
+		t.Fatal("workflow ratio restriction ignored")
+	}
+	d.Options.Ratio = "9:16"
+	if err := d.ValidateGenerationOptions(model); err != nil {
+		t.Fatal(err)
+	}
+}

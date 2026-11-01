@@ -1,4 +1,4 @@
-// File selection UI shared by typed template slots and cover media. Transport,
+// File selection UI shared by references, template media and provider logos. Transport,
 // authorization and durable bindings stay with the caller and existing API.
 (() => {
  'use strict';
@@ -20,10 +20,10 @@
   actions.append(upload);if(library)actions.append(library);actions.append(cancel,retry);
   preview.hidden=true;root.append(preview,title,actions,hint,status,input);
   let busy=false,operation=null,lastFile=null,depth=0,returnFocus=false,assignedName='';
-  const retained=()=>assignedName?' Current assignment remains '+assignedName+'.':' No new reference assigned.';
+  const retained=()=>config.retainedMessage?config.retainedMessage():assignedName?' Current assignment remains '+assignedName+'.':' No new reference assigned.';
   function limits(kind){const shared={image:30,video:200,audio:50}[kind]*1024*1024,rule=config.limits?.(kind)||{};return {shared,rule};}
   function message(text='',error=false){status.textContent=text;status.classList.toggle('error',error);}
-  function sync(){const locked=busy||!!config.locked?.();upload.disabled=locked;if(library)library.disabled=locked;retry.disabled=locked;cancel.disabled=!busy;cancel.hidden=!busy;root.setAttribute('aria-busy',String(busy));input.accept=config.kinds.flatMap(kind=>types[kind].filter(type=>{const allowed=limits(kind).rule.content_types;return !allowed?.length||allowed.some(item=>equivalent(item)===equivalent(type));})).join(',');hint.textContent=config.hint||config.kinds.map(kind=>{const {shared,rule}=limits(kind);return kind+' · '+(rule.max_bytes&&rule.max_bytes-1<shared?((rule.max_bytes-1)/1_000_000)+' MB':(shared/1024/1024)+' MiB')+' maximum';}).join(' · ');}
+  function sync(){const locked=busy||!!config.locked?.();upload.disabled=locked;input.disabled=locked;if(library)library.disabled=locked;retry.disabled=locked;cancel.disabled=!busy;cancel.hidden=!busy||config.cancelable?.()===false;root.setAttribute('aria-busy',String(busy));input.accept=config.kinds.flatMap(kind=>types[kind].filter(type=>{const allowed=limits(kind).rule.content_types;return !allowed?.length||allowed.some(item=>equivalent(item)===equivalent(type));})).join(',');hint.textContent=config.hint||config.kinds.map(kind=>{const {shared,rule}=limits(kind);return kind+' · '+(rule.max_bytes&&rule.max_bytes-1<shared?((rule.max_bytes-1)/1_000_000)+' MB':(shared/1024/1024)+' MiB')+' maximum';}).join(' · ');}
   function error(file){
    const kind=config.kinds.find(kind=>types[kind].includes(file.type));
    if(!kind)return file.name+': format '+(file.type||'unknown')+'; use a supported '+config.kinds.join(' or ')+' file ('+config.kinds.flatMap(kind=>types[kind]).join(', ')+').';
@@ -40,7 +40,7 @@
    catch(e){if(!config.signal?.aborted){message((e.name==='AbortError'?'Upload cancelled. Choose the file again or retry.':e.message)+retained(),true);retry.hidden=!lastFile;}}
    finally{config.signal?.removeEventListener('abort',abort);operation=null;busy=false;const restoreFocus=requestedFocus||root.contains(document.activeElement);config.onBusy?.(false,{restoreFocus});sync();if(restoreFocus&&root.isConnected&&!config.signal?.aborted&&!upload.disabled)upload.focus({preventScroll:true});}
   }
-  function select(files){if(busy||config.locked?.()||!files.length)return;retry.hidden=true;lastFile=null;if(files.length!==1){message('Choose one file for '+config.label+'.',true);return;}const file=files[0],problem=error(file);input.value='';if(problem){message(problem+retained(),true);return;}lastFile=file;return run(signal=>config.onFile(file,signal),file.name);}
+  function select(files){if(busy||config.locked?.()||!files.length)return;retry.hidden=true;lastFile=null;if(files.length!==1){message('Choose one file for '+config.label+'.',true);return;}const file=files[0],problem=config.validate?'':error(file);input.value='';if(problem){message(problem+retained(),true);return;}lastFile=file;return run(async signal=>{if(config.validate)await config.validate(file,signal);signal.throwIfAborted();return config.onFile(file,signal);},file.name);}
   input.onchange=()=>select([...input.files]);
   root.onclick=e=>{if(!e.target.closest('button,input,video,audio')&&!busy&&!config.locked?.()){returnFocus=root.contains(document.activeElement);input.click();}};
   root.ondragenter=e=>{if(e.dataTransfer?.types.includes('Files')){e.preventDefault();depth++;if(!busy&&!config.locked?.())root.classList.add('dragover');}};
@@ -60,7 +60,7 @@
   }
   function setLabel(label){config.label=label;root.setAttribute('aria-label',label);upload.setAttribute('aria-label',config.uploadLabel+' for '+label);}
   const dispose=()=>{operation?.abort();setPreview(null);};config.signal?.addEventListener('abort',dispose,{once:true});
-  const api={root,input,message,sync,setPreview,run,error,setLabel,dispose};sync();return api;
+  const api={root,input,message,sync,setPreview,run,error,setLabel,dispose,clearRetry(){lastFile=null;retry.hidden=true;}};sync();return api;
  }
  window.ReferenceUpload={create};
 })();

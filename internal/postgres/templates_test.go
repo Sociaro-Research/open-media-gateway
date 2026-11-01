@@ -154,3 +154,25 @@ func templateJSONEqual(a, b []byte) bool {
 	}
 	return reflect.DeepEqual(av, bv)
 }
+
+func TestTemplateGenerationSettingsPersistence(t *testing.T) {
+	db := auditDatabase(t, true)
+	repo := NewTemplateRepository(db)
+	t.Cleanup(func() { _ = repo.Close() })
+	ctx := context.Background()
+	for _, audio := range []bool{false, true} {
+		d := templates.Definition{Title: "Output settings", MediaType: "video", Options: core.MediaOptions{ReferenceMode: "references", Ratio: "9:16", Resolution: "1080p", Duration: 9, GenerateAudio: &audio}}
+		saved, err := repo.Save(ctx, templates.Record{ID: uuid.NewString(), Draft: d}, 0, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		saved, err = repo.Save(ctx, saved, saved.Version, "publish")
+		if err != nil {
+			t.Fatal(err)
+		}
+		reloaded, err := NewTemplateRepository(db).Get(ctx, saved.ID)
+		if err != nil || reloaded.Published == nil || !reflect.DeepEqual(reloaded.Draft.Options, d.Options) || !reflect.DeepEqual(reloaded.Published.Options, d.Options) {
+			t.Fatal(reloaded, err)
+		}
+	}
+}

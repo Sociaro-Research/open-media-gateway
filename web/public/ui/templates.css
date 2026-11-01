@@ -37,20 +37,13 @@
  .template-editor > .form-heading .form-heading-actions { width:100%; margin-left:0; grid-template-columns:repeat(2,minmax(0,1fr)); }
 }
 
-.template-reference-library { max-width:min(960px,calc(100vw - 32px)); }
-.template-reference-library .reference-dropzone { margin-bottom:24px; }
-.template-reference-library .reference-card { display:flex; flex-direction:column; gap:12px; padding:16px; }
-.template-reference-library .reference-name { white-space:normal; overflow-wrap:anywhere; }
-.template-reference-library button { min-height:44px; font-size:var(--type-body); }
-.template-reference-library small { overflow-wrap:anywhere; }
 
 .template-reference-preview :is(video,audio) { width:100%; max-width:100%; height:auto; display:block; }
 .template-editor .template-reference-preview { width:240px; }
 .template-editor .template-reference-preview img { height:auto; max-height:240px; object-fit:contain; }
 .template-fixed-reference { display:grid; gap:12px; min-width:0; }
 .template-fixed-reference h3,.template-fixed-reference p { margin:0; }
-.template-library-preview :is(img,video,audio) { width:100%; height:auto; max-height:280px; object-fit:contain; display:block; }
-.template-reference-preview video,.template-library-preview video { aspect-ratio:auto; object-fit:contain; background:var(--bg); }
+.template-reference-preview video { aspect-ratio:auto; object-fit:contain; background:var(--bg); }
 
 /* Templates shares the Playground panel and key components; only its gallery
    uses three responsive columns alongside the selection panel. */
@@ -94,3 +87,20 @@
 #templatesGallery .template-create-card { gap:12px; }
 #templatesGallery .template-create-card > .primary.compact { width:auto; min-width:0; flex:0 0 auto; }
 .template-card video:focus-visible { outline:2px solid var(--accent-text); outline-offset:3px; }
+
+/* A single audio option fills the template editor; narrow editors stack fields. */
+.template-editor .toggle-grid { grid-template-columns:minmax(0,1fr); }
+@media(max-width:600px) {
+ .template-editor .settings-grid { grid-template-columns:minmax(0,1fr); }
+}
+
+/* Audio controls have no intrinsic aspect ratio; auto height collapses in Chromium. */
+.template-reference-preview audio,.template-library-preview audio { height:54px; }
+
+/* Fixed inputs are a compact strip; full controls live in the shared modal. */
+.template-fixed-references { display:flex; gap:8px; overflow-x:auto; min-width:0; max-width:100%; padding:3px; }
+#templatesView .template-fixed-preview { flex:0 0 56px; width:56px; height:56px; min-height:56px; padding:0; overflow:hidden; border:1px solid var(--line); border-radius:12px; background:var(--field); color:var(--text); font-size:24px; }
+.template-fixed-preview :is(img,video) { width:100%; height:100%; object-fit:cover; pointer-events:none; }
+.template-fixed-preview:focus-visible { outline:2px solid var(--accent-text); outline-offset:1px; }
+.template-preview-dialog { width:min(640px,calc(100vw - 32px)); }
+.template-preview-dialog :is(img,video,audio) { display:block; max-width:100%; max-height:70vh; margin:auto; }

@@ -134,7 +134,7 @@ func (r *TemplateRepository) Save(ctx context.Context, input templates.Record, e
 	if _, err = tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(199079)`); err != nil {
 		return input, err
 	}
-	ids := []string{input.Draft.CoverID}
+	ids := []string{input.Draft.CoverID, input.Draft.OverrideSoundID}
 	for _, slot := range input.Draft.Slots {
 		ids = append(ids, slot.AssetID)
 	}
@@ -215,7 +215,7 @@ func (r *TemplateRepository) Asset(ctx context.Context, id string) (templates.As
 		return a, templates.ErrNotFound
 	}
 	e := r.db.QueryRowContext(ctx, `SELECT r.id,'',r.content_type,r.size_bytes,r.storage_key,COALESCE(r.content_sha256,''),
- r.template_published OR COALESCE((SELECT bool_or(published) FROM template_media WHERE id=r.id),false) OR EXISTS(SELECT 1 FROM generation_templates t WHERE t.published->>'cover_id'=r.id::text OR EXISTS(SELECT 1 FROM jsonb_array_elements(COALESCE(NULLIF(t.published->'slots','null'::jsonb),'[]')) s WHERE s->>'asset_id'=r.id::text)),r.name,r.id,COALESCE(r.storage_owner_id::text,r.owner_id::text)
+ r.template_published OR COALESCE((SELECT bool_or(published) FROM template_media WHERE id=r.id),false) OR EXISTS(SELECT 1 FROM generation_templates t WHERE t.published->>'cover_id'=r.id::text OR t.published->>'override_sound_id'=r.id::text OR EXISTS(SELECT 1 FROM jsonb_array_elements(COALESCE(NULLIF(t.published->'slots','null'::jsonb),'[]')) s WHERE s->>'asset_id'=r.id::text)),r.name,r.id,COALESCE(r.storage_owner_id::text,r.owner_id::text)
  FROM reference_images r WHERE NOT r.deleting AND r.owner_id=$2 AND r.id=$1`, id, templates.LibraryOwnerID).Scan(&a.ID, &a.TemplateID, &a.ContentType, &a.SizeBytes, &a.StorageKey, &a.SHA256, &a.Published, &a.Name, &a.LibraryReferenceID, &a.StorageOwnerID)
 	if errors.Is(e, sql.ErrNoRows) {
 		e = templates.ErrNotFound

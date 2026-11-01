@@ -96,6 +96,18 @@ func (r *TaskRepository) CreateOrGet(ctx context.Context, task core.Task, idempo
 		return stored, false, nil
 	}
 
+	if sound := task.Options.OverrideSound; sound != nil {
+		if err := sourceAssetLock(ctx, tx, sound.OwnerID, sound.ReferenceID); err != nil {
+			return core.Task{}, false, err
+		}
+		var valid bool
+		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM reference_images WHERE owner_id::text=$1 AND id::text=$2 AND NOT deleting AND storage_key=$3 AND content_sha256=$4 AND size_bytes=$5)`, sound.OwnerID, sound.ReferenceID, sound.StorageKey, sound.SHA256, sound.SizeBytes).Scan(&valid); err != nil {
+			return core.Task{}, false, err
+		}
+		if !valid {
+			return core.Task{}, false, core.ErrOptionsInvalid
+		}
+	}
 	if task.ProjectID != "" {
 		if err := projectAccess(ctx, tx, task.ProjectID); err != nil {
 			return core.Task{}, false, err

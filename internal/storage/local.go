@@ -77,6 +77,10 @@ func (s *Local) Archive(ctx context.Context, taskID, sourceURL string) (core.Sto
 		return core.StoredMedia{}, err
 	}
 	defer reader.Close()
+	return s.archiveReader(ctx, taskID, reader, contentType, size, sourceURL)
+}
+
+func (s *Local) archiveReader(ctx context.Context, taskID string, reader io.Reader, contentType string, size int64, sourceURL string) (core.StoredMedia, error) {
 	if size > s.maxBytes {
 		return core.StoredMedia{}, fmt.Errorf("provider result exceeds STORAGE_MAX_BYTES (%d)", s.maxBytes)
 	}

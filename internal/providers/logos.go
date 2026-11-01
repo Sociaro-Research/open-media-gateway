@@ -39,6 +39,19 @@ func (m *Manager) SaveLogo(ctx context.Context, id string, data []byte) (string,
 	return logoURL(ctx, id, data), nil
 }
 
+func (m *Manager) RemoveLogo(ctx context.Context, id string) error {
+	if _, err := m.repo.Get(ctx, id); err != nil {
+		return err
+	}
+	repo, ok := m.repo.(interface {
+		RemoveLogo(context.Context, string) error
+	})
+	if !ok {
+		return errors.New("provider logo storage is unavailable")
+	}
+	return repo.RemoveLogo(ctx, id)
+}
+
 func logoURL(ctx context.Context, id string, data []byte) string {
 	digest := sha256.Sum256(data)
 	result := "/provider-assets/" + url.PathEscape(identity.ProviderOwnerID(ctx)) + "/" + url.PathEscape(id) + "/icon.png?v=" + hex.EncodeToString(digest[:])

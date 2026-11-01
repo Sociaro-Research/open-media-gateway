@@ -505,7 +505,7 @@ function renderTasks(tasks) {
 }
 
 async function api(path, options = {}) {
- if(sharedConfiguration){path=path.replace(/^\/v1\/admin\/(providers|storage)(?=[/?]|$)/,'/v1/system/$1');}
+ if(options.providerScope??sharedConfiguration){path=path.replace(/^\/v1\/admin\/(providers|storage)(?=[/?]|$)/,'/v1/system/$1');}
 
   const management = path.startsWith('/provider-assets/') || path.startsWith('/v1/workspace-authorizations/') || path.startsWith('/v1/workspace-installations') || path.startsWith('/v1/sales/') || /^\/v1\/(client-onboardings(?:[/?]|$)|organizations(?:[/?]|$)|invitations\/|audit\/|shared\/|system\/|admin\/|api-keys(?:[/?]|$)|me(?:[/?]|$))/.test(path);
   const useKey = options.providerLogoGeneration || !management || authMode === 'api_key';
@@ -528,6 +528,7 @@ async function api(path, options = {}) {
   if (useKey && (key !== window.GenerationKey.value() || keyVersion !== generationKeyVersion)) throw new DOMException('API key changed', 'AbortError');
   options.signal?.throwIfAborted();
   if (!response.ok) {
+    if(response.status===401||response.status===403)ProviderLogos.clear();
     const error = new Error(body.error?.message || `HTTP ${response.status}`);
     error.status = response.status;
     error.code = body.error?.code;
@@ -537,7 +538,10 @@ async function api(path, options = {}) {
   return body;
 }
 
-ProviderLogos.configure({request:api});
+ProviderLogos.configure({request:api,context:url=>{
+  const key=authMode==='api_key'||new URL(url||location.href,location.origin).searchParams.get('generation')==='1';
+  return providerLogoSession+'/'+(key?'key-'+generationKeyVersion:'session')+'/'+(window.Workspace?.id()||'personal');
+}});
 
 function setProviderMessage(text = '', type = '') {
   elements.providerMessage.textContent = text;
@@ -550,12 +554,9 @@ function setProviderCheckFeedback(text = '', type = '') {
 }
 
 function providerStatusLabel(provider) {
-  if (!provider.configured) return 'Not configured';
-  if (provider.status === 'error') return 'Failed';
-  if (provider.status === 'unverified') return 'Not verified';
-  if (!provider.enabled) return 'Disabled';
-  if (provider.status === 'authenticated') return 'Authentication verified';
-  return 'Connected';
+  const connection = provider.archived ? 'Archived' : !provider.configured ? 'Not configured' : !provider.enabled ? 'Disabled' : 'Connected';
+  const verification = provider.configured && provider.status === 'authenticated' ? 'Verified' : 'Unverified';
+  return `${connection}, ${verification}`;
 }
 
 function renderProviderAdminList() {
@@ -602,14 +603,15 @@ function renderProviderDetail(provider) {
   const logoHost = document.querySelector('#providerLogoEditor');
   logoHost.hidden = !systemAdministrator;
   const logoScope = sharedConfiguration, logoID = provider.id, logoSession=providerLogoSession;
-  if (systemAdministrator) ProviderLogos.editor(logoHost, provider, {api, identity:logoSession+'/'+logoScope+'/'+logoID,
+  if (systemAdministrator) ProviderLogos.editor(logoHost, provider, {api:(path,options={})=>{if(providerLogoSession!==logoSession)return Promise.reject(new DOMException('Session changed','AbortError'));return api(path,{...options,providerScope:logoScope});}, identity:logoSession+'/'+logoScope+'/'+logoID,
     current:()=>selectedAdminProviderID===logoID && sharedConfiguration===logoScope && providerLogoSession===logoSession,
     saved:iconURL=>{
       if (sharedConfiguration!==logoScope || providerLogoSession!==logoSession) return;
       // Connection dialogs retain this metadata object beside their own drafts.
+      const previous=providerAdminCatalog.find(p=>p.id===logoID)?.icon_url;
       for (const p of providerAdminCatalog) if (p.id===logoID) p.icon_url=iconURL;
       renderProviderAdminList();
-      ProviderLogos.refresh(iconURL);
+      if(iconURL||previous)ProviderLogos.refresh(iconURL||previous,!iconURL);
       // Reconcile icons through the active generation key's actual resource scope.
       if (GenerationKey.value()) api('/v1/providers').then(response=>{
         const icons = new Map((response.data||[]).map(p=>[p.id,p.icon_url]));
@@ -661,7 +663,7 @@ function selectAdminProvider(id) {
   setProviderCheckFeedback();
 }
 
-let providerLoadSequence=0;
+let providerLoadSequence=0, providerCheckSequence=0;
 async function loadAdminProviders(showErrors = true) {
  window.ProviderConnections?.setup();
  const sequence=++providerLoadSequence,scope=sharedConfiguration;
@@ -690,6 +692,8 @@ async function loadAdminProviders(showErrors = true) {
 async function updateAdminProvider(payload, successMessage, showSaved = false) {
   const id = selectedAdminProviderID;
   if (!id) return;
+  ++providerLoadSequence;
+  ++providerCheckSequence;
   // Model actions live outside the form but mutate the same submitted draft.
   const controls = [...elements.providerForm.querySelectorAll('input,select,textarea,button'), ...document.querySelectorAll('#manualModelSettings button'), elements.adminProviderEnabled];
   const disabled = controls.map(control => control.disabled);
@@ -797,6 +801,7 @@ async function authRequest(path) {
 
 function setAuthState(state) {
   authState = state;
+  if(state==='anonymous'||state==='error')ProviderLogos.clear();
   const checking = state === 'checking', failed = state === 'error';
   document.querySelector('#authCheck').hidden = !checking && !failed;
   document.querySelector('#authCheckStatus').textContent = failed
@@ -822,11 +827,24 @@ function fillSelect(select, values, preferred) {
   select.replaceChildren(...values.map(value => new Option(value, value, false, value === preferred)));
 }
 
+let playgroundSound=null;
+window.addEventListener('gateway-reference-deleted',event=>{
+ const {id,scope,keyVersion}=event.detail;
+ if(['organization','template'].includes(scope)&&keyVersion===generationKeyVersion&&playgroundSound?.value===id)playgroundSound.clear();
+});
+function syncOverrideSound(model){
+ if(!playgroundSound){
+ playgroundSound=OverrideSound.create({upload:(file,signal)=>ReferenceValidation.upload(file,{signal,expectedKey:elements.apiKey.value.trim()}),onChange:()=>updatePrice(),onBusy:busy=>{elements.submit.disabled=busy;}});
+ document.querySelector('#generationSettings').append(playgroundSound.root);
+ }
+ playgroundSound.root.hidden=model?.media_type!=='video';
+}
 function updateModelUI() {
   const provider = selectedProvider();
   const model = selectedModel();
   document.querySelector('#generationSettings').hidden = !provider || !model;
   elements.priceCard.hidden = !model;
+  syncOverrideSound(model);
   if (!provider || !model) { clearTimeout(quoteTimer); ++quoteSequence; return; }
   const isVideo = model.media_type === 'video';
   const isImage = model.media_type === 'image';
@@ -973,6 +991,7 @@ function formatPrice(value) {
 
 function updatePrice() {
  if(currentConsoleSection==='templates'){elements.priceCard.hidden=true;return;}
+ elements.priceCard.hidden = !window.GenerationKey.value() || !selectedModel();
  clearTimeout(quoteTimer);
  const sequence=++quoteSequence;
  const request=estimateRequest(); if(!request) return;
@@ -1000,6 +1019,7 @@ async function refreshGenerationBudget() {
  const sequence = ++budgetSequence, panel = document.querySelector('#generationKeyBudget');
  const key = window.GenerationKey.value();
  panel.hidden = !key;
+ panel.classList.remove('over-budget');
  if (!key) { panel.replaceChildren(); return; }
  if (panel.dataset.keyState !== 'loaded') panel.textContent = 'Loading key…';
  const node = (tag, text, className) => { const el = document.createElement(tag); el.textContent = text; if (className) el.className = className; return el; };
@@ -1011,17 +1031,14 @@ async function refreshGenerationBudget() {
   if (!result.key) { panel.append(node('p', 'Service key')); return; }
   panel.append(node('strong', result.key.name, 'generation-key-name'));
   const o=result.organization;
-  panel.append(node('p',`${o?.name || (result.key.organization_id?'Organization unavailable':'Profile')} · ${result.key.resource_mode==='shared'?'Shared':'Personal'} providers and storage`));
-  if (result.key.resource_mode!=='shared') {panel.append(node('p','Generation is billed to your provider account.'));return;}
-  if (!o) {panel.append(node('p','Organization allowance unavailable.'));return;}
   const stats=node('dl','','generation-budget-stats');
-  for(const [label,value] of [['This week',usd(o.weekly_committed_usd)],['Weekly limit',o.weekly_limit_usd==null?'Unlimited':usd(o.weekly_limit_usd)]]){
-    const item=node('div','');item.append(node('dt',label),node('dd',value));stats.append(item);
+  const item=node('div','');
+  const limit=result.key.resource_mode!=='shared'?'Not applicable':!o?'Unavailable':o.weekly_limit_usd==null?'Unlimited':usd(o.weekly_limit_usd);
+  item.append(node('dt','Weekly limit'),node('dd',limit));stats.append(item);panel.append(stats);
+  if(result.key.resource_mode==='shared'&&o){
+   const weeklyRemaining=o.weekly_limit_usd==null?Infinity:o.weekly_limit_usd-o.weekly_committed_usd;
+   panel.classList.toggle('over-budget', Math.min(o.available_usd,weeklyRemaining)<0);
   }
-  panel.append(stats,node('p',weeklyResetText(),'generation-budget-month'));
-  const weeklyRemaining=o.weekly_limit_usd==null?Infinity:o.weekly_limit_usd-o.weekly_committed_usd;
-  if(o.available_usd<weeklyRemaining)panel.append(node('p',`Organization funds available: ${usd(o.available_usd)}.`, 'generation-budget-warning'));
-  panel.classList.toggle('over-budget', Math.min(o.available_usd,weeklyRemaining)<0);
 
  } catch (error) {
   if (sequence !== budgetSequence || key !== window.GenerationKey.value()) return;
@@ -1045,6 +1062,7 @@ async function loadProviders() {
 
 function requestOptions(model) {
   const options = {};
+  if(model.media_type==='video'&&playgroundSound?.value)options.override_sound_id=playgroundSound.value;
   const parameters={};for(const field of model.parameters||[]){const input=document.getElementById('model-param-'+field.key);if(!input)continue;if(input.type==='checkbox')parameters[field.key]=input.checked;else if(input.value!=='')parameters[field.key]=['number','integer'].includes(field.type)?Number(input.value):input.value;}if(Object.keys(parameters).length)options.parameters=parameters;
 
   if (model.media_type !== 'speech' && !model.no_watermark) options.watermark = elements.watermark.checked;
@@ -1060,9 +1078,9 @@ function requestOptions(model) {
   if (!model.no_seed && elements.seed.value !== '') options.seed = Number(elements.seed.value);
   if (model.supports_negative_prompt && elements.negativePrompt.value.trim()) options.negative_prompt = elements.negativePrompt.value.trim();
   if (!document.querySelector("#referenceModeField").hidden) options.reference_mode=document.querySelector("#referenceMode").value;
-  if (model.supports_image_input && !elements.imageURLsField.hidden) options.image_urls = elements.imageURLs.value.split('\n').map(value => value.trim()).filter(Boolean);
-  if (model.supports_video_input && !elements.videoURLField.hidden && elements.videoURL.value.trim()) options.video_urls = elements.videoURL.value.split('\n').map(v=>v.trim()).filter(Boolean);
-  if (model.supports_audio_input && !elements.audioURLField.hidden && elements.audioURL.value.trim()) options.audio_urls = elements.audioURL.value.split('\n').map(v=>v.trim()).filter(Boolean);
+  if (model.supports_image_input && !elements.imageURLsField.hidden) options.image_urls = window.referencePicker?.values('image') || elements.imageURLs.value.split('\n').map(value => value.trim()).filter(Boolean);
+  if (model.supports_video_input && !elements.videoURLField.hidden && (elements.videoURL.value.trim()||window.referencePicker?.values('video').some(v=>!v))) options.video_urls = window.referencePicker?.values('video') || elements.videoURL.value.split('\n').map(v=>v.trim()).filter(Boolean);
+  if (model.supports_audio_input && !elements.audioURLField.hidden && (elements.audioURL.value.trim()||window.referencePicker?.values('audio').some(v=>!v))) options.audio_urls = window.referencePicker?.values('audio') || elements.audioURL.value.split('\n').map(v=>v.trim()).filter(Boolean);
   if (model.supports_voice) options.voice = elements.voice.value;
   if (model.media_type === 'speech') {
     if (!model.no_language) options.language = elements.language.value;
@@ -1088,8 +1106,10 @@ window.addEventListener('gateway-project-change', event => {
 });
 window.addEventListener('gateway-key-change', () => {
   generationKeyVersion++;
+  ProviderLogos.prune();
   taskListRequest?.controller.abort();
   elements.taskList.querySelectorAll('.task').forEach(disposeTaskCard);
+  playgroundSound?.clear();
   providerCatalog = []; latestTasks = []; taskCompletionUntil.clear(); renderedTasksFingerprint = ''; pendingSubmission = null;
   window.referencePicker?.reset();
   if(dialog.open&&!submitting)dialog.close();
@@ -1153,21 +1173,24 @@ elements.providerForm.addEventListener('submit', event => {
 });
 elements.checkProvider.addEventListener('click', async () => {
   if (!selectedAdminProviderID) return;
-  const id = selectedAdminProviderID;
+  const id = selectedAdminProviderID, scope = sharedConfiguration, sequence = providerLoadSequence;
+  const checkSequence = ++providerCheckSequence;
+  const current = () => scope === sharedConfiguration && sequence === providerLoadSequence && checkSequence === providerCheckSequence;
   elements.checkProvider.disabled = true;
   setProviderCheckFeedback('Checking connection…');
   try {
     const provider = await api(`/v1/admin/providers/${id}/check`, {method: 'POST'});
+    if (!current()) return;
     providerAdminCatalog = providerAdminCatalog.map(item => item.id === provider.id ? provider : item);
     renderProviderAdminList();
     if (selectedAdminProviderID === id) {
       renderProviderDetail(provider);
-      setProviderCheckFeedback(provider.status_message || (provider.status === 'connected' ? 'Connection verified.' : 'Connection status updated.'), provider.status === 'error' ? 'error' : ['connected','authenticated'].includes(provider.status) ? 'success' : '');
+      setProviderCheckFeedback(provider.status_message || (provider.status === 'authenticated' ? 'Authentication verified.' : 'Connection status updated.'), provider.status === 'error' ? 'error' : ['connected','authenticated'].includes(provider.status) ? 'success' : '');
     }
   } catch (error) {
-    if (selectedAdminProviderID === id) setProviderCheckFeedback(`Connection check failed: ${error.message}`, 'error');
+    if (current() && selectedAdminProviderID === id) setProviderCheckFeedback(`Connection check failed: ${error.message}`, 'error');
   } finally {
-    elements.checkProvider.disabled = false;
+    if (checkSequence === providerCheckSequence) elements.checkProvider.disabled = false;
   }
 });
 elements.model.addEventListener('change', updateModelUI);
@@ -1231,15 +1254,17 @@ function updateTimer(timer) {
   const minutes = Math.floor(seconds % 3600 / 60);
   timer.textContent = `Time ${hours ? hours+'h ' : ''}${minutes ? minutes+'m ' : ''}${seconds % 60}s`;
 }
-function reuseTask(task) {
+function reuseTask(task, {sparse=false}={}) {
   const provider = providerCatalog.find(item => item.id === task.provider);
   if (!provider?.models.some(item => item.id === task.model)) {
     setMessage('This provider or model is unavailable. Enable it in Providers before copying.', 'error');
     elements.message.scrollIntoView({block: 'center'});
     return;
   }
+  window.referencePicker?.restoreSlots(sparse?task.options:null);
   updateModelSelection(modelSelectionValue(task.provider, task.model));
   const options = task.options || {};
+  playgroundSound?.restore(options.override_sound_id);
   const defaults = optionDefaults(selectedModel());
   for (const [key, field] of Object.entries(optionFields)) {
     const input = elements[field] || document.getElementById(field);
@@ -1260,6 +1285,21 @@ function reuseTask(task) {
   setMessage('Parameters copied. Ready to edit.', 'success');
   elements.prompt.scrollIntoView({behavior: 'smooth', block: 'center'});
   elements.prompt.focus({preventScroll: true});
+}
+// Explicit handoff reuses the ordinary editor, without changing its submission path.
+async function openTemplateInPlayground(source, signal) {
+  const key=GenerationKey.value();
+  const response=await api('/v1/providers',{signal,expectedKey:key});signal.throwIfAborted();
+  if(!response.data?.some(p=>p.id===source.provider&&p.models.some(m=>m.id===source.model)))throw Error('This model is no longer available. Choose another model.');
+  return new Promise(resolve=>{
+    const modal=document.createElement('dialog'),text=document.createElement('p'),actions=document.createElement('div'),apply=document.createElement('button');
+    const close=()=>{signal.removeEventListener('abort',close);modal.close();modal.remove();resolve();};
+    FormUI.dialogHeading(modal,'Advanced editing',close);
+    text.textContent='Open these template values in Playground? This replaces the current Playground draft. The template stays unchanged.';
+    actions.className='dialog-actions';apply.type='button';apply.className='primary';apply.textContent='Open in Playground';
+    apply.onclick=()=>{if(signal.aborted||GenerationKey.value()!==key){close();return;}providerCatalog=response.data;close();showConsoleSection('generation');reuseTask(source,{sparse:true});};
+    actions.append(apply);modal.append(text,actions);modal.addEventListener('cancel',e=>{e.preventDefault();close();});signal.addEventListener('abort',close,{once:true});document.body.append(modal);modal.showModal();
+  });
 }
 function closeConfirmation() {
   if (submitting) return;
@@ -1302,6 +1342,7 @@ function retryTask(task, trigger) {
   openGenerationConfirmation({prompt: task.prompt ?? promptHistory[task.id] ?? '', provider: task.provider, model: task.model, media_type: task.media_type, options: task.options || {}, ...(task.project_id ? {project_id:task.project_id} : {})}, trigger.closest('.task-menu').querySelector('summary'));
 }
 async function openGenerationConfirmation(source, trigger) {
+ if(!source?.template && playgroundSound?.busy)return;
   if (submitting || dialog.open) return;
   if (!window.GenerationKey.value()) { setMessage('Enter a valid Gateway API key above.', 'error'); return; }
   const provider = (source.template ? source.template_catalog || providerCatalog : providerCatalog).find(item => item.id === source.provider);
@@ -1418,6 +1459,7 @@ async function initialize() {
   if (initializationPending) return;
   initializationPending = true;
   providerLogoSession++;
+  ProviderLogos.prune();
   const retryFocused = document.activeElement === document.querySelector('#authRetry');
   setAuthState('checking');
   let user;

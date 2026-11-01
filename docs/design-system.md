@@ -67,7 +67,7 @@ validate the same 1440/390/320 px layouts and keyboard controls as email sign-in
 - **Dates/months:** use the shared calendar, including its icon, navigation, selection, Clear/Today actions and keyboard controls. Never introduce a native browser calendar as an alternative.
 - **Model selection:** always use `ModelPicker`: provider groups, model names, information button; internal name search, release-date cutoff and content-type filter. Provider headings use 32px square artwork, 16px bold names, at least 64px height and 16px separation with a shared divider between groups. Every provider logo uses the original PNG in dark theme and `brightness(0)` in light theme, preserving transparency and antialiased edges. Missing or failed artwork uses an initial in the same slot. Long names wrap; distinct connections retain separate headings even with equal display names. Filters combine and never select a model automatically. Keep filters in one row on wide screens and stack them on narrow screens; keep them visible while results scroll.
 - **Scrollbars:** one global style: transparent track/corner; 8px width; rounded thumb mixing accent 45% with border color; accent on hover. Firefox uses the shared thin scrollbar equivalent. No local overrides.
-- **Provider settings:** show connection settings in expanded cards using the shared provider header, availability switch and field grid. Administrators can immediately upload a provider logo through the native accessible file control, separate from credential drafts. Accept only decoded transparent PNG, up to 1 MiB and 2048 pixels per side; retain the confirmed image and show local retry feedback after failure. The logo preview retains its fixed square size and stacks above its hint/control below 420px to keep the format guidance readable. Use an unlabeled header switch with an accessible provider-specific name. Payment modes are **Production** and **Test**. Place credential validation beside the relevant field in `.field-action-row.control-row`; validation of saved credentials is unavailable while that credential has unsaved changes. Put settings shared by all providers above the cards; avoid Configure buttons and repeated scope explanations.
+- **Provider settings:** show connection settings in expanded cards using the shared provider header, availability switch and field grid. Administrators immediately upload provider logos through the shared `ReferenceUpload` dropzone, separate from credential drafts. Hide native file-input chrome; reuse its styled keyboard picker, drag/drop, small muted hint and progress/error/retry states. Show a round 44px remove control beside installed artwork; removal persists immediately, retains credential drafts and restores the no-logo state. Accept only decoded transparent PNG, up to 1 MiB and 2048 pixels per side; retain the confirmed image and show local retry feedback after failure. The compact square preview keeps the remove action beside it; upload actions and the 11px format hint wrap within the shared dropzone on narrow screens. Use an unlabeled header switch with an accessible provider-specific name. Payment modes are **Production** and **Test**. Place credential validation beside the relevant field in `.field-action-row.control-row`; validation of saved credentials is unavailable while that credential has unsaved changes. Put settings shared by all providers above the cards; avoid Configure buttons and repeated scope explanations.
 - **Payment provider actions:** the form includes its shared card header. Save
   and the new-provider Cancel use `.form-heading-actions` beside the immediate
   availability switch, with equal 40px heights and 12px gaps. Save remains
@@ -447,6 +447,25 @@ matching/consent. Preserve the remote/local workspace distinction and use the
 existing company funding controls. The new primary flow never collects a remote
 password in the local portal; the existing-key option is an advanced fallback.
 
+## Reference libraries
+
+`reference-library.js` owns the common dialog, cards, selected state, media
+previews and permanent-delete confirmation, using the Playground design in
+`references.css`. Playground and Templates configure this component rather than
+copying its markup. Transport adapters retain their existing authorization and
+model/slot validation. Never reconstruct media paths from the current owner;
+render the URL returned by the authorized library response.
+
+Playground keeps its multiple-reference selection and provider-specific library
+adapter. Template user slots select one compatible organization reference;
+choosing another replaces only that slot and choosing the selected file clears
+it. Template editing uses the instance template library and administrator
+mutation endpoints. Uploading to that library does not assign a slot. Delete
+cancellation or rejection retains the selection; confirmed organization-file
+deletion clears matching retained selections in both screens. Native audio/video
+preview controls sit outside the selection button so playback cannot assign a
+reference. Preview failures offer a retry without changing the binding.
+
 ## Templates
 
 The shared gallery reuses cards, fields, `ModelPicker`, reference-library dialogs,
@@ -460,8 +479,10 @@ and Edit actions. There is no management-mode switch.
 Cover media preserves its complete natural aspect ratio, including portrait
 video, and has a textual failure state. Mouse hover previews pause on leave;
 keyboard users focus the video and press Space/Enter; touch users tap the video. Cards have no separate Play/Pause preview button. Reduced-motion preferences
-disable hover playback. Devices without hover ignore compatibility mouse-enter events after touch. Changing or leaving media disposes the previous player. Prompt
-reading uses a native collapsed details/summary disclosure with plain text.
+disable hover playback. Devices without hover ignore compatibility mouse-enter events after touch. Changing or leaving media disposes the previous player. Fixed references use a single horizontally scrolling row of 56px preview buttons
+below the description, with accessible labels and full media in the shared modal.
+The runner omits the prompt; Advanced editing opens the existing Playground after
+explicit draft replacement confirmation.
 Missing slots use labeled file/library controls; fixed slots have no user editor.
 Authoring reuses the shared native-textarea reference mirror and declared prompt
 syntax contract. Reviewed variable slots count as bound references even without
@@ -479,3 +500,20 @@ they do not change global headings or unrelated Settings styles.
 The Administrator uses the shared versioned Save pattern. All new surfaces use
 shared theme tokens and stack within the 320px viewport. No visual exception is
 required.
+
+## Shared generation key panel
+
+Playground and Templates move the same key panel between their hosts. Keep the
+credential field, Forget key and a secondary Manage keys button, followed by
+the key name and weekly limit. Omit saved-state actions, policy/billing prose,
+reset dates and storage usage. Show creation/restoration actions only without an
+active key. Preserve transient loading/error feedback, keyboard focus after
+Forget and existing storage/generation enforcement outside this panel. Actions
+wrap within narrow panels using shared button styles; no design exception.
+
+Override Sound uses the shared `ReferenceUpload` dropzone, keyboard file picker,
+progress/cancel/retry feedback and native audio preview in Playground and the
+Template editor. Its separate removal action clears the assignment; uploaded
+library media retains its existing lifecycle. It adds no independent library
+picker. The section is available for video output and remains visible when an
+existing template assignment needs removal after a model change.

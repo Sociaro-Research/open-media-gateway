@@ -1,7 +1,7 @@
 # Agnes AI provider
 
 Reviewed against the [official documentation](https://www.agnes-ai.com/en/docs/overview)
-and public API catalog on 2026-09-30. The adapter ID is `agnes`. No vendor SDK or
+and API catalog; authentication rechecked on 2026-10-30. The adapter ID is `agnes`. No vendor SDK or
 database migration is required. Compose already loads the optional `.env` into
 gateway and worker, so the module's environment aliases need no Compose edit.
 
@@ -26,20 +26,28 @@ AGNES_MODEL=agnes-image-2.5-flash
 Saved encrypted credentials remain authoritative. Gateway and worker need the
 same encryption key and runtime settings. Keys are masked in management responses.
 The module uses the shared credential controls and generic provider presentation;
-no new UI component or custom layout is needed. The included square Agnes icon
-is retained alongside the other provider assets.
+no new UI component or custom layout is needed.
 
-`GET /v1/models` on Agnes returned HTTP 200 **without a key** during review.
-Discovery therefore proves only that the global catalog is reachable. The
-shared connection-check action deliberately reports unverified access instead of
-marking an arbitrary key as valid or making a generation call. Only an explicit
-generation can verify model access; the module never generates during setup.
+**Check connection** performs a read-only authenticated `GET /v1/models`.
+On 2026-10-30 the official endpoint returned HTTP 401 for both a missing key
+and a deliberately invalid synthetic key. This supersedes the September review,
+when the endpoint was public. The [official authentication guide](https://wiki.agnes-ai.com/en/docs/overview)
+requires a Bearer API key; [error documentation](https://wiki.agnes-ai.com/en/docs/code)
+distinguishes 401 authentication failures from 403 access restrictions.
 
-This integration also extends the shared module contract with `PublicCatalog`
-and displays module-provided estimate qualifications in catalog prices. Neither
-change requires a provider-name branch or a custom UI component.
-The existing aspect-ratio picker is also enabled for image models that declare
-ratios, defaulting to the first declared image ratio instead of the video default.
+Only an explicit check with a successful, structurally valid model-list response
+establishes **Verified**. Discovery, cached/manual models and the offline catalog
+fallback cannot verify a key. HTTP errors, semantic errors and malformed replies
+remain unverified. The check never generates content; it also works with a manual
+catalog without following discovery or polling endpoint overrides. Authentication
+expires after five minutes in process memory and resets on configuration changes.
+
+Verification proves acceptance of the key by that read endpoint only. It does not
+prove per-model generation grants, available balance, quota or successful output.
+An empty authenticated catalog is not evidence of model access. Real-key success
+must be checked through the normal application control; fixtures do not establish
+that an operator's key is valid.
+
 
 ## Implemented models
 
