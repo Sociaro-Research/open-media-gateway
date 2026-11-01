@@ -36,12 +36,17 @@ func (r *repoStub) SetProviderResultURL(_ context.Context, _ string, resultURL s
 	r.task.ProviderResultURL = &resultURL
 	return nil
 }
-func (r *repoStub) MarkSucceeded(_ context.Context, _ string, result core.StoredMedia, _ string) error {
+func (r *repoStub) MarkSucceeded(_ context.Context, _ string, result core.StoredMedia, lastFrameURL string) error {
 	r.task.Status = core.TaskSucceeded
 	url := "/v1/generations/" + r.task.ID + "/content"
 	r.task.ResultURL = &url
 	r.task.StorageKey = &result.StorageKey
-	r.task.LastFrameStorageKey = &result.LastFrameStorageKey
+	if result.LastFrameStorageKey != "" {
+		r.task.LastFrameStorageKey = &result.LastFrameStorageKey
+	}
+	if lastFrameURL != "" {
+		r.task.LastFrameURL = &lastFrameURL
+	}
 	return nil
 }
 func (r *repoStub) MarkFailed(_ context.Context, _ string, message string) error {
@@ -128,13 +133,17 @@ func TestProcessQueuedTaskToSuccess(t *testing.T) {
 }
 
 type artifactStorage struct {
-	cancel    context.CancelFunc
-	ids       []string
-	failFrame bool
+	cancel      context.CancelFunc
+	ids         []string
+	failFrame   bool
+	failPrimary bool
 }
 
 func (s *artifactStorage) Archive(_ context.Context, taskID, sourceURL string) (core.StoredMedia, error) {
 	s.ids = append(s.ids, taskID)
+	if s.failPrimary && len(s.ids) == 1 {
+		return core.StoredMedia{}, fmt.Errorf("primary upload failed")
+	}
 	if s.cancel != nil && len(s.ids) == 2 {
 		s.cancel()
 		return core.StoredMedia{}, context.Canceled
@@ -144,23 +153,44 @@ func (s *artifactStorage) Archive(_ context.Context, taskID, sourceURL string) (
 	}
 	return core.StoredMedia{StorageKey: "s3:connection/" + taskID + "/image.png", ContentType: "image/png"}, nil
 }
-func TestArchiveIncludesLastFrameAndFailsOnMissingArtifact(t *testing.T) {
-	for _, fail := range []bool{false, true} {
-		repo := &repoStub{task: core.Task{ID: "frame-task", Status: core.TaskRunning}}
-		dest := &artifactStorage{failFrame: fail}
-		w := &Worker{repo: repo, storage: dest}
-		if err := w.archiveResult(context.Background(), context.Background(), repo.task, "https://provider/video", "https://provider/frame"); err != nil {
-			t.Fatal(err)
-		}
-		if len(dest.ids) != 2 || dest.ids[1] != "frame-task/last-frame" {
-			t.Fatal(dest.ids)
-		}
-		if fail && repo.task.Status != core.TaskFailed {
-			t.Fatal("missing artifact marked successful")
-		}
-		if !fail && (repo.task.Status != core.TaskSucceeded || repo.task.LastFrameStorageKey == nil || *repo.task.LastFrameStorageKey == "") {
-			t.Fatal("last frame not archived")
-		}
+func TestArchivePreservesPrimaryWhenOptionalLastFrameFails(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		failFrame bool
+	}{{name: "frame archived"}, {name: "frame download failed", failFrame: true}} {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := &repoStub{task: core.Task{ID: "frame-task", Status: core.TaskRunning}}
+			dest := &artifactStorage{failFrame: tc.failFrame}
+			w := &Worker{repo: repo, storage: dest}
+			if err := w.archiveResult(context.Background(), context.Background(), repo.task, "https://provider/video", "https://provider/frame"); err != nil {
+				t.Fatal(err)
+			}
+			if len(dest.ids) != 2 || dest.ids[1] != "frame-task/last-frame" {
+				t.Fatal(dest.ids)
+			}
+			if repo.task.Status != core.TaskSucceeded || repo.task.ResultURL == nil || repo.task.StorageKey == nil || *repo.task.StorageKey == "" {
+				t.Fatal("primary result was lost", repo.task)
+			}
+			if tc.failFrame {
+				if repo.task.LastFrameStorageKey != nil || repo.task.LastFrameURL != nil {
+					t.Fatal("invalid optional frame was published")
+				}
+			} else if repo.task.LastFrameStorageKey == nil || *repo.task.LastFrameStorageKey == "" || repo.task.LastFrameURL == nil {
+				t.Fatal("valid last frame not archived")
+			}
+		})
+	}
+}
+
+func TestPrimaryArchiveFailureStillFailsTask(t *testing.T) {
+	repo := &repoStub{task: core.Task{ID: "primary-task", Status: core.TaskRunning}}
+	dest := &artifactStorage{failPrimary: true}
+	w := &Worker{repo: repo, storage: dest}
+	if err := w.archiveResult(context.Background(), context.Background(), repo.task, "https://provider/video", "https://provider/frame"); err != nil {
+		t.Fatal(err)
+	}
+	if repo.task.Status != core.TaskFailed || len(dest.ids) != 1 {
+		t.Fatal("required primary archive failure was swallowed", repo.task, dest.ids)
 	}
 }
 

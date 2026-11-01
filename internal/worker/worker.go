@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"math"
 	"strconv"
 	"strings"
@@ -462,15 +463,19 @@ func (w *Worker) archiveResults(ctx, archiveCtx context.Context, task core.Task,
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
-			return w.repo.MarkFailed(context.WithoutCancel(ctx), task.ID, "store last frame: "+err.Error())
+			// The primary video is already safely archived. A missing optional
+			// frame must not turn that completed result into a provider failure.
+			slog.Warn("optional last frame could not be archived; primary result preserved")
+			lastFrameURL = ""
+		} else {
+			frameArtifact := storedArtifact(core.ProviderArtifact{MediaType: "image"}, frame, 64)
+			frameArtifact.ID = "last-frame"
+			if err := progress.record(ctx, frameArtifact, 0, true); err != nil {
+				return err
+			}
+			media.LastFrameStorageKey = frame.StorageKey
+			lastFrameURL = "/v1/generations/" + task.ID + "/last-frame"
 		}
-		frameArtifact := storedArtifact(core.ProviderArtifact{MediaType: "image"}, frame, 64)
-		frameArtifact.ID = "last-frame"
-		if err := progress.record(ctx, frameArtifact, 0, true); err != nil {
-			return err
-		}
-		media.LastFrameStorageKey = frame.StorageKey
-		lastFrameURL = "/v1/generations/" + task.ID + "/last-frame"
 	}
 	media.Resources = resources
 	return w.repo.MarkSucceeded(ctx, task.ID, media, lastFrameURL)
