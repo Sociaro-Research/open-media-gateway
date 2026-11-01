@@ -67,7 +67,6 @@
 #templatesGallery { grid-template-columns:repeat(3,minmax(0,1fr)); gap:20px; align-items:start; }
 #templatesGallery .template-card,#templatesGallery .template-create-card { padding:16px; gap:16px; min-width:0; }
 .template-create-card { display:grid; }
-#templatesGallery .template-card.selected { outline:2px solid var(--accent-text); outline-offset:2px; }
 .template-card > p { margin:0; overflow-wrap:anywhere; }
 #templatesView .template-media { aspect-ratio:auto; display:block; overflow:visible; }
 #templatesView .template-media :is(img,video) { display:block; width:100%; height:auto; aspect-ratio:auto; object-fit:contain; border-radius:12px; background:var(--field); }
@@ -93,7 +92,6 @@
 
 #templatesGallery .template-create-card { gap:12px; }
 #templatesGallery .template-create-card > .primary.compact { width:auto; min-width:0; flex:0 0 auto; }
-.template-card video:focus-visible { outline:2px solid var(--accent-text); outline-offset:3px; }
 
 /* A single audio option fills the template editor; narrow editors stack fields. */
 .template-editor .toggle-grid { grid-template-columns:minmax(0,1fr); }
@@ -108,6 +106,5 @@
 .template-fixed-references { display:flex; gap:8px; overflow-x:auto; min-width:0; max-width:100%; padding:3px; }
 #templatesView .template-fixed-preview { flex:0 0 56px; width:56px; height:56px; min-height:56px; padding:0; overflow:hidden; border:1px solid var(--line); border-radius:12px; background:var(--field); color:var(--text); font-size:24px; }
 .template-fixed-preview :is(img,video) { width:100%; height:100%; object-fit:cover; pointer-events:none; }
-.template-fixed-preview:focus-visible { outline:2px solid var(--accent-text); outline-offset:1px; }
 .template-preview-dialog { width:min(640px,calc(100vw - 32px)); }
 .template-preview-dialog :is(img,video,audio) { display:block; max-width:100%; max-height:70vh; margin:auto; }

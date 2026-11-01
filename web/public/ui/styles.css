@@ -398,7 +398,7 @@ body:has(.confirm-dialog[open]) { overflow: hidden; }
 #confirmStatus.error { color: var(--red); }
 .sending::before { content: ''; flex-shrink: 0; width: 13px; height: 13px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
 button:disabled { cursor: default; opacity: .5; }
-:focus-visible { outline: 2px solid var(--accent-text,var(--accent)); outline-offset: 4px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 0; }
 .task-arriving { opacity: 0; }
 .task-highlight { animation: arrival 1.6s ease-out; }
 .confirm-dialog.transferring { pointer-events: none; overflow: hidden; }
@@ -700,7 +700,7 @@ table :is(.role-editor,.member-limit-form) button { min-height: 44px; }
 .select-chevron { position:absolute; right:14px; top:50%; width:10px; height:6px; transform:translateY(-50%); pointer-events:none; background:var(--muted); clip-path:polygon(0 0,50% 70%,100% 0,100% 30%,50% 100%,0 30%); }
 .select-trigger[aria-expanded=true] .select-chevron { transform:translateY(-50%) rotate(180deg); }
 table .select-chevron { right:12px; }
-.floating-field > .select-trigger:focus-visible { outline:2px solid var(--accent-text,var(--accent)); outline-offset:2px; }
+
 .floating-field > .select-trigger:disabled { opacity:.55; cursor:not-allowed; }
 .custom-select > .floating-label { z-index:1; right:42px; }
 table .floating-field > .select-trigger { min-height:44px; padding:9px 42px 9px 12px; font:inherit; line-height:24px; }
@@ -826,7 +826,7 @@ table .floating-field > .select-trigger { min-height:44px; padding:9px 42px 9px 
 .password-toggle { position:absolute; display:grid; place-items:center; right:7px; top:50%; transform:translateY(-50%); width:44px; height:44px; min-height:44px; padding:11px; border:0; border-radius:8px; background:transparent; color:var(--muted); box-shadow:none; }
 .password-toggle svg { width:22px; height:22px; }
 .password-toggle:hover { color:var(--highlight); }
-.password-toggle:focus-visible { outline:2px solid var(--highlight); outline-offset:-2px; }
+.password-toggle:focus-visible { outline:2px solid var(--accent); outline-offset:0; }
 .password-field input::-ms-reveal { display:none; }
 .task-id-label { display:block; margin-top:16px; }
 
@@ -937,7 +937,7 @@ table .floating-field > .select-trigger { min-height:44px; padding:9px 42px 9px 
 
 :is(.organization-row,.interactive-row) { cursor:pointer; }
 :is(.organization-row,.interactive-row):hover, :is(.organization-row,.interactive-row):focus-visible { background:color-mix(in srgb,var(--highlight) 8%,transparent); }
-:is(.organization-row,.interactive-row):focus-visible { outline:2px solid var(--highlight); outline-offset:-2px; }
+:is(.organization-row,.interactive-row):focus-visible { outline:2px solid var(--accent); outline-offset:0; }
 
 /* Prefer the supplied symbol before moving navigation to another row. */
 .topbar { --brand-full-width:190px; --brand-image-height:40px; }
@@ -964,7 +964,7 @@ button.save-confirmation { color:var(--success)!important; background:transparen
 .floating-field.multiline-field { padding-top:26px; border:1px solid var(--line); border-radius:12px; background:var(--field); }
 .floating-field.multiline-field > textarea { min-height:calc(var(--textarea-min-rows, 3) * 1.5em + 10px); padding:0 14px 10px; border:0; border-radius:0 0 11px 11px; background:transparent; outline:none; box-shadow:none; }
 .floating-field.multiline-field > .floating-label { top:4px; font-size:11px; line-height:20px; }
-.floating-field.multiline-field:focus-within { border-color:var(--muted); outline:2px solid var(--accent-text,var(--accent)); outline-offset:4px; }
+
 .floating-field.multiline-field:has(> .field-invalid) { border-color:var(--red); outline-color:var(--red); }
 
 /* Both authentication methods use the same card and shared form controls. */
@@ -1002,7 +1002,7 @@ button.save-confirmation { color:var(--success)!important; background:transparen
 .markup-table th:last-child { width:112px; }
 .markup-settings .markup-table td { padding:8px 12px; vertical-align:middle; }
 .markup-rule td:last-child button { width:100%; margin:0; }
-.markup-table-wrap:focus-visible { outline:2px solid var(--highlight); outline-offset:3px; }
+.markup-table-wrap:focus-visible { outline:2px solid var(--accent); outline-offset:0; }
 
 
 .request-limits > .field-explanation { grid-column: 1 / -1; }
@@ -1079,7 +1079,7 @@ button.save-confirmation { color:var(--success)!important; background:transparen
 .model-access-toolbar > .floating-field { max-width:320px; }
 .model-access-count { color:var(--muted); font-size:12px; white-space:nowrap; }
 .model-access-scroll { max-height:480px; overflow:auto; min-width:0; border:1px solid var(--line); border-radius:10px; }
-.model-access-scroll:focus-visible { outline:2px solid var(--accent-text,var(--accent)); outline-offset:2px; }
+
 .model-access-table { min-width:640px; table-layout:fixed; border-collapse:separate; border-spacing:0; }
 .model-access-table th { position:sticky; top:0; z-index:1; }
 .model-access-table th:nth-child(1) { width:28%; }
@@ -1120,7 +1120,7 @@ button.save-confirmation { color:var(--success)!important; background:transparen
 /* Keep a content-based flex basis: Safari collapses a zero-basis list when
    the parent has max-height without a definite height. */
 .model-picker-options { overflow:auto; min-height:60px; flex:1 1 auto; overscroll-behavior:contain; outline:none; }
-.model-picker-options:focus-visible { box-shadow:inset 0 0 0 1px var(--accent); border-radius:8px; }
+.model-picker-options:focus-visible { outline:2px solid var(--accent); outline-offset:0; box-shadow:none; border-radius:8px; }
 .model-picker-options .model-picker-provider { position:sticky; top:0; z-index:1; display:flex; align-items:center; gap:12px; min-height:64px; box-sizing:border-box; margin-top:16px; padding:12px; border-top:1px solid var(--line); background:var(--popup); color:var(--text); font-size:16px; font-weight:700; line-height:1.4; }
 .model-picker-options .model-picker-provider:first-child { margin-top:0; border-top:0; }
 .model-picker-provider-mark { display:grid; place-items:center; flex:none; width:32px; height:32px; overflow:hidden; border-radius:8px; background:var(--field); color:var(--muted); font-size:16px; font-weight:600; }
@@ -1134,7 +1134,7 @@ button.save-confirmation { color:var(--success)!important; background:transparen
 .picker-search-status { flex:none; margin:0; color:var(--muted); font-size:var(--type-detail); }
 .picker-search-status:empty { display:none; }
 .picker-search-options { overflow:auto; min-height:44px; flex:1 1 auto; overscroll-behavior:contain; outline:none; }
-.picker-search-options:focus-visible { box-shadow:inset 0 0 0 1px var(--accent); border-radius:8px; }
+.picker-search-options:focus-visible { outline:2px solid var(--accent); outline-offset:0; box-shadow:none; border-radius:8px; }
 .model-grant-controls > .floating-field { flex:1; min-width:0; }
 
 /* Transparent tracks and rounded blue thumbs across the console. */
@@ -1172,7 +1172,7 @@ input[type=checkbox]::before {
 }
 input[type=checkbox]:checked { background:var(--accent); box-shadow:inset 0 0 0 1px var(--switch-on-border,var(--accent)); }
 input[type=checkbox]:checked::before { transform:translateX(18px); background:var(--switch-thumb-on,var(--on-accent)); }
-input[type=checkbox]:focus-visible { outline:2px solid var(--highlight); outline-offset:3px; box-shadow:none; }
+
 input[type=checkbox]:disabled { opacity:.45; cursor:not-allowed; }
 label:has(> input[type=checkbox]) { display:flex; align-items:center; gap:12px; cursor:pointer; }
 label:has(> input[type=checkbox]:disabled) { cursor:default; }
@@ -1439,7 +1439,7 @@ body:has(.detail-dialog[open]) { overflow:hidden; }
 .sales-person .sales-drag{padding:0;width:36px;min-width:36px;min-height:44px;cursor:grab;touch-action:auto}
 .sales-dragging{opacity:.55}
 .sales-role-slot{overflow-wrap:anywhere;border:1px dashed var(--line);border-radius:12px;padding:12px 16px;font-size:12px;color:var(--muted)}
-.sales-drop-active{outline:2px solid var(--accent-text);outline-offset:2px;background:var(--field)}
+.sales-drop-active{background:var(--field)}
 .sales-dialog{width:min(620px,calc(100vw - 24px));max-width:620px;max-height:calc(100dvh - 32px);overflow:auto}
 .sales-editor-dialog{width:min(420px,calc(100vw - 24px));max-width:420px}
 .sales-editor-dialog form>label{margin:0}
@@ -1554,7 +1554,7 @@ body:has(.detail-dialog[open]) { overflow:hidden; }
 .setup-option{display:flex;gap:14px;align-items:flex-start;padding:16px;border:1px solid var(--line);border-radius:12px;cursor:pointer}
 .setup-option:has(input:checked){border-color:var(--accent-text,var(--accent));background:color-mix(in srgb,var(--accent) 5%,transparent)}
 .setup-option:hover{border-color:var(--muted)}
-.setup-option:has(input:focus-visible){outline:2px solid var(--accent-text,var(--accent));outline-offset:3px}
+
 .setup-option input{padding:0;margin-top:5px}
 .setup-option strong,.setup-option small{display:block}.setup-option small{font-size:13px;color:var(--muted);line-height:1.6;margin:0}
 .setup-section{display:grid;gap:16px;padding-bottom:24px}.setup-section>button{justify-self:start}
@@ -1604,3 +1604,79 @@ body:has(.detail-dialog[open]) { overflow:hidden; }
 .task-menu .change-project { display:flex; justify-content:space-between; gap:12px; }
 @media(max-width:600px) { .journal-project-controls { width:100%; } }
 @media(max-width:600px) { .generation-settings { padding:20px; } }
+
+/* A single shared perimeter owns border paint. The existing transparent layout
+   border stays reserved; only this actual CSS border changes thickness. Absolute
+   paint preserves field padding, floating labels, media size and card geometry. */
+:where(.floating-field,.template-card,.reference-card,.template-media,.primary,.secondary,input[type=checkbox]) {
+ --interaction-border-color:var(--line); --interaction-border-rest:1px;
+ --interaction-border-width:var(--interaction-border-rest); --interaction-border-inset:-1px;
+ position:relative;
+}
+.floating-field { --interaction-border-inset:0px; border-radius:12px; }
+.floating-field.multiline-field { --interaction-border-inset:-1px; border-color:transparent; }
+.primary,.template-media,input[type=checkbox] { --interaction-border-rest:0px; --interaction-border-inset:0px; }
+:is(.floating-field,.template-card,.reference-card,.template-media,.primary,.secondary,input[type=checkbox])::after {
+ content:''; position:absolute; inset:var(--interaction-border-inset);
+ border:var(--interaction-border-width) solid var(--interaction-border-color);
+ border-radius:inherit; pointer-events:none; box-sizing:border-box; z-index:1;
+}
+:is(.template-card,.reference-card,.primary,.secondary),
+.floating-field > :is(input,textarea,select,.select-trigger) { border-color:transparent!important; }
+.floating-field > :is(input,textarea,select,.select-trigger):focus,
+.floating-field.multiline-field:focus-within { outline:none!important; box-shadow:none!important; }
+:is(.primary,.secondary,input[type=checkbox],.reference-choice,.template-card-title):focus-visible,
+.template-card video:focus-visible { outline:none!important; box-shadow:none!important; }
+.floating-field:has(> .field-invalid) { --interaction-border-color:var(--red); }
+.floating-field:has(> :is(input,textarea,.select-trigger):focus-visible),
+:is(.primary,.secondary,input[type=checkbox],.reference-card):focus-visible,
+.template-card:has(.template-card-title:focus-visible),
+.reference-card:has(> .reference-choice:focus-visible),
+.template-media:has(> video:focus-visible) { --interaction-border-color:var(--accent); --interaction-border-width:2px; }
+.template-card.selected,.reference-card[data-selected="true"] { --interaction-border-color:var(--accent); --interaction-border-width:2px; outline:none; }
+.template-card.selected:has(.template-card-title:focus-visible),
+.reference-card[data-selected="true"]:has(> .reference-choice:focus-visible) { --interaction-border-width:3px; }
+/* Filled controls need a contrasting interior so their one accent edge remains
+   visible during keyboard focus, including themes whose fill equals the accent. */
+.primary:focus-visible { background:var(--field); color:var(--text); }
+input[type=checkbox] { border:0!important; box-shadow:none!important; }
+input[type=checkbox]:checked { --interaction-border-rest:1px; --interaction-border-color:var(--switch-on-border,var(--accent)); }
+input[type=checkbox]:focus-visible { --interaction-border-color:var(--accent); background:var(--field); }
+input[type=checkbox]:focus-visible::before { background:var(--accent); }
+input[type=checkbox]:checked:focus-visible { --interaction-border-width:3px; }
+button.save-confirmation::after { display:none; }
+/* The native color well has fixed dimensions and can change its own border. */
+input[type=color]:focus-visible { outline:none; box-shadow:none; border:2px solid var(--accent); padding:7px; }
+@media(forced-colors:active) {
+ :is(.floating-field,.template-card,.reference-card,.template-media,.primary,.secondary,input[type=checkbox]) { --interaction-border-color:CanvasText; forced-color-adjust:none; }
+ :is(.template-card,.reference-card,.primary,.secondary) { border-color:transparent!important; box-shadow:none!important; background:Canvas; color:CanvasText; }
+ .floating-field > :is(input,textarea,select,.select-trigger) { forced-color-adjust:none; background:Canvas; color:CanvasText; border-color:transparent!important; }
+ .floating-field > :disabled { color:GrayText; }
+ .floating-field:has(> :is(input,textarea,.select-trigger):focus-visible),
+ :is(.primary,.secondary,input[type=checkbox],.reference-card):focus-visible,
+ .template-card:has(.template-card-title:focus-visible),.reference-card:has(> .reference-choice:focus-visible),
+ .template-media:has(> video:focus-visible),.template-card.selected,.reference-card[data-selected="true"] { --interaction-border-color:Highlight; }
+ input[type=checkbox] { --interaction-border-rest:1px; background:Canvas; }
+ input[type=checkbox]:checked { background:Highlight; }
+ input[type=checkbox]:focus-visible { background:Canvas; }
+ input[type=checkbox]:focus-visible::before { background:Highlight; }
+ .primary:focus-visible { background:Canvas; color:CanvasText; }
+}
+
+/* Scrollable owners retain their native perimeter; compensate its extra pixel
+   with reserved padding so focus never shifts content or adds an outline. */
+.model-access-scroll { padding:1px; }
+.model-access-scroll:focus-visible { outline:none; border:2px solid var(--accent); padding:0; }
+.control-popup:focus-visible { outline:none; border:2px solid var(--accent); padding:5px; }
+.setup-option:has(input:checked),.setup-option:has(input:focus-visible) { outline:none; border:2px solid var(--accent); padding:15px; }
+.setup-option:has(input:checked:focus-visible) { border-width:3px; padding:14px; }
+:is(.sales-root,.sales-person).sales-drop-active { outline:none; border:2px solid var(--accent); padding:15px 19px; }
+.sales-role-slot.sales-drop-active { outline:none; border:2px solid var(--accent); padding:11px 15px; }
+@media(forced-colors:active) {
+ .model-access-scroll:focus-visible,.control-popup:focus-visible,.setup-option:has(input:checked),.setup-option:has(input:focus-visible),:is(.sales-root,.sales-person).sales-drop-active,.sales-role-slot.sales-drop-active { border-color:Highlight; }
+}
+
+@media(max-width:700px) { .sales-person.sales-drop-active { padding:11px; } }
+
+.setup-option input[type=radio] { accent-color:var(--accent); }
+.setup-option input[type=radio]:focus-visible { outline:none; box-shadow:none; }
