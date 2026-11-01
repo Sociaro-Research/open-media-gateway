@@ -1,8 +1,10 @@
 FROM golang:1.27.3-alpine AS caddy-build
 WORKDIR /src
 # Keep the current Caddy modules/configuration; rebuild with patched Go and HTTP/2.
+# GW-215: upstream v3 RSA-JWK DoS backport (PR #314), pending its next tagged release.
+# https://github.com/go-jose/go-jose/commit/0e502b87c7aa651155b11ae8e195ec33ce10230a
 RUN go mod init gateway-caddy-build && \
-    go get github.com/caddyserver/caddy/v2/cmd/caddy@v2.11.7 golang.org/x/net@v0.60.0 github.com/go-jose/go-jose/v4@v4.1.6 && \
+    go get github.com/caddyserver/caddy/v2/cmd/caddy@v2.11.7 golang.org/x/net@v0.60.0 github.com/go-jose/go-jose/v4@v4.1.6 github.com/go-jose/go-jose/v3@v3.0.6-0.20261030183946-0e502b87c7aa && \
     CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X github.com/caddyserver/caddy/v2.CustomVersion=v2.11.7" -o /out/caddy github.com/caddyserver/caddy/v2/cmd/caddy
 
 COPY collect-licenses.go collect-licenses_test.go /tmp/

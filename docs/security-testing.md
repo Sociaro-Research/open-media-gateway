@@ -73,3 +73,20 @@ occurs only when the opt-in variable is set. Scan the actual release images and
 recheck transport/storage policies after dependency or configuration changes.
 Live identity providers, mail/payment delivery, cloud permissions, host firewall,
 public TLS and recovery remain separate controlled environment checks.
+
+## Caddy JOSE security pin
+
+The UI build pins go-jose/v3 to the genuine upstream Go pseudo-version
+`v3.0.6-0.20261030183946-0e502b87c7aa` while the next tagged v3 release is pending.
+[Upstream commit 0e502b8](https://github.com/go-jose/go-jose/commit/0e502b87c7aa651155b11ae8e195ec33ce10230a)
+backports the RSA JWK denial-of-service fix for
+[CVE-2026-116587](https://github.com/go-jose/go-jose/security/advisories/GHSA-mgcc-cww5-fp2q).
+Caddy's standard PKI module reaches this dependency through Smallstep JOSE.
+This keeps the v3 API and avoids a broader Smallstep/v4 authentication migration.
+The upstream guard rejects RSA JWK moduli larger than 4096 bits and private key
+material in public JWK/EPK message headers. Retain those security bounds.
+
+The image's license collector includes the exact module's Apache-2.0 notice and
+checksum in `/licenses/modules.json`. Verify that binary/module identity and run
+the unchanged HIGH/CRITICAL image scan for every built architecture; a local
+patch or a new-looking version string alone is not evidence of remediation.
