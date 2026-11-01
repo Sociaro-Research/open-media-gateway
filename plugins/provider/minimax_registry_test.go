@@ -26,7 +26,7 @@ func TestMiniMaxBuiltInDefinitionAndFactory(t *testing.T) {
 		t.Fatal("factory returned wrong adapter")
 	}
 	models, err := a.ListModels(context.Background())
-	if err != nil || len(models) != 33 {
+	if err != nil || len(models) != 37 {
 		t.Fatal("reviewed catalogue missing", len(models), err)
 	}
 	for _, id := range []string{"openai", "mock", "bytedance", "alibaba", "agnes", "sonilo", "kling"} {

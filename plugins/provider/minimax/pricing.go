@@ -43,6 +43,17 @@ func h3Tariff(model, res string) tariff {
 	return t
 }
 func (a *Adapter) Quote(ctx context.Context, _ core.MediaModel, r core.MediaRequest) (core.TaskCost, string, error) {
+	if r.Model == ResourceUpload || r.Model == ResourceOutputFile || r.Model == ResourceSourceTask {
+		return a.quoteFileResource(ctx, r)
+	}
+	var managedErr error
+	r, managedErr = a.expandManagedFiles(ctx, r)
+	if managedErr != nil {
+		return core.TaskCost{}, "", managedErr
+	}
+	if r.Model == RegenerationVideo {
+		return a.quoteBaseRegeneration(ctx, r)
+	}
 	if r.Model == Regeneration {
 		return a.quoteRegeneration(ctx, r)
 	}
@@ -58,7 +69,7 @@ func (a *Adapter) Quote(ctx context.Context, _ core.MediaModel, r core.MediaRequ
 	var amount money.USD
 	switch op.kind {
 	case "context":
-		return core.TaskCost{Status: "unknown", QuotedAt: time.Now().UTC(), Pricing: ContextIRTariff()}, "", core.ErrPricingUnavailable
+		return core.TaskCost{QuantityUnknown: true, Status: "quantity_unknown", QuotedAt: time.Now().UTC(), Pricing: ContextIRTariff()}, "", nil
 	case "image":
 		if r.Model != "image-01" {
 			return core.TaskCost{}, "", core.ErrPricingUnavailable
@@ -129,8 +140,8 @@ func (a *Adapter) Quote(ctx context.Context, _ core.MediaModel, r core.MediaRequ
 // ContextIRTariff is token-priced; no prompt-to-token conversion or output-token
 // ceiling is published, so a pre-generation total must remain unknown.
 func ContextIRTariff() core.PricingSnapshot {
-	return core.PricingSnapshot{Currency: "USD", Unit: "token", Per: 1_000_000, Source: priceSource, Version: "2026-10-31", CheckedAt: time.Date(2026, 10, 31, 0, 0, 0, 0, time.UTC), Components: []core.PricingComponent{{Metric: "prompt_tokens", Price: 900000, Per: 1_000_000}, {Metric: "completion_tokens", Price: 3600000, Per: 1_000_000}}}
+	return core.PricingSnapshot{Currency: "USD", Region: "Global", Unit: "token", Per: 1_000_000, Source: priceSource, Version: "2026-10-31", CheckedAt: time.Date(2026, 10, 31, 0, 0, 0, 0, time.UTC), Components: []core.PricingComponent{{Metric: "prompt_tokens", Price: 900000, Per: 1_000_000}, {Metric: "completion_tokens", Price: 3600000, Per: 1_000_000}}}
 }
 func RegenerationTariff() core.PricingSnapshot {
-	return core.PricingSnapshot{Currency: "USD", Unit: "second", Per: 1, Source: priceSource, Version: "2026-10-31", CheckedAt: time.Date(2026, 10, 31, 0, 0, 0, 0, time.UTC), Components: []core.PricingComponent{{Metric: "output_video_duration", Price: 50000, Per: 1}, {Metric: "input_video_duration", Price: 50000, Per: 1}, {Metric: "billable_input_images", Price: 25000, Per: 1}}, EstimateDescription: "Regeneration is billed separately; original input materials are billed again, with the first five images free. The 768P base output is not an original reference-video charge."}
+	return core.PricingSnapshot{Currency: "USD", Region: "Global", Unit: "second", Price: 50000, Per: 1, Source: priceSource, Version: "2026-10-31", CheckedAt: time.Date(2026, 10, 31, 0, 0, 0, 0, time.UTC), Components: []core.PricingComponent{{Metric: "output_video_duration", Price: 50000, Per: 1}, {Metric: "input_video_duration", Price: 50000, Per: 1}, {Metric: "billable_input_images", Price: 25000, Per: 1}}, EstimateDescription: "Regeneration is billed separately; original input materials are billed again, with the first five images free. The 768P base output is not an original reference-video charge."}
 }

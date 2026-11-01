@@ -10,6 +10,18 @@ import (
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
 )
 
+func reviewedRateFixture(a *Adapter, model core.MediaModel, rate catalogsync.Rate) (core.TaskCost, error) {
+	if quote, handled, err := a.CatalogRateQuote(model, rate); handled || err != nil {
+		return quote, err
+	}
+	request, err := a.CatalogRateRequest(model, rate)
+	if err != nil {
+		return core.TaskCost{}, err
+	}
+	quote, _, err := a.Quote(context.Background(), model, request)
+	return quote, err
+}
+
 func TestOfficialPriceReplayAndReprice(t *testing.T) {
 	b, e := os.ReadFile("testdata/pricing.md")
 	if e != nil {
@@ -17,27 +29,14 @@ func TestOfficialPriceReplayAndReprice(t *testing.T) {
 	}
 	src := catalogsync.Source{ID: "pricing", URL: priceSource + ".md", Parser: "document"}
 	entries, e := interpretPrices(src, string(b))
-	if e != nil || len(entries) != 8 {
+	if e != nil || len(entries) != 11 {
 		t.Fatal(entries, e)
 	}
 	a := fixture(t, nil)
 	for _, entry := range entries {
 		m, _ := modelFor(entry.ID)
 		for _, rate := range entry.Rates {
-			r := core.MediaRequest{Model: m.ID, Prompt: "scene", Options: core.MediaOptions{Resolution: rate.Resolution, Duration: rate.Duration}}
-			if rate.Resolution == "512p" {
-				r.Options.ReferenceMode = "first_frame"
-				r.Options.ImageURLs = []string{"https://media.example/frame.png"}
-			}
-			if m.RequiresImageInput {
-				r.Options.ReferenceMode = "first_frame"
-				r.Options.ImageURLs = []string{"https://media.example/frame.png"}
-			}
-			if rate.VideoInput != nil && *rate.VideoInput {
-				r.Options.ReferenceMode = "references"
-				r.Options.VideoURL = "https://media.example/video.mp4"
-			}
-			q, _, e := a.Quote(context.Background(), m, r)
+			q, e := reviewedRateFixture(a, m, rate)
 			if e != nil {
 				t.Fatal(m.ID, e)
 			}
@@ -47,7 +46,7 @@ func TestOfficialPriceReplayAndReprice(t *testing.T) {
 			}
 		}
 	}
-	for _, edit := range [][2]string{{"per 768P, 10s video", "per 768P, 8s video"}, {"**MiniMax-H3**", "**MiniMax-H3-Turbo**"}, {"**MiniMax-H3-Max**", "**MiniMax-H3-Max-v2**"}, {"first **5 images**", "first **6 images**"}, {"first **2 images**", "first **1 images**"}, {"Output Video\\\n      per second", "Output Video per request"}, {"\\$0.143", "unknown"}, {"768P", "1080P"}, {"Audio input is free", "Audio input is billed"}} {
+	for _, edit := range [][2]string{{"per 768P, 10s video", "per 768P, 8s video"}, {"**MiniMax-H3**", "**MiniMax-H3-Turbo**"}, {"**MiniMax-H3-Max**", "**MiniMax-H3-Max-v2**"}, {"first **5 images**", "first **6 images**"}, {"first **2 images**", "first **1 images**"}, {"Output Video\\\n      per second", "Output Video per request"}, {"\\$0.143", "unknown"}, {"768P", "1080P"}, {"Audio input is free", "Audio input is billed"}, {"Input Price** per M tokens", "Input Price** per K tokens"}, {"768P → 2K", "720P → 2K"}, {"Output Video** per second", "Output Video** per minute"}, {"first **5 images** are free", "first **4 images** are free"}} {
 		changed := strings.Replace(string(b), edit[0], edit[1], 1)
 		if changed == string(b) {
 			t.Fatalf("fixture mutation did not apply: %q", edit[0])
@@ -61,7 +60,7 @@ func TestOfficialPriceReplayAndReprice(t *testing.T) {
 	}
 }
 
-func TestEveryPublishedRateHasAnExecutableRepresentative(t *testing.T) {
+func TestEveryPublishedRateMatchesReviewedEstimator(t *testing.T) {
 	b, e := os.ReadFile("testdata/pricing.md")
 	if e != nil {
 		t.Fatal(e)
@@ -74,11 +73,7 @@ func TestEveryPublishedRateHasAnExecutableRepresentative(t *testing.T) {
 	for _, entry := range entries {
 		m, _ := modelFor(entry.ID)
 		for _, rate := range entry.Rates {
-			r, e := a.CatalogRateRequest(m, rate)
-			if e != nil {
-				t.Fatal(entry.ID, rate, e)
-			}
-			q, _, e := a.Quote(context.Background(), m, r)
+			q, e := reviewedRateFixture(a, m, rate)
 			if e != nil {
 				t.Fatal(entry.ID, rate, e)
 			}
@@ -100,7 +95,7 @@ func TestOfficialPricesThroughActualCatalogueIngestion(t *testing.T) {
 		t.Fatal(e)
 	}
 	entries, e := interpretPrices(source, text)
-	if e != nil || len(entries) != 8 {
+	if e != nil || len(entries) != 11 {
 		for _, line := range strings.Split(text, "\n") {
 			if strings.HasPrefix(strings.TrimSpace(line), "|") {
 				t.Log(line)

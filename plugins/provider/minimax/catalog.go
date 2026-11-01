@@ -38,6 +38,8 @@ func operations() []operation {
 		out = append(out, operation{id: id, upstream: id, kind: "image", endpoint: "/v1/image_generation"})
 	}
 	out = append(out, operation{id: ContextIR, upstream: "MiniMax-H3", kind: "context", endpoint: "/v2/h3_context_ir"}, operation{id: Regeneration, upstream: "MiniMax-H3", kind: "regeneration", endpoint: "/v2/video_regeneration"})
+	out = append(out, operation{id: RegenerationVideo, upstream: "MiniMax-H3", kind: "base_regeneration", endpoint: "/v2/video_regeneration"})
+	out = append(out, operation{id: ResourceUpload, kind: "resource"}, operation{id: ResourceOutputFile, kind: "resource"}, operation{id: ResourceSourceTask, kind: "resource"})
 	for i := range agentTemplates {
 		t := &agentTemplates[i]
 		out = append(out, operation{id: "video-agent-" + t.id, kind: "agent", endpoint: "/v1/video_template_generation", template: t})
@@ -72,6 +74,12 @@ func catalog() []core.MediaModel {
 func (a *Adapter) ListModels(context.Context) ([]core.MediaModel, error) { return catalog(), nil }
 func (a *Adapter) ReviewedCatalogModels() []core.MediaModel              { return catalog() }
 func describe(op operation) core.MediaModel {
+	if op.kind == "base_regeneration" {
+		return baseRegenerationModel()
+	}
+	if op.kind == "resource" {
+		return fileOperationModel(op.id)
+	}
 	if op.kind == "regeneration" {
 		return regenerationModel()
 	}
@@ -80,6 +88,7 @@ func describe(op operation) core.MediaModel {
 		m.ID = ContextIR
 		m.DisplayName = "MiniMax H3 · Context preparation"
 		m.MediaType = "text"
+		m.Metadata.Description = "Prepares text from image, video and audio context. Audio references are inputs; this operation returns text and has no generated-audio control."
 		m.Resolutions = nil
 		m.SupportsAudio = false
 		m.AudioAlwaysOn = false
@@ -93,8 +102,10 @@ func describe(op operation) core.MediaModel {
 	switch op.kind {
 	case "h3":
 		m.Metadata.Sources = append(m.Metadata.Sources, core.ModelSource{Title: "H3 generation contract", URL: docsBase + "api-reference/video-generation-v2-create"})
+		m.ResourceInputSchemas = []core.ResourceInputSchema{{Kind: "file_resource", MaxCount: 12, Subtypes: []string{"image", "video", "audio"}}}
 		m.SupportsAssetReferences = true
 		m.RatioMayBeInferred = true
+		m.Metadata.Description = "H3 always produces native audio and has no audio on/off parameter. Audio references are separate inputs. Text requires a concrete ratio; frame modes use adaptive; reference modes support adaptive except on Lite."
 		m.MaxPromptCharacters = 7000
 		m.Resolutions = []string{"768p", "2k"}
 		m.Ratios = append(append([]string{}, concreteRatios...), "adaptive")
@@ -130,6 +141,7 @@ func describe(op operation) core.MediaModel {
 		}
 		m.Pricing = core.MediaModelPricing{Known: true, ReferencePriceUSD: float64(h3Tariff(op.id, "768p").output) * 5 / 1e6, ReferenceDescription: "5-second 768P output with no input-video charges or images beyond the free allowance. Other inputs are priced separately."}
 	case "legacy":
+		m.Metadata.Description = "768P supports 6 or 10 seconds; 1080P supports only 6 seconds. Legacy models have no configurable generated-audio switch."
 		m.MaxPromptCharacters = 2000
 		m.DefaultDuration = 6
 		m.MinDuration = 6
@@ -151,11 +163,13 @@ func describe(op operation) core.MediaModel {
 				m.Pricing.ReferencePriceUSD = 0.19
 			}
 			if op.id == "MiniMax-Hailuo-02" {
+				m.Metadata.Description += " Hailuo-02 512P supports 6 or 10 seconds only with a first-frame input."
 				m.Resolutions = append(m.Resolutions, "512p")
 				m.MaxImageInputs = 2
 				m.ReferenceModes = append(m.ReferenceModes, core.ReferenceMode{ID: "last_frame", Label: "Last frame", MinImages: 1, MaxImages: 1, ImageRoles: []string{"last_frame"}}, core.ReferenceMode{ID: "first_last_frame", Label: "First and last frames", MinImages: 2, MaxImages: 2, ImageRoles: []string{"first_frame", "last_frame"}})
 			}
 		} else {
+			m.Metadata.Description = "The reviewed legacy endpoint exposes 720P and 6 seconds, without a generated-audio switch."
 			m.Resolutions = []string{"720p"}
 			m.MaxDuration = 6
 			if strings.HasPrefix(op.id, "T2V-") {
@@ -169,6 +183,7 @@ func describe(op operation) core.MediaModel {
 				m.PromptOptional = true
 			}
 			if op.id == "S2V-01" {
+				m.Metadata.Description = "One character portrait; the endpoint has no documented resolution, duration or generated-audio controls."
 				m.Resolutions = nil
 				m.MinDuration = 0
 				m.MaxDuration = 0
@@ -179,7 +194,7 @@ func describe(op operation) core.MediaModel {
 		if m.SupportsImageInput {
 			m.PromptOptional = true
 		}
-		m.ReferenceMediaLimits = &core.ReferenceMediaLimits{MaxFiles: m.MaxImageInputs, Image: core.MediaFileLimits{ContentTypes: []string{"image/jpeg", "image/png", "image/webp"}, MaxBytes: 20_000_000 - 1, MinDimension: 301, MinRatio: .4, MaxRatio: 2.5}}
+		m.ReferenceMediaLimits = &core.ReferenceMediaLimits{MaxFiles: m.MaxImageInputs, Image: core.MediaFileLimits{ContentTypes: []string{"image/jpeg", "image/png", "image/webp"}, MaxBytes: 20_000_000, MinDimension: 301, MinRatio: .4, MaxRatio: 2.5}}
 		endpoint := "video-generation-i2v"
 		if strings.HasPrefix(op.id, "T2V-") {
 			endpoint = "video-generation-t2v"
@@ -207,7 +222,7 @@ func describe(op operation) core.MediaModel {
 		m.MaxImageInputs = 1
 		m.ReferenceModes = []core.ReferenceMode{{ID: "none", Label: "Text only"}, {ID: "references", Label: "Character portrait", MinImages: 1, MaxImages: 1, ImageRoles: []string{"reference"}}}
 		m.Parameters = []core.ParameterField{{Key: "prompt_optimizer", Label: "Optimize prompt", Type: "boolean", Default: false}, {Key: "width", Label: "Custom width (multiple of 8)", Type: "integer", Min: number(512), Max: number(2048)}, {Key: "height", Label: "Custom height (multiple of 8)", Type: "integer", Min: number(512), Max: number(2048)}}
-		m.ReferenceMediaLimits = &core.ReferenceMediaLimits{MaxFiles: 1, Image: core.MediaFileLimits{ContentTypes: []string{"image/jpeg", "image/png"}, MaxBytes: 10_000_000 - 1}}
+		m.ReferenceMediaLimits = &core.ReferenceMediaLimits{MaxFiles: 1, Image: core.MediaFileLimits{ContentTypes: []string{"image/jpeg", "image/png"}, MaxBytes: 10_000_000}}
 		if op.id == "image-01-live" {
 			m.RequiresImageInput = true
 			m.MinImageInputs = 1
@@ -230,7 +245,7 @@ func describe(op operation) core.MediaModel {
 		}
 		m.PromptOptional = !op.template.text
 		m.ReferenceModes = []core.ReferenceMode{{ID: "none", Label: "Text only"}}
-		m.ReferenceMediaLimits = &core.ReferenceMediaLimits{MaxFiles: 64, Image: core.MediaFileLimits{ContentTypes: []string{"image/jpeg", "image/png", "image/webp"}, MaxBytes: 20_000_000 - 1, MinDimension: 301, MinRatio: .4, MaxRatio: 2.5}}
+		m.ReferenceMediaLimits = &core.ReferenceMediaLimits{MaxFiles: 64, Image: core.MediaFileLimits{ContentTypes: []string{"image/jpeg", "image/png", "image/webp"}, MaxBytes: 20_000_000, MinDimension: 301, MinRatio: .4, MaxRatio: 2.5}}
 		if op.template.image {
 			m.SupportsImageInput = true
 			m.RequiresImageInput = true
@@ -247,8 +262,8 @@ func describe(op operation) core.MediaModel {
 }
 func h3Limits() *core.ReferenceMediaLimits {
 	return &core.ReferenceMediaLimits{MaxFiles: 12,
-		Image: core.MediaFileLimits{ContentTypes: []string{"image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"}, MaxBytes: 30_000_000, MinDimension: 256, MaxDimension: 5760, MinRatio: .4, MaxRatio: 2.5},
-		Video: core.MediaFileLimits{ContentTypes: []string{"video/mp4", "video/quicktime"}, Codecs: []string{"h264", "hevc"}, MaxBytes: 50_000_000, MinDimension: 256, MaxDimension: 5760, MinRatio: .4, MaxRatio: 2.5, MinDuration: 2, MaxDuration: 15, MaxTotalDuration: 15, MinFPS: 23.976, MaxFPS: 60},
-		Audio: core.MediaFileLimits{ContentTypes: []string{"audio/wav", "audio/mpeg"}, MaxBytes: 15_000_000, MinDuration: 2, MaxDuration: 15, MaxTotalDuration: 15}}
+		Image: core.MediaFileLimits{ContentTypes: []string{"image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"}, MaxBytes: 30_000_000, MaxBytesInclusive: true, MinDimension: 256, MaxDimension: 5760, MinRatio: .4, MaxRatio: 2.5},
+		Video: core.MediaFileLimits{ContentTypes: []string{"video/mp4", "video/quicktime"}, Codecs: []string{"avc1", "avc3", "hvc1", "hev1"}, AllowedAudioCodecs: []string{"aac", "mp3"}, MaxBytes: 50_000_000, MaxBytesInclusive: true, MinDimension: 256, MaxDimension: 5760, MinRatio: .4, MaxRatio: 2.5, MinDuration: 2, MaxDuration: 15, MaxTotalDuration: 15, MinFPS: 23.976, MaxFPS: 60},
+		Audio: core.MediaFileLimits{ContentTypes: []string{"audio/wav", "audio/mpeg"}, MaxBytes: 15_000_000, MaxBytesInclusive: true, MinDuration: 2, MaxDuration: 15, MaxTotalDuration: 15}}
 }
 func number(n float64) *float64 { return &n }

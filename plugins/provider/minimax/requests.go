@@ -13,6 +13,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
@@ -33,6 +34,19 @@ func effectiveMode(m core.MediaModel, o core.MediaOptions) (core.ReferenceMode, 
 	return core.ReferenceMode{}, invalid("reference counts or selected workflow are unsupported")
 }
 func (a *Adapter) ValidateRequest(ctx context.Context, r core.MediaRequest) error {
+	if r.Model == ResourceUpload || r.Model == ResourceOutputFile || r.Model == ResourceSourceTask {
+		_, e := a.validateFileCreation(ctx, r)
+		return e
+	}
+	var managedErr error
+	r, managedErr = a.expandManagedFiles(ctx, r)
+	if managedErr != nil {
+		return managedErr
+	}
+	if r.Model == RegenerationVideo {
+		_, err := a.validateBaseRegeneration(ctx, r)
+		return err
+	}
 	if r.Model == Regeneration {
 		return a.validateRegeneration(ctx, r)
 	}
@@ -131,6 +145,9 @@ func (a *Adapter) ValidateRequest(ctx context.Context, r core.MediaRequest) erro
 			if evidence, ok := o.ReferenceMediaEvidence[raw]; ok && (evidence.Type != "video" || evidence.Duration < 2 || evidence.Duration > 15 || math.IsNaN(evidence.Duration) || math.IsInf(evidence.Duration, 0)) {
 				return invalid("reference videos require 2–15 seconds per clip")
 			}
+			if evidence, ok := o.ReferenceMediaEvidence[raw]; ok && !core.AudioCodecsAllowed(evidence.AudioStreams, evidence.AudioCodecs, m.ReferenceMediaLimits.Video.AllowedAudioCodecs) {
+				return invalid("reference-video embedded audio requires inspected AAC/MP3 or verified silence")
+			}
 		}
 	}
 	if h3Input {
@@ -172,7 +189,7 @@ func (a *Adapter) ValidateRequest(ctx context.Context, r core.MediaRequest) erro
 			limit := item.limit
 			if op.kind == "image" {
 				limit = 10_000_000 - 1
-			} else if op.kind == "legacy" {
+			} else if op.kind == "legacy" || op.kind == "agent" {
 				limit = 20_000_000 - 1
 			}
 			if strings.HasPrefix(s, "asset://") && h3Input {
@@ -232,6 +249,14 @@ func (a *Adapter) Generate(ctx context.Context, r core.MediaRequest) (core.Provi
 	if a.requestConnectionScope(ctx) == "" {
 		return core.ProviderTask{}, errors.New("MiniMax provider connection identity is not bound")
 	}
+	if r.Model == ResourceUpload || r.Model == ResourceOutputFile || r.Model == ResourceSourceTask {
+		return a.generateFileResource(ctx, r)
+	}
+	var managedErr error
+	r, managedErr = a.expandManagedFiles(ctx, r)
+	if managedErr != nil {
+		return core.ProviderTask{}, managedErr
+	}
 	if e := a.ValidateRequest(ctx, r); e != nil {
 		return core.ProviderTask{}, e
 	}
@@ -247,9 +272,15 @@ func (a *Adapter) Generate(ctx context.Context, r core.MediaRequest) (core.Provi
 		}
 		return a.CreateVideoAgent(ctx, r.Model, r.Options.ImageURLs, texts)
 	}
+	if op.kind == "base_regeneration" {
+		return a.generateBaseRegeneration(ctx, r)
+	}
 	if op.kind == "regeneration" {
-		p, _ := core.NormalizeParameters(regenerationModel().Parameters, r.Options.Parameters)
-		token, e := a.RegenerateTask(ctx, p["source_task"].(string), r.Options.Watermark)
+		source, e := a.regenerationSource(ctx, r)
+		if e != nil {
+			return core.ProviderTask{}, e
+		}
+		token, e := a.RegenerateTask(ctx, source, r.Options.Watermark)
 		if e != nil {
 			return core.ProviderTask{}, e
 		}
@@ -297,7 +328,7 @@ func (a *Adapter) Generate(ctx context.Context, r core.MediaRequest) (core.Provi
 	if !numericID.MatchString(out.ID) {
 		return core.ProviderTask{}, errors.New("MiniMax submission returned an invalid task ID")
 	}
-	return core.ProviderTask{ID: a.seal(ctx, handle{ID: out.ID, Model: r.Model, Kind: op.kind, InputHash: contentHash(payload["content"])})}, nil
+	return core.ProviderTask{ID: a.seal(ctx, handle{ID: out.ID, Model: r.Model, Kind: op.kind, Duration: duration(describe(op), r.Options), ExpiresAt: taskExpiry(op.kind), InputHash: contentHash(payload["content"])})}, nil
 }
 func requestBody(op operation, r core.MediaRequest) (map[string]any, error) {
 	m := describe(op)
@@ -522,4 +553,11 @@ func imageCount(o core.MediaOptions) int {
 		return o.OutputCount
 	}
 	return 1
+}
+
+func taskExpiry(kind string) int64 {
+	if kind == "h3" {
+		return time.Now().Add(7 * 24 * time.Hour).Unix()
+	}
+	return 0
 }

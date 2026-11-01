@@ -21,6 +21,7 @@ import (
 	"github.com/Sociaro-Research/open-media-gateway/internal/storage"
 	"github.com/Sociaro-Research/open-media-gateway/internal/worker"
 	"github.com/Sociaro-Research/open-media-gateway/plugins/provider/minimax"
+	"github.com/google/uuid"
 )
 
 type workerRoundTrip func(*http.Request) (*http.Response, error)
@@ -34,7 +35,11 @@ func workerJSON(v any) *http.Response {
 type workerScope struct{ *minimax.Adapter }
 
 func (p workerScope) scope(ctx context.Context) context.Context {
-	return core.WithProviderConnectionScope(ctx, core.ProviderConnectionScope{ID: "minimax--integration", OwnerID: identity.ProviderOwnerID(ctx), Revision: "integration-revision"})
+	return core.WithProviderConnectionScope(ctx, core.ProviderConnectionScope{ID: "minimax", OwnerID: identity.ProviderOwnerID(ctx), Revision: "integration-revision"})
+}
+func (p workerScope) Quote(ctx context.Context, m core.MediaModel, r core.MediaRequest) (core.TaskCost, string, error) {
+	q, _, e := p.Adapter.Quote(p.scope(ctx), m, r)
+	return q, "integration-revision", e
 }
 func (p workerScope) Generate(ctx context.Context, r core.MediaRequest) (core.ProviderTask, error) {
 	return p.Adapter.Generate(p.scope(ctx), r)
@@ -365,7 +370,16 @@ func TestMiniMaxWorkerArchiveAndPublicContent(t *testing.T) {
 					t.Fatal(err)
 				}
 				delete(payload, "prompt")
-				payload["options"] = map[string]any{"parameters": map[string]any{"source_task": source.ID}}
+				duration := 5.
+				ctx := identity.WithOwnerID(context.Background(), identity.SystemOwnerID)
+				job, e := provider.Adapter.CreateResource(provider.scope(ctx), core.ResourceCreateRequest{Kind: "file_resource", Subtype: "regeneration_source", Name: "Owned source", GeneratedVideo: &core.GeneratedResourceSource{TaskID: uuid.NewString(), TaskHandle: source.ID, Model: "MiniMax-H3", Duration: &duration}})
+				if e != nil {
+					t.Fatal(e)
+				}
+				binding := uuid.NewString()
+				snapshot := core.ResourceSnapshot{BindingID: binding, ReferenceID: "source_task", Kind: "file_resource", Subtype: "regeneration_source", RemoteID: job.Handle, ConnectionIdentity: "integration-revision"}
+				service.SetReferenceResourceResolver(fixtureSourceResolver{snapshot: snapshot})
+				payload["options"] = map[string]any{"resource_references": []map[string]string{{"binding_id": binding, "reference_id": "source_task"}}}
 			}
 			if mediaType == "image" {
 				payload["n"] = count
@@ -406,7 +420,7 @@ func TestMiniMaxWorkerArchiveAndPublicContent(t *testing.T) {
 			if public.Code != 200 {
 				t.Fatal(public.Code, public.Body.String())
 			}
-			for _, private := range []string{"provider-fixture-secret", "https://cdn.fixture", enhanced, "source_reference", "storage_key"} {
+			for _, private := range []string{"provider-fixture-secret", "https://cdn.fixture", enhanced, `"source_reference"`, `"storage_key"`, "minimax:"} {
 				if strings.Contains(public.Body.String(), private) {
 					t.Fatal("private artifact material exposed", private)
 				}
@@ -419,7 +433,7 @@ func TestMiniMaxWorkerArchiveAndPublicContent(t *testing.T) {
 				t.Fatal(e)
 			}
 			wantArtifacts := count
-			if scenario == "video_url" || scenario == "video_agent" || scenario == "regeneration" {
+			if scenario == "video_agent" {
 				wantArtifacts = 0
 			}
 			if len(view.Artifacts) != wantArtifacts {
@@ -458,4 +472,13 @@ func TestMiniMaxWorkerArchiveAndPublicContent(t *testing.T) {
 			}
 		})
 	}
+}
+
+type fixtureSourceResolver struct{ snapshot core.ResourceSnapshot }
+
+func (f fixtureSourceResolver) ResolveResourceReferences(ctx context.Context, _ string, refs []core.ResourceReference) ([]core.ResourceSnapshot, error) {
+	if identity.OwnerID(ctx) != identity.SystemOwnerID || len(refs) != 1 || refs[0].BindingID != f.snapshot.BindingID {
+		return nil, core.ErrTaskNotFound
+	}
+	return []core.ResourceSnapshot{f.snapshot}, nil
 }

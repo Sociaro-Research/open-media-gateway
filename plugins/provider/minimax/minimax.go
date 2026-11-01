@@ -20,19 +20,21 @@ import (
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
 	"github.com/Sociaro-Research/open-media-gateway/internal/httpclient"
 	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
+	"github.com/Sociaro-Research/open-media-gateway/internal/money"
 	"github.com/Sociaro-Research/open-media-gateway/internal/providerkit"
 )
 
 const maxResponseBytes = 4 << 20
-const maxRequestBytes = 64 << 20
+const maxRequestBytes = 64_000_000
 
 var numericID = regexp.MustCompile(`^[0-9]{1,40}$`)
 
 type Adapter struct {
-	key, base string
-	client    *http.Client
-	checkMu   sync.Mutex
-	check     providerkit.CredentialCheck
+	fileOperationPrice *money.USD
+	key, base          string
+	client             *http.Client
+	checkMu            sync.Mutex
+	check              providerkit.CredentialCheck
 }
 
 func New(key, base string, client *http.Client) (*Adapter, error) {
@@ -147,7 +149,7 @@ func (a *Adapter) json(ctx context.Context, method, path string, payload any, ou
 	if payload != nil {
 		b, e := json.Marshal(payload)
 		if e != nil || len(b) > maxRequestBytes {
-			return errors.New("MiniMax request exceeds 64 MiB or cannot be encoded")
+			return errors.New("MiniMax request exceeds 64 MB or cannot be encoded")
 		}
 		body = bytes.NewReader(b)
 	}
@@ -165,6 +167,8 @@ func (a *Adapter) json(ctx context.Context, method, path string, payload any, ou
 // connections sharing one upstream account. They survive worker restarts without
 // accepting caller-supplied raw provider task or file IDs.
 type handle struct {
+	ExpiresAt int64  `json:"expires_at,omitempty"`
+	Duration  int    `json:"duration,omitempty"`
 	ID        string `json:"id"`
 	Owner     string `json:"owner"`
 	Model     string `json:"model,omitempty"`
@@ -206,7 +210,7 @@ func (a *Adapter) open(ctx context.Context, s string) (handle, error) {
 	m := hmac.New(sha256.New, []byte(a.key+"\x00"+a.base+"\x00"+connection))
 	m.Write(b)
 	var h handle
-	if !hmac.Equal(mac, m.Sum(nil)) || json.Unmarshal(b, &h) != nil || !numericID.MatchString(h.ID) || h.Owner != identity.OwnerID(ctx) {
+	if !hmac.Equal(mac, m.Sum(nil)) || json.Unmarshal(b, &h) != nil || !numericID.MatchString(h.ID) || h.Owner != identity.OwnerID(ctx) || h.ExpiresAt > 0 && time.Now().Unix() >= h.ExpiresAt {
 		return handle{}, invalid
 	}
 	return h, nil

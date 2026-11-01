@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 )
 
 type File struct {
@@ -47,23 +48,47 @@ func (a *Adapter) retrieveFile(ctx context.Context, id string) (File, error) {
 	return out.File, nil
 }
 func (a *Adapter) fileView(ctx context.Context, f File) File {
-	f.Handle = a.seal(ctx, handle{ID: f.ID.String(), Kind: "file", Purpose: f.Purpose, MediaKind: f.MediaKind})
+	h := handle{ID: f.ID.String(), Kind: "file", Purpose: f.Purpose, MediaKind: f.MediaKind}
 	if f.Purpose == "video_generation_input" {
+		h.ExpiresAt = time.Now().Add(7 * 24 * time.Hour).Unix()
+		if f.CreatedAt > 0 {
+			h.ExpiresAt = f.CreatedAt + 7*86400
+		}
+	}
+	f.Handle = a.seal(ctx, h)
+	if referenceFilePurpose(h, h.MediaKind) {
 		f.URI = "asset://" + base64.RawURLEncoding.EncodeToString([]byte(f.Handle))
 	}
 	return f
 }
+
+// Translate equivalent inspected MIME labels to MiniMax's documented upload
+// spelling; this never replaces trusted byte inspection or size/hash checks.
+func uploadContentType(raw string) (string, error) {
+	typ, _, err := mime.ParseMediaType(raw)
+	if err != nil {
+		return "", err
+	}
+	switch typ {
+	case "audio/wave", "audio/x-wav":
+		typ = "audio/wav"
+	case "image/heif":
+		typ = "image/heic"
+	}
+	return typ, nil
+}
+
 func (a *Adapter) UploadFile(ctx context.Context, filename, contentType string, reader io.Reader) (File, error) {
 	if a.requestConnectionScope(ctx) == "" {
 		return File{}, errors.New("MiniMax provider connection identity is not bound")
 	}
-	typ, _, e := mime.ParseMediaType(contentType)
+	typ, e := uploadContentType(contentType)
 	if e != nil {
 		return File{}, invalid("invalid file content type")
 	}
 	limit := map[string]int{"image/jpeg": 30_000_000, "image/png": 30_000_000, "image/webp": 30_000_000, "image/heic": 30_000_000, "image/heif": 30_000_000, "video/mp4": 50_000_000, "video/quicktime": 50_000_000, "audio/wav": 15_000_000, "audio/mpeg": 15_000_000}[typ]
 	ext := strings.ToLower(filepath.Ext(filename))
-	extensions := map[string][]string{"image/jpeg": {".jpg", ".jpeg"}, "image/png": {".png"}, "image/webp": {".webp"}, "image/heic": {".heic"}, "image/heif": {".heif"}, "video/mp4": {".mp4"}, "video/quicktime": {".mov"}, "audio/wav": {".wav"}, "audio/mpeg": {".mp3"}}
+	extensions := map[string][]string{"image/jpeg": {".jpg", ".jpeg"}, "image/png": {".png"}, "image/webp": {".webp"}, "image/heic": {".heic", ".heif"}, "image/heif": {".heif"}, "video/mp4": {".mp4"}, "video/quicktime": {".mov"}, "audio/wav": {".wav"}, "audio/mpeg": {".mp3"}}
 	if limit == 0 || !slices.Contains(extensions[typ], ext) || filepath.Base(filename) != filename || strings.ContainsAny(filename, "\r\n") || len(filename) > 200 {
 		return File{}, invalid("unsupported upload type or filename")
 	}
@@ -115,7 +140,11 @@ func (a *Adapter) GetFile(ctx context.Context, token string) (File, error) {
 		return File{}, errors.New("MiniMax file purpose changed")
 	}
 	f.MediaKind = h.MediaKind
-	return a.fileView(ctx, f), nil
+	f.Handle = token
+	if referenceFilePurpose(h, h.MediaKind) {
+		f.URI = "asset://" + base64.RawURLEncoding.EncodeToString([]byte(token))
+	}
+	return f, nil
 }
 func (a *Adapter) ListFiles(ctx context.Context, tokens []string) ([]File, error) {
 	if len(tokens) == 0 || len(tokens) > 100 {
@@ -148,7 +177,9 @@ func (a *Adapter) ListFiles(ctx context.Context, tokens []string) ([]File, error
 		}
 		h, _ := a.open(ctx, allowed[f.ID.String()])
 		f.MediaKind = h.MediaKind
-		result = append(result, a.fileView(ctx, f))
+		f.Handle = allowed[f.ID.String()]
+		f.URI = "asset://" + base64.RawURLEncoding.EncodeToString([]byte(f.Handle))
+		result = append(result, f)
 	}
 	return result, nil
 }
@@ -282,6 +313,13 @@ func (a *Adapter) DeleteFile(ctx context.Context, token string) error {
 	}
 	return nil
 }
+
+// A generated file capability can only be minted from an owned successful
+// generation, and remains restricted to video. Raw platform IDs are never inputs.
+func referenceFilePurpose(h handle, kind string) bool {
+	return h.Purpose == "video_generation_input" || h.Purpose == "video_generation" && kind == "video" && h.MediaKind == "video"
+}
+
 func (a *Adapter) resolveFileInput(ctx context.Context, value, expectedKind string) (string, error) {
 	if !strings.HasPrefix(value, "asset://") {
 		return value, nil
@@ -294,8 +332,8 @@ func (a *Adapter) resolveFileInput(ctx context.Context, value, expectedKind stri
 	if e != nil {
 		return "", e
 	}
-	if h.Kind != "file" || h.Purpose != "video_generation_input" || h.MediaKind != expectedKind {
-		return "", invalid("only owned video input files can be referenced")
+	if h.Kind != "file" || !referenceFilePurpose(h, expectedKind) || h.MediaKind != expectedKind {
+		return "", invalid("only owned uploaded inputs or generated video files can be referenced")
 	}
 	return "mm_file://" + h.ID, nil
 }

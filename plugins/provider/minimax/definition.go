@@ -2,10 +2,13 @@
 package minimax
 
 import (
+	"errors"
 	"github.com/Sociaro-Research/open-media-gateway/internal/catalogsync"
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
+	"github.com/Sociaro-Research/open-media-gateway/internal/money"
 	"github.com/Sociaro-Research/open-media-gateway/internal/providerkit"
 	"net/http"
+	"strings"
 )
 
 const ContextIR = "MiniMax-H3-Context-IR"
@@ -22,11 +25,22 @@ func Definition() providerkit.Definition {
 	return providerkit.Definition{
 		ID: "minimax", Name: "MiniMax", DefaultModel: "MiniMax-H3", ModelEnv: "MINIMAX_MODEL",
 		Description:   "Direct MiniMax H3 multimodal video, documented legacy video, image generation and Video Agent templates.",
-		Fields:        []providerkit.Field{{Key: "api_key", Label: "Pay-as-you-go API key", Secret: true, Required: true, Env: "MINIMAX_API_KEY"}, {Key: "base_url", Label: "API endpoint", Default: DefaultBaseURL, Env: "MINIMAX_BASE_URL"}},
+		Fields:        []providerkit.Field{{Key: "api_key", Label: "Pay-as-you-go API key", Secret: true, Required: true, Env: "MINIMAX_API_KEY"}, {Key: "base_url", Label: "API endpoint", Default: DefaultBaseURL, Env: "MINIMAX_BASE_URL"}, {Key: "file_operation_price_usd", Label: "Confirmed file-operation USD/request price (blank means unknown)"}},
 		PublicCatalog: true, AuthenticatedCheck: true, CatalogSources: sources, CatalogInterpret: interpretPrices,
 		BillingHelp: "Connection checks authenticate through the free models-list endpoint; they do not verify image/video entitlement, whitelist access, balance or successful generation. Published USD prices remain estimates; H3 charges output seconds, input video seconds and images beyond the free allowance separately. Unknown tariffs remain unavailable; no public invoice-detail API is documented.",
 		Factory: func(c providerkit.Credentials, _ providerkit.Settings, h *http.Client) (core.MediaProvider, error) {
-			return New(c.Get("api_key"), c.Get("base_url"), h)
+			a, err := New(c.Get("api_key"), c.Get("base_url"), h)
+			if err != nil {
+				return nil, err
+			}
+			if value := strings.TrimSpace(c.Get("file_operation_price_usd")); value != "" {
+				price, e := money.Parse(value)
+				if e != nil || price < 0 {
+					return nil, errors.New("invalid confirmed file-operation USD price")
+				}
+				a.fileOperationPrice = &price
+			}
+			return a, nil
 		},
 	}
 }

@@ -1,13 +1,20 @@
 package core_test
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
+	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
 	"github.com/Sociaro-Research/open-media-gateway/plugins/provider/kling"
+	"github.com/Sociaro-Research/open-media-gateway/plugins/provider/minimax"
 	"github.com/google/uuid"
 )
 
@@ -105,6 +112,104 @@ func TestResourceMediaInputFileKeyframeCardinality(t *testing.T) {
 			}
 			if e := core.ValidateReferenceMode(m, o); e != nil {
 				t.Fatal(e)
+			}
+		})
+	}
+}
+
+func TestResourceMediaInputMiniMaxActualAdmissionAndWireRoles(t *testing.T) {
+	for _, tc := range []struct {
+		mode  string
+		url   bool
+		files int
+		roles []string
+	}{{"first_frame", false, 1, []string{"first_frame"}}, {"last_frame", false, 1, []string{"last_frame"}}, {"first_last_frame", false, 2, []string{"first_frame", "last_frame"}}, {"first_last_frame", true, 1, []string{"first_frame", "last_frame"}}} {
+		t.Run(fmt.Sprintf("%s/URL=%t", tc.mode, tc.url), func(t *testing.T) {
+			ctx := core.WithProviderConnectionScope(identity.WithOwnerID(context.Background(), "fixture-owner"), core.ProviderConnectionScope{ID: "minimax-fixture", OwnerID: "fixture-provider-owner", Revision: "count-revision"})
+			uploads, generations := 0, 0
+			var wire map[string]any
+			a, e := minimax.New("synthetic-count-key", "", &http.Client{Transport: mediaCountTransport(func(r *http.Request) (*http.Response, error) {
+				var payload any
+				switch r.URL.Path {
+				case "/v1/files/upload":
+					uploads++
+					if e := r.ParseMultipartForm(1 << 20); e != nil {
+						t.Fatal(e)
+					}
+					f, _, e := r.FormFile("file")
+					if e != nil {
+						t.Fatal(e)
+					}
+					defer f.Close()
+					_, _ = io.Copy(io.Discard, f)
+					payload = map[string]any{"file": map[string]any{"file_id": fmt.Sprint(450 + uploads), "purpose": "video_generation_input", "bytes": 7}, "base_resp": map[string]any{"status_code": 0}}
+				case "/v2/video_generation":
+					generations++
+					if e := json.NewDecoder(r.Body).Decode(&wire); e != nil {
+						t.Fatal(e)
+					}
+					payload = map[string]any{"task_id": "123", "base_resp": map[string]any{"status_code": 0}}
+				default:
+					t.Fatalf("unexpected mock route: %s", r.URL.Path)
+				}
+				raw, _ := json.Marshal(payload)
+				return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": {"application/json"}}, Body: io.NopCloser(bytes.NewReader(raw))}, nil
+			})})
+			if e != nil {
+				t.Fatal(e)
+			}
+			o := core.MediaOptions{ReferenceMode: tc.mode, Ratio: "adaptive"}
+			if tc.url {
+				o.ImageURLs = []string{"https://media.example/front.png"}
+			}
+			resolver := &mediaCountResolver{snapshots: map[string]core.ResourceSnapshot{}}
+			for i := 0; i < tc.files; i++ {
+				f, e := a.UploadFile(ctx, fmt.Sprintf("image%d.png", i), "image/png", strings.NewReader("fixture"))
+				if e != nil {
+					t.Fatal(e)
+				}
+				s := mediaCountSnapshot("file_resource", "image", fmt.Sprintf("image_%d", len(o.ImageURLs)+i+1))
+				s.RemoteID = f.Handle
+				resolver.snapshots[s.BindingID] = s
+				o.ResourceReferences = append(o.ResourceReferences, core.ResourceReference{BindingID: s.BindingID, ReferenceID: s.ReferenceID})
+			}
+			repo := &mediaCountRepository{}
+			queue := &mediaCountQueue{}
+			service := core.NewTaskServiceWithProviders(repo, queue, map[string]core.MediaProvider{"minimax-fixture": a}, map[string]string{"minimax-fixture": "MiniMax-H3"}, "minimax-fixture")
+			service.EnableAccounting()
+			service.SetReferenceResourceResolver(resolver)
+			input := core.CreateMediaInput{Prompt: "A synthetic scene", Options: o}
+			task, e := service.CreateMediaRequest(ctx, input, "keyframes")
+			if e != nil {
+				t.Fatalf("actual reviewed file-bound keyframes rejected by shared admission: %v", e)
+			}
+			if repo.creates != 1 || len(queue.ids) != 1 || generations != 0 || uploads != tc.files {
+				t.Fatal("admission performed provider generation or duplicated uploads")
+			}
+			if _, e = a.Generate(ctx, core.MediaRequest{TaskID: task.ID, Model: task.Model, Prompt: task.Prompt, Options: task.Options}); e != nil {
+				t.Fatal(e)
+			}
+			content, ok := wire["content"].([]any)
+			if !ok || len(content) != len(tc.roles)+1 {
+				t.Fatalf("wrong native content: %#v", wire)
+			}
+			for i, role := range tc.roles {
+				part := content[i+1].(map[string]any)
+				if part["role"] != role {
+					t.Fatalf("position%d role %#v want%s", i, part, role)
+				}
+				u := part["image_url"].(map[string]any)["url"].(string)
+				if (!tc.url || i > 0) && !strings.HasPrefix(u, "mm_file://") {
+					t.Fatalf("managed binding lost native file identity: %s", u)
+				}
+			}
+			resolver.fail = errors.New("binding deleted after acceptance")
+			replay, e := service.CreateMediaRequest(ctx, input, "keyframes")
+			if e != nil || replay.ID != task.ID || repo.creates != 1 || generations != 1 {
+				t.Fatal("accepted immutable replay depended on live binding", e)
+			}
+			if _, e = service.CreateMediaRequest(ctx, input, "new-key"); !errors.Is(e, resolver.fail) || repo.creates != 1 {
+				t.Fatal("new unavailable binding admitted", e)
 			}
 		})
 	}
@@ -264,7 +369,7 @@ func TestResourceMediaInputRolesUseURLThenFilePositions(t *testing.T) {
 	}
 }
 
-func TestResourceMediaInputMaterializedPairsAreConsumed(t *testing.T) {
+func TestResourceMediaInputMaterializedPairsAreConsumedAndCallerEvidenceCleared(t *testing.T) {
 	m := mediaCountModel()
 	m.SupportsAssetReferences = true
 	o := core.MediaOptions{ReferenceMode: "first_last_frame", ImageURLs: []string{"asset://trusted_file_1", "asset://trusted_file_2"}}
@@ -272,5 +377,23 @@ func TestResourceMediaInputMaterializedPairsAreConsumed(t *testing.T) {
 	if e != nil || counts.Images != 2 {
 		t.Fatal("materialized files counted twice", counts, e)
 	}
-
+	// The host resolves ResourceReferences afresh; caller-supplied snapshots cannot
+	// satisfy cardinality even if they otherwise resemble a trusted file binding.
+	a, e := minimax.New("synthetic-count-key", "", &http.Client{Transport: mediaCountTransport(func(*http.Request) (*http.Response, error) {
+		t.Fatal("forged source contacted provider")
+		return nil, nil
+	})})
+	if e != nil {
+		t.Fatal(e)
+	}
+	repo := &mediaCountRepository{}
+	q := &mediaCountQueue{}
+	svc := core.NewTaskServiceWithProviders(repo, q, map[string]core.MediaProvider{"minimax": a}, map[string]string{"minimax": "MiniMax-H3"}, "minimax")
+	forged := mediaCountOptions(mediaCountSnapshot("file_resource", "image", "image_1"))
+	forged.ResourceReferences = nil
+	forged.ReferenceMode = "first_frame"
+	forged.Ratio = "adaptive"
+	if _, e = svc.CreateMediaRequest(context.Background(), core.CreateMediaInput{Prompt: "scene", Options: forged}, "forged"); !errors.Is(e, core.ErrOptionsInvalid) || repo.creates != 0 {
+		t.Fatal("caller asserted private file snapshot", e)
+	}
 }

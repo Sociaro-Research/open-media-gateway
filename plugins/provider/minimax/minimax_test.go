@@ -76,12 +76,12 @@ func requestFor(m core.MediaModel, mode core.ReferenceMode) core.MediaRequest {
 	return r
 }
 func TestEveryCatalogGenerationWorkflow(t *testing.T) {
-	if len(catalog()) != 33 {
+	if len(catalog()) != 37 {
 		t.Fatalf("catalog has %d entries", len(catalog()))
 	}
 	seen := map[string]bool{}
 	for _, m := range catalog() {
-		if m.ID == Regeneration {
+		if m.ID == Regeneration || m.ID == RegenerationVideo || m.ResourceOperation != nil {
 			continue
 		} // Dedicated capability-bearing source-task contract test.
 		if seen[m.ID] {
@@ -188,7 +188,7 @@ func TestH3MultimodalRequestAndPrices(t *testing.T) {
 				if q.ExpectedUSD != want || len(q.Pricing.Components) != 3 {
 					t.Fatal(q, want)
 				}
-				r.Options.ReferenceMediaEvidence = map[string]core.InputMediaEvidence{"https://media.example/video": {Type: "video", Duration: 4}}
+				r.Options.ReferenceMediaEvidence = map[string]core.InputMediaEvidence{"https://media.example/video": {Type: "video", Duration: 4, AudioStreams: new(int)}}
 				q, _, e = a.Quote(context.Background(), m, r)
 				want = rate.output*7 + rate.input*4 + rate.image*coreMoney(max(0, 6-rate.free))
 				if e != nil || q.ExpectedUSD != want {
@@ -476,7 +476,7 @@ func TestProtectedOperationsRequireHostScope(t *testing.T) {
 func TestEveryDescriptorSurvivesSharedAdmission(t *testing.T) {
 	a := fixture(t, nil)
 	for _, m := range catalog() {
-		if m.ID == Regeneration {
+		if m.ID == Regeneration || m.ID == RegenerationVideo || m.ResourceOperation != nil {
 			continue
 		} // Dedicated capability-bearing source-task contract test.
 		for _, mode := range m.ReferenceModes {
@@ -494,6 +494,10 @@ func TestEveryDescriptorSurvivesSharedAdmission(t *testing.T) {
 				if m.Pricing.Known {
 					if e != nil || q.ExpectedUSD <= 0 {
 						t.Fatal("known tariff lacks valid quote", q, e)
+					}
+				} else if m.ID == ContextIR {
+					if e != nil || !q.QuantityUnknown || len(q.Pricing.Components) != 2 {
+						t.Fatal("known token tariff lost", q, e)
 					}
 				} else if !errors.Is(e, core.ErrPricingUnavailable) {
 					t.Fatal("unknown tariff was invented", q, e)
@@ -594,5 +598,34 @@ func TestPerGenerationHTTPTimeoutUsesSharedOverride(t *testing.T) {
 	ctx := httpclient.WithRequestTimeout(owned("alice"), 100*time.Millisecond)
 	if _, e := a.Generate(ctx, core.MediaRequest{Model: "MiniMax-H3", Prompt: "scene"}); e != nil {
 		t.Fatal(e)
+	}
+}
+
+func TestJSONRequestUsesExactDecimal64MBCeiling(t *testing.T) {
+	const officialLimit = 64_000_000
+	payload := strings.Repeat("a", officialLimit-1)
+	calls := 0
+	wantSize := int64(0)
+	a := fixture(t, func(r *http.Request) (*http.Response, error) {
+		calls++
+		n, err := io.Copy(io.Discard, r.Body)
+		if err != nil || n != wantSize {
+			t.Fatalf("wire bytes %d, want %d: %v", n, wantSize, err)
+		}
+		return response(200, `{"base_resp":{"status_code":0}}`), nil
+	})
+	for _, size := range []int{officialLimit - 1, officialLimit, officialLimit + 1} {
+		wantSize = int64(size)
+		before := calls
+		err := a.json(owned("alice"), "POST", "/v2/video_generation", payload[:size-2], nil)
+		if (err == nil) != (size <= officialLimit) {
+			t.Fatalf("encoded size %d: %v", size, err)
+		}
+		if size > officialLimit && calls != before {
+			t.Fatal("oversized JSON reached transport")
+		}
+	}
+	if calls != 2 {
+		t.Fatalf("transport calls %d, want 2", calls)
 	}
 }

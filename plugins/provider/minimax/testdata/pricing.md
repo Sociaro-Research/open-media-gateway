@@ -200,3 +200,21 @@ Checked: 2026-10-31
 | Model | Price |
 | :- | :- |
 | image-01 | \$0.0035 per image |
+
+
+### Video Regeneration
+
+Regenerate a 768P video produced by MiniMax-H3 into 2K.
+
+| **Model / API** | **Spec** | **Output Video** per second | **Input Video** per second | **Input Image** per image beyond free quota |
+| :- | :- | -: | -: | -: |
+| MiniMax-H3-Regeneration | 768P → 2K | \$0.05 | \$0.05 | \$0.025 |
+
+* Input materials from the original task are billed again: the first **5 images** are free and additional images are billed per image; video is billed by the original input duration; audio is free.
+* The regeneration fee is charged separately from the original task fee and includes the regenerated video output fee and input material fees.
+
+### Context-IR
+
+| **Model / API** | **Input Price** per M tokens | **Output Price** per M tokens |
+| :- | -: | -: |
+| MiniMax-H3-Context-IR | \$0.90 | \$3.60 |

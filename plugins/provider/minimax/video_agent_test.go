@@ -1,6 +1,7 @@
 package minimax
 
 import (
+	"encoding/base64"
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
 	"net/http"
 	"testing"
@@ -139,5 +140,28 @@ func TestVideoAgentCommonOrderedImagesAndAggregateBoundary(t *testing.T) {
 	}
 	if calls != 1 {
 		t.Fatal("validation performed provider HTTP")
+	}
+}
+
+func TestVideoAgentAdmissionAndDispatchShareExclusiveInlineByteLimit(t *testing.T) {
+	a := fixture(t, func(*http.Request) (*http.Response, error) {
+		t.Fatal("oversized inline image reached provider")
+		return nil, nil
+	})
+	for _, size := range []int{19_999_999, 20_000_000} {
+		input := "data:image/png;base64," + base64.StdEncoding.EncodeToString(make([]byte, size))
+		r := core.MediaRequest{Model: "video-agent-392747428568649728", Options: core.MediaOptions{ReferenceMode: "references", ImageURLs: []string{input}}}
+		err := a.ValidateRequest(owned("alice"), r)
+		if (err == nil) != (size < 20_000_000) {
+			t.Fatalf("size %d admission: %v", size, err)
+		}
+		if size == 20_000_000 {
+			if _, err := a.Generate(owned("alice"), r); err == nil {
+				t.Fatal("oversized common generation accepted")
+			}
+			if _, err := a.CreateVideoAgent(owned("alice"), r.Model, []string{input}, nil); err == nil {
+				t.Fatal("oversized native generation accepted")
+			}
+		}
 	}
 }

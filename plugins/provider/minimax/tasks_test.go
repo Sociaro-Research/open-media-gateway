@@ -3,13 +3,13 @@ package minimax
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"io"
 	"net/http"
 	"strings"
 	"testing"
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
+	"github.com/google/uuid"
 )
 
 func nativeResponse(id, model, state, kind string) map[string]any {
@@ -335,7 +335,11 @@ func TestSourceTaskRegenerationThroughCommonProviderContract(t *testing.T) {
 	})
 	source := a.seal(ctx, handle{ID: "123", Kind: "h3", Model: "MiniMax-H3"})
 	m, _ := modelFor(Regeneration)
-	o, e := core.NormalizeModelOptions(m, core.MediaOptions{Parameters: map[string]any{"source_task": source}})
+	h, _ := a.open(ctx, source)
+	h.Kind = "source_binding"
+	binding := uuid.NewString()
+	scope, _ := core.ProviderConnectionScopeFromContext(ctx)
+	o, e := core.NormalizeModelOptions(m, core.MediaOptions{ResourceReferences: []core.ResourceReference{{BindingID: binding, ReferenceID: "source_task"}}, ResourceSnapshots: []core.ResourceSnapshot{{BindingID: binding, ReferenceID: "source_task", Kind: "file_resource", Subtype: "regeneration_source", RemoteID: a.seal(ctx, h), ConnectionIdentity: scope.Revision}}})
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -434,11 +438,54 @@ func TestContextAliasUsesSameOwnedInputValidation(t *testing.T) {
 func TestContextQuoteRetainsKnownTariffWhileTotalIsUnknown(t *testing.T) {
 	a := fixture(t, nil)
 	quote, _, e := a.Quote(owned("alice"), core.MediaModel{}, core.MediaRequest{Model: ContextIR, Prompt: "scene"})
-	if !errors.Is(e, core.ErrPricingUnavailable) || quote.Status != "unknown" || len(quote.Pricing.Components) != 2 {
+	if e != nil || !quote.QuantityUnknown || quote.Status != "quantity_unknown" || len(quote.Pricing.Components) != 2 {
 		t.Fatal(quote, e)
+	}
+	raw, err := json.Marshal(quote)
+	if err != nil || strings.Contains(string(raw), `"expected_usd"`) || strings.Contains(string(raw), `"estimated_units"`) {
+		t.Fatal("unknown quantity became a numeric quote", err)
 	}
 	usage, _ := normalizeH3Usage(json.RawMessage(`{"prompt_tokens":100,"completion_tokens":50,"total_tokens":150}`), "MiniMax-H3")
 	if !quote.MeterUsage(*usage) || *quote.MeteredUSD != 270 {
 		t.Fatal(quote)
+	}
+}
+
+func TestOwnedNativeTaskListAllFilters(t *testing.T) {
+	for _, state := range []string{"queued", "running", "succeeded", "failed", "cancelled"} {
+		for _, kind := range []string{"generation", "h3_context_ir", "regeneration"} {
+			t.Run(state+"/"+kind, func(t *testing.T) {
+				a := fixture(t, func(r *http.Request) (*http.Response, error) {
+					q := r.URL.Query()
+					if r.Method != "GET" || q.Get("filter.status") != state || q.Get("filter.model") != "MiniMax-H3" || q.Get("filter.task_type") != kind || q.Get("page_num") != "1" || q.Get("page_size") != "20" || len(q["filter.task_ids"]) != 1 || q.Get("filter.task_ids") != "123" {
+						t.Fatal("documented owner-scoped filters were not preserved")
+					}
+					return response(200, map[string]any{"total": 1, "items": []any{nativeResponse("123", "MiniMax-H3", state, kind)["task"]}}), nil
+				})
+				family := map[string]string{"generation": "h3", "h3_context_ir": "context", "regeneration": "regeneration"}[kind]
+				token := a.seal(owned("alice"), handle{ID: "123", Model: "MiniMax-H3", Kind: family})
+				items, total, err := a.ListTasksFiltered(owned("alice"), []string{token}, 1, 20, NativeTaskFilter{Status: state, Model: "MiniMax-H3", TaskType: kind})
+				if err != nil || total != 1 || len(items) != 1 || items[0].ID != token {
+					t.Fatal("filtered list failed or exposed provider ID", err)
+				}
+			})
+		}
+	}
+	for _, filter := range []NativeTaskFilter{{Status: "unknown"}, {Model: "other"}, {TaskType: "other"}} {
+		a := fixture(t, func(*http.Request) (*http.Response, error) { t.Fatal("invalid filter reached HTTP"); return nil, nil })
+		token := a.seal(owned("alice"), handle{ID: "123", Model: "MiniMax-H3", Kind: "h3"})
+		if _, _, err := a.ListTasksFiltered(owned("alice"), []string{token}, 1, 20, filter); err == nil {
+			t.Fatal("invalid filter")
+		}
+		if _, _, err := a.ListTasks(owned("alice"), []string{token, token}, 1, 20); err == nil {
+			t.Fatal("duplicate owned handle")
+		}
+	}
+	a := fixture(t, func(*http.Request) (*http.Response, error) {
+		return response(200, map[string]any{"total": 1, "items": []any{nativeResponse("123", "MiniMax-H3", "running", "generation")["task"]}}), nil
+	})
+	token := a.seal(owned("alice"), handle{ID: "123", Model: "MiniMax-H3", Kind: "h3"})
+	if _, _, err := a.ListTasksFiltered(owned("alice"), []string{token}, 1, 20, NativeTaskFilter{Status: "queued"}); err == nil {
+		t.Fatal("provider ignored filter")
 	}
 }

@@ -116,7 +116,12 @@ func TestEveryEligibleReferenceWorkflowThroughTemplates(t *testing.T) {
 					prompt += " @audio1"
 					o.AudioURLs = []string{"https://media.example/audio.wav"}
 				}
-				d := templates.Definition{Title: "MiniMax reference workflow", MediaType: m.MediaType, Model: m.ID, Prompt: prompt, Syntax: templates.UIReferenceSyntax, Options: core.MediaOptions{ReferenceMode: mode.ID, Ratio: o.Ratio}}
+				if m.ID == RegenerationVideo {
+					evidence := baseRequest().Options.ReferenceMediaEvidence[baseRequest().Options.Videos()[0]]
+					o.ReferenceRoles = map[string]string{"video_1": "base_video"}
+					o.ReferenceMediaEvidence = map[string]core.InputMediaEvidence{o.VideoURLs[0]: evidence}
+				}
+				d := templates.Definition{Title: "MiniMax reference workflow", MediaType: m.MediaType, Model: m.ID, Prompt: prompt, Syntax: templates.UIReferenceSyntax, Options: core.MediaOptions{ReferenceMode: mode.ID, Ratio: o.Ratio, ReferenceRoles: o.ReferenceRoles}}
 				var err error
 				d.Slots, err = d.InferSlots(m)
 				if err != nil {

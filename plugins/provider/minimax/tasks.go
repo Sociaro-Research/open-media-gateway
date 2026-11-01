@@ -101,6 +101,13 @@ func (a *Adapter) GetTask(ctx context.Context, token string) (core.ProviderResul
 	if e != nil {
 		return core.ProviderResult{}, e
 	}
+	if h.Kind == "file" || h.Kind == "source_binding" {
+		j, err := a.GetResourceJob(ctx, "file_resource", token)
+		if err != nil {
+			return core.ProviderResult{}, err
+		}
+		return core.ProviderResult{Status: j.Status, Resources: j.Resources, Usage: &core.ProviderUsage{CostStatus: "metered"}}, nil
+	}
 	if h.Kind == "h3" || h.Kind == "regeneration" || h.Kind == "context" {
 		t, e := a.queryNative(ctx, h)
 		if e != nil {
@@ -116,6 +123,7 @@ func (a *Adapter) GetTask(ctx context.Context, token string) (core.ProviderResul
 				out.Artifacts = []core.ProviderArtifact{{ID: "prepared-prompt", MediaType: "text", Format: "txt", Text: t.Content.Prompt}}
 			} else {
 				out.ResultURL = t.Content.URL
+				out.Artifacts = []core.ProviderArtifact{{ID: t.ID, MediaType: "video", Format: "mp4", URL: t.Content.URL, Duration: float64(t.Duration)}}
 			}
 			out.Usage, e = normalizeH3Usage(t.Usage, h.Model)
 			if e != nil {
@@ -172,9 +180,10 @@ func (a *Adapter) GetTask(ctx context.Context, token string) (core.ProviderResul
 			if file.DownloadURL == "" {
 				file.MediaKind = "video"
 				file = a.fileView(ctx, file)
-				result.Artifacts = []core.ProviderArtifact{{ID: "video", MediaType: "video", Format: "mp4", SourceReference: file.Handle}}
+				result.Artifacts = []core.ProviderArtifact{{ID: out.File, MediaType: "video", Format: "mp4", SourceReference: file.Handle, Duration: float64(h.Duration)}}
 			} else {
 				result.ResultURL = file.DownloadURL
+				result.Artifacts = []core.ProviderArtifact{{ID: out.File, MediaType: "video", Format: "mp4", URL: file.DownloadURL, Duration: float64(h.Duration)}}
 			}
 		}
 		if len(result.Artifacts) == 0 && !publicURL(result.ResultURL) {
@@ -323,11 +332,31 @@ func (a *Adapter) CancelOrDeleteTask(ctx context.Context, token string) (string,
 
 // ListTasks filters the remote account inventory to explicitly owner-bound task
 // handles. Unbound or foreign tasks never become discoverable via this method.
+type NativeTaskFilter struct {
+	Status   string
+	Model    string
+	TaskType string
+}
+
 func (a *Adapter) ListTasks(ctx context.Context, tokens []string, page, size int) ([]NativeTask, int, error) {
+	return a.ListTasksFiltered(ctx, tokens, page, size, NativeTaskFilter{})
+}
+
+// ListTasksFiltered supports every documented list filter while always requiring
+// the caller's locally authorized handles. Filters never expand that owner scope.
+func (a *Adapter) ListTasksFiltered(ctx context.Context, tokens []string, page, size int, filter NativeTaskFilter) ([]NativeTask, int, error) {
 	if len(tokens) == 0 || len(tokens) > 100 || page < 1 || size < 1 || size > 100 {
 		return nil, 0, invalid("list requires 1–100 owned handles and valid pagination")
 	}
+	if filter.Status != "" && !slices.Contains([]string{"queued", "running", "succeeded", "failed", "cancelled"}, filter.Status) || filter.TaskType != "" && !slices.Contains([]string{"generation", "h3_context_ir", "regeneration"}, filter.TaskType) || filter.Model != "" && !slices.Contains([]string{"MiniMax-H3", "MiniMax-H3-Highspeed", "MiniMax-H3-Lite", "MiniMax-H3-Max"}, filter.Model) {
+		return nil, 0, invalid("unsupported native task filter")
+	}
 	q := url.Values{"page_num": {strconv.Itoa(page)}, "page_size": {strconv.Itoa(size)}}
+	for key, value := range map[string]string{"filter.status": filter.Status, "filter.model": filter.Model, "filter.task_type": filter.TaskType} {
+		if value != "" {
+			q.Set(key, value)
+		}
+	}
 	allowed := map[string]string{}
 	for _, token := range tokens {
 		h, e := a.open(ctx, token)
@@ -336,6 +365,9 @@ func (a *Adapter) ListTasks(ctx context.Context, tokens []string, page, size int
 		}
 		if h.Kind != "h3" && h.Kind != "context" && h.Kind != "regeneration" {
 			return nil, 0, invalid("invalid task list family")
+		}
+		if _, duplicate := allowed[h.ID]; duplicate {
+			return nil, 0, invalid("duplicate owned task")
 		}
 		q.Add("filter.task_ids", h.ID)
 		allowed[h.ID] = token
@@ -363,6 +395,9 @@ func (a *Adapter) ListTasks(ctx context.Context, tokens []string, page, size int
 		seen[h.ID] = true
 		if e := validateNativeTask(out.Items[i], h); e != nil {
 			return nil, 0, e
+		}
+		if filter.Status != "" && out.Items[i].Status != filter.Status || filter.Model != "" && out.Items[i].Model != filter.Model || filter.TaskType != "" && out.Items[i].TaskType != filter.TaskType {
+			return nil, 0, errors.New("MiniMax task list ignored the requested filter")
 		}
 		out.Items[i].ID = token
 		if out.Items[i].Error != nil {

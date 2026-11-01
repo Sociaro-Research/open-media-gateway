@@ -18,6 +18,10 @@ var h3Model = regexp.MustCompile(`MiniMax-[A-Za-z0-9._-]+`)
 var dollarAmount = regexp.MustCompile(`^\$([0-9]+(?:\.[0-9]+)?)$`)
 var legacyPrice = regexp.MustCompile(`\|\s*(MiniMax-Hailuo-(?:2\.3-Fast|2\.3|02))\s*\|\s*\\?\$([0-9]+(?:\.[0-9]+)?) per (512|768|1080)P, (6|10)s video\s*\|`)
 var imagePrice = regexp.MustCompile(`\|\s*image-01\s*\|\s*\\?\$([0-9]+(?:\.[0-9]+)?) per image\s*\|`)
+var regenerationPrice = regexp.MustCompile(`\|\s*MiniMax-H3-Regeneration\s*\|\s*768P → 2K\s*\|\s*\\?\$([0-9]+(?:\.[0-9]+)?)\s*\|\s*\\?\$([0-9]+(?:\.[0-9]+)?)\s*\|\s*\\?\$([0-9]+(?:\.[0-9]+)?)\s*\|`)
+var contextPrice = regexp.MustCompile(`\|\s*MiniMax-H3-Context-IR\s*\|\s*\\?\$([0-9]+(?:\.[0-9]+)?)\s*\|\s*\\?\$([0-9]+(?:\.[0-9]+)?)\s*\|`)
+var regenerationPriceHeader = regexp.MustCompile(`\|\s*Model / API\s*\|\s*Spec\s*\|\s*Output Video\s+per second\s*\|\s*Input Video\s+per second\s*\|\s*Input Image\s+per image beyond free quota\s*\|\s*(?:\|[\s:\-]+\|[\s:\-]+\|[\s:\-]+\|[\s:\-]+\|[\s:\-]+\|\s*)?\|\s*MiniMax-H3-Regeneration\s*\|`)
+var contextPriceHeader = regexp.MustCompile(`\|\s*Model / API\s*\|\s*Input Price\s+per M tokens\s*\|\s*Output Price\s+per M tokens\s*\|\s*(?:\|[\s:\-]+\|[\s:\-]+\|[\s:\-]+\|\s*)?\|\s*MiniMax-H3-Context-IR\s*\|`)
 
 // interpretPrices recognizes the reviewed public table shape and its three
 // separate billable metrics. Changed units/quotas or incomplete rows fail closed;
@@ -87,8 +91,10 @@ func interpretPrices(source catalogsync.Source, text string) ([]catalogsync.Entr
 			entry := entries[model]
 			entry.ID = model
 			for _, video := range []bool{false, true} {
-				v := video
-				entry.Rates = append(entry.Rates, catalogsync.Rate{Region: "Global", Resolution: res, VideoInput: &v, Unit: "second", Per: 1, Price: prices[0], Source: source.URL, Components: []core.PricingComponent{{Metric: "output_video_duration", Price: prices[0], Per: 1}, {Metric: "input_video_duration", Price: prices[1], Per: 1}, {Metric: "billable_input_images", Price: prices[2], Per: 1}}})
+				for _, audio := range []bool{false, true} {
+					v, au := video, audio
+					entry.Rates = append(entry.Rates, catalogsync.Rate{Region: "Global", Resolution: res, VideoInput: &v, AudioInput: &au, Unit: "second", Per: 1, Price: prices[0], Source: source.URL, Components: []core.PricingComponent{{Metric: "output_video_duration", Price: prices[0], Per: 1}, {Metric: "input_video_duration", Price: prices[1], Per: 1}, {Metric: "billable_input_images", Price: prices[2], Per: 1}}})
+				}
 			}
 			entries[model] = entry
 		}
@@ -131,8 +137,54 @@ func interpretPrices(source catalogsync.Source, text string) ([]catalogsync.Entr
 	if len(legacySeen) != 11 {
 		return nil, errors.New("MiniMax legacy duration price rows are incomplete; retain last confirmed tariffs")
 	}
+	clean := strings.Join(strings.Fields(strings.ReplaceAll(text, "*", "")), " ")
+	regeneration := regenerationPrice.FindAllStringSubmatch(text, -1)
+	contextRows := contextPrice.FindAllStringSubmatch(text, -1)
+	if len(regeneration) != 1 || len(contextRows) != 1 || !regenerationPriceHeader.MatchString(strings.ReplaceAll(text, "*", "")) || !contextPriceHeader.MatchString(strings.ReplaceAll(text, "*", "")) || !strings.Contains(clean, "Input materials from the original task are billed again") || !strings.Contains(clean, "first 5 images are free") || !strings.Contains(clean, "audio is free") {
+		return nil, errors.New("MiniMax context/regeneration prices, units or recharge rule changed; retain last confirmed tariffs")
+	}
+	parsePrices := func(cells []string) ([]money.USD, error) {
+		values := []money.USD{}
+		for _, cell := range cells {
+			value, err := money.Parse(cell)
+			if err != nil || value <= 0 {
+				return nil, errors.New("invalid MiniMax context/regeneration tariff")
+			}
+			values = append(values, value)
+		}
+		return values, nil
+	}
+	regenerationValues, err := parsePrices(regeneration[0][1:])
+	if err != nil {
+		return nil, err
+	}
+	contextValues, err := parsePrices(contextRows[0][1:])
+	if err != nil {
+		return nil, err
+	}
+	regenerationRate := func() catalogsync.Rate {
+		return catalogsync.Rate{Region: "Global", Unit: "second", Per: 1, Price: regenerationValues[0], Source: source.URL, Components: []core.PricingComponent{{Metric: "output_video_duration", Price: regenerationValues[0], Per: 1}, {Metric: "input_video_duration", Price: regenerationValues[1], Per: 1}, {Metric: "billable_input_images", Price: regenerationValues[2], Per: 1}}}
+	}
+	entries[Regeneration] = catalogsync.Entry{ID: Regeneration, Rates: []catalogsync.Rate{regenerationRate()}}
+	baseEntry := catalogsync.Entry{ID: RegenerationVideo}
+	for _, audio := range []bool{false, true} {
+		video, au := true, audio
+		rate := regenerationRate()
+		rate.VideoInput = &video
+		rate.AudioInput = &au
+		baseEntry.Rates = append(baseEntry.Rates, rate)
+	}
+	entries[RegenerationVideo] = baseEntry
+	contextEntry := catalogsync.Entry{ID: ContextIR}
+	for _, video := range []bool{false, true} {
+		for _, audio := range []bool{false, true} {
+			v, au := video, audio
+			contextEntry.Rates = append(contextEntry.Rates, catalogsync.Rate{Region: "Global", Unit: "token", Per: 1_000_000, VideoInput: &v, AudioInput: &au, Source: source.URL, Components: []core.PricingComponent{{Metric: "prompt_tokens", Price: contextValues[0], Per: 1_000_000}, {Metric: "completion_tokens", Price: contextValues[1], Per: 1_000_000}}})
+		}
+	}
+	entries[ContextIR] = contextEntry
 	out := []catalogsync.Entry{}
-	for _, id := range []string{"MiniMax-H3", "MiniMax-H3-Highspeed", "MiniMax-H3-Lite", "MiniMax-H3-Max", "image-01", "MiniMax-Hailuo-2.3", "MiniMax-Hailuo-2.3-Fast", "MiniMax-Hailuo-02"} {
+	for _, id := range []string{"MiniMax-H3", "MiniMax-H3-Highspeed", "MiniMax-H3-Lite", "MiniMax-H3-Max", "image-01", "MiniMax-Hailuo-2.3", "MiniMax-Hailuo-2.3-Fast", "MiniMax-Hailuo-02", ContextIR, Regeneration, RegenerationVideo} {
 		out = append(out, entries[id])
 	}
 	return out, nil
@@ -190,6 +242,9 @@ func (a *Adapter) CatalogRateRequest(model core.MediaModel, rate catalogsync.Rat
 	if !ok {
 		return core.MediaRequest{}, invalid("unreviewed model for catalogue tariff")
 	}
+	if m.MediaType == "resource" || m.ResourceOperation != nil {
+		return core.MediaRequest{}, invalid("resource management operations have no automatic generation tariff")
+	}
 	r := core.MediaRequest{Model: m.ID, Prompt: strings.Repeat("a", 100), Options: core.MediaOptions{Resolution: rate.Resolution, Duration: rate.Duration}}
 	if r.Options.Resolution == "" && len(m.Resolutions) > 0 {
 		r.Options.Resolution = m.Resolutions[0]
@@ -210,15 +265,50 @@ func (a *Adapter) CatalogRateRequest(model core.MediaModel, rate catalogsync.Rat
 	if rate.VideoInput != nil && *rate.VideoInput {
 		r.Options.ReferenceMode = "references"
 		r.Options.VideoURL = "https://example.invalid/catalogue-reference.mp4"
-		r.Options.ReferenceMediaEvidence = map[string]core.InputMediaEvidence{r.Options.VideoURL: {Type: "video", Duration: 2}}
+		r.Options.ReferenceMediaEvidence = map[string]core.InputMediaEvidence{r.Options.VideoURL: {Type: "video", Duration: 2, AudioStreams: new(int)}}
+	}
+	if rate.AudioInput != nil && *rate.AudioInput {
+		url := "https://example.invalid/catalogue-reference.mp3"
+		r.Options.ReferenceMode = "references"
+		r.Options.AudioURLs = []string{url}
+		if r.Options.ReferenceMediaEvidence == nil {
+			r.Options.ReferenceMediaEvidence = map[string]core.InputMediaEvidence{}
+		}
+		r.Options.ReferenceMediaEvidence[url] = core.InputMediaEvidence{Type: "audio", Duration: 2}
 	}
 	if rate.Audio != nil {
 		r.Options.GenerateAudio = rate.Audio
+	}
+	if m.ID == RegenerationVideo {
+		one := 1
+		url := "https://example.invalid/catalogue-base.mp4"
+		r.Options.ReferenceMode = "references"
+		r.Options.VideoURLs = []string{url}
+		r.Options.VideoURL = ""
+		r.Options.ReferenceRoles = map[string]string{"video_1": "base_video"}
+		// Server-only structural sample for a pure tariff check, never a user reference.
+		if r.Options.ReferenceMediaEvidence == nil {
+			r.Options.ReferenceMediaEvidence = map[string]core.InputMediaEvidence{}
+		}
+		r.Options.ReferenceMediaEvidence[url] = core.InputMediaEvidence{Type: "video", ReferenceID: "00000000-0000-4000-8000-000000000001", SHA256: strings.Repeat("a", 64), ContentType: "video/mp4", SizeBytes: 1, Width: 768, Height: 1024, FPS: 24, FrameCount: 124, Duration: 124.0 / 24, AudioStreams: &one, VideoStreams: &one}
 	}
 	if err := a.ValidateRequest(context.Background(), r); err != nil {
 		return core.MediaRequest{}, err
 	}
 	return r, nil
+}
+
+// CatalogRateQuote supplies only a reviewed metric tariff for source-task
+// regeneration. Catalogue refresh must not query an owner's task to validate a
+// documented price. Ordinary generation Quote still requires its protected source.
+func (a *Adapter) CatalogRateQuote(model core.MediaModel, rate catalogsync.Rate) (core.TaskCost, bool, error) {
+	if model.ID != Regeneration {
+		return core.TaskCost{}, false, nil
+	}
+	if rate.Duration != 0 || rate.Resolution != "" || rate.Quality != "" || rate.Audio != nil || rate.VideoInput != nil || rate.AudioInput != nil || rate.ImageInput != nil || rate.VoiceInput != nil || len(rate.Parameters)+len(rate.ResourceInputs)+len(rate.ReferenceRoles) > 0 || rate.VideoInputIncludesResources {
+		return core.TaskCost{}, true, invalid("unsupported regeneration tariff selector")
+	}
+	return core.TaskCost{QuantityUnknown: true, Status: "quantity_unknown", Pricing: RegenerationTariff()}, true, nil
 }
 
 // Catalogue Fetch normalizes embedded HTML tables into pipe rows, even inside
