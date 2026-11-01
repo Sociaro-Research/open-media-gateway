@@ -41,6 +41,31 @@ jobs keep their own immutable resolved prompt, options and template snapshot.
 Workers use those task values and do not reload a changed template. Task retention
 and request-log minimization continue to follow their existing policies.
 
+## Progressive consumer loading
+
+`GET /v1/templates/{id}/metadata` uses the same generation-key authentication,
+policy middleware and current-publication checks as the consumer detail route.
+It returns `id`, `revision`, the canonical `template` and
+`validation_status: "pending"`. It does not open storage or inspect media and
+returns no media URLs, compatible catalogue or availability claim. Displaying
+this content must not enable generation, Advanced editing or reference changes.
+
+Fetch `GET /v1/templates/{id}?revision={revision}` separately. All existing
+media availability, byte/checksum/type, model compatibility and native request
+checks run unchanged. The token is checked before expensive work and again
+before responding; a concurrent change returns 409, while removal or unpublish
+returns 404. Discard stale selection/key/navigation results and obtain current
+metadata before retrying. Admission, estimate, input validation and editing keep
+their own revision and authorization checks; this read token never replaces them.
+
+Full detail returns `validation_status: "ready"` only when media/workflow checks
+pass and a compatible model remains; otherwise it returns `"failed"` and the
+existing error fields. Enable actions only for a ready result matching the
+currently displayed ID/key/revision, with all existing input checks still met.
+Keep lightweight content visible if media validation is slow, fails or times out.
+Legacy full-detail callers may omit the query token and retain the existing
+response fields and validation behavior; the status field is additive.
+
 ## Schema transition
 
 Migration 081 introduces canonical `content` and `is_published` columns. For a

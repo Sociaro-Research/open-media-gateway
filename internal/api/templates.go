@@ -12,6 +12,7 @@ import (
 	"io"
 	"net/http"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
@@ -40,6 +41,7 @@ func (s *Server) registerTemplateRoutes(mux *http.ServeMux) {
 	mux.Handle("GET /v1/system/template-references/{id}/content", s.authenticate(http.HandlerFunc(s.sharedTemplateReferences)))
 	mux.Handle("GET /v1/templates", s.authenticate(http.HandlerFunc(s.templateGallery)))
 	mux.Handle("GET /v1/templates/{template}", s.authenticate(http.HandlerFunc(s.templateUse)))
+	mux.Handle("GET /v1/templates/{template}/metadata", s.authenticate(http.HandlerFunc(s.templateMetadata)))
 	mux.Handle("POST /v1/templates/{template}/editing", s.authenticate(http.HandlerFunc(s.templateEditing)))
 	mux.Handle("POST /v1/templates/{template}/estimate", s.authenticate(http.HandlerFunc(s.templateGenerate)))
 	mux.Handle("POST /v1/templates/{template}/validate-media", s.authenticate(http.HandlerFunc(s.templateValidateInputs)))
@@ -529,11 +531,44 @@ func (s *Server) templateGallery(w http.ResponseWriter, r *http.Request) {
 	}
 	s.writeViewerJSON(w, r, 200, map[string]any{"data": data})
 }
+
+// templateMetadata exposes only the current published definition. Availability,
+// model compatibility and media bytes are deliberately not represented as valid.
+// The normal authentication and model-access middleware remain in force.
+func (s *Server) templateMetadata(w http.ResponseWriter, r *http.Request) {
+	item, err := s.templates.Get(r.Context(), r.PathValue("template"))
+	if err != nil || item.Published == nil {
+		templateError(w, templates.ErrNotFound)
+		return
+	}
+	s.writeViewerJSON(w, r, 200, map[string]any{"id": item.ID, "revision": item.Revision, "template": item.Draft, "validation_status": "pending"})
+}
+
 func (s *Server) templateUse(w http.ResponseWriter, r *http.Request) {
 	item, e := s.templates.Get(r.Context(), r.PathValue("template"))
 	if e != nil || item.Published == nil {
 		templateError(w, templates.ErrNotFound)
 		return
+	}
+	// Legacy callers may omit the revision. Progressive readers bind expensive
+	// validation to the exact lightweight definition they are currently displaying.
+	expected, guarded := int64(0), false
+	if values, ok := r.URL.Query()["revision"]; ok {
+		if len(values) != 1 {
+			writeError(w, 400, "invalid_request", "revision must be one non-negative integer")
+			return
+		}
+		var err error
+		expected, err = strconv.ParseInt(values[0], 10, 64)
+		if err != nil || expected < 0 {
+			writeError(w, 400, "invalid_request", "revision must be one non-negative integer")
+			return
+		}
+		guarded = true
+		if item.Revision != expected {
+			templateError(w, templates.ErrConflict)
+			return
+		}
 	}
 	fixedFiles, complete, fixedError := s.fixedTemplateMedia(r.Context(), item.ID, item.Draft)
 	catalog := []core.ProviderDescriptor{}
@@ -573,7 +608,23 @@ func (s *Server) templateUse(w http.ResponseWriter, r *http.Request) {
 		}
 		fixed = append(fixed, map[string]string{"slot_id": slot.ID, "asset_id": a.ID, "name": a.Name, "content_type": a.ContentType, "url": s.templateAssetURL(a.ID)})
 	}
-	s.writeViewerJSON(w, r, 200, map[string]any{"id": item.ID, "revision": item.Revision, "template": item.Draft, "fixed_references": fixed, "catalog": catalog, "default_available": defaultAvailable, "asset_error": assetError, "workflow_error": templateWorkflowError(item.Draft)})
+	if guarded {
+		current, err := s.templates.Get(r.Context(), item.ID)
+		if err != nil || current.Published == nil {
+			templateError(w, templates.ErrNotFound)
+			return
+		}
+		if current.Revision != expected {
+			templateError(w, templates.ErrConflict)
+			return
+		}
+	}
+	workflowError := templateWorkflowError(item.Draft)
+	validationStatus := "failed"
+	if assetError == "" && workflowError == "" && len(catalog) > 0 {
+		validationStatus = "ready"
+	}
+	s.writeViewerJSON(w, r, 200, map[string]any{"id": item.ID, "revision": item.Revision, "template": item.Draft, "fixed_references": fixed, "catalog": catalog, "default_available": defaultAvailable, "asset_error": assetError, "workflow_error": workflowError, "validation_status": validationStatus})
 }
 
 // Use the same normalized request and native validator as admission, with one

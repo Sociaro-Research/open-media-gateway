@@ -7341,10 +7341,11 @@ paths:
   /v1/templates/{template}:
     parameters:
     - {in: path, name: template, required: true, schema: {type: string, format: uuid}}
+    - {in: query, name: revision, required: false, schema: {type: integer, minimum: 0}, description: Optional current metadata token; checked before media work and before the response}
     get:
       tags: [Templates]
       operationId: getPublishedTemplate
-      summary: Read the immutable published revision and current compatible models
+      summary: Read current published content and validated compatible models
       responses:
         '200':
           description: Default unavailability is explicit; a replacement is never silently selected. Models are selected by their complete returned contracts and current key access, never a model-name allowlist. Templates require explicit references mode and at least one reviewed slot. Legacy incompatible revisions are retained but have no compatible models and return workflow_error; they are not mapped to empty or frame workflows.
@@ -7355,6 +7356,7 @@ paths:
                 properties:
                   id: {type: string, format: uuid}
                   revision: {type: integer}
+                  validation_status: {type: string, enum: [ready, failed], description: Ready requires completed media and workflow validation plus a compatible model; pending metadata never enables actions}
                   template: {$ref: '#/components/schemas/TemplateDefinition'}
                   catalog: {type: array, items: {$ref: '#/components/schemas/ProviderDescriptor'}}
                   fixed_references:
@@ -7371,6 +7373,32 @@ paths:
                   default_available: {type: boolean}
                   workflow_error: {type: string, description: Incompatible saved workflow or missing reference slots; explicit Administrator revision and republication required}
                   asset_error: {type: string}
+        '400': {description: Invalid revision query}
+        '409': {description: Template changed before or during validation}
+        '404': {description: Unpublished, removed or unavailable template}
+  /v1/templates/{template}/metadata:
+    parameters:
+    - {in: path, name: template, required: true, schema: {type: string, format: uuid}}
+    get:
+      tags: [Templates]
+      operationId: getPublishedTemplateMetadata
+      summary: Read current published content without opening media storage
+      description: Authenticated canonical content for progressive rendering only. Existing policy middleware applies. Generation, editing and reference changes remain blocked until full detail for the same revision reports ready.
+      responses:
+        '200':
+          description: Media/model compatibility has not been validated; no media URLs or catalogue are included.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, revision, template, validation_status]
+                properties:
+                  id: {type: string, format: uuid}
+                  revision: {type: integer}
+                  template: {$ref: '#/components/schemas/TemplateDefinition'}
+                  validation_status: {type: string, enum: [pending]}
+        '401': {description: A valid generation key is required; browser sign-in alone is insufficient}
+        '403': {description: Generation scope or existing policy denied access}
         '404': {description: Unpublished, removed or unavailable template}
   /v1/templates/{template}/estimate:
     parameters:
