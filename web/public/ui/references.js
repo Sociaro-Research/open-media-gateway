@@ -14,14 +14,14 @@ function hashReferenceFile(file,signal){
  const pickers = [];
  let voices={},voiceTarget=null;
  const modeField=document.querySelector('#referenceModeField'), modeSelect=document.querySelector('#referenceMode');
- let modeModel='';
+ let modeModel='',selectionVersion=0;
  const mode=()=>selectedModel()?.reference_modes?.find(item=>item.id===modeSelect.value);
  function configure() {
-   const model=selectedModel();if(!model)return;
+   const model=selectedModel();if(!model){if(modeModel){modeModel='';selectionVersion++;}return;}
    modeField.hidden=!model.reference_modes?.length;modeSelect.disabled=modeField.hidden;
-   const modes=model.reference_modes||[], signature=JSON.stringify([selectedProvider()?.id,model.id,modes]);
+   const modes=model.reference_modes||[], signature=JSON.stringify([selectedProvider()?.id,model]);
    if(modeModel!==signature){
-     voiceTarget=null;modeModel=signature;const previous=modeSelect.value;
+     voiceTarget=null;selectionVersion++;modeModel=signature;const previous=modeSelect.value;
      modeSelect.replaceChildren(...modes.map(item=>new Option(item.label,item.id)));
      if(modes.some(item=>item.id===previous))modeSelect.value=previous;
    }
@@ -70,7 +70,7 @@ function hashReferenceFile(file,signal){
   let controller = new AbortController();
   let checkedSignature='',checking=false,validationError='';
   const validationTarget=()=>{const model=selectedModel();const t=model?ReferenceValidation.target(selectedProvider()?.id,model.id,requestOptions(model)):null;if(t&&kind==='audio'&&voiceTarget)t.role='reference_voice';return t;};
-  const selectionSignature=()=>JSON.stringify([validationTarget(),urls(),kind==='audio'?activeVoices():null]);
+  const selectionSignature=()=>JSON.stringify([selectionVersion,validationTarget(),urls(),kind==='audio'?activeVoices():null]);
   const candidateIDs=values=>[...new Set([...(validationTarget()?.reference_ids||[]).filter(id=>!ReferenceValidation.ids(urls()).includes(id)),...ReferenceValidation.ids(values)])];
  let remote,returnFocus=null,previousFocus=null;
   const libraryView=ReferenceLibrary.create({id:image?'referenceLibrary':`${kind}ReferenceLibrary`,description:`Choose ${displayPlural} for this generation.`});

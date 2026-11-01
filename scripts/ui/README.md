@@ -16,6 +16,12 @@ ignored `.local/` or `dist/`; record limits explicitly.
 
 ## Available fixtures
 
+`model-settings-preservation.cjs` checks compatible Playground settings across
+model/provider switches, false/zero/Auto values, workflow limits, typed parameters,
+voice/language pairs, explicit Copy and out-of-order catalogue reads. Run Chromium
+and WebKit with `UI_EVIDENCE_DIR` for isolated evidence. It blocks external requests,
+submits no generations and captures both themes at 1440/390/320px.
+
 `provider-voice-languages.cjs` checks the existing TTS fields against actual
 `voice_choices` from `UI_PROVIDER_DESCRIPTOR_FILE`: initial default, compatible
 language preservation, every declared pair, normal request serialization, managed

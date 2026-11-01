@@ -848,13 +848,37 @@ function syncOverrideSound(model){
  playgroundSound.root.hidden=model?.media_type!=='video';
 }
 FormUI.disclosure(document.querySelector('.advanced-settings > summary'),'Advanced settings');
-function updateModelUI() {
+let renderedPlaygroundModel=null,renderedPlaygroundProvider='';
+function capturePlaygroundSettings(){
+ if(!renderedPlaygroundModel)return {};
+ // Serialize supported source controls before rebuilding them. Do not normalize
+ // against the source: a draft invalid there may be valid on the next model.
+ // Reference roles/voices remain owned by the reference picker, not this adapter.
+ const values=requestOptions(renderedPlaygroundModel);
+ for(const [key,input,supported] of [['negative_prompt',elements.negativePrompt,renderedPlaygroundModel.supports_negative_prompt],['instructions',elements.instructions,renderedPlaygroundModel.media_type==='speech'&&!renderedPlaygroundModel.no_instructions],['lyrics',elements.lyrics,renderedPlaygroundModel.supports_lyrics]])if(supported)values[key]=input.value;
+ // Retained files can become active on the target even when hidden here.
+ values.video_urls=window.referencePicker?.values('video')||[];
+ if(renderedPlaygroundModel.audio_always_on)delete values.generate_audio;
+ return values;
+}
+function updateModelUI({preserve=true}={}) {
+  const previous=preserve?capturePlaygroundSettings():{};
+  const bindings=preserve?playgroundResources?.read()||[]:[],records=playgroundResources?.bindings()||[];
+  const session=preserve?playgroundResources?.action():null;
   const provider = selectedProvider();
   const model = selectedModel();
   document.querySelector('#generationSettings').hidden = !provider || !model;
   elements.priceCard.hidden = !model;
   syncOverrideSound(model);
-  if (!provider || !model) { clearTimeout(quoteTimer); ++quoteSequence; return; }
+  if (!provider || !model) { clearTimeout(quoteTimer); ++quoteSequence;window.referencePicker?.configure();return; }
+  const settings=ModelControls.reconcile(model,previous);
+  pendingSubmission=null;if(dialog.open&&!submitting)dialog.close();
+  const sameProvider=provider.id===renderedPlaygroundProvider,sameModel=sameProvider&&model.id===renderedPlaygroundModel?.id;
+  const resourceBindings=sameProvider?bindings.filter(ref=>{const kind=records.find(item=>item.id===ref.binding_id)?.kind||(renderedPlaygroundModel?.resource_input_schemas?.length===1?renderedPlaygroundModel.resource_input_schemas[0].kind:null);return (model.resource_input_schemas||[]).some(schema=>!kind||schema.kind===kind);}):[];
+  if(resourceBindings.some(ref=>records.find(item=>item.id===ref.binding_id)?.kind==='voice'||model.resource_input_schemas?.length===1&&model.resource_input_schemas[0].kind==='voice')){
+   delete settings.voice;settings.language=model.languages?.includes(previous.language)?previous.language:model.languages?.[0]||'';
+  }
+  renderedPlaygroundModel=model;renderedPlaygroundProvider=provider.id;
   document.querySelector('#settingsTitle').textContent=model.session_operation?'Session settings':model.resource_operation?'Resource settings':'Output settings';
   const isVideo = model.media_type === 'video';
   const isImage = model.media_type === 'image';
@@ -871,15 +895,15 @@ function updateModelUI() {
   const durationLabel=ModelInfo.durationLabel(model);
   FormUI.setLabel(elements.duration,durationLabel);
   elements.duration.setAttribute('aria-label',durationLabel);
-  if (model.resolutions?.length) fillSelect(elements.resolution, model.resolutions, model.resolutions[0]);
-  if (model.ratios?.length) ModelControls.ratios(elements.ratio,model,model.ratios,model.ratio_may_be_inferred?undefined:isVideo&&model.ratios.includes('16:9')?'16:9':model.ratios[0]);
+  if (model.resolutions?.length) fillSelect(elements.resolution, model.resolutions, settings.resolution);
+  if (model.ratios?.length) ModelControls.ratios(elements.ratio,model,model.ratios,settings.ratio);
   if (!elements.durationField.hidden) {
     elements.duration.min = model.min_duration;
     elements.duration.step = model.duration_step || 1;
     elements.duration.max = model.max_duration;
-    elements.duration.value = model.default_duration;
+    elements.duration.value = settings.duration??model.default_duration;
   }
-  durationChoice=ModelControls.inferredDuration(elements.durationField,elements.duration,model,undefined,()=>{pendingSubmission=null;updatePrice();});
+  durationChoice=ModelControls.inferredDuration(elements.durationField,elements.duration,model,settings.duration,()=>{pendingSubmission=null;updatePrice();});
   elements.imageURLsField.hidden = !model.supports_image_input;
   elements.videoURLField.hidden = !model.supports_video_input;
   document.querySelector('#inputDurationHint').hidden = !model.duration_from_input;
@@ -890,25 +914,29 @@ function updateModelUI() {
   elements.instructionsField.hidden = !isSpeech || !!model.no_instructions;
   elements.lyricsField.hidden = !model.supports_lyrics;
   elements.genderField.hidden = !model.supports_gender;
-  renderModelParameters(model);
-  syncModelResources(model);
+  renderModelParameters(model,settings.parameters,settings.output_count);
+  syncModelResources(model,resourceBindings,null,sameModel?session:null);
   elements.qualityField.hidden = !model.qualities?.length;
   elements.backgroundField.hidden = !model.backgrounds?.length;
-  if (model.qualities?.length) fillSelect(elements.quality, model.qualities, model.qualities[0]);
-  if (model.backgrounds?.length) fillSelect(elements.background, model.backgrounds, model.backgrounds[0]);
+  if (model.qualities?.length) fillSelect(elements.quality, model.qualities, settings.quality);
+  if (model.backgrounds?.length) fillSelect(elements.background, model.backgrounds, settings.background);
   elements.formatField.hidden = !model.formats?.length;
   elements.voiceOptions.replaceChildren(...(model.voices || []).map(value => new Option(value, value)));
-  elements.voice.value = model.voices?.[0] || '';
-  if (model.formats?.length) fillSelect(elements.format, model.formats, model.formats[0]);
+  elements.voice.value = settings.voice||'';
+  if (model.formats?.length) fillSelect(elements.format, model.formats, settings.format);
   elements.watermarkOption.hidden = isSpeech || !!model.no_watermark;
   elements.seed.closest('div').hidden = !!model.no_seed;
   elements.seed.max = model.max_seed || (isVideo ? 4294967295 : 2147483647);
   document.querySelectorAll('#commonMediaFields > div').forEach(field => {
     field.querySelectorAll('input, select, textarea').forEach(input => { input.disabled = field.hidden || !!input.closest('[hidden]'); });
   });
-  [elements.generateAudio, elements.cameraFixed, elements.draft, elements.returnLastFrame]
-    .forEach(element => { element.checked = false; });
-  voiceLanguageControl=ModelControls.voiceLanguage(model,{voice:elements.voice,language:elements.language,legacy:legacyLanguageChoices,managed:()=>!!playgroundResources?.hasKind('voice')});
+  for(const [key,field] of Object.entries(optionFields)){
+   if(['resolution','ratio','duration','quality','background','format','reference_mode'].includes(key)||key.endsWith('_urls')||key.endsWith('_url'))continue;
+   const input=elements[field];if(!input)continue;
+   if(input.type==='checkbox')input.checked=settings[key]===true;else input.value=settings[key]??'';
+  }
+  const referenceMode=document.querySelector('#referenceMode');if(settings.reference_mode)referenceMode.value=settings.reference_mode;
+  voiceLanguageControl=ModelControls.voiceLanguage(model,{voice:elements.voice,language:elements.language,legacy:legacyLanguageChoices,managed:()=>!!playgroundResources?.hasKind('voice'),initial:settings});
   updateDynamicCapabilities();
   window.referencePicker?.render();
   updatePrice();
@@ -932,7 +960,7 @@ function mediaTypeLabel(value) {
   return ({video: 'Video', image: 'Image', speech: 'Speech', music: 'Music', audio: 'Audio'})[value] || value;
 }
 
-function updateModelSelection(preferred = elements.model.value) {
+function updateModelSelection(preferred = elements.model.value||(renderedPlaygroundModel?modelSelectionValue(renderedPlaygroundProvider,renderedPlaygroundModel.id):''),renderOptions={}) {
   ModelPicker.populate(elements.model, providerCatalog, {value: preferred, label: modelOptionLabel});
   const options = [...elements.model.options];
   const defaultProvider = providerCatalog.find(provider => provider.id === serviceInfo.provider);
@@ -942,7 +970,7 @@ function updateModelSelection(preferred = elements.model.value) {
   elements.model.disabled = options.length === 0;
   if (!options.length) elements.model.append(new Option('No models available', ''));
   elements.submit.disabled = !options.length;
-  updateModelUI();
+  updateModelUI(renderOptions);
 }
 
 function updateCatalogUI() {
@@ -1070,14 +1098,17 @@ async function refreshGenerationBudget() {
  }
 }
 
+let playgroundCatalogSequence=0;
 async function loadProviders() {
+  const sequence=++playgroundCatalogSequence;
   if (!window.GenerationKey.value()) return;
   try {
     const response = await api('/v1/providers');
+    if(sequence!==playgroundCatalogSequence)return;
     providerCatalog = response.data || [];
     updateCatalogUI();
   } catch (error) {
-    if (error.name === 'AbortError') return;
+    if (error.name === 'AbortError'||sequence!==playgroundCatalogSequence) return;
     providerCatalog = []; updateCatalogUI();
     elements.model.replaceChildren(new Option('Could not load models', ''));
     setMessage(error.status === 401 ? 'Enter a valid Gateway API key above.' : `Could not load providers: ${error.message}`, 'error');
@@ -1133,6 +1164,7 @@ window.addEventListener('gateway-project-change', event => {
 });
 window.addEventListener('gateway-key-change', () => {
   generationKeyVersion++;
+  playgroundCatalogSequence++;renderedPlaygroundModel=null;renderedPlaygroundProvider='';
   ProviderLogos.prune();
   taskListRequest?.controller.abort();
   elements.taskList.querySelectorAll('.task').forEach(disposeTaskCard);
@@ -1293,7 +1325,7 @@ function reuseTask(task, {sparse=false}={}) {
     return;
   }
   window.referencePicker?.restoreSlots(sparse?task.options:null);
-  updateModelSelection(modelSelectionValue(task.provider, task.model));
+  updateModelSelection(modelSelectionValue(task.provider, task.model),{preserve:false});
   const options = task.options || {};
   playgroundSound?.restore(options.override_sound_id);
   const defaults = optionDefaults(selectedModel());
@@ -1327,7 +1359,7 @@ async function openTemplateInPlayground(source, signal) {
   const response=await api('/v1/providers',{signal,expectedKey:key});signal.throwIfAborted();
   if(!response.data?.some(p=>p.id===source.provider&&p.models.some(m=>m.id===source.model)))throw Error('This model is no longer available. Choose another model.');
   if(GenerationKey.value()!==key)return;
-  providerCatalog=response.data;
+  ++playgroundCatalogSequence;providerCatalog=response.data;
   showConsoleSection('generation');
   reuseTask(source,{sparse:true});
 }

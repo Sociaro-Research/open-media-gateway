@@ -52,11 +52,11 @@ const server = http.createServer((req, res) => {
     assert.deepEqual(await page.locator('#model optgroup').evaluateAll(es=>es.map(e=>[e.label,e.children.length])),[['Alibaba',2],['BytePlus',2]]);
     const choose=async(label,option)=>{await page.getByRole('combobox',{name:label,exact:true}).click();await page.getByRole('option',{name:option}).click();};
     await page.getByRole('combobox',{name:'Model',exact:true}).click();
-    assert.deepEqual(await page.locator('.picker-group').allTextContents(),['Alibaba','BytePlus']);
+    assert.deepEqual(await page.locator('.picker-group .model-picker-provider-name').allTextContents(),['Alibaba','BytePlus']);
     await page.screenshot({path:path.join(output,'grouped-models-desktop.png')});
     await page.getByRole('option',{name:/Video B/}).click();
     assert.equal(await page.locator('#resolution').inputValue(),'1080p');
-    assert.equal(await page.locator('#duration').inputValue(),'8');
+    assert.equal(await page.locator('#duration').inputValue(),'5');
     await page.locator('#prompt').fill('A free fixture generation');
     await page.waitForFunction(()=>document.querySelector('#priceValue').textContent==='Free');
     assert.equal(estimates.at(-1).provider,undefined);assert.equal(estimates.at(-1).model,'other/shared-id');
@@ -77,7 +77,7 @@ const server = http.createServer((req, res) => {
     for(const width of [390,320]){
       await page.setViewportSize({width,height:900});
       await page.getByRole('combobox',{name:'Model',exact:true}).click();
-      assert.deepEqual(await page.locator('.picker-group').allTextContents(),['Alibaba','BytePlus']);
+      assert.deepEqual(await page.locator('.picker-group .model-picker-provider-name').allTextContents(),['Alibaba','BytePlus']);
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
       await page.screenshot({path:path.join(output,`grouped-models-${width}.png`)});
       await page.getByRole('option',{name:/Video B/}).click();

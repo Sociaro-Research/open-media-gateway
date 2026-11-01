@@ -605,6 +605,12 @@ Template selection renders authorized metadata text before media validation comp
 
 ## Descriptor-driven generation controls
 
+Playground model changes retain every compatible current generation setting.
+Reconcile only unsupported values against the selected model and workflow; use
+the shared nearest advertised resolution policy. Preserve explicit false, zero
+and supported Auto inference. Reference files retain their ordered identities and
+must pass the selected target's existing compatibility checks before generation.
+
 Playground and Template authoring share `ModelControls`. Only declared media-role schemas produce role choices; a single declared default needs no selector. Save only non-default overrides at the ordered image/video addresses. Removal and reordering move the matching roles by slot index, including duplicate URLs. Role-bearing reference cards reserve enough width for the shared floating picker and wrap as whole cards on narrow screens. A role is generation intent, never client-supplied media evidence or a native resource ID.
 
 Descriptors that permit inference expose Auto (infer). This preserves omission of duration or aspect ratio instead of substituting a model default. Other models retain their declared ordinary defaults. Custom duration and its inference choice form one shared 12px group; hidden controls stay disabled across saves and validation. Unknown quantity means Estimate unavailable even with a verified tariff; only an explicit numeric zero may display Free, and an unavailable quote never enables confirmation.
