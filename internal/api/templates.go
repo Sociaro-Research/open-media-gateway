@@ -285,6 +285,7 @@ func (s *Server) templateAdmin(w http.ResponseWriter, r *http.Request) {
 		// Target adaptation must not erase the optional saved preference, including
 		// absence. It may apply again when a different model is selected later.
 		normalized.GenerateAudio = definition.Options.GenerateAudio
+		normalized.Resolution = definition.Options.Resolution
 		item.Draft.Options = normalized
 	}
 	saved, e := s.templates.Save(r.Context(), item, in.Version, in.Action)
@@ -593,14 +594,20 @@ func (s *Server) templateUse(w http.ResponseWriter, r *http.Request) {
 	}
 	fixedFiles, complete, fixedError := s.fixedTemplateMedia(r.Context(), item.ID, item.Draft)
 	catalog := []core.ProviderDescriptor{}
+	effectiveResolutions := map[string]map[string]string{}
 	defaultAvailable := false
 	for _, p := range s.visibleCatalog(r) {
 		models := []core.MediaModel{}
 		for _, m := range p.Models {
-			if item.Draft.Compatible(m) == nil && fixedError == nil && templates.ValidateRequestFiles(m, item.Draft.Options, fixedFiles, complete) == nil {
-				if _, e := s.validateTemplateRequest(r.Context(), item.Draft, p.ID, m); e != nil {
+			if item.Draft.Compatible(m) == nil && fixedError == nil && templates.ValidateRequestFiles(m, item.Draft.GenerationOptionsFor(m), fixedFiles, complete) == nil {
+				options, e := s.validateTemplateRequest(r.Context(), item.Draft, p.ID, m)
+				if e != nil {
 					continue
 				}
+				if effectiveResolutions[p.ID] == nil {
+					effectiveResolutions[p.ID] = map[string]string{}
+				}
+				effectiveResolutions[p.ID][m.ID] = options.Resolution
 				models = append(models, m)
 				if p.ID == item.Draft.Provider && m.ID == item.Draft.Model {
 					defaultAvailable = true
@@ -645,7 +652,7 @@ func (s *Server) templateUse(w http.ResponseWriter, r *http.Request) {
 	if assetError == "" && workflowError == "" && len(catalog) > 0 {
 		validationStatus = "ready"
 	}
-	s.writeViewerJSON(w, r, 200, map[string]any{"id": item.ID, "revision": item.Revision, "template": item.Draft, "fixed_references": fixed, "catalog": catalog, "default_available": defaultAvailable, "asset_error": assetError, "workflow_error": workflowError, "validation_status": validationStatus})
+	s.writeViewerJSON(w, r, 200, map[string]any{"id": item.ID, "revision": item.Revision, "template": item.Draft, "fixed_references": fixed, "catalog": catalog, "effective_resolutions": effectiveResolutions, "default_available": defaultAvailable, "asset_error": assetError, "workflow_error": workflowError, "validation_status": validationStatus})
 }
 
 // Use the same normalized request and native validator as admission, with one
@@ -676,12 +683,13 @@ func (s *Server) validateTemplateRequest(ctx context.Context, d templates.Defini
 }
 
 type templateGenerationInput struct {
-	Revision       int64             `json:"revision"`
-	Provider       string            `json:"provider"`
-	Model          string            `json:"model"`
-	Inputs         map[string]string `json:"inputs"`
-	ProjectID      string            `json:"project_id,omitempty"`
-	MaxExpectedUSD *money.USD        `json:"max_expected_cost_usd,omitempty"`
+	ExpectedResolution *string           `json:"expected_resolution,omitempty"`
+	Revision           int64             `json:"revision"`
+	Provider           string            `json:"provider"`
+	Model              string            `json:"model"`
+	Inputs             map[string]string `json:"inputs"`
+	ProjectID          string            `json:"project_id,omitempty"`
+	MaxExpectedUSD     *money.USD        `json:"max_expected_cost_usd,omitempty"`
 }
 
 func (s *Server) resolveTemplate(r *http.Request, item templates.Record, in templateGenerationInput) (core.CreateMediaInput, error) {
@@ -784,9 +792,19 @@ func (s *Server) resolveTemplate(r *http.Request, item templates.Record, in temp
 		return input, e
 	}
 	input.Options = normalized
+	if err := checkTemplateResolution(in, normalized.Resolution); err != nil {
+		return input, err
+	}
 	snapshot := map[string]any{"id": item.ID, "revision": item.Revision, "prompt": input.Prompt, "references": resolved, "provider": input.Provider, "model": input.Model, "options": input.Options}
 	input.TemplateSnapshot, _ = json.Marshal(snapshot)
 	return input, nil
+}
+
+func checkTemplateResolution(in templateGenerationInput, resolution string) error {
+	if in.ExpectedResolution != nil && *in.ExpectedResolution != resolution {
+		return fmt.Errorf("%w: model output resolution changed; reload the template and review settings", templates.ErrConflict)
+	}
+	return nil
 }
 func (s *Server) templateGenerate(w http.ResponseWriter, r *http.Request) {
 	if r.Header.Get("Authorization") == "" {

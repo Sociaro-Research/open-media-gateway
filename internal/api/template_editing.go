@@ -37,6 +37,9 @@ func (s *Server) templateEditing(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			return err
 		}
+		if err := checkTemplateResolution(in, options.Resolution); err != nil {
+			return err
+		}
 		remaining := map[string]string{}
 		for k, v := range in.Inputs {
 			remaining[k] = v

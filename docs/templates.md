@@ -49,7 +49,9 @@ generation or library access.
    Models without a configurable audio switch explain their native behavior;
    the optional saved audio preference never blocks saving or model eligibility.
    Input-derived duration is not configurable. Other unsupported saved choices
-   remain visible and block saving until corrected or a compatible model is selected.
+   remain visible and block saving until corrected or a compatible model is selected,
+   except output resolution, which is retained as a preference and mapped to a
+   supported target choice.
    Changing the authoring model or workflow resets the unsaved generation defaults. Save applies the current content immediately, including when the template is published.
 2. Use **Infer and review slots**. Each stable typed slot has its own index and
    role. Repeated prompt mentions bind once. Numbering must be contiguous within
@@ -338,3 +340,16 @@ Model audio default otherwise, and Overridden Audio when a replacement is set.
 Always-on targets are identified as Audio On (model default). Pending metadata
 shows a saved Audio preference rather than promising the selected model's output.
 Media and all other compatibility limits remain mandatory.
+
+### Output resolution preference
+
+Models are not hidden merely because their output resolution labels differ from
+the saved template. The selected target uses the nearest comparable advertised
+size; unknown or incomparable labels use its advertised Gateway default. Exact
+matches win. Numeric p and K families are not guessed interchangeable. Fixed
+width/height sizes prefer the same orientation and closest aspect before size;
+if the exact shape is unavailable, actual output dimensions may differ. The saved
+aspect-ratio option and native checks remain strict. See template-api.md for the
+deterministic tie/default rules. The runner and generation review show the actual
+selected resolution, and pricing uses it. Saved preferences stay unchanged on
+Save/Publish; input-reference resolution/codec/FPS and other limits are not relaxed.

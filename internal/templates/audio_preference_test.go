@@ -45,7 +45,7 @@ func TestTemplateAudioPreferenceIsOptionalForTarget(t *testing.T) {
 					if string(before) != string(after) {
 						t.Fatal("target adaptation changed saved preference")
 					}
-					d.Options.Resolution = "unsupported-resolution"
+					d.Options.Ratio = "unsupported-ratio"
 					if d.Compatible(m) == nil {
 						t.Fatal("audio adaptation bypassed other options")
 					}

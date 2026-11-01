@@ -11,6 +11,35 @@ video from the shared Template library as `cover_id`. There is no automatic
 fixed-reference fallback. Unpublished content may have no cover. Cover identity
 is separate from generation input slots; changing a slot does not change its cover.
 
+## Output resolution preference
+
+The saved `content.options.resolution` is a preference, not an exact-match model
+eligibility requirement. Templates choose an advertised target resolution without
+changing saved content. Exact tokens win; otherwise numeric `p` and `K` values
+are compared only within their own semantic family. No universal K-to-p mapping
+is inferred. Explicit width/height labels (`x`, `*` or `×`) prioritize the same
+orientation and closest oriented aspect ratio, then squared pixel distance.
+Equal-distance ties choose the smaller numeric size/pixel area, then catalogue
+order. A different available fixed shape can change implicit image aspect ratio;
+the actual selected dimensions are shown. Explicit `ratio` is never rewritten
+and its existing target/native validation remains strict.
+
+Absent, unknown or incomparable preferences use the target's first advertised
+choice, the existing Gateway default. This fallback is not claimed numerically
+nearest. With no choices the resolution is omitted. Known comparable choices
+are ranked even if an unknown or different-family label appears first.
+
+Validated detail includes `effective_resolutions[provider_id][model_id]` for each
+eligible catalogue target. Values come from the same normalized request used by
+native validation. An empty string authoritatively means no configurable
+resolution; a missing entry is older-server metadata, for which the UI uses the
+same deterministic rule. The runner summary, upload context and confirmation
+show/use the effective target value. Estimates, tariffs, admission, immutable
+job snapshots and Advanced editing use that value too. Current UI requests also send `expected_resolution` from the reviewed options; a same-revision catalogue change returns 409 instead of silently changing output between estimate and submission. Empty string binds omission, while absent/null retains legacy API behavior. The editor retains a
+saved unsupported preference and explains its effective choice instead of
+blocking Save. Direct API unsupported-resolution validation and all input-media
+width/height, FPS, duration, size, ownership and admission constraints are unchanged.
+
 ## Optional audio preference
 
 `content.options.generate_audio` is an optional saved preference, not a model

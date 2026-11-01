@@ -88,6 +88,10 @@ func (s *Server) templateValidateInputs(w http.ResponseWriter, r *http.Request) 
 		templateError(w, err)
 		return
 	}
+	if err := checkTemplateResolution(in, options.Resolution); err != nil {
+		templateError(w, err)
+		return
+	}
 	if err = s.referenceValidator(r)(r.Context(), &referencevalidation.Target{Provider: in.Provider, Model: in.Model, Options: options}, files, false); err != nil {
 		templateError(w, err)
 		return

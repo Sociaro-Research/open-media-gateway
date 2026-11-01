@@ -7587,6 +7587,12 @@ paths:
                   validation_status: {type: string, enum: [ready, failed], description: Ready requires completed media and workflow validation plus a compatible model; pending metadata never enables actions}
                   template: {$ref: '#/components/schemas/TemplateDefinition'}
                   catalog: {type: array, items: {$ref: '#/components/schemas/ProviderDescriptor'}}
+                  effective_resolutions:
+                    type: object
+                    description: Validated effective output resolution by provider ID then model ID. Only eligible models are present. Empty string means omit resolution; missing entries on older servers use the documented deterministic fallback. Stored preferences remain unchanged.
+                    additionalProperties:
+                      type: object
+                      additionalProperties: {type: string}
                   fixed_references:
                     type: array
                     description: Read-only previews of fixed assets in this published revision only. Draft replacements are excluded.
@@ -8146,7 +8152,7 @@ components:
     TemplateDefinition:
       type: object
       additionalProperties: false
-      description: Unpublished current content may be incomplete but creation and saves require an available image/video model with the explicit references workflow. Known fixed-media incompatibilities are rejected on save and binding. Publish and every published Save require an explicit accessible shared image/video cover and at least one reviewed reference slot, and validate every binding and the native request contract before freezing admission defaults. Availability uses the same native validation without quoting or admitting a task. No generation reference URLs are allowed in options. Audio is an optional saved preference and does not filter template models; selected targets without a configurable audio switch omit generate_audio and retain native audio behavior, which does not promise silence. Direct API validation remains strict.
+      description: Unpublished current content may be incomplete but creation and saves require an available image/video model with the explicit references workflow. Known fixed-media incompatibilities are rejected on save and binding. Publish and every published Save require an explicit accessible shared image/video cover and at least one reviewed reference slot, and validate every binding and the native request contract before freezing admission defaults. Availability uses the same native validation without quoting or admitting a task. No generation reference URLs are allowed in options. Audio is an optional saved preference and does not filter template models; selected targets without a configurable audio switch omit generate_audio and retain native audio behavior, which does not promise silence. Direct API validation remains strict. Output resolution is a saved preference; template-derived requests select the nearest comparable advertised target choice, or the Gateway default for unknown/incomparable labels, without relaxing input-media or direct API validation.
       properties:
         title: {type: string, maxLength: 120}
         description: {type: string, maxLength: 500}
@@ -8197,6 +8203,7 @@ components:
       additionalProperties: false
       required: [revision, provider, model, inputs]
       properties:
+        expected_resolution: {type: string, nullable: true, description: Optional reviewed effective output resolution. Empty string binds omission; mismatch returns 409 before estimate/admission. Omitted or null retains legacy behavior.}
         revision: {type: integer, minimum: 1, description: Current opaque generation token; a changed template requires reloading and reviewing input choices.}
         provider: {type: string}
         model: {type: string}

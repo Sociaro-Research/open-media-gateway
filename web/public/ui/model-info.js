@@ -4,6 +4,15 @@
  const node=(tag,cls,text)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(text!=null)n.textContent=text;return n;};
  const usd=v=>new Intl.NumberFormat(undefined,{style:'currency',currency:'USD',maximumFractionDigits:6}).format(Number(v));
  const date=v=>v?new Date(v+(v.length===7?'-01':'')+'T12:00:00').toLocaleDateString(undefined,{year:'numeric',month:'short',...(v.length===7?{}:{day:'numeric'})}):'Not published';
+ // Resolve only advertised choices; K and p are different semantic families.
+ function nearestResolution(preference,choices=[]){
+  if(!choices.length)return '';if(choices.includes(preference))return preference;
+  const parse=value=>{const text=String(value||'').trim().toLowerCase().replaceAll(' ',''),tier=/^([0-9]+(?:\.[0-9]+)?)([pk])$/.exec(text),dimensions=/^([0-9]+)[x*×]([0-9]+)$/.exec(text);if(tier){const x=Number(tier[1]);if(x>0&&x<=1e6)return {family:tier[2],x};}if(dimensions){const x=Number(dimensions[1]),y=Number(dimensions[2]);if(x>0&&y>0&&x<=1e6&&y<=1e6)return {family:'dimensions',x,y};}return {};};
+  const source=parse(preference);if(!source.family)return choices[0];let best='',bestScore;
+  const orientation=s=>Math.sign(s.x-s.y),less=(a,b)=>{for(let i=0;i<a.length;i++)if(Math.abs(a[i]-b[i])>1e-9)return a[i]<b[i];return false;};
+  for(const choice of choices){const target=parse(choice);if(target.family!==source.family)continue;const score=source.family==='dimensions'?[orientation(target)===orientation(source)?0:1,Math.abs(target.x/target.y-source.x/source.y),(target.x-source.x)**2+(target.y-source.y)**2,target.x*target.y]:[0,0,Math.abs(target.x-source.x),target.x];if(!best||less(score,bestScore)){best=choice;bestScore=score;}}
+  return best||choices[0];
+ }
  // Format capability bounds once for both generation and template fields.
  function durationLabel(model={}){
   if(model.duration_from_input)return 'Duration (from input)';
@@ -77,5 +86,5 @@
  document.addEventListener('keydown',e=>{if(active&&e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();close(true);}},true);
  document.addEventListener('pointerdown',e=>{if(active&&!contains(e.target))close();},true);
  window.addEventListener('resize',position);document.addEventListener('scroll',e=>{if(active&&!active.panel.contains(e.target))position();},true);
- window.ModelInfo={button,informationButton,close,contains,durationLabel,compare:(a,b)=>{const d=m=>[m.metadata?.release_date||'',m.metadata?.version_date||''].sort().at(-1);return d(b).localeCompare(d(a))||a.display_name.localeCompare(b.display_name);}};
+ window.ModelInfo={nearestResolution,button,informationButton,close,contains,durationLabel,compare:(a,b)=>{const d=m=>[m.metadata?.release_date||'',m.metadata?.version_date||''].sort().at(-1);return d(b).localeCompare(d(a))||a.display_name.localeCompare(b.display_name);}};
 })();

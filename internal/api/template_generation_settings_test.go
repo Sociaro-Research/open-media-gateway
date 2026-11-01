@@ -86,8 +86,8 @@ func TestTemplateDraftValidatesSettingsWithOptionalAudio(t *testing.T) {
 			change(&d.Options)
 			body, _ := json.Marshal(map[string]any{"version": 1, "draft": d})
 			w := sendTest(s.handler(), "PUT", "/v1/system/templates/"+id, string(body), "alice", "")
-			if name == "audio" {
-				if w.Code != 200 || repo.saves != 1 || repo.items[id].Draft.Options.GenerateAudio == nil || !*repo.items[id].Draft.Options.GenerateAudio {
+			if name == "audio" || name == "resolution" {
+				if w.Code != 200 || repo.saves != 1 || (name == "audio" && (repo.items[id].Draft.Options.GenerateAudio == nil || !*repo.items[id].Draft.Options.GenerateAudio)) || (name == "resolution" && repo.items[id].Draft.Options.Resolution != d.Options.Resolution) {
 					t.Fatal("optional preference not retained", w.Code, w.Body.String())
 				}
 				return

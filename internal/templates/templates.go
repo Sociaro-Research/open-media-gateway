@@ -325,9 +325,6 @@ func (d Definition) ValidateGenerationOptions(model core.MediaModel) error {
 	invalid := func(name string) error {
 		return fmt.Errorf("%w: unsupported %s for the selected model", ErrInvalid, name)
 	}
-	if o.Resolution != "" && !slices.Contains(model.Resolutions, o.Resolution) {
-		return invalid("resolution")
-	}
 	if o.Ratio != "" && !slices.Contains(ratios, o.Ratio) {
 		return invalid("aspect ratio")
 	}
@@ -343,6 +340,7 @@ func (d Definition) ValidateGenerationOptions(model core.MediaModel) error {
 // behavior. Direct API requests do not use this template-only adaptation.
 func (d Definition) GenerationOptionsFor(model core.MediaModel) core.MediaOptions {
 	options := d.Options
+	options.Resolution = NearestResolution(options.Resolution, model.Resolutions)
 	if model.MediaType != "video" || !model.SupportsAudio || model.AudioAlwaysOn {
 		options.GenerateAudio = nil
 	}

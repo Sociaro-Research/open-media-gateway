@@ -991,7 +991,7 @@ function generationRequest(request) {
  }
  return body;
 }
-function templateRequest(request){return {revision:request.template.revision,inputs:request.template.inputs,provider:request.provider,model:request.model,...(request.project_id?{project_id:request.project_id}:{}),...(request.max_expected_cost_usd!==undefined?{max_expected_cost_usd:request.max_expected_cost_usd}:{})};}
+function templateRequest(request){return {expected_resolution:request.options?.resolution||'',revision:request.template.revision,inputs:request.template.inputs,provider:request.provider,model:request.model,...(request.project_id?{project_id:request.project_id}:{}),...(request.max_expected_cost_usd!==undefined?{max_expected_cost_usd:request.max_expected_cost_usd}:{})};}
 async function fetchEstimate(request) {
  const model=providerCatalog.find(p=>p.id===request.provider)?.models.find(m=>m.id===request.model),issue=ModelControls.voiceRequestError(model,request.options);if(issue)throw Error(issue);
  return api(request.template ? `/v1/templates/${encodeURIComponent(request.template.id)}/estimate` : request.resource_create?'/v1/provider-resources/estimate':request.session_action?sessionPath(request)+'/estimate':'/v1/generations/estimate',{method:'POST',body:JSON.stringify(request.template ? templateRequest(request) : generationRequest(request))});
