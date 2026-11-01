@@ -1,9 +1,5 @@
 # Direct Kling integration
 
-This native protocol stage registers **37** generation, analysis, solution and
-resource-creation descriptors. Public editing initialization/selection actions,
-their UI and native account-query rows remain separate integration work.
-
 Contracts were reviewed on **2026-10-31** against the official
 [API index](https://kling.ai/document-api/llms.txt), including its endpoint-specific
 Markdown exports. The adapter uses `https://api-singapore.klingai.com` and a
@@ -33,7 +29,7 @@ concrete connection prefix, for example `kling/kling-4.0-omni-video`.
 | Audio and Avatar | Text-to-audio, video-to-audio, TTS, Avatar image-to-video | [TTS](https://kling.ai/document-api/api/video/avatar/text-to-speech.md), [Avatar](https://kling.ai/document-api/api/video/avatar.md) |
 | Solutions | Effects, Apparel, Goods Studio, Video Commerce, Virtual Try-On | [Apparel](https://kling.ai/document-api/api/ecommerce-replication/apparel.md), [Goods Studio](https://kling.ai/document-api/api/ecommerce-replication/goods-studio.md), [Video Commerce](https://kling.ai/document-api/api/ecommerce-replication/video-commerce.md), [Virtual Try-On](https://kling.ai/document-api/api/ecommerce-replication/virtual-try-on.md) |
 | Analysis and editing | Image recognition, face detection, lip-sync, multi-element editing | [Recognition](https://kling.ai/document-api/api/video/image-recognition.md), [Face detection](https://kling.ai/document-api/api/video/lip-sync/face-detection.md), [Lip-sync](https://kling.ai/document-api/api/video/lip-sync.md), [Editing](https://kling.ai/document-api/api/video/multi-elements.md) |
-| Managed resources | Element/voice creation and owner/connection-bound local bindings | [Elements](https://kling.ai/document-api/api/video/4-0/elements.md), [Voices](https://kling.ai/document-api/api/video/4-0/voice-customization.md) |
+| Managed resources | Element/voice creation, local binding lifecycle, editing initialization and selection actions | [Elements](https://kling.ai/document-api/api/video/4-0/elements.md), [Voices](https://kling.ai/document-api/api/video/4-0/voice-customization.md) |
 
 Use the authorized `/v1/models` response for exact operation IDs, controls,
 reference modes, resource schemas and price availability. Capability maps do not
@@ -91,63 +87,69 @@ models retain their existing limits. Uninspected external video duration remains
 Gateway does not fetch arbitrary remote references as a side effect of quoting.
 A required input-duration estimate cannot treat unknown metadata as zero.
 
-## Managed resources and face detection
+## Resources and session actions
 
 `POST /v1/provider-resources/estimate` and `POST /v1/provider-resources` accept
-local reference UUIDs or an eligible owned generation for element/voice creation.
-The host inspects source bytes and constructs private native inputs for the
-selected connection. Public bodies do not accept native resource IDs, source
-URLs, hashes or duration assertions. Accepted jobs retain their connection and
-tariff revisions; reusing a binding requires its owner and connection revision.
-Completed creation jobs return local `resources[{binding_id,reference_id}]`.
+local reference UUIDs or an eligible owned generation. The host inspects source
+bytes, pins the actual connection/revision and constructs private native inputs.
+Public bodies never accept native IDs, source URLs, hashes or duration assertions.
+Completed generations return local `resources[{binding_id,reference_id}]`.
+Read local bindings with `GET /v1/provider-resources?provider=CONNECTION` and
+`GET /v1/provider-resources/{id}`. This is owner-local inventory.
 
 ```json
 {
   "provider": "kling",
-  "model": "kling-create-voice",
-  "kind": "voice",
-  "subtype": "custom",
-  "name": "Voice sample",
+  "model": "kling-selection-init",
+  "kind": "editing_session",
+  "subtype": "selection",
+  "name": "My selection",
   "reference_ids": ["00000000-0000-4000-8000-000000000001"]
 }
 ```
 
-Read bindings with `GET /v1/provider-resources?provider=CONNECTION` and
-`GET /v1/provider-resources/{id}`. This inventory contains the owner's local
-bindings. Element creation distinguishes a frontal image plus 1–3 distinct
-reference images from a 3–8 second 1080p character video. Voice creation requires
-one eligible 5–30 second source. Use the catalogue's resource variants for exact
-source types, dimensions and limits. Unverified creation tariffs remain
-unavailable until a positive account-specific tariff is explicitly configured.
+Editing initialization requires an inspected MP4/MOV of2–5 or7–10seconds,
+720–2160pixels on each side and exactly24,30or60fps. Its session lasts24hours.
+Face detection uses a separate source contract and host retention policy; its
+response exposes local1-based face indices and archived preview selectors.
 
-`kling-lip-sync-face-detection` accepts its own inspected video contract and
-returns typed JSON plus archived face previews. When source hash and duration
-are known, the host can retain an owner/connection-bound `face_session` for one
-hour; upstream expiry is undocumented. Uninspected external video can return
-artifacts without creating a reusable binding. Public results use local 1-based
-face indices. Preview selectors identify images archived by that same generation;
-native face/session IDs and provider preview URLs stay private.
+Selection operations use
+`POST /v1/provider-resources/{id}/actions/{add|delete|clear|preview}`, with
+`/estimate` appended for a quote. Submit a stable `Idempotency-Key`.
 
-Lip-sync selects the local binding through `options.resource_references` and one
-`options.parameters.face_index`. Crop/insertion controls are milliseconds; crops
-must fit inspected source duration and overlap the face interval by at least
-2 seconds. Both volume controls permit zero. Generated-TTS audio selection still
-requires its separate owner-bound provenance workflow; native IDs are not a
+```json
+{
+  "expected_revision": 0,
+  "frame": {
+    "frame_index": 0,
+    "points": [{"x": 0.123456789012345, "y": 0.5}]
+  },
+  "max_expected_usd": 0.1
+}
+```
+
+`frame` is required only for add/delete. Frame indices are zero-based and less
+than `session.frame_count`; coordinates are finite0..1. At most10frames and
+10points per frame can be marked. Preserve exact coordinates when deleting.
+Clear/preview forbid frame data. Mutations freeze concurrent uses and update the
+same binding at revision+1. A failed or uncertain mutation leaves the binding
+unusable; only an explicit clear with `recover:true` can restore a known state.
+Never silently retry an uncertain paid provider submission.
+
+`DELETE /v1/provider-resources/{id}` revokes local face/editing bindings without
+claiming an upstream deletion or changing native expiry. Active admitted uses
+prevent revocation. Element/voice deletions use their documented native operation;
+an asynchronous handle without a documented matching poll endpoint remains
+pending/uncertain. A submitted request is not proof of deletion.
+
+Lip-sync selects one local face index and exactly one allowed sound source. Crop
+and insertion controls are milliseconds; crops must fit inspected source duration
+and overlap the face interval by at least2seconds. Both volume controls permit0.
+Multi-element editing distinguishes addition (1–2cropped JPEG/PNG images), swap
+(exactly1) and removal (no image). Prompt aliases use native
+`<<<video_1>>>`/`<<<image_1>>>` syntax. Generated-TTS audio selection still requires
+its separate owner-bound provenance workflow; native IDs are not accepted as a
 shortcut.
-
-Multi-element editing has a native generation serializer for addition
-(1–2 cropped JPEG/PNG images), swap (exactly one) and removal (no image). Prompt
-aliases use `<<<video_1>>>`/`<<<image_1>>>`. It requires a trusted editing-session
-binding. Public editing initialization and selection add/delete/clear/preview
-actions are **not included in this stage**. Their serializer helpers are retained
-for the later host workflow; no public selection action endpoint or UI is
-promised here.
-
-`DELETE /v1/provider-resources/{id}` uses the documented element/voice deletion
-operation. Active admitted uses and dependent elements protect retained bindings.
-An asynchronous handle without a documented matching poll endpoint remains
-pending/uncertain; submission alone is not proof of deletion. Public local
-face/editing-session revocation actions belong to the later workflow.
 
 ## Pricing and outputs
 
@@ -168,7 +170,7 @@ series count is unknown in advance. AI Multi-Shot instead charges per call.
 
 A verified tariff with unknown quantity is retained as `quantity_unknown` and
 omits the total; it is not free. Such a request cannot satisfy an explicit cost
-cap. Unknown tariffs stay unavailable. Unpublished Element costs,
+cap. Unknown tariffs stay unavailable. Unpublished session/Element costs,
 lip-sync partial-block rounding and Avatar/multi-edit mode-to-resolution mapping
 are not invented. Optional positive operator-confirmed USD/request fields can
 supply explicit account tariffs for these named operations; they are labeled
@@ -180,14 +182,19 @@ unpriced keeps it unavailable; no template-dependent fee is guessed. Existing
 `kling4_720p_price`/`kling4_1080p_price` USD/second overrides remain supported.
 
 All normalized outputs are archived before success: multiple images/audio,
-recognition JSON, face/segmentation previews and watermarked variants. Read
+recognition JSON, masks, previews and watermarked variants. Read
 `artifacts[{id,media_type,content_url,content_type,size_bytes,sha256}]` from the
 normal generation response. `/v1/generations/{id}/media-access` issues signed
 per-artifact preview/download links. Owner checks, expiry and deletion apply to
 every artifact. Scalar primary-result routes remain compatible.
 
-Credentials, provider task/resource IDs, inspected source proof and connection
-revisions remain private in generation/report views and download errors.
+Selection preview also returns `tracking_output`, whose serialization is not
+documented. Gateway preserves it as a scoped private `binary`/`bin` source,
+archives at most32MiB under the storage cap, and serves an
+`application/octet-stream` attachment. It is never relabeled as validated JSON or
+exposed as an upstream URL. Credentials, provider task/resource IDs, inspected
+source proof and connection revisions remain private in generation/report views
+and download errors.
 
 See [the OpenAI-style API](openai-api.md), [Templates API](template-api.md) and
 [testing guide](testing.md). Provider fixtures use synthetic inputs and mocked

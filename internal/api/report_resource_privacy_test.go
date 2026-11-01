@@ -12,6 +12,7 @@ func TestReportDetailKeepsResourceAndSourceEvidencePrivate(t *testing.T) {
 	s, _ := newPersonalTestServer()
 	task := detailTask()
 	task.Options.ResourceReferences = []core.ResourceReference{{BindingID: "local-binding", ReferenceID: "editing_session_1"}}
+	task.Options.SessionAction = &core.SessionActionIntent{BindingID: "local-binding", Action: "add", ExpectedRevision: 2, Frame: &core.FrameSelection{FrameIndex: 0, Points: []core.SelectionPoint{{X: .123456789012345, Y: .5}}}}
 	task.Options.ResourceSnapshots = []core.ResourceSnapshot{{BindingID: "local-binding", RemoteID: "private-native-session", ConnectionIdentity: "private-connection-revision", Session: &core.MediaSessionEvidence{SourceSHA256: "private-source-hash", Faces: []core.SessionFace{{ID: "private-native-face"}}}}}
 	task.Options.ResourceCreation = &core.ResourceCreateRequest{VoiceSources: []core.ResourceSourceInput{{URL: "https://private-source.test/signed?token=private-token", SHA256: "private-creation-hash"}}}
 	task.Options.ReferenceMediaEvidence = map[string]core.InputMediaEvidence{"private-reference": {SHA256: "private-inspection-hash"}}
@@ -26,7 +27,7 @@ func TestReportDetailKeepsResourceAndSourceEvidencePrivate(t *testing.T) {
 			t.Errorf("private request evidence leaked: %s", private)
 		}
 	}
-	for _, public := range []string{"local-binding", "editing_session_1", "Private extension"} {
+	for _, public := range []string{"local-binding", "editing_session_1", `"expected_revision":2`, "0.123456789012345", "Private extension"} {
 		if !strings.Contains(w.Body.String(), public) {
 			t.Errorf("public immutable request missing: %s", public)
 		}

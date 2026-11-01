@@ -65,6 +65,9 @@ func (a *Adapter) Generate(ctx context.Context, r core.MediaRequest) (core.Provi
 		return core.ProviderTask{}, err
 	}
 	m, _ := modelFor(r.Model)
+	if isSessionOperation(r.Model) {
+		return a.generateSessionOperation(ctx, m, r)
+	}
 	if isLegacyOmniOperation(r.Model) {
 		return a.generateLegacyOmni(ctx, r)
 	}

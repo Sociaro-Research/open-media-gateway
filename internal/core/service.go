@@ -196,7 +196,11 @@ func (s *TaskService) prepare(ctx context.Context, input CreateMediaInput, idemp
 		if s.resourceResolver == nil {
 			resourceError = fmt.Errorf("%w: resource resolver unavailable", ErrOptionsInvalid)
 		} else {
-			input.Options.ResourceSnapshots, resourceError = s.resourceResolver.ResolveResourceReferences(ctx, provider, append([]ResourceReference(nil), input.Options.ResourceReferences...))
+			if resolver, ok := s.resourceResolver.(SessionActionResolver); ok && input.Options.SessionAction != nil {
+				input.Options.ResourceSnapshots, resourceError = resolver.ResolveSessionAction(ctx, provider, CloneSessionAction(input.Options.SessionAction), append([]ResourceReference(nil), input.Options.ResourceReferences...))
+			} else {
+				input.Options.ResourceSnapshots, resourceError = s.resourceResolver.ResolveResourceReferences(ctx, provider, append([]ResourceReference(nil), input.Options.ResourceReferences...))
+			}
 		}
 		if resourceError != nil && input.AdmissionError == nil {
 			input.AdmissionError = resourceError
@@ -346,6 +350,10 @@ func normalizeModelOptions(descriptor MediaModel, options MediaOptions, deferRes
 	}
 	if options.OutputCount == 1 {
 		options.OutputCount = 0
+	}
+	options.SessionAction = CloneSessionAction(options.SessionAction)
+	if err := ValidateSessionAction(descriptor, options, deferResourceLookup); err != nil {
+		return MediaOptions{}, err
 	}
 	options.ResourceIntent = CloneResourceIntent(options.ResourceIntent)
 	options.ResourceCreation = CloneResourceCreation(options.ResourceCreation)

@@ -28,7 +28,7 @@ func assertKlingContracts(t *testing.T, models []core.MediaModel) {
 		kling.OmniVideo4:          {10, true, []string{"references"}, 3, 30, 1, 26000},
 	}
 
-	additional := map[string]string{kling.OmniVideo3: "video", kling.OmniVideoO1: "video", kling.ResourceCreateElement: "resource", kling.ResourceCreateVoice: "resource", kling.ImageRecognition: "json", kling.FaceDetection: "json", kling.LipSync: "video", kling.MultiElementsEditing: "video",
+	additional := map[string]string{kling.SessionInit: "resource", kling.SessionAdd: "json", kling.SessionDelete: "json", kling.SessionClear: "json", kling.SessionPreview: "video", kling.OmniVideo3: "video", kling.OmniVideoO1: "video", kling.ResourceCreateElement: "resource", kling.ResourceCreateVoice: "resource", kling.ImageRecognition: "json", kling.FaceDetection: "json", kling.LipSync: "video", kling.MultiElementsEditing: "video",
 		kling.ImageGeneration3:   "image",
 		kling.ImageGeneration21:  "image",
 		kling.ImageOmni3:         "image",
@@ -65,6 +65,15 @@ func assertKlingContracts(t *testing.T, models []core.MediaModel) {
 			}
 			if (m.ID == kling.MotionControl3 || m.ID == kling.MotionControl26) && (!m.DurationFromInput || !m.RequiresVideoInput || m.ReferenceMediaLimits.Video.MaxDuration != 30) {
 				t.Fatalf("missing motion video contract: %+v", m)
+			}
+			if m.ID == kling.SessionInit && (m.ResourceOperation == nil || m.ResourceOperation.Kind != "editing_session" || len(m.ResourceOutputs) != 1 || !m.ResourceOutputs[0].ProviderExpiryKnown) {
+				t.Fatal("missing initialized session contract", m)
+			}
+			if m.ID == kling.SessionAdd || m.ID == kling.SessionDelete || m.ID == kling.SessionClear || m.ID == kling.SessionPreview {
+				action := map[string]string{kling.SessionAdd: "add", kling.SessionDelete: "delete", kling.SessionClear: "clear", kling.SessionPreview: "preview"}[m.ID]
+				if m.SessionOperation == nil || m.SessionOperation.Kind != "editing_session" || m.SessionOperation.Action != action || m.SessionOperation.Mutates != (action != "preview") || m.SessionOperation.MaxFrames != 10 || m.SessionOperation.MaxPoints != 10 || m.SessionOperation.FrameIndexBase != 0 {
+					t.Fatal("wrong exact selection action contract", m)
+				}
 			}
 			seen[m.ID] = true
 			continue

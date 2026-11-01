@@ -6499,6 +6499,63 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
         '422': {description: Verified pricing unavailable.}
+  "/v1/provider-resources/{id}/actions/{action}":
+    parameters:
+    - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    - {name: action, in: path, required: true, schema: {type: string, enum: [add, delete, clear, preview]}}
+    post:
+      tags: [References]
+      operationId: actOnProviderResource
+      summary: Admit a priced typed session action
+      description: Uses only an authorized local session binding and its exact revision. Native IDs, source evidence and upstream URLs are never accepted. Mutations serialize with active work; an uncertain mutation makes the session unusable until an explicitly requested recovery clear. Coordinates retain exact submitted precision. Unknown prices cannot be submitted.
+      x-required-scope: generation
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ProviderResourceAction'}
+      responses:
+        '202':
+          description: Normal asynchronous generation; poll its status URL and read archived artifacts.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Generation'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {description: Idempotency conflict, active work or changed estimate.}
+        '422': {description: Verified price unavailable.}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  "/v1/provider-resources/{id}/actions/{action}/estimate":
+    parameters:
+    - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    - {name: action, in: path, required: true, schema: {type: string, enum: [add, delete, clear, preview]}}
+    post:
+      tags: [References]
+      operationId: estimateProviderResourceAction
+      summary: Quote a typed session action without provider submission
+      description: Uses only an authorized local session binding and its exact revision. Native IDs, source evidence and upstream URLs are never accepted. Mutations serialize with active work; an uncertain mutation makes the session unusable until an explicitly requested recovery clear. Coordinates retain exact submitted precision. Unknown prices cannot be submitted.
+      x-required-scope: generation
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ProviderResourceAction'}
+      responses:
+        '200':
+          description: Normal cost estimate; no provider call.
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {description: Idempotency conflict, active work or changed estimate.}
+        '422': {description: Verified price unavailable.}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
   "/v1/provider-resources/{id}":
     parameters:
     - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
@@ -9817,6 +9874,16 @@ components:
         resource_input_schemas:
           type: array
           items: {$ref: '#/components/schemas/ResourceInputSchema'}
+        session_operation:
+          type: object
+          required: [kind, action, mutates, frame_index_base]
+          properties:
+            kind: {type: string}
+            action: {type: string, enum: [add, delete, clear, preview]}
+            mutates: {type: boolean}
+            max_frames: {type: integer, minimum: 1}
+            max_points: {type: integer, minimum: 1}
+            frame_index_base: {type: integer, const: 0}
         public_id: {type: string, description: Public model identifier used for generation requests}
 
         metadata:
@@ -10143,6 +10210,34 @@ components:
         authentication check does not prove model access or funded generation; inspect
         status_message for its scope. Cached checks can expire or reset on restart.
         Separate billing credentials are used to retrieve actual generation charges.
+    ProviderResourceAction:
+      type: object
+      additionalProperties: false
+      required: [expected_revision]
+      properties:
+        model: {type: string, description: Optional authorized session-operation model.}
+        expected_revision: {type: integer, format: int64, minimum: 0}
+        recover: {type: boolean, default: false, description: Explicit recovery clear only; never automatically resubmit an uncertain mutation.}
+        max_expected_usd: {type: number, minimum: 0}
+        frame: {$ref: '#/components/schemas/FrameSelection'}
+    FrameSelection:
+      type: object
+      additionalProperties: false
+      required: [frame_index, points]
+      properties:
+        frame_index: {type: integer, minimum: 0, description: Zero-based frame index, strictly less than the current session frame_count.}
+        points:
+          type: array
+          minItems: 1
+          maxItems: 10
+          uniqueItems: true
+          items:
+            type: object
+            additionalProperties: false
+            required: ['x', 'y']
+            properties:
+              'x': {type: number, minimum: 0, maximum: 1}
+              'y': {type: number, minimum: 0, maximum: 1}
     ProviderResourceCreate:
       type: object
       additionalProperties: false
@@ -10241,7 +10336,7 @@ components:
       required: [id, media_type, content_url, content_type, size_bytes, sha256]
       properties:
         id: {type: string, description: Local artifact selector; never a provider ID or storage key.}
-        media_type: {type: string, enum: [image, video, audio, speech, music, text, json]}
+        media_type: {type: string, enum: [image, video, audio, speech, music, text, json, binary]}
         format: {type: string}
         duration: {type: number, exclusiveMinimum: 0}
         group_id: {type: string, description: Opaque output grouping; never used as a path.}

@@ -47,6 +47,7 @@ func Definition() providerkit.Definition {
 			{Key: "lip_sync_price", Label: "Confirmed lip-sync tariff (USD/request, optional)", Env: "KLING_LIP_SYNC_PRICE"},
 			{Key: "multi_edit_std_price", Label: "Confirmed multi-edit std tariff (USD/request, optional)", Env: "KLING_MULTI_EDIT_STD_PRICE"},
 			{Key: "multi_edit_pro_price", Label: "Confirmed multi-edit pro tariff (USD/request, optional)", Env: "KLING_MULTI_EDIT_PRO_PRICE"},
+			{Key: "effect_prices", Label: "Confirmed Effects tariffs (scene to USD/request JSON, optional)", Env: "KLING_EFFECT_PRICES"},
 		},
 		CatalogSources:       reviewedSources(),
 		CatalogInterpret:     interpretPrices,
@@ -63,6 +64,9 @@ func Definition() providerkit.Definition {
 				return nil, err
 			}
 			if err = a.setOperationPrices(c); err != nil {
+				return nil, err
+			}
+			if err = a.setEffectPrices(c); err != nil {
 				return nil, err
 			}
 			return a, nil

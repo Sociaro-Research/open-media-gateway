@@ -325,6 +325,24 @@ func insertCompletedResource(ctx context.Context, tx *sql.Tx, j providerresource
 	if err := providerresources.ValidateSessionProvenance(j.Kind, result.Session, j.Intent.Sources); err != nil {
 		return providerresources.Binding{}, err
 	}
+	if j.Kind == "editing_session" && originTaskID != "" {
+		var optionsRaw []byte
+		if err := tx.QueryRowContext(ctx, "SELECT request_options FROM tasks WHERE id=$1", originTaskID).Scan(&optionsRaw); err != nil {
+			return providerresources.Binding{}, err
+		}
+		var options core.MediaOptions
+		if err := json.Unmarshal(optionsRaw, &options); err != nil {
+			return providerresources.Binding{}, err
+		}
+		if options.ResourceCreation == nil || len(options.ResourceCreation.Videos) != 1 {
+			return providerresources.Binding{}, providerresources.ErrInvalid
+		}
+		source := options.ResourceCreation.Videos[0]
+		if result.Session == nil || int64(result.Session.FrameCount) != source.FrameCount || result.Session.FPS != source.FPS || result.Session.SelectionRevision != 0 || result.Session.HasSelection || len(result.Session.Selections) != 0 {
+			return providerresources.Binding{}, providerresources.ErrConflict
+		}
+	}
+
 	var err error
 	voiceID := j.Intent.BoundVoiceBindingID
 	if voiceID != "" {
@@ -540,6 +558,9 @@ func (r *ProviderResourceRepository) PendingJobs(ctx context.Context, limit int)
 // validateTaskResourceSnapshots runs only for a new task admission. FOR SHARE
 // serializes its task INSERT/commit with BeginDelete's FOR UPDATE and busy scan.
 func validateTaskResourceSnapshots(ctx context.Context, tx *sql.Tx, task core.Task) error {
+	if task.Options.SessionAction != nil {
+		return reserveTaskSessionAction(ctx, tx, task)
+	}
 	refs, snapshots := slices.Clone(task.Options.ResourceReferences), slices.Clone(task.Options.ResourceSnapshots)
 	if task.Options.ResourceIntent != nil || task.Options.ResourceCreation != nil {
 		creation, err := resourceTaskCreationIntent(task.Options)
@@ -632,6 +653,9 @@ func captureTaskResourceBindings(ctx context.Context, tx *sql.Tx, taskID string,
 	var options core.MediaOptions
 	if err = json.Unmarshal(optionsJSON, &options); err != nil {
 		return nil, err
+	}
+	if options.SessionAction != nil {
+		return completeTaskSessionAction(ctx, tx, taskID, resources)
 	}
 	var creation *providerresources.Intent
 	if options.ResourceIntent != nil || options.ResourceCreation != nil {
@@ -747,8 +771,17 @@ func captureTaskResourceBindings(ctx context.Context, tx *sql.Tx, taskID string,
 // source URLs or result-reported durations as provenance.
 func resourceTaskCreationIntent(options core.MediaOptions) (providerresources.Intent, error) {
 	public, private := options.ResourceIntent, options.ResourceCreation
-	if public == nil || private == nil || (public.Kind != "element" && public.Kind != "voice" && public.Kind != "file_resource") || public.Kind != private.Kind || public.Subtype != private.Subtype || public.Name != private.Name || public.Description != private.Description || !slices.Equal(public.Tags, private.Tags) {
+	if public == nil || private == nil || (public.Kind != "element" && public.Kind != "voice" && public.Kind != "file_resource" && public.Kind != "editing_session") || public.Kind != private.Kind || public.Subtype != private.Subtype || public.Name != private.Name || public.Description != private.Description || !slices.Equal(public.Tags, private.Tags) {
 		return providerresources.Intent{}, providerresources.ErrInvalid
+	}
+	if public.Kind == "editing_session" {
+		if public.Subtype != "selection" || len(public.ReferenceIDs) != 1 || public.GeneratedTaskID != "" || public.BoundVoiceBindingID != "" || len(public.Tags) != 0 || len(private.Videos) != 1 || len(private.Images)+len(private.VoiceSources)+len(private.FileSources) != 0 || private.GeneratedVideo != nil || private.BoundVoice != nil {
+			return providerresources.Intent{}, providerresources.ErrInvalid
+		}
+		source := private.Videos[0]
+		if source.MediaType != "video" || source.ReferenceID != public.ReferenceIDs[0] || source.SizeBytes <= 0 || source.Width <= 0 || source.Height <= 0 || source.FrameCount <= 0 || source.FPS <= 0 || source.Duration == nil {
+			return providerresources.Intent{}, providerresources.ErrInvalid
+		}
 	}
 	intent := providerresources.Intent{Kind: public.Kind, Subtype: public.Subtype, Name: public.Name, Description: public.Description, GeneratedTaskID: public.GeneratedTaskID, BoundVoiceBindingID: public.BoundVoiceBindingID, Tags: slices.Clone(public.Tags)}
 	expected := map[string]bool{}

@@ -26,7 +26,7 @@ func NewLifecycle(repo Repository, current ScopeResolver, directory core.Provide
 	return &Lifecycle{repo: repo, current: current, directory: directory}
 }
 func (l *Lifecycle) bindingScope(ctx context.Context, b Binding) (core.ProviderConnectionScope, error) {
-	if l == nil || l.repo == nil || l.current == nil || l.directory == nil {
+	if l == nil || l.repo == nil || l.current == nil {
 		return core.ProviderConnectionScope{}, ErrInvalid
 	}
 	if b.OwnerID != identity.OwnerID(ctx) || b.ProviderOwnerID != identity.ProviderOwnerID(ctx) || b.ProviderID == "" || b.ConnectionID == "" || b.Revision == "" || !ValidRemoteID(b.RemoteID) {
@@ -44,6 +44,10 @@ func (l *Lifecycle) bindingScope(ctx context.Context, b Binding) (core.ProviderC
 	}
 	return scope, nil
 }
+func localSessionRevocation(kind string) bool {
+	return kind == "face_session" || kind == "editing_session"
+}
+
 func lifecycleJobMatches(ctx context.Context, j Job, b Binding) bool {
 	return j.Operation == Delete && j.BindingID == b.ID && j.OwnerID == identity.OwnerID(ctx) && j.OwnerID == b.OwnerID && j.ProviderOwnerID == identity.ProviderOwnerID(ctx) && j.ProviderOwnerID == b.ProviderOwnerID && j.ProviderID == b.ProviderID && j.ConnectionID == b.ConnectionID && j.Revision == b.Revision && j.Kind == b.Kind && j.Intent.Kind == b.Kind && (identity.ContentAuthorFilter(ctx) == "" || j.ActorID == identity.ContentAuthorFilter(ctx))
 }
@@ -51,6 +55,17 @@ func lifecyclePublicJob(j Job) Job {
 	uncertain := strings.HasPrefix(j.Warning, "The provider outcome is uncertain.")
 	j.Intent = CloneIntent(j.Intent)
 	j.SafeError = SafeFailure(j.SafeError)
+	if j.Operation == Delete && localSessionRevocation(j.Kind) {
+		switch j.Status {
+		case Succeeded:
+			j.Warning = "Local session binding revoked. Provider session expiry is unchanged."
+		case Queued, Running:
+			j.Warning = "Local session revocation is pending. No provider deletion is performed."
+		case Failed:
+			j.Warning = "Local session revocation failed. Provider session expiry is unchanged."
+		}
+		return j
+	}
 	if j.Operation == Delete && j.Status == Queued && j.Handle == "" {
 		j.Warning = "Deletion has not been submitted. Repeat the original request to resume this queued job."
 		return j
@@ -80,6 +95,9 @@ func (l *Lifecycle) provider(ctx context.Context, j Job, b Binding) (context.Con
 	}
 	if !lifecycleJobMatches(ctx, j, b) {
 		return ctx, nil, ErrNotFound
+	}
+	if l.directory == nil {
+		return ctx, nil, core.ErrProviderUnavailable
 	}
 	pinned := lifecycleProviderContext(ctx, j, scope)
 	provider, err := l.directory.Provider(pinned, j.ProviderID)
@@ -137,6 +155,61 @@ func (l *Lifecycle) apply(ctx context.Context, j Job, result core.ResourceJob) (
 	}
 	return l.refresh(persist, j.ID)
 }
+
+// revokeSession completes only the local binding lifecycle. Native session
+// identities, source evidence and expiry remain untouched in the tombstone.
+// A missing native task handle is expected because this path has no provider I/O.
+func (l *Lifecycle) revokeSession(ctx context.Context, job Job) (Job, error) {
+	persist, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	b, err := l.repo.GetBinding(persist, job.BindingID)
+	if err != nil {
+		return lifecyclePublicJob(job), err
+	}
+	// A concurrent caller may already have completed the same local job after
+	// our initial queued/running read. Refresh after the binding so a deleted
+	// tombstone is paired with its current terminal job, not stale pending state.
+	currentJob, err := l.repo.GetJob(persist, job.ID)
+	if err != nil {
+		return lifecyclePublicJob(job), err
+	}
+	job = currentJob
+	if !localSessionRevocation(b.Kind) || !lifecycleJobMatches(persist, job, b) {
+		return Job{}, ErrNotFound
+	}
+	if _, err = l.bindingScope(persist, b); err != nil {
+		return lifecyclePublicJob(job), err
+	}
+	if b.IsPreset {
+		return lifecyclePublicJob(job), ErrConflict
+	}
+	if job.Status == Succeeded || job.Status == Failed {
+		return lifecyclePublicJob(job), nil
+	}
+	if b.Status != Deleting {
+		return lifecyclePublicJob(job), ErrConflict
+	}
+	if job.Status == Queued {
+		job, _, err = l.repo.StartJob(persist, job.ID)
+		if err != nil {
+			return lifecyclePublicJob(job), err
+		}
+		if !lifecycleJobMatches(persist, job, b) {
+			return Job{}, ErrNotFound
+		}
+	}
+	if job.Status == Succeeded || job.Status == Failed {
+		return lifecyclePublicJob(job), nil
+	}
+	if job.Status != Running {
+		return lifecyclePublicJob(job), ErrConflict
+	}
+	if err = l.repo.CompleteDelete(persist, job.ID); err != nil {
+		return lifecyclePublicJob(job), err
+	}
+	return l.refresh(persist, job.ID)
+}
+
 func lifecycleDeletionSnapshot(b Binding) core.ResourceSnapshot {
 	return core.ResourceSnapshot{Session: CloneSession(b.Session), BindingID: b.ID, ReferenceID: "resource", Kind: b.Kind, RemoteID: b.RemoteID, IsPreset: b.IsPreset, Subtype: b.Subtype, ConnectionIdentity: b.Revision, Sources: CloneSources(b.Sources)}
 }
@@ -161,7 +234,7 @@ func (l *Lifecycle) deletionPreflight(ctx context.Context, b Binding) error {
 }
 
 func (l *Lifecycle) Delete(ctx context.Context, bindingID, idem string) (Job, error) {
-	if l == nil || l.repo == nil || l.current == nil || l.directory == nil {
+	if l == nil || l.repo == nil || l.current == nil {
 		return Job{}, ErrInvalid
 	}
 	if _, err := uuid.Parse(bindingID); err != nil {
@@ -177,7 +250,10 @@ func (l *Lifecycle) Delete(ctx context.Context, bindingID, idem string) (Job, er
 	if b.IsPreset {
 		return Job{}, ErrConflict
 	}
-	if b.Kind != "element" && b.Kind != "voice" && b.Kind != "file_resource" {
+	if b.Kind != "element" && b.Kind != "voice" && b.Kind != "file_resource" && !localSessionRevocation(b.Kind) {
+		return Job{}, ErrInvalid
+	}
+	if !localSessionRevocation(b.Kind) && l.directory == nil {
 		return Job{}, ErrInvalid
 	}
 	switch b.Status {
@@ -191,7 +267,7 @@ func (l *Lifecycle) Delete(ctx context.Context, bindingID, idem string) (Job, er
 	if len(idem) > 200 {
 		return Job{}, ErrInvalid
 	}
-	if b.Status == Succeeded || b.Status == Failed {
+	if !localSessionRevocation(b.Kind) && (b.Status == Succeeded || b.Status == Failed) {
 		if err := l.deletionPreflight(ctx, b); err != nil {
 			return Job{}, err
 		}
@@ -204,6 +280,9 @@ func (l *Lifecycle) Delete(ctx context.Context, bindingID, idem string) (Job, er
 	}
 	if !lifecycleJobMatches(ctx, job, b) {
 		return Job{}, ErrNotFound
+	}
+	if localSessionRevocation(b.Kind) {
+		return l.revokeSession(ctx, job)
 	}
 	if job.Status != Queued {
 		return lifecyclePublicJob(job), nil
@@ -222,7 +301,7 @@ func (l *Lifecycle) Delete(ctx context.Context, bindingID, idem string) (Job, er
 	if err != nil {
 		return l.failed(ctx, job)
 	}
-	snapshot := core.ResourceSnapshot{Session: CloneSession(b.Session), BindingID: b.ID, ReferenceID: "resource", Kind: b.Kind, RemoteID: b.RemoteID, IsPreset: b.IsPreset, Subtype: b.Subtype, ConnectionIdentity: b.Revision, Sources: CloneSources(b.Sources)}
+	snapshot := lifecycleDeletionSnapshot(b)
 	result, err := provider.DeleteResource(pinned, snapshot)
 	if err != nil {
 		// Only adapter-declared pre-I/O rejections prove that no remote deletion was
@@ -235,7 +314,7 @@ func (l *Lifecycle) Delete(ctx context.Context, bindingID, idem string) (Job, er
 	return l.apply(ctx, job, result)
 }
 func (l *Lifecycle) Poll(ctx context.Context, jobID string) (Job, error) {
-	if l == nil || l.repo == nil || l.current == nil || l.directory == nil {
+	if l == nil || l.repo == nil || l.current == nil {
 		return Job{}, ErrInvalid
 	}
 	if _, err := uuid.Parse(jobID); err != nil {
@@ -255,8 +334,14 @@ func (l *Lifecycle) Poll(ctx context.Context, jobID string) (Job, error) {
 	if _, err = l.bindingScope(ctx, b); err != nil {
 		return Job{}, err
 	}
+	if !localSessionRevocation(b.Kind) && l.directory == nil {
+		return Job{}, ErrInvalid
+	}
 	if job.Status == Succeeded || job.Status == Failed {
 		return lifecyclePublicJob(job), nil
+	}
+	if localSessionRevocation(b.Kind) {
+		return l.revokeSession(ctx, job)
 	}
 	if b.Status != Deleting {
 		return Job{}, ErrConflict

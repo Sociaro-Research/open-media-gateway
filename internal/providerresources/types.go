@@ -341,6 +341,15 @@ func EqualSession(a, b *core.MediaSessionEvidence) bool {
 	return true
 }
 func (s *Service) ResolveResourceReferences(ctx context.Context, providerID string, refs []core.ResourceReference) ([]core.ResourceSnapshot, error) {
+	return s.resolveResourceReferences(ctx, providerID, refs, nil)
+}
+func (s *Service) ResolveSessionAction(ctx context.Context, providerID string, action *core.SessionActionIntent, refs []core.ResourceReference) ([]core.ResourceSnapshot, error) {
+	if action == nil || len(refs) != 1 || action.BindingID != refs[0].BindingID || action.ExpectedRevision < 0 || action.Recover && action.Action != "clear" {
+		return nil, ErrInvalid
+	}
+	return s.resolveResourceReferences(ctx, providerID, refs, action)
+}
+func (s *Service) resolveResourceReferences(ctx context.Context, providerID string, refs []core.ResourceReference, action *core.SessionActionIntent) ([]core.ResourceSnapshot, error) {
 	if len(refs) == 0 {
 		return []core.ResourceSnapshot{}, nil
 	}
@@ -367,7 +376,11 @@ func (s *Service) ResolveResourceReferences(ctx context.Context, providerID stri
 		if err != nil {
 			return nil, err
 		}
-		if b.OwnerID != identity.OwnerID(ctx) || b.ProviderOwnerID != scope.OwnerID || b.ProviderID != providerID || b.ConnectionID != scope.ID || b.Revision != scope.Revision || b.Status != Succeeded || !ValidRemoteID(b.RemoteID) || !ValidKind(b.Kind) || (b.Kind == "element" && b.Subtype == "") {
+		allowedState := b.Status == Succeeded || action != nil && action.Recover && action.Action == "clear" && b.Kind == "editing_session" && b.Status == Failed
+		if action != nil && (b.Session == nil || b.Session.SelectionRevision != action.ExpectedRevision) {
+			return nil, ErrConflict
+		}
+		if b.OwnerID != identity.OwnerID(ctx) || b.ProviderOwnerID != scope.OwnerID || b.ProviderID != providerID || b.ConnectionID != scope.ID || b.Revision != scope.Revision || !allowedState || !ValidRemoteID(b.RemoteID) || !ValidKind(b.Kind) || (b.Kind == "element" && b.Subtype == "") {
 			return nil, ErrNotFound
 		}
 		if err := ValidateSessionProvenance(b.Kind, b.Session, b.Sources); err != nil {
@@ -388,3 +401,5 @@ func (s *Service) ResolveResourceReferences(ctx context.Context, providerID stri
 }
 
 var _ core.ReferenceResourceResolver = (*Service)(nil)
+
+var _ core.SessionActionResolver = (*Service)(nil)

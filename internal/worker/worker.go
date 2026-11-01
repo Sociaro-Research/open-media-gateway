@@ -276,8 +276,11 @@ func (w *Worker) archiveArtifacts(ctx, archiveCtx context.Context, provider core
 		return w.repo.MarkFailed(ctx, task.ID, "provider returned an invalid artifact count")
 	}
 	for _, a := range artifacts {
-		if a.MediaType != "image" && a.MediaType != "video" && a.MediaType != "audio" && a.MediaType != "speech" && a.MediaType != "music" && a.MediaType != "text" && a.MediaType != "json" {
+		if a.MediaType != "image" && a.MediaType != "video" && a.MediaType != "audio" && a.MediaType != "speech" && a.MediaType != "music" && a.MediaType != "text" && a.MediaType != "json" && a.MediaType != "binary" {
 			return w.repo.MarkFailed(ctx, task.ID, "provider returned an unknown artifact media type")
+		}
+		if a.MediaType == "binary" && (a.SourceReference == "" || a.URL != "" || a.Text != "") {
+			return w.repo.MarkFailed(ctx, task.ID, "binary artifacts require a private provider source reference")
 		}
 		sources := 0
 		for _, value := range []string{a.URL, a.SourceReference, a.Text} {
@@ -297,6 +300,9 @@ func (w *Worker) archiveArtifacts(ctx, archiveCtx context.Context, provider core
 
 func artifactMatchesMedia(a core.ProviderArtifact, m core.StoredMedia) bool {
 	kind := a.MediaType
+	if kind == "binary" {
+		return m.ContentType == "application/octet-stream"
+	}
 	if kind == "json" {
 		return m.ContentType == "application/json"
 	}

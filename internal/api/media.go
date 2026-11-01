@@ -158,7 +158,7 @@ func (s *Server) serveTaskMedia(w http.ResponseWriter, r *http.Request, id strin
 			contentType = *resultType
 		}
 		disposition := "inline"
-		if r.URL.Query().Get("download") == "1" {
+		if r.URL.Query().Get("download") == "1" || strings.EqualFold(strings.TrimSpace(strings.SplitN(contentType, ";", 2)[0]), "application/octet-stream") {
 			disposition = "attachment"
 		}
 		disposition += `; filename="` + task.ID + filepath.Ext(*key) + `"`
@@ -206,7 +206,7 @@ func (s *Server) serveTaskMedia(w http.ResponseWriter, r *http.Request, id strin
 		w.Header().Set("ETag", `"sha256-`+*resultSHA+`"`)
 	}
 	disposition := "inline"
-	if r.URL.Query().Get("download") == "1" {
+	if r.URL.Query().Get("download") == "1" || strings.EqualFold(strings.TrimSpace(strings.SplitN(contentType, ";", 2)[0]), "application/octet-stream") {
 		disposition = "attachment"
 	}
 	w.Header().Set("Content-Disposition", disposition+`; filename="`+task.ID+filepath.Ext(object.Key)+`"`)

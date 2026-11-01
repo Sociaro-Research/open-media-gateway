@@ -102,6 +102,7 @@ type SoundOverride struct {
 }
 
 type MediaOptions struct {
+	SessionAction          *SessionActionIntent          `json:"session_action,omitempty"`
 	ResourceIntent         *ResourceIntent               `json:"resource_intent,omitempty"`
 	ResourceCreation       *ResourceCreateRequest        `json:"_resource_creation,omitempty"`
 	ResourceReferences     []ResourceReference           `json:"resource_references,omitempty"`
@@ -207,6 +208,7 @@ func (r *ReferencePromptRecommendation) Clone() *ReferencePromptRecommendation {
 }
 
 type MediaModel struct {
+	SessionOperation      *SessionOperationSchema  `json:"session_operation,omitempty"`
 	ResourceOutputs       []ResourceOutputSchema   `json:"resource_outputs,omitempty"`
 	ReferenceRoleLimits   []MediaRoleLimits        `json:"reference_role_limits,omitempty"`
 	ResourceOperation     *ResourceOperationSchema `json:"resource_operation,omitempty"`

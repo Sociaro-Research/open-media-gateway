@@ -92,7 +92,7 @@ func (s *Local) archiveReaderChecked(ctx context.Context, taskID string, reader 
 		return core.StoredMedia{}, fmt.Errorf("provider result exceeds STORAGE_MAX_BYTES (%d)", s.maxBytes)
 	}
 	buffered := bufio.NewReader(reader)
-	if contentType == "" || contentType == "application/octet-stream" {
+	if contentType == "" || contentType == "application/octet-stream" && !trustedStream {
 		sample, _ := buffered.Peek(512)
 		detected := strings.TrimSpace(strings.Split(http.DetectContentType(sample), ";")[0])
 		if supportedMediaType(detected) {

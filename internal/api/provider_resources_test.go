@@ -43,7 +43,7 @@ func (p *resourceAPIProvider) ListModels(ctx context.Context) ([]core.MediaModel
 	models, err := p.MediaProvider.(core.ModelCatalog).ListModels(ctx)
 	out := []core.MediaModel{}
 	for _, m := range models {
-		if m.ResourceOperation != nil {
+		if m.ResourceOperation != nil || m.SessionOperation != nil {
 			out = append(out, m)
 		}
 	}

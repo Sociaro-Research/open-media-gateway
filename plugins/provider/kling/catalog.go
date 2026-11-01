@@ -89,7 +89,7 @@ func catalog() []core.MediaModel {
 	models = append(models, legacyOmniModels()...)
 	models = append(models, resourceGenerationModels()...)
 	models = append(models, auxiliaryModels()...)
-	return models
+	return append(models, sessionModels()...)
 }
 
 func modelFor(id string) (core.MediaModel, bool) {
@@ -117,6 +117,13 @@ func (a *Adapter) ListModels(context.Context) ([]core.MediaModel, error) { retur
 func (a *Adapter) ReviewedCatalogModels() []core.MediaModel              { return a.models() }
 
 func (a *Adapter) ValidateRequest(ctx context.Context, r core.MediaRequest) error {
+	if isSessionOperation(r.Model) {
+		if r.Prompt != "" {
+			return auxiliaryInvalid("selection operations do not accept a prompt")
+		}
+		m, _ := modelFor(r.Model)
+		return a.validateSessionOperation(ctx, m, r.Options)
+	}
 	if isLegacyOmniOperation(r.Model) {
 		return a.validateLegacyOmniRequest(r)
 	}
@@ -186,6 +193,9 @@ func (a *Adapter) Quote(ctx context.Context, _ core.MediaModel, r core.MediaRequ
 		return core.TaskCost{}, "", err
 	}
 	m, _ := modelFor(r.Model)
+	if isSessionOperation(r.Model) {
+		return a.quoteSessionOperation(m, r.Options)
+	}
 	if isLegacyOmniOperation(r.Model) {
 		return a.quoteLegacyOmni(r)
 	}
@@ -203,6 +213,9 @@ func (a *Adapter) Quote(ctx context.Context, _ core.MediaModel, r core.MediaRequ
 	}
 	if isMotionOperation(r.Model) {
 		return a.quoteMotion(r)
+	}
+	if r.Model == KlingEffects {
+		return a.quoteEffect(r)
 	}
 	if isSolutionOperation(r.Model) {
 		return quoteSolution(r)

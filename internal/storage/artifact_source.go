@@ -54,7 +54,7 @@ func (s *Local) ArchiveSource(ctx context.Context, id string, source core.Artifa
 	stop := context.AfterFunc(ctx, closeSource)
 	defer func() { stop(); closeSource() }()
 	kind, params, err := mime.ParseMediaType(source.ContentType)
-	if err != nil || len(params) > 0 && !(kind == "text/plain" && len(params) == 1 && strings.EqualFold(params["charset"], "utf-8")) || !(supportedMediaType(kind) || kind == "text/plain" || kind == "application/json") {
+	if err != nil || len(params) > 0 && !(kind == "text/plain" && len(params) == 1 && strings.EqualFold(params["charset"], "utf-8")) || !(supportedMediaType(kind) || kind == "text/plain" || kind == "application/json" || kind == "application/octet-stream") {
 		return core.StoredMedia{}, errors.New("provider artifact stream has an unsupported content type")
 	}
 	if source.SizeBytes < -1 {
@@ -75,6 +75,11 @@ func validateArtifactFile(ctx context.Context, f *os.File, kind string) error {
 			}
 			return errors.New("provider artifact stream contains invalid JSON")
 		}
+		return nil
+	}
+	// Opaque trusted streams are download-only data, including unknown tracking formats.
+	// Never reinterpret their payload or change ordinary URL media validation.
+	if kind == "application/octet-stream" {
 		return nil
 	}
 	if kind == "text/plain" {

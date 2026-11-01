@@ -24,6 +24,9 @@ func isModelCatalogPath(path string) bool {
 }
 
 func isGenerationPath(path string) bool {
+	if isResourceActionPath(path) {
+		return true
+	}
 	if strings.HasPrefix(path, "/v1/templates/") && (strings.HasSuffix(path, "/generations") || strings.HasSuffix(path, "/estimate")) {
 		return true
 	}

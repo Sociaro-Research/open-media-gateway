@@ -392,7 +392,7 @@ func TestLifecyclePresetBusyAndForeignScopeAreBlockedBeforeProviderIO(t *testing
 			case "revision":
 				repo.binding.Revision = "rotated"
 			case "unsupported-kind":
-				repo.binding.Kind = "face_session"
+				repo.binding.Kind = "unknown_resource"
 			}
 			_, err := l.Delete(ctx, repo.binding.ID, "blocked")
 			if err == nil {

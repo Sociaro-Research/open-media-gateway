@@ -301,7 +301,7 @@ func TestDedicatedMigrationPreservesLegacyCompanyAndGrant(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertResourceBindingsEmptyDefault(t, db)
-	if preserved.snapshot(t, db, "dedicated84-after-upgrade") != before {
+	if preserved.snapshot(t, db, "dedicated85-after-upgrade") != before {
 		t.Fatal("migration changed an old field, data count or ledger")
 	}
 	repo := NewSystemRepository(db)
@@ -327,7 +327,7 @@ func TestDedicatedMigrationPreservesLegacyCompanyAndGrant(t *testing.T) {
 	if err = db.QueryRow(`SELECT count(*) FROM workspace_installations`).Scan(&count); err != nil || count != 0 {
 		t.Fatal("migration created a dedicated company", err)
 	}
-	// Exercise the populated combined 081→084→081→084 window. Additive Down
+	// Exercise the populated combined 081→085→081→085 window. Additive Down
 	// paths retain both Kling artifacts and installation proofs/billing snapshots.
 	exec(`UPDATE system_settings SET customer_workspaces=TRUE,shared_resources=TRUE`)
 	proof, _ := wa.DeviceCode()
@@ -363,7 +363,7 @@ func TestDedicatedMigrationPreservesLegacyCompanyAndGrant(t *testing.T) {
 		// Real old-column updates/inserts preserve populated resource metadata.
 		assertResourceMetadataSurvivesOldWriter(t, db, resourceSeed)
 		afterOldWrite := protected()
-		if err = goose.UpTo(db, "migrations", 84); err != nil {
+		if err = goose.UpTo(db, "migrations", 85); err != nil {
 			t.Fatal(err)
 		}
 		if protected() != afterOldWrite {

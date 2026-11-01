@@ -18,6 +18,8 @@ import (
 )
 
 func (s *Server) registerProviderResourceRoutes(mux *http.ServeMux) {
+	mux.Handle("POST /v1/provider-resources/{id}/actions/{action}", s.providerResourceRoute(s.actOnResource))
+	mux.Handle("POST /v1/provider-resources/{id}/actions/{action}/estimate", s.providerResourceRoute(s.actOnResource))
 	mux.Handle("GET /v1/provider-resources", s.providerResourceRoute(s.listResources))
 	mux.Handle("POST /v1/provider-resources/estimate", s.providerResourceRoute(s.createResource))
 	mux.Handle("POST /v1/provider-resources", s.providerResourceRoute(s.createResource))

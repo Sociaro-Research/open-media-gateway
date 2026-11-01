@@ -292,7 +292,9 @@ func (r *TaskRepository) MarkSucceeded(ctx context.Context, id string, media cor
 	}
 	args := []any{publicURL, nullableString(media.SourceURL), nullableString(lastFrameURL), nullableString(media.StorageKey), nullableString(media.ContentType), media.SizeBytes, nullableString(media.SHA256), nullableString(media.LastFrameStorageKey), encoded}
 	resourceAssignment := ""
-	var hooks []func(*sql.Tx) error
+	hooks := []func(*sql.Tx) error{func(tx *sql.Tx) error {
+		return validateSessionActionCompletion(ctx, tx, id, media.Resources)
+	}}
 	if len(media.Resources) > 0 {
 		resourceAssignment = ", result_resource_bindings = $11"
 		args = append(args, []byte("[]"))
@@ -320,7 +322,9 @@ func (r *TaskRepository) MarkFailed(ctx context.Context, id, message string) err
 		UPDATE tasks
 		SET status = 'failed', error = CASE WHEN minimize_request_logging THEN 'Generation failed' ELSE $2 END, updated_at = NOW()
 		WHERE id = $1 AND status IN ('queued', 'running')
-		RETURNING `+taskColumns, []any{message})
+		RETURNING `+taskColumns, []any{message}, func(tx *sql.Tx) error {
+		return failTaskSessionAction(ctx, tx, id)
+	})
 }
 
 func (r *TaskRepository) transition(ctx context.Context, id string, eventType core.TaskEventType, query string, args []any, hooks ...func(*sql.Tx) error) error {
