@@ -31,6 +31,9 @@ func contract(m core.MediaModel) core.MediaModel {
 }
 func rateKey(r Rate) string {
 	key := fmt.Sprintf("%s/%s/%s/%s/%d", r.Region, r.Resolution, r.Quality, r.Unit, r.Per)
+	if r.Duration != 0 {
+		key += fmt.Sprintf("/duration=%d", r.Duration)
+	}
 	if r.Audio != nil {
 		key += fmt.Sprintf("/audio=%t", *r.Audio)
 	}

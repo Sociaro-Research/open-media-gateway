@@ -147,6 +147,16 @@ func (m *Manager) CheckCatalogRate(ctx context.Context, id string, model core.Me
 		}
 	}
 	if !typedRequest {
+		if rate.Duration < 0 {
+			return fmt.Errorf("unsupported duration selector")
+		}
+		if rate.Duration > 0 {
+			if model.MediaType != "video" || model.DurationFromInput || model.MaxDuration <= 0 || rate.Duration < model.MinDuration || rate.Duration > model.MaxDuration || model.DurationStep > 0 && (rate.Duration-model.MinDuration)%model.DurationStep != 0 {
+				return fmt.Errorf("unsupported output duration")
+			}
+			r.Options.Duration = rate.Duration
+		}
+
 		if rate.Resolution != "" {
 			r.Options.Resolution = rate.Resolution
 		}
@@ -286,6 +296,14 @@ func applyCatalogQuote(base core.TaskCost, err error, model core.MediaModel, req
 	var selected *catalogsync.Rate
 	for i := range entry.Rates {
 		r := &entry.Rates[i]
+		duration := request.Options.Duration
+		if duration == 0 {
+			duration = model.DefaultDuration
+		}
+		if r.Duration < 0 || r.Duration > 0 && r.Duration != duration {
+			continue
+		}
+
 		if !r.MatchesConditions(model, request) {
 			continue
 		}
@@ -335,7 +353,7 @@ func applyCatalogQuote(base core.TaskCost, err error, model core.MediaModel, req
 			}
 			return n
 		}
-		if selected == nil || specificity(r) > specificity(selected) {
+		if selected == nil || r.Duration > 0 && selected.Duration == 0 || r.Duration == selected.Duration && specificity(r) > specificity(selected) {
 			selected = r
 		}
 	}

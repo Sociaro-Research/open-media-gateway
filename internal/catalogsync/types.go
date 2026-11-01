@@ -108,6 +108,8 @@ func NextDaily(now time.Time, clock, zone string) time.Time {
 }
 
 type Rate struct {
+	// Duration selects an exact output duration in seconds; zero preserves an unconditioned tariff.
+	Duration                    int                     `json:"duration,omitempty"`
 	AudioInput                  *bool                   `json:"audio_input,omitempty"`
 	VoiceInput                  *bool                   `json:"voice_input,omitempty"`
 	ImageInput                  *bool                   `json:"image_input,omitempty"`
