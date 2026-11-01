@@ -13,3 +13,37 @@ regexes = [
   '''replace-with-an-independent-32-byte-secret(?:['"\s]|$)''',
   '''isolated-headless-encryption-secret-32(?:['"\s]|$)''',
 ]
+
+# Exact independently reviewed non-secret source lines.
+# Rule, path and complete line must all match; changed content fails closed.
+
+[[allowlists]]
+targetRules = ["generic-api-key"]
+description = "Exact reviewed parameterized SQL statement"
+condition = "AND"
+paths = ['''\Ainternal/postgres/remote_workspace\.go\z''']
+regexTarget = "line"
+regexes = [
+  '''\A(?:\r?\n)?\t_, err = tx\.ExecContext\(ctx, `INSERT INTO remote_workspaces\(owner_id,version,active,origin,organization_id,organization_name,remote_user_id,remote_key_id,token_hash,token_ciphertext,verified_at\) VALUES\(\$1,\$2,TRUE,\$3,\$4,\$5,\$6,\$7,\$8,\$9,\$10\) ON CONFLICT\(owner_id\) DO UPDATE SET version=EXCLUDED\.version,active=TRUE,origin=EXCLUDED\.origin,organization_id=EXCLUDED\.organization_id,organization_name=EXCLUDED\.organization_name,remote_user_id=EXCLUDED\.remote_user_id,remote_key_id=EXCLUDED\.remote_key_id,token_hash=EXCLUDED\.token_hash,token_ciphertext=EXCLUDED\.token_ciphertext,verified_at=EXCLUDED\.verified_at`, next\.Owner, next\.Version, next\.Origin, next\.OrganizationID, next\.OrganizationName, next\.UserID, next\.KeyID, next\.TokenHash, next\.Ciphertext, next\.VerifiedAt\)\r?\n?\z''',
+]
+
+[[allowlists]]
+targetRules = ["generic-api-key"]
+description = "Exact reviewed public model price field definitions"
+condition = "AND"
+paths = ['''\Aplugins/provider/kling/definition\.go\z''']
+regexTarget = "line"
+regexes = [
+  '''\A(?:\r?\n)?\t\t\t\{Key: "kling4_720p_price", Label: "4\.0 720p override \(USD/s, optional\)", Env: "KLING4_720P_PRICE"\},\r?\n?\z''',
+  '''\A(?:\r?\n)?\t\t\t\{Key: "kling4_1080p_price", Label: "4\.0 1080p override \(USD/s, optional\)", Env: "KLING4_1080P_PRICE"\},\r?\n?\z''',
+]
+
+[[allowlists]]
+targetRules = ["generic-api-key"]
+description = "Exact reviewed synthetic reference fixture"
+condition = "AND"
+paths = ['''\Ainternal/postgres/override_sound_test\.go\z''']
+regexTarget = "line"
+regexes = [
+  '''\A(?:\r?\n)?\tref := references\.Image\{ID: uuid\.NewString\(\), Name: "Audio", ContentType: "audio/wav", SizeBytes: 12, StorageKey: "fixture/sound", SHA256: "hash", CreatedAt: time\.Now\(\)\}\r?\n?\z''',
+]

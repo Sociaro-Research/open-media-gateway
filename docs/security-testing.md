@@ -50,9 +50,24 @@ python3 scripts/security/install-tools.py --bin-dir /tmp/gateway-security-tools
 ```
 
 Inspect findings before changing allowlists. Allow only reviewed literal
-placeholders; do not suppress whole files or generic credential prefixes. A
-clean current checkout does not remove material from Git history. Keep scanner
+placeholders or independently reviewed exact non-secret source lines constrained
+by detection rule and exact file path. Never suppress whole files, commits,
+generic credential prefixes or variable source content. A clean current checkout
+does not remove material from Git history. Keep scanner
 evidence private and redact credentials from any shared report.
+
+Verify exact-line exceptions against the pinned real scanner and synthetic
+credential controls before accepting a scanner configuration change:
+
+```sh
+GITLEAKS_BIN=/tmp/gateway-security-tools/gitleaks \
+  python3 -m unittest discover -s scripts/tests -p test_gitleaks.py -v
+```
+
+The suite checks original detections, exact benign exclusions, adjacent and
+same-line credential assignments, changed SQL/field values and another provider
+rule. It never uses real credentials. Without the scanner it reports skipped
+tests; skips do not satisfy this gate.
 
 For browser/proxy checks, install Playwright and use a verified Caddy binary as
 specified in [the UI guide](../scripts/ui/README.md). Existing suites include
