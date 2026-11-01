@@ -10402,7 +10402,8 @@ components:
         name: {type: string}
         description: {type: string}
         reference_ids: {type: array, maxItems: 64, items: {type: string, format: uuid}}
-        generated_task_id: {type: string, format: uuid, description: An eligible completed owned generation; never a provider video ID.}
+        generated_task_id: {type: string, format: uuid, description: An eligible completed owned generation; never a native provider ID.}
+        generated_artifact_id: {type: string, maxLength: 128, pattern: "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$", description: Local archived audio artifact selector. Required when multiple eligible audio outputs exist; never an upstream audio ID or URL.}
         bound_voice_binding_id: {type: string, format: uuid}
         tags: {type: array, maxItems: 32, items: {type: string}}
         max_expected_usd: {type: number, minimum: 0, description: Unknown totals cannot satisfy an explicit cap.}

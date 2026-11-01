@@ -41,9 +41,9 @@ func auxiliaryModels() []core.MediaModel {
 		Pricing:              core.MediaModelPricing{Known: true, ReferencePriceUSD: .007, ReferenceDescription: "Published USD balance list price per face-detection request; generated video IDs require managed provenance and are not accepted as free-form parameters."},
 	}
 	lip := core.MediaModel{ID: LipSync, DisplayName: "Kling · Lip-sync", MediaType: "video", NoPrompt: true, NoSeed: true, NoLanguage: true, NoInstructions: true, DurationFromInput: true, SupportsAudioInput: true, MaxReferenceInputs: 2,
-		ResourceInputSchemas: []core.ResourceInputSchema{{Kind: "face_session", MaxCount: 1}, {Kind: "audio", MaxCount: 1}},
+		ResourceInputSchemas: []core.ResourceInputSchema{{Kind: "face_session", MaxCount: 1}, {Kind: "file_resource", Subtypes: []string{"audio"}, MaxCount: 1}},
 		Parameters:           []core.ParameterField{auxiliaryInteger("face_index", "Face number (1-based)", 1, 64, true), auxiliaryInteger("sound_start_time", "Audio crop start (ms)", 0, 60000, true), auxiliaryInteger("sound_end_time", "Audio crop end (ms)", 2000, 60000, true), auxiliaryInteger("sound_insert_time", "Insert audio at video time (ms)", 0, 60000, true), auxiliaryNumber("sound_volume", "Inserted audio volume", 0, 2, 1), auxiliaryNumber("original_audio_volume", "Original video volume", 0, 2, 1)},
-		ReferenceModes:       []core.ReferenceMode{{ID: "audio", Label: "Managed face session and audio file", MinAudios: 1, MaxAudios: 1}, {ID: "managed_audio", Label: "Managed face session and generated audio"}},
+		ReferenceModes:       []core.ReferenceMode{{ID: "audio", Label: "Managed face session and audio file", MinAudios: 1, MaxAudios: 1}, {ID: "managed_audio", Label: "Managed face session and generated audio", MinAudios: 1, MaxAudios: 1}},
 		ReferenceMediaLimits: &core.ReferenceMediaLimits{MaxFiles: 1, Audio: core.MediaFileLimits{ContentTypes: []string{"audio/mpeg", "audio/wav", "audio/x-wav", "audio/mp4", "audio/aac"}, MaxBytes: 5 << 20, MinDuration: 2, MaxDuration: 60}},
 		Pricing:              core.MediaModelPricing{Known: false, ReferenceDescription: "Published USD balance tariff is $0.07 per 5 seconds; partial-block rounding is unspecified, so a verified estimate is unavailable."},
 	}
@@ -72,7 +72,10 @@ func auxiliaryModel(id string) (core.MediaModel, bool) {
 func auxiliaryInvalid(message string) error {
 	return errors.Join(core.ErrOptionsInvalid, errors.New(message))
 }
-func (a *Adapter) validateAuxiliaryRequest(r core.MediaRequest) error {
+func (a *Adapter) validateAuxiliaryRequest(r core.MediaRequest, scopes ...context.Context) error {
+	if e := a.validateGeneratedAudioConsumers(generatedAudioScope(scopes), r); e != nil {
+		return e
+	}
 	m, ok := auxiliaryModel(r.Model)
 	if !ok {
 		return auxiliaryInvalid("Kling operation requires a managed editing or face session")
@@ -246,7 +249,7 @@ func normalizeFaceDetection(raw json.RawMessage) (core.ProviderTask, auxiliaryFa
 	return core.ProviderTask{Artifacts: artifacts, Usage: session.usage(nil)}, session, nil
 }
 func (a *Adapter) generateAuxiliary(ctx context.Context, r core.MediaRequest) (core.ProviderTask, error) {
-	if err := a.validateAuxiliaryRequest(r); err != nil {
+	if err := a.validateAuxiliaryRequest(r, ctx); err != nil {
 		return core.ProviderTask{}, err
 	}
 	if r.Model == LipSync || r.Model == MultiElementsEditing {
@@ -255,7 +258,19 @@ func (a *Adapter) generateAuxiliary(ctx context.Context, r core.MediaRequest) (c
 				return core.ProviderTask{}, err
 			}
 		}
-		payload, err := auxiliaryVideoPayload(r)
+		nativeAudioID := ""
+		if r.Model == LipSync {
+			for _, binding := range r.Options.ResourceSnapshots {
+				if binding.Kind == "file_resource" {
+					id, _, e := a.generatedAudioID(ctx, binding, 60, false)
+					if e != nil {
+						return core.ProviderTask{}, e
+					}
+					nativeAudioID = id
+				}
+			}
+		}
+		payload, err := auxiliaryVideoPayload(r, nativeAudioID)
 		if err != nil {
 			return core.ProviderTask{}, err
 		}
@@ -295,8 +310,8 @@ func (a *Adapter) generateAuxiliary(ctx context.Context, r core.MediaRequest) (c
 	task, _, err := normalizeFaceDetection(raw)
 	return task, err
 }
-func (a *Adapter) quoteAuxiliary(r core.MediaRequest) (core.TaskCost, string, error) {
-	if err := a.validateAuxiliaryRequest(r); err != nil {
+func (a *Adapter) quoteAuxiliary(r core.MediaRequest, scopes ...context.Context) (core.TaskCost, string, error) {
+	if err := a.validateAuxiliaryRequest(r, scopes...); err != nil {
 		return core.TaskCost{}, "", err
 	}
 	if r.Model == LipSync {
@@ -406,16 +421,13 @@ func validateAuxiliarySessionRequest(m core.MediaModel, r core.MediaRequest) err
 	audioResources := 0
 	audioDuration := 0.0
 	for _, resource := range o.ResourceSnapshots {
-		if resource.Kind == "audio" {
+		if resource.Kind == "file_resource" {
 			audioResources++
-			if resource.RemoteID == "" || !validTaskID(resource.RemoteID) || resource.ConnectionIdentity == "" {
-				return auxiliaryInvalid("Kling generated audio requires a resolved managed resource")
+			d, e := generatedAudioEvidenceDuration(resource, 60, false)
+			if e != nil {
+				return e
 			}
-			for _, source := range resource.Sources {
-				if source.MediaType == "audio" && source.Duration != nil {
-					audioDuration += *source.Duration
-				}
-			}
+			audioDuration = d
 		}
 	}
 	if len(o.Audios())+audioResources != 1 || len(o.ResourceSnapshots) != 1+audioResources {
@@ -478,7 +490,7 @@ func auxiliaryVideoPath(id string) string {
 	}
 	return ""
 }
-func auxiliaryVideoPayload(r core.MediaRequest) (any, error) {
+func auxiliaryVideoPayload(r core.MediaRequest, audioIDs ...string) (any, error) {
 	m, ok := auxiliaryModel(r.Model)
 	if !ok {
 		return nil, auxiliaryInvalid("unsupported Kling auxiliary operation")
@@ -518,8 +530,11 @@ func auxiliaryVideoPayload(r core.MediaRequest) (any, error) {
 		face.SoundFile = r.Options.Audios()[0]
 	}
 	for _, resource := range r.Options.ResourceSnapshots {
-		if resource.Kind == "audio" {
-			face.AudioID = resource.RemoteID
+		if resource.Kind == "file_resource" {
+			if len(audioIDs) != 1 || !validTaskID(audioIDs[0]) {
+				return nil, auxiliaryInvalid("generated audio must resolve to an authenticated native identity")
+			}
+			face.AudioID = audioIDs[0]
 		}
 	}
 	return auxiliaryLipPayload{SessionID: session.RemoteID, Faces: []auxiliaryLipFace{face}, Watermark: watermark, ExternalTaskID: r.TaskID}, nil

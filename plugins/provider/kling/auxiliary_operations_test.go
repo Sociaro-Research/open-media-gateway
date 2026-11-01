@@ -386,25 +386,31 @@ func TestAuxiliarySelectionBoundsAndExactDeletionBeforeNetwork(t *testing.T) {
 	}
 }
 func TestAuxiliaryManagedAudioSelectsOnlyResolvedRemoteID(t *testing.T) {
-	r := auxiliaryFixture(LipSync)
-	r.Options.AudioURLs = nil
-	r.Options.ReferenceMode = "managed_audio"
-	binding := "22222222-2222-4222-8222-222222222222"
-	duration := 4.0
-	r.Options.ResourceReferences = append(r.Options.ResourceReferences, core.ResourceReference{BindingID: binding, ReferenceID: "audio"})
-	r.Options.ResourceSnapshots = append(r.Options.ResourceSnapshots, core.ResourceSnapshot{BindingID: binding, ReferenceID: "audio", Kind: "audio", RemoteID: "9007199254740993999", ConnectionIdentity: "fixture-revision", Sources: []core.ResourceSourceEvidence{{MediaType: "audio", Duration: &duration}}})
+	calls := 0
 	a := adapter(t, func(req *http.Request) (*http.Response, error) {
+		calls++
 		var p auxiliaryLipPayload
-		if err := json.NewDecoder(req.Body).Decode(&p); err != nil {
-			t.Fatal(err)
+		if e := json.NewDecoder(req.Body).Decode(&p); e != nil {
+			t.Fatal(e)
 		}
 		if p.Faces[0].AudioID != "9007199254740993999" || p.Faces[0].SoundFile != "" {
 			t.Fatal(p)
 		}
 		return response(200, `{"code":0,"data":{"task_id":"lip-task","task_status":"submitted"}}`), nil
 	})
-	if _, err := a.generateAuxiliary(auxiliaryContext(), r); err != nil {
-		t.Fatal(err)
+	b := generatedAudioSnapshotFixture(t, a, auxiliaryContext(), 4)
+	r := generatedAudioConsumerFixture(LipSync, b)
+	if _, e := a.generateAuxiliary(auxiliaryContext(), r); e != nil || calls != 1 {
+		t.Fatal(e, calls)
+	}
+	for _, kind := range []string{"audio", "file_resource"} {
+		bad := r
+		bad.Options.ResourceSnapshots = append([]core.ResourceSnapshot(nil), r.Options.ResourceSnapshots...)
+		bad.Options.ResourceSnapshots[1].Kind = kind
+		bad.Options.ResourceSnapshots[1].RemoteID = "88"
+		if _, e := a.generateAuxiliary(auxiliaryContext(), bad); !errors.Is(e, core.ErrOptionsInvalid) || calls != 1 {
+			t.Fatal("raw generated audio identity accepted", e, calls)
+		}
 	}
 }
 

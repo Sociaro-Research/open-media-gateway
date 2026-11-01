@@ -157,9 +157,16 @@ and insertion controls are milliseconds; crops must fit inspected source duratio
 and overlap the face interval by at least2seconds. Both volume controls permit0.
 Multi-element editing distinguishes addition (1–2cropped JPEG/PNG images), swap
 (exactly1) and removal (no image). Prompt aliases use native
-`<<<video_1>>>`/`<<<image_1>>>` syntax. Generated-TTS audio selection still requires
-its separate owner-bound provenance workflow; native IDs are not accepted as a
-shortcut.
+`<<<video_1>>>`/`<<<image_1>>>` syntax. Generated TTS reuse selects an owned completed `kling-tts` task and its local
+`generated_artifact_id`. The host reopens the archived audio, verifies byte hash,
+size and format, inspects duration and pins owner, actual connection revision,
+source model, artifact and expiry before admission. The preparation binds that
+existing output locally without another provider request or charge; native IDs
+remain private. Avatar accepts inspected TTS audio of 2–300 seconds; lip-sync
+accepts 2–60 seconds. Both require an output generated within 30 days and use
+exactly one audio source: the bound TTS output or the existing upload workflow.
+Upload limits and existing upload behavior are unchanged. Already admitted work
+retains immutable source evidence; new admission rejects expired/deleted sources.
 
 For media models declaring `supports_presets`, the input library offers **Saved
 inputs** and **Official presets** using the shared selector and dialog. Discovery

@@ -61,6 +61,9 @@ func New(key, base string, client *http.Client) (*Adapter, error) {
 func (*Adapter) Name() string { return "kling" }
 
 func (a *Adapter) Generate(ctx context.Context, r core.MediaRequest) (core.ProviderTask, error) {
+	if r.Model == BindGeneratedAudio {
+		return a.generateAudioBinding(ctx, r)
+	}
 	if err := a.ValidateRequest(ctx, r); err != nil {
 		return core.ProviderTask{}, err
 	}

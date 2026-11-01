@@ -10,7 +10,7 @@ import (
 
 func TestPromptCharacterLimitsNativeModelsAndModes(t *testing.T) {
 	for _, m := range catalog() {
-		if isSessionOperation(m.ID) || isLegacyOmniOperation(m.ID) || isResourceGenerationOperation(m.ID) || isAuxiliaryOperation(m.ID) || isImageOperation(m.ID) || isAudioOperation(m.ID) || isMotionOperation(m.ID) || isSolutionOperation(m.ID) {
+		if m.ID == BindGeneratedAudio || isSessionOperation(m.ID) || isLegacyOmniOperation(m.ID) || isResourceGenerationOperation(m.ID) || isAuxiliaryOperation(m.ID) || isImageOperation(m.ID) || isAudioOperation(m.ID) || isMotionOperation(m.ID) || isSolutionOperation(m.ID) {
 			continue
 		} // These families have dedicated input/parameter boundary fixtures.
 		limit := 3072

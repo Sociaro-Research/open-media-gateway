@@ -129,6 +129,8 @@ func audioModels() []core.MediaModel {
 	avatar.SupportsImageInput, avatar.RequiresImageInput, avatar.MinImageInputs, avatar.MaxImageInputs = true, true, 1, 1
 	avatar.SupportsAudioInput, avatar.RequiresAudioInput, avatar.DurationFromInput, avatar.RatioMayBeInferred = true, true, true, true
 	avatar.Parameters = []core.ParameterField{{Key: "mode", Label: "Generation mode", Type: "select", Choices: []string{"std", "pro"}, Default: "std"}}
+	avatar.MaxReferenceInputs = 2
+	avatar.ResourceInputSchemas = []core.ResourceInputSchema{{Kind: "file_resource", Subtypes: []string{"audio"}, MaxCount: 1}}
 	avatar.ReferenceModes = []core.ReferenceMode{{ID: "image_audio", Label: "Avatar image and speech audio", MinImages: 1, MaxImages: 1, MinAudios: 1, MaxAudios: 1}}
 	avatar.ReferenceMediaLimits = &core.ReferenceMediaLimits{MaxFiles: 2, Image: core.MediaFileLimits{ContentTypes: []string{"image/jpeg", "image/png"}, MaxBytes: 10 << 20, MinDimension: 300, MinRatio: 0.4, MaxRatio: 2.5}, Audio: core.MediaFileLimits{ContentTypes: []string{"audio/mpeg", "audio/wav", "audio/mp4", "audio/aac"}, MaxBytes: 5 << 20, MinDuration: 2, MaxDuration: 300}}
 	// The protocol specifies std/pro, while the price table specifies 720p/1080p.
@@ -157,7 +159,10 @@ func audioTenth(n float64) bool {
 	return !math.IsNaN(n) && !math.IsInf(n, 0) && math.Abs(n*10-math.Round(n*10)) < 1e-8
 }
 
-func (a *Adapter) validateAudioRequest(r core.MediaRequest) error {
+func (a *Adapter) validateAudioRequest(r core.MediaRequest, scopes ...context.Context) error {
+	if e := a.validateGeneratedAudioConsumers(generatedAudioScope(scopes), r); e != nil {
+		return e
+	}
 	m, ok := audioModel(r.Model)
 	if !ok {
 		return audioInvalid("unknown Kling audio operation")
@@ -228,8 +233,10 @@ func (a *Adapter) validateAudioRequest(r core.MediaRequest) error {
 			return err
 		}
 	case AvatarImageToVideo:
-		if err := audioValidateEvidence(o, o.Audios()[0], "audio", 2, 300); err != nil {
-			return err
+		if len(o.Audios()) == 1 {
+			if err := audioValidateEvidence(o, o.Audios()[0], "audio", 2, 300); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -245,7 +252,7 @@ func audioValidateEvidence(o core.MediaOptions, raw, kind string, min, max float
 }
 
 func (a *Adapter) generateAudio(ctx context.Context, r core.MediaRequest) (core.ProviderTask, error) {
-	if err := a.validateAudioRequest(r); err != nil {
+	if err := a.validateAudioRequest(r, ctx); err != nil {
 		return core.ProviderTask{}, err
 	}
 	m, _ := audioModel(r.Model)
@@ -262,7 +269,20 @@ func (a *Adapter) generateAudio(ctx context.Context, r core.MediaRequest) (core.
 			}
 		}
 	case AvatarImageToVideo:
-		payload["image"], payload["sound_file"], payload["mode"] = r.Options.ImageURLs[0], r.Options.Audios()[0], p["mode"]
+		payload["image"], payload["mode"] = r.Options.ImageURLs[0], p["mode"]
+		if len(r.Options.Audios()) == 1 {
+			payload["sound_file"] = r.Options.Audios()[0]
+		} else {
+			for _, binding := range r.Options.ResourceSnapshots {
+				if binding.Kind == "file_resource" {
+					id, _, e := a.generatedAudioID(ctx, binding, 300, false)
+					if e != nil {
+						return core.ProviderTask{}, e
+					}
+					payload["audio_id"] = id
+				}
+			}
+		}
 		if r.Prompt != "" {
 			payload["prompt"] = r.Prompt
 		}
@@ -495,8 +515,8 @@ func normalizeAudioTask(operation, expectedID string, raw json.RawMessage) (core
 	return result, nil
 }
 
-func (a *Adapter) quoteAudio(r core.MediaRequest) (core.TaskCost, string, error) {
-	if err := a.validateAudioRequest(r); err != nil {
+func (a *Adapter) quoteAudio(r core.MediaRequest, scopes ...context.Context) (core.TaskCost, string, error) {
+	if err := a.validateAudioRequest(r, scopes...); err != nil {
 		return core.TaskCost{}, "", err
 	}
 	rate := money.USD(35000)

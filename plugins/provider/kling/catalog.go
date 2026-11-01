@@ -84,6 +84,7 @@ func catalog() []core.MediaModel {
 	models = append(models, omni4Model())
 	models = append(models, imageModels()...)
 	models = append(models, audioModels()...)
+	models = append(models, generatedAudioModel())
 	models = append(models, motionModels()...)
 	models = append(models, solutionModels()...)
 	models = append(models, legacyOmniModels()...)
@@ -121,6 +122,10 @@ func (a *Adapter) ReviewedCatalogModels() []core.MediaModel {
 }
 
 func (a *Adapter) ValidateRequest(ctx context.Context, r core.MediaRequest) error {
+	if r.Model == BindGeneratedAudio {
+		_, e := a.prepareGeneratedAudio(ctx, r)
+		return e
+	}
 	if isSessionOperation(r.Model) {
 		if r.Prompt != "" {
 			return auxiliaryInvalid("selection operations do not accept a prompt")
@@ -135,13 +140,13 @@ func (a *Adapter) ValidateRequest(ctx context.Context, r core.MediaRequest) erro
 		return a.validateResourceGenerationRequest(ctx, r)
 	}
 	if isAuxiliaryOperation(r.Model) {
-		return a.validateAuxiliaryRequest(r)
+		return a.validateAuxiliaryRequest(r, ctx)
 	}
 	if isImageOperation(r.Model) {
 		return a.validateImageRequest(r)
 	}
 	if isAudioOperation(r.Model) {
-		return a.validateAudioRequest(r)
+		return a.validateAudioRequest(r, ctx)
 	}
 	if isMotionOperation(r.Model) {
 		return a.validateMotionRequest(r)
@@ -193,6 +198,9 @@ func (a *Adapter) ValidateRequest(ctx context.Context, r core.MediaRequest) erro
 }
 
 func (a *Adapter) Quote(ctx context.Context, _ core.MediaModel, r core.MediaRequest) (core.TaskCost, string, error) {
+	if r.Model == BindGeneratedAudio {
+		return a.quoteGeneratedAudio(ctx, r)
+	}
 	if err := a.ValidateRequest(ctx, r); err != nil {
 		return core.TaskCost{}, "", err
 	}
@@ -207,13 +215,13 @@ func (a *Adapter) Quote(ctx context.Context, _ core.MediaModel, r core.MediaRequ
 		return a.quoteResourceGeneration(ctx, r)
 	}
 	if isAuxiliaryOperation(r.Model) {
-		return a.quoteAuxiliary(r)
+		return a.quoteAuxiliary(r, ctx)
 	}
 	if isImageOperation(r.Model) {
 		return a.quoteImage(r)
 	}
 	if isAudioOperation(r.Model) {
-		return a.quoteAudio(r)
+		return a.quoteAudio(r, ctx)
 	}
 	if isMotionOperation(r.Model) {
 		return a.quoteMotion(r)

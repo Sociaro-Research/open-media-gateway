@@ -88,6 +88,10 @@ func (s *Server) resourceView(r *http.Request, b providerresources.Binding) reso
 	if !view.Usable {
 		view.UnavailableReason = "resource_or_connection_unavailable"
 	}
+	if core.ResourceSourcesExpired(b.Sources, time.Now()) {
+		view.Usable = false
+		view.UnavailableReason = "generated_source_expired"
+	}
 	if b.Session != nil {
 		e := b.Session
 		v := &resourceSessionView{ExpiresAt: e.ExpiresAt, SourceVideoDuration: e.SourceVideoDuration, FrameCount: e.FrameCount, FPS: e.FPS, SelectionRevision: e.SelectionRevision, Selections: e.Selections, HasSelection: e.HasSelection}
@@ -180,6 +184,7 @@ type resourceCreateInput struct {
 	Description         string     `json:"description,omitempty"`
 	ReferenceIDs        []string   `json:"reference_ids,omitempty"`
 	GeneratedTaskID     string     `json:"generated_task_id,omitempty"`
+	GeneratedArtifactID string     `json:"generated_artifact_id,omitempty"`
 	BoundVoiceBindingID string     `json:"bound_voice_binding_id,omitempty"`
 	Tags                []string   `json:"tags,omitempty"`
 	MaxExpectedUSD      *money.USD `json:"max_expected_usd,omitempty"`
@@ -217,7 +222,7 @@ func (s *Server) createResource(w http.ResponseWriter, r *http.Request) {
 		body.Subtype = model.ResourceOperation.Subtypes[0]
 	}
 	r = r.WithContext(core.WithMediaPreparationWorkflow(r.Context(), body.Provider, consumer.ID, model.ID, body.Subtype, consumer.PublicID))
-	intent := &core.ResourceIntent{Kind: body.Kind, Subtype: body.Subtype, Name: body.Name, Description: body.Description, ReferenceIDs: body.ReferenceIDs, GeneratedTaskID: body.GeneratedTaskID, BoundVoiceBindingID: body.BoundVoiceBindingID, Tags: body.Tags}
+	intent := &core.ResourceIntent{Kind: body.Kind, Subtype: body.Subtype, Name: body.Name, Description: body.Description, ReferenceIDs: body.ReferenceIDs, GeneratedTaskID: body.GeneratedTaskID, GeneratedArtifactID: body.GeneratedArtifactID, BoundVoiceBindingID: body.BoundVoiceBindingID, Tags: body.Tags}
 	options := core.MediaOptions{ResourceIntent: intent}
 	if err := core.ValidateResourceCreationIntent(model, options, true); err != nil {
 		s.resourceError(w, err)
@@ -300,6 +305,17 @@ func (s *Server) resolveResourceCreation(r *http.Request, intent *core.ResourceI
 		task, err := s.service.GetTask(r.Context(), intent.GeneratedTaskID)
 		if err != nil {
 			return nil, err
+		}
+		if core.GeneratedTaskMediaType(task.MediaType) == "audio" {
+			generated, e := s.resolveGeneratedMediaSource(r, intent, provider, model, task)
+			if e != nil {
+				return nil, e
+			}
+			request.GeneratedMedia = generated
+			return request, nil
+		}
+		if intent.GeneratedArtifactID != "" {
+			return nil, providerresources.ErrInvalid
 		}
 		scope, err := s.resourceScopes(r.Context(), provider)
 		if err != nil || task.Provider != provider || task.ProviderIdentity != scope.Revision || task.ProviderOwnerID != scope.OwnerID || task.Status != core.TaskSucceeded || task.ResultDeletedAt != nil || task.MediaType != "video" || task.ProviderTaskID == nil || task.CreatedAt.Before(time.Now().Add(-30*24*time.Hour)) || len(task.StoredArtifacts) == 0 {

@@ -59,6 +59,7 @@ type Intent struct {
 	Sources             []core.ResourceSourceEvidence `json:"sources,omitempty"`
 	BoundVoiceBindingID string                        `json:"bound_voice_binding_id,omitempty"`
 	GeneratedTaskID     string                        `json:"generated_task_id,omitempty"`
+	GeneratedArtifactID string                        `json:"generated_artifact_id,omitempty"`
 	Tags                []string                      `json:"tags,omitempty"`
 }
 
@@ -174,6 +175,9 @@ func ValidateIntent(in Intent) error {
 			}
 		}
 	}
+	if in.GeneratedArtifactID != "" && (in.GeneratedTaskID == "" || !core.ValidGeneratedArtifactID(in.GeneratedArtifactID)) {
+		return ErrInvalid
+	}
 	for _, tag := range in.Tags {
 		if len(tag) > 128 || !utf8.ValidString(tag) {
 			return ErrInvalid
@@ -192,6 +196,11 @@ func ValidateIntent(in Intent) error {
 		}
 		if source.Duration != nil && (*source.Duration <= 0 || math.IsNaN(*source.Duration) || math.IsInf(*source.Duration, 0)) {
 			return ErrInvalid
+		}
+		if p := source.Provenance; p != nil {
+			if p.TaskID != source.ReferenceID || !core.ValidGeneratedArtifactID(p.ArtifactID) || p.Model == "" || p.CreatedAt.IsZero() || !p.ExpiresAt.After(p.CreatedAt) || source.Inspection == nil || source.Inspection.SizeBytes <= 0 || source.Duration == nil {
+				return ErrInvalid
+			}
 		}
 		if e := source.Inspection; e != nil {
 			if e.ReferenceID != source.ReferenceID || e.Type != source.MediaType || e.SHA256 != source.SHA256 || e.SizeBytes < 0 || e.Width < 0 || e.Height < 0 || e.FrameCount < 0 || e.FPS < 0 || math.IsNaN(e.FPS) || math.IsInf(e.FPS, 0) || e.Duration < 0 || math.IsNaN(e.Duration) || math.IsInf(e.Duration, 0) || e.AudioStreams != nil && *e.AudioStreams < 0 || e.VideoStreams != nil && *e.VideoStreams < 0 {
@@ -317,7 +326,7 @@ func EqualSources(a, b []core.ResourceSourceEvidence) bool {
 	}
 	for i := range a {
 		x, y := a[i], b[i]
-		if !reflect.DeepEqual(x.Inspection, y.Inspection) || x.ReferenceID != y.ReferenceID || x.MediaType != y.MediaType || x.SHA256 != y.SHA256 || (x.Duration == nil) != (y.Duration == nil) {
+		if !equalGeneratedProvenance(x.Provenance, y.Provenance) || !reflect.DeepEqual(x.Inspection, y.Inspection) || x.ReferenceID != y.ReferenceID || x.MediaType != y.MediaType || x.SHA256 != y.SHA256 || (x.Duration == nil) != (y.Duration == nil) {
 			return false
 		}
 		if x.Duration != nil && *x.Duration != *y.Duration {
@@ -325,6 +334,12 @@ func EqualSources(a, b []core.ResourceSourceEvidence) bool {
 		}
 	}
 	return true
+}
+func equalGeneratedProvenance(a, b *core.GeneratedSourceProvenance) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return a.TaskID == b.TaskID && a.ArtifactID == b.ArtifactID && a.Model == b.Model && a.CreatedAt.Equal(b.CreatedAt) && a.ExpiresAt.Equal(b.ExpiresAt)
 }
 func EqualSession(a, b *core.MediaSessionEvidence) bool {
 	if a == nil || b == nil {
@@ -384,6 +399,9 @@ func (s *Service) resolveResourceReferences(ctx context.Context, providerID stri
 			return nil, ErrNotFound
 		}
 		if err := ValidateSessionProvenance(b.Kind, b.Session, b.Sources); err != nil {
+			return nil, ErrNotFound
+		}
+		if core.ResourceSourcesExpired(b.Sources, time.Now()) {
 			return nil, ErrNotFound
 		}
 		if b.Session != nil && !time.Now().Before(b.Session.ExpiresAt) {

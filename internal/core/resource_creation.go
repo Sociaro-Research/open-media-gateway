@@ -46,18 +46,8 @@ func CloneResourceCreation(in *ResourceCreateRequest) *ResourceCreateRequest {
 	out.Videos = clone(in.Videos)
 	out.VoiceSources = clone(in.VoiceSources)
 	out.Tags = slices.Clone(in.Tags)
-	if in.GeneratedVideo != nil {
-		v := *in.GeneratedVideo
-		if v.Duration != nil {
-			d := *v.Duration
-			v.Duration = &d
-		}
-		if v.Inspection != nil {
-			inspection := CloneInputMediaEvidence(map[string]InputMediaEvidence{"source": *v.Inspection})["source"]
-			v.Inspection = &inspection
-		}
-		out.GeneratedVideo = &v
-	}
+	out.GeneratedVideo = CloneGeneratedResourceSource(in.GeneratedVideo)
+	out.GeneratedMedia = CloneGeneratedResourceSource(in.GeneratedMedia)
 	if in.BoundVoice != nil {
 		v := *in.BoundVoice
 		v.Session = CloneMediaSession(v.Session)
@@ -110,6 +100,9 @@ func ValidateResourceCreationIntent(model MediaModel, o MediaOptions, deferResol
 			}
 		}
 	}
+	if intent.GeneratedArtifactID != "" && (intent.GeneratedTaskID == "" || !ValidGeneratedArtifactID(intent.GeneratedArtifactID)) {
+		return invalid()
+	}
 	for _, tag := range intent.Tags {
 		if len(tag) > 128 {
 			return invalid()
@@ -134,10 +127,18 @@ func ValidateResourceCreationIntent(model MediaModel, o MediaOptions, deferResol
 			actual[source.ReferenceID] = true
 		}
 	}
-	if len(actual) != len(seen) || (request.GeneratedVideo != nil) != (intent.GeneratedTaskID != "") || (request.BoundVoice != nil) != (intent.BoundVoiceBindingID != "") {
+	if len(actual) != len(seen) || (request.GeneratedVideo != nil || request.GeneratedMedia != nil) != (intent.GeneratedTaskID != "") || request.GeneratedVideo != nil && request.GeneratedMedia != nil || (request.BoundVoice != nil) != (intent.BoundVoiceBindingID != "") {
 		return invalid()
 	}
-	if request.GeneratedVideo != nil && request.GeneratedVideo.TaskID != intent.GeneratedTaskID {
+	if request.GeneratedMedia != nil {
+		if request.GeneratedMedia.TaskID != intent.GeneratedTaskID || intent.GeneratedArtifactID != "" && request.GeneratedMedia.ArtifactID != intent.GeneratedArtifactID {
+			return invalid()
+		}
+		if err := ValidateGeneratedMediaSource(model, intent.Subtype, request.GeneratedMedia); err != nil {
+			return err
+		}
+	}
+	if request.GeneratedVideo != nil && (request.GeneratedVideo.TaskID != intent.GeneratedTaskID || intent.GeneratedArtifactID != "") {
 		return invalid()
 	}
 	if request.BoundVoice != nil && request.BoundVoice.BindingID != intent.BoundVoiceBindingID {

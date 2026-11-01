@@ -571,6 +571,11 @@ func validateTaskResourceSnapshots(ctx context.Context, tx *sql.Tx, task core.Ta
 		if task.OwnerID != identity.OwnerID(ctx) || task.ProviderOwnerID != identity.ProviderOwnerID(ctx) || task.ProviderIdentity == "" {
 			return fmt.Errorf("%w: resource creation scope unavailable", core.ErrOptionsInvalid)
 		}
+		if task.Options.ResourceCreation.GeneratedMedia != nil {
+			if err := validateTaskGeneratedMedia(ctx, tx, task, true); err != nil {
+				return err
+			}
+		}
 		if creation.BoundVoiceBindingID != "" {
 			voice := *task.Options.ResourceCreation.BoundVoice
 			voice.ReferenceID = "resource_bound_voice"
@@ -620,6 +625,9 @@ func validateTaskResourceSnapshots(ctx context.Context, tx *sql.Tx, task core.Ta
 		if providerresources.ValidateSessionProvenance(b.Kind, b.Session, b.Sources) != nil {
 			return invalid
 		}
+		if core.ResourceSourcesExpired(b.Sources, time.Now()) {
+			return invalid
+		}
 		if b.Session != nil && !time.Now().Before(b.Session.ExpiresAt) {
 			return invalid
 		}
@@ -665,6 +673,12 @@ func captureTaskResourceBindings(ctx context.Context, tx *sql.Tx, taskID string,
 			return nil, e
 		}
 		creation = &prepared
+		if options.ResourceCreation.GeneratedMedia != nil {
+			task := core.Task{ID: taskID, OwnerID: owner, ProviderOwnerID: powner, Provider: provider, ProviderIdentity: revision, Options: options}
+			if e := validateTaskGeneratedMedia(ctx, tx, task, false); e != nil {
+				return nil, e
+			}
+		}
 		if len(resources) != 1 {
 			return nil, providerresources.ErrConflict
 		}
@@ -709,6 +723,9 @@ func captureTaskResourceBindings(ctx context.Context, tx *sql.Tx, taskID string,
 			b, e := resourceBindingTx(ctx, tx, ref.BindingID, ` FOR SHARE`)
 			if e != nil {
 				return nil, e
+			}
+			if creation != nil && !providerresources.EqualSources(b.Sources, creation.Sources) {
+				return nil, providerresources.ErrConflict
 			}
 			if b.OriginTaskID != taskID || b.ProviderID != provider || b.ConnectionID != provider || b.Revision != revision || b.RemoteID != resources[i].RemoteID || b.Kind != resources[i].Kind || !providerresources.EqualSession(b.Session, resources[i].Session) {
 				return nil, providerresources.ErrConflict
@@ -776,7 +793,7 @@ func resourceTaskCreationIntent(options core.MediaOptions) (providerresources.In
 		return providerresources.Intent{}, providerresources.ErrInvalid
 	}
 	if public.Kind == "editing_session" {
-		if public.Subtype != "selection" || len(public.ReferenceIDs) != 1 || public.GeneratedTaskID != "" || public.BoundVoiceBindingID != "" || len(public.Tags) != 0 || len(private.Videos) != 1 || len(private.Images)+len(private.VoiceSources)+len(private.FileSources) != 0 || private.GeneratedVideo != nil || private.BoundVoice != nil {
+		if public.Subtype != "selection" || len(public.ReferenceIDs) != 1 || public.GeneratedTaskID != "" || public.GeneratedArtifactID != "" || public.BoundVoiceBindingID != "" || len(public.Tags) != 0 || len(private.Videos) != 1 || len(private.Images)+len(private.VoiceSources)+len(private.FileSources) != 0 || private.GeneratedVideo != nil || private.GeneratedMedia != nil || private.BoundVoice != nil {
 			return providerresources.Intent{}, providerresources.ErrInvalid
 		}
 		source := private.Videos[0]
@@ -784,7 +801,7 @@ func resourceTaskCreationIntent(options core.MediaOptions) (providerresources.In
 			return providerresources.Intent{}, providerresources.ErrInvalid
 		}
 	}
-	intent := providerresources.Intent{Kind: public.Kind, Subtype: public.Subtype, Name: public.Name, Description: public.Description, GeneratedTaskID: public.GeneratedTaskID, BoundVoiceBindingID: public.BoundVoiceBindingID, Tags: slices.Clone(public.Tags)}
+	intent := providerresources.Intent{Kind: public.Kind, Subtype: public.Subtype, Name: public.Name, Description: public.Description, GeneratedTaskID: public.GeneratedTaskID, GeneratedArtifactID: public.GeneratedArtifactID, BoundVoiceBindingID: public.BoundVoiceBindingID, Tags: slices.Clone(public.Tags)}
 	expected := map[string]bool{}
 	for _, id := range public.ReferenceIDs {
 		if !validResourceUUID(id) || expected[id] {
@@ -808,7 +825,13 @@ func resourceTaskCreationIntent(options core.MediaOptions) (providerresources.In
 	if len(expected) != 0 {
 		return intent, providerresources.ErrInvalid
 	}
-	if public.GeneratedTaskID != "" {
+	if private.GeneratedMedia != nil {
+		generated := private.GeneratedMedia
+		if public.GeneratedTaskID == "" || private.GeneratedVideo != nil || generated.TaskID != public.GeneratedTaskID || public.GeneratedArtifactID != "" && public.GeneratedArtifactID != generated.ArtifactID || generated.RemoteID != "" || !providerresources.ValidRemoteID(generated.OutputID) || generated.ArtifactID == "" || generated.Model == "" || generated.Operation != generated.Model || generated.MediaType != "audio" || generated.Inspection == nil {
+			return intent, providerresources.ErrInvalid
+		}
+		intent.Sources = append(intent.Sources, core.GeneratedResourceEvidence(generated))
+	} else if public.GeneratedTaskID != "" {
 		generated := private.GeneratedVideo
 		if generated == nil || generated.TaskID != public.GeneratedTaskID || (generated.TaskHandle == "" && generated.OutputID == "") {
 			return intent, providerresources.ErrInvalid
@@ -826,7 +849,7 @@ func resourceTaskCreationIntent(options core.MediaOptions) (providerresources.In
 			evidence.Duration = &duration
 		}
 		intent.Sources = append(intent.Sources, evidence)
-	} else if private.GeneratedVideo != nil {
+	} else if private.GeneratedVideo != nil || public.GeneratedArtifactID != "" {
 		return intent, providerresources.ErrInvalid
 	}
 	if public.BoundVoiceBindingID != "" {

@@ -508,6 +508,12 @@ func (a *Adapter) ListResources(ctx context.Context, kind string, preset bool, p
 	return result, nil
 }
 func (a *Adapter) DeleteResource(ctx context.Context, binding core.ResourceSnapshot) (core.ResourceJob, error) {
+	if binding.Kind == "file_resource" {
+		if e := a.ValidateResourceDeletion(ctx, binding); e != nil {
+			return core.ResourceJob{}, e
+		}
+		return core.ResourceJob{Status: core.ProviderSucceeded}, nil
+	}
 	if _, err := legacyScope(ctx); err != nil {
 		return core.ResourceJob{}, err
 	}

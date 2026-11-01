@@ -882,3 +882,8 @@ official preset chooser: encrypted ticket import, expired/unavailable presets,
 owner-context changes, no automatic uncertain import retry, keyboard focus and
 both themes at 1440/390/320 px. Responses are synthetic and loopback-only; no
 provider request is made. Repeat with `UI_BROWSER_ENGINE=webkit`.
+
+Run `node scripts/ui/generated-audio-inputs.cjs` for archived TTS audio/artifact
+selection, explicit artifact identity across restore and rename, selected-output
+preview, source removal and foreign/expired-source exclusion. This uses the same
+shared component harness and synthetic responses; repeat in Chromium and WebKit.

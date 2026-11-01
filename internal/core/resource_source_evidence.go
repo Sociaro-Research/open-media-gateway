@@ -18,6 +18,10 @@ func InspectedResourceSource(source ResourceSourceInput) ResourceSourceEvidence 
 func CloneResourceSources(in []ResourceSourceEvidence) []ResourceSourceEvidence {
 	out := slices.Clone(in)
 	for i := range out {
+		if out[i].Provenance != nil {
+			p := *out[i].Provenance
+			out[i].Provenance = &p
+		}
 		if out[i].Duration != nil {
 			d := *out[i].Duration
 			out[i].Duration = &d
