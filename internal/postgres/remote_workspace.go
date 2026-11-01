@@ -8,10 +8,10 @@ import (
 	remote "github.com/Sociaro-Research/open-media-gateway/internal/remoteworkspace"
 )
 
-const remoteColumns = `owner_id::text,version,active,origin,organization_id,organization_name,remote_user_id,remote_key_id,token_hash,token_ciphertext,verified_at`
+const remoteColumns = `owner_id::text,version,active,origin,organization_id,organization_name,remote_user_id,remote_key_id,token_hash,token_ciphertext,verified_at,provisioning`
 
 func scanRemote(row interface{ Scan(...any) error }) (r remote.Record, err error) {
-	err = row.Scan(&r.Owner, &r.Version, &r.Active, &r.Origin, &r.OrganizationID, &r.OrganizationName, &r.UserID, &r.KeyID, &r.TokenHash, &r.Ciphertext, &r.VerifiedAt)
+	err = row.Scan(&r.Owner, &r.Version, &r.Active, &r.Origin, &r.OrganizationID, &r.OrganizationName, &r.UserID, &r.KeyID, &r.TokenHash, &r.Ciphertext, &r.VerifiedAt, &r.Provisioning)
 	if errors.Is(err, sql.ErrNoRows) {
 		err = remote.ErrNotFound
 	}
@@ -42,14 +42,32 @@ func (r *SystemRepository) SaveRemoteWorkspace(ctx context.Context, next remote.
 	} else if err != nil {
 		return remote.Record{}, err
 	}
+	if current.Active {
+		oldOrigin, oldErr := remote.Origin(current.Origin)
+		newOrigin, newErr := remote.Origin(next.Origin)
+		if oldErr != nil || newErr != nil || oldOrigin != newOrigin || current.OrganizationID != next.OrganizationID || current.UserID != next.UserID {
+			return remote.Record{}, remote.ErrConflict
+		}
+		// Preserve the old spelling because it is part of the admitted retry namespace.
+		next.Origin = current.Origin
+	}
 	if version != current.Version {
 		if current.Active && current.Version == version+1 && current.Origin == next.Origin && current.OrganizationID == next.OrganizationID && bytes.Equal(current.TokenHash, next.TokenHash) {
 			return current, tx.Commit()
 		}
 		return remote.Record{}, remote.ErrConflict
 	}
+	if next.Provisioning == "" {
+		next.Provisioning = "legacy"
+	}
+	if current.Active {
+		if current.Origin != next.Origin || current.OrganizationID != next.OrganizationID || current.UserID != next.UserID {
+			return remote.Record{}, remote.ErrConflict
+		}
+		next.Provisioning = current.Provisioning
+	}
 	next.Version = current.Version + 1
-	_, err = tx.ExecContext(ctx, `INSERT INTO remote_workspaces(owner_id,version,active,origin,organization_id,organization_name,remote_user_id,remote_key_id,token_hash,token_ciphertext,verified_at) VALUES($1,$2,TRUE,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT(owner_id) DO UPDATE SET version=EXCLUDED.version,active=TRUE,origin=EXCLUDED.origin,organization_id=EXCLUDED.organization_id,organization_name=EXCLUDED.organization_name,remote_user_id=EXCLUDED.remote_user_id,remote_key_id=EXCLUDED.remote_key_id,token_hash=EXCLUDED.token_hash,token_ciphertext=EXCLUDED.token_ciphertext,verified_at=EXCLUDED.verified_at`, next.Owner, next.Version, next.Origin, next.OrganizationID, next.OrganizationName, next.UserID, next.KeyID, next.TokenHash, next.Ciphertext, next.VerifiedAt)
+	_, err = tx.ExecContext(ctx, `INSERT INTO remote_workspaces(owner_id,version,active,origin,organization_id,organization_name,remote_user_id,remote_key_id,token_hash,token_ciphertext,verified_at,provisioning) VALUES($1,$2,TRUE,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT(owner_id) DO UPDATE SET version=EXCLUDED.version,active=TRUE,origin=EXCLUDED.origin,organization_id=EXCLUDED.organization_id,organization_name=EXCLUDED.organization_name,remote_user_id=EXCLUDED.remote_user_id,remote_key_id=EXCLUDED.remote_key_id,token_hash=EXCLUDED.token_hash,token_ciphertext=EXCLUDED.token_ciphertext,verified_at=EXCLUDED.verified_at,provisioning=EXCLUDED.provisioning`, next.Owner, next.Version, next.Origin, next.OrganizationID, next.OrganizationName, next.UserID, next.KeyID, next.TokenHash, next.Ciphertext, next.VerifiedAt, next.Provisioning)
 	if err != nil {
 		return remote.Record{}, err
 	}

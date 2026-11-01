@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -112,7 +113,8 @@ func TestWorkspaceSignupCompanyAndInstallationEndToEnd(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	hostHandler := NewGateway(Dependencies{Service: &accountService{}, Health: healthStub{}, Auth: hostAuth, System: hostSystem, Keys: postgres.NewAPIKeyRepository(hostDB), WorkspaceAuthorization: wa.New(hostSystem, cipher)})
+	hostService := &accountService{}
+	hostHandler := NewGateway(Dependencies{Service: hostService, Health: healthStub{}, Auth: hostAuth, System: hostSystem, Keys: postgres.NewAPIKeyRepository(hostDB), WorkspaceAuthorization: wa.New(hostSystem, cipher)})
 	host := httptest.NewTLSServer(hostHandler)
 	defer host.Close()
 	transport := &loseWorkspaceReply{base: host.Client().Transport}
@@ -237,7 +239,7 @@ func TestWorkspaceSignupCompanyAndInstallationEndToEnd(t *testing.T) {
 	if strings.Contains(inspected.Body.String(), localToken) {
 		t.Fatal("local token leaked")
 	}
-	approval := map[string]any{"user_code": view.Code, "company_name": "Customer company", "company_website": "https://customer.fixture.test", "consent": false}
+	approval := map[string]any{"user_code": view.Code, "consent": false}
 	expect(call(hostHandler, "POST", "/v1/workspace-authorizations/approve", approval, customer, "", false), 403)
 	approval["consent"] = true
 	expect(call(hostHandler, "POST", "/v1/workspace-authorizations/approve", approval, customer, "", true), 403)
@@ -289,6 +291,70 @@ func TestWorkspaceSignupCompanyAndInstallationEndToEnd(t *testing.T) {
 	if strings.Contains(list.Body.String(), credential) {
 		t.Fatal("grant list returned secret")
 	}
+	// A distinct physical installation authenticated by the same customer creates
+	// a separate company, even with identical human-readable metadata.
+	secondDB := workspaceDatabase(t)
+	secondPeople := postgres.NewAuthRepository(secondDB)
+	secondSystem := postgres.NewSystemRepository(secondDB)
+	secondOwner := seed(secondPeople, "Second local owner")
+	if err = secondSystem.SetAdmin(ctx, "", secondOwner.ID, true, true); err != nil {
+		t.Fatal(err)
+	}
+	secondManager := remote.New(secondSystem, cipher, host.Client())
+	secondView, err := secondManager.BeginAuthorization(ctx, secondOwner.ID, host.URL, "My private installation", "http://192.168.1.8:8088", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondConsent := call(hostHandler, "POST", "/v1/workspace-authorizations/approve", map[string]any{"user_code": secondView.Code, "consent": true}, customer, "", false)
+	expect(secondConsent, 200)
+	secondRecord, err := secondManager.PollAuthorization(ctx, secondOwner.ID, secondView.ID)
+	if err != nil || secondRecord.OrganizationID == record.OrganizationID || secondRecord.Provisioning != "dedicated" {
+		t.Fatal("distinct installation reused company", err)
+	}
+	proxy := func(m *remote.Manager, owner string, snapshot remote.Record, method, path, body string, status int) []byte {
+		t.Helper()
+		expected := snapshot.Context
+		if expected == "" {
+			expected = snapshot.SnapshotID()
+		}
+		res, _, _, e := m.Proxy(ctx, owner, method, path, "", []byte(body), uuid.NewString(), expected)
+		if e != nil {
+			t.Fatal(e)
+		}
+		defer res.Body.Close()
+		data, e := io.ReadAll(res.Body)
+		if e != nil {
+			t.Fatal(e)
+		}
+		if res.StatusCode != status {
+			t.Fatalf("proxy %s returned %d wanted %d: %s", path, res.StatusCode, status, data)
+		}
+		return data
+	}
+	proxy(manager, localOwner.ID, record, "GET", "/v1/models", "", 200)
+	proxy(manager, localOwner.ID, record, "POST", "/v1/generations/estimate", `{"prompt":"Synthetic first installation","model":"mock/mock-video-v1"}`, 200)
+	firstJSON := proxy(manager, localOwner.ID, record, "POST", "/v1/generations", `{"prompt":"Synthetic first installation","model":"mock/mock-video-v1"}`, 202)
+	var firstTask struct {
+		ID string `json:"id"`
+	}
+	if err = json.Unmarshal(firstJSON, &firstTask); err != nil {
+		t.Fatal(err)
+	}
+	proxy(secondManager, secondOwner.ID, secondRecord, "POST", "/v1/generations", `{"prompt":"Synthetic second installation","model":"mock/mock-video-v1"}`, 202)
+	firstHistory := proxy(manager, localOwner.ID, record, "GET", "/v1/generations", "", 200)
+	secondHistory := proxy(secondManager, secondOwner.ID, secondRecord, "GET", "/v1/generations", "", 200)
+	if !strings.Contains(string(firstHistory), "Synthetic first installation") || strings.Contains(string(firstHistory), "Synthetic second installation") || strings.Contains(string(secondHistory), firstTask.ID) {
+		t.Fatal("remote history mixed dedicated companies")
+	}
+	proxy(secondManager, secondOwner.ID, secondRecord, "GET", "/v1/generations/"+firstTask.ID, "", 404)
+	proxy(secondManager, secondOwner.ID, secondRecord, "GET", "/v1/generations/"+firstTask.ID+"/content", "", 404)
+	keyView := proxy(secondManager, secondOwner.ID, secondRecord, "GET", "/v1/key", "", 200)
+	if !strings.Contains(string(keyView), secondRecord.OrganizationID) || strings.Contains(string(keyView), record.OrganizationID) {
+		t.Fatal("remote balance bound to another company")
+	}
+	if count(hostDB, "organization_credits") != 0 {
+		t.Fatal("onboarding or mock generation issued credit")
+	}
 	stranger := seed(hostPeople, "Stranger")
 	strangerToken, _ := wa.DeviceCode()
 	if err = hostPeople.CreateSession(ctx, wa.Digest(strangerToken), stranger.ID, time.Now().Add(time.Hour)); err != nil {
@@ -298,7 +364,7 @@ func TestWorkspaceSignupCompanyAndInstallationEndToEnd(t *testing.T) {
 	expect(call(hostHandler, "DELETE", "/v1/workspace-installations/"+saved.KeyID, nil, strangerCookie, "", false), 410)
 	expect(call(hostHandler, "DELETE", "/v1/workspace-installations/"+saved.KeyID, nil, customer, "", false), 200)
 	expect(call(localHandler, "GET", "/v1/system/remote-workspace/proxy/v1/key?workspace_context="+url.QueryEscape(saved.SnapshotID()), nil, localCookie, "", false), 401)
-	if count(hostDB, "organizations") != 1 {
+	if count(hostDB, "organizations") != 2 {
 		t.Fatal("revocation deleted company")
 	}
 	// The normal grant key is usable only for its actual remote company.

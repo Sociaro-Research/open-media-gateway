@@ -10,7 +10,7 @@ import (
 )
 
 func remoteAuthorizationError(w http.ResponseWriter, err error) {
-	if errors.Is(err, wa.ErrKeyLimit) || errors.Is(err, wa.ErrPending) || errors.Is(err, wa.ErrSlow) || errors.Is(err, wa.ErrUnavailable) || errors.Is(err, wa.ErrForbidden) || errors.Is(err, wa.ErrDisabled) {
+	if errors.Is(err, wa.ErrLegacy) || errors.Is(err, wa.ErrKeyLimit) || errors.Is(err, wa.ErrPending) || errors.Is(err, wa.ErrSlow) || errors.Is(err, wa.ErrUnavailable) || errors.Is(err, wa.ErrForbidden) || errors.Is(err, wa.ErrDisabled) {
 		workspaceAuthorizationError(w, err)
 		return
 	}

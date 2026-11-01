@@ -44,13 +44,20 @@ func TestWorkspaceAuthorizationLifecycleAndIsolation(t *testing.T) {
 	}
 	cipher, _ := providerconfig.NewCipher(strings.Repeat("c", 32))
 	manager := wa.New(repo, cipher)
+	deviceProof := map[string]string{}
+	keyProof := map[string]string{}
 	start := func(replacement string) (string, wa.Challenge) {
 		t.Helper()
 		device, e := wa.DeviceCode()
 		if e != nil {
 			t.Fatal(e)
 		}
-		v, e := manager.Start(ctx, device, wa.Challenge{Label: "Synthetic installation", Origin: "http://private.lan:8088", ReplaceKey: replacement})
+		proof, _ := wa.DeviceCode()
+		if replacement != "" {
+			proof = keyProof[replacement]
+		}
+		deviceProof[device] = proof
+		v, e := manager.Start(ctx, device, wa.Challenge{InstallationProof: proof, Label: "Synthetic installation", Origin: "http://private.lan:8088", ReplaceKey: replacement})
 		if e != nil {
 			t.Fatal(e)
 		}
@@ -58,7 +65,11 @@ func TestWorkspaceAuthorizationLifecycleAndIsolation(t *testing.T) {
 	}
 	poll := func(device string) (wa.Challenge, string, error) {
 		db.Exec(`UPDATE workspace_authorizations SET next_poll_at=NOW()-INTERVAL '1 second' WHERE device_hash=$1`, wa.Digest(device))
-		return manager.Poll(ctx, device)
+		v, token, err := manager.Poll(ctx, device)
+		if err == nil {
+			keyProof[v.KeyID] = deviceProof[device]
+		}
+		return v, token, err
 	}
 	count := func(table string) int {
 		t.Helper()
@@ -85,10 +96,10 @@ func TestWorkspaceAuthorizationLifecycleAndIsolation(t *testing.T) {
 	if count("user_api_keys") != 0 {
 		t.Fatal("pending request issued key")
 	}
-	if _, e = repo.Approve(ctx, a.ID, v.Code, wa.Approval{Name: "Own A", Website: "own-a.fixture.test"}); !errors.Is(e, wa.ErrForbidden) {
+	if _, e = repo.Approve(ctx, a.ID, v.Code, wa.Approval{}); !errors.Is(e, wa.ErrForbidden) {
 		t.Fatal("missing consent", e)
 	}
-	in := wa.Approval{Name: "Own A", Website: "own-a.fixture.test", Consent: true}
+	in := wa.Approval{Consent: true}
 	approved, e := repo.Approve(ctx, a.ID, v.Code, in)
 	if e != nil {
 		t.Fatal(e)
@@ -98,7 +109,7 @@ func TestWorkspaceAuthorizationLifecycleAndIsolation(t *testing.T) {
 			t.Fatal("consent retry", e)
 		}
 	}
-	if count("customer_workspace_owners") != 1 || count("organization_credits") != 0 {
+	if count("workspace_installations") != 1 || count("organization_credits") != 0 {
 		t.Fatal("company duplicated or funded")
 	}
 	if _, _, _, e = repo.Describe(ctx, b.ID, v.Code); !errors.Is(e, wa.ErrForbidden) {
@@ -129,7 +140,7 @@ func TestWorkspaceAuthorizationLifecycleAndIsolation(t *testing.T) {
 	if _, e = repo.Approve(ctx, b.ID, request.Code, wa.Approval{Company: company.ID, Consent: true, Replace: true}); !errors.Is(e, wa.ErrForbidden) {
 		t.Fatal("foreign replacement accepted", e)
 	}
-	if _, e = repo.Approve(ctx, a.ID, request.Code, wa.Approval{Company: approved.Company, Consent: true, Replace: true}); e != nil {
+	if _, e = repo.Approve(ctx, a.ID, request.Code, wa.Approval{Consent: true, Replace: true}); e != nil {
 		t.Fatal(e)
 	}
 	replacement, replacementToken, e := poll(renewal)
@@ -153,10 +164,11 @@ func TestWorkspaceAuthorizationLifecycleAndIsolation(t *testing.T) {
 	}
 	// Approval cannot survive a lost membership before device proof.
 	revoked, request := start("")
-	if _, e = repo.Approve(ctx, b.ID, request.Code, wa.Approval{Company: company.ID, Consent: true}); e != nil {
+	bApproved, e := repo.Approve(ctx, b.ID, request.Code, wa.Approval{Consent: true})
+	if e != nil {
 		t.Fatal(e)
 	}
-	db.Exec(`UPDATE organization_members SET removed_at=NOW() WHERE organization_id=$1 AND user_id=$2`, company.ID, b.ID)
+	db.Exec(`UPDATE organization_members SET removed_at=NOW() WHERE organization_id=$1 AND user_id=$2`, bApproved.Company, b.ID)
 	if _, _, e = poll(revoked); !errors.Is(e, wa.ErrForbidden) {
 		t.Fatal("removed owner issued key", e)
 	}
@@ -185,7 +197,7 @@ func TestWorkspaceAuthorizationLifecycleAndIsolation(t *testing.T) {
 		t.Fatal("invalid device proof accepted")
 	}
 }
-func TestWorkspaceConsentCancellationAndSingleCompanyRace(t *testing.T) {
+func TestWorkspaceConsentCancellationAndSameInstallationRace(t *testing.T) {
 	db := auditDatabase(t, true)
 	ctx := context.Background()
 	repo := NewSystemRepository(db)
@@ -197,11 +209,12 @@ func TestWorkspaceConsentCancellationAndSingleCompanyRace(t *testing.T) {
 	db.Exec(`UPDATE system_settings SET customer_workspaces=TRUE,shared_resources=TRUE`)
 	cipher, _ := providerconfig.NewCipher(strings.Repeat("r", 32))
 	manager := wa.New(repo, cipher)
+	proof, _ := wa.DeviceCode()
 	codes := make([]string, 2)
 	requests := make([]wa.Challenge, 2)
 	for i := range codes {
 		codes[i], _ = wa.DeviceCode()
-		requests[i], e = manager.Start(ctx, codes[i], wa.Challenge{Label: "Installation", Origin: "http://localhost:8088"})
+		requests[i], e = manager.Start(ctx, codes[i], wa.Challenge{InstallationProof: proof, Label: "Installation", Origin: "http://localhost:8088"})
 		if e != nil {
 			t.Fatal(e)
 		}
@@ -212,7 +225,7 @@ func TestWorkspaceConsentCancellationAndSingleCompanyRace(t *testing.T) {
 	for i := range codes {
 		wg.Go(func() {
 			<-start
-			_, e := repo.Approve(ctx, owner.ID, requests[i].Code, wa.Approval{Name: "Racing company " + requests[i].Code, Website: strings.ToLower(requests[i].Code) + ".fixture.test", Consent: true})
+			_, e := repo.Approve(ctx, owner.ID, requests[i].Code, wa.Approval{Consent: true})
 			results <- e
 		})
 	}
@@ -227,8 +240,8 @@ func TestWorkspaceConsentCancellationAndSingleCompanyRace(t *testing.T) {
 			t.Fatal(e)
 		}
 	}
-	if successes != 1 {
-		t.Fatal("self-service company cap raced", successes)
+	if successes != 2 {
+		t.Fatal("same installation approvals failed", successes)
 	}
 	var n int
 	db.QueryRow(`SELECT count(*) FROM organizations`).Scan(&n)

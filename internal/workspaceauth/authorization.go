@@ -22,6 +22,7 @@ var ErrUnavailable = errors.New("authorization is missing, expired or no longer 
 var ErrForbidden = errors.New("a browser account with ownership of this company is required")
 var ErrPending = errors.New("authorization_pending")
 var ErrSlow = errors.New("slow_down")
+var ErrLegacy = errors.New("legacy connection preserved; upgrade both installations and use explicit legacy key management before starting a dedicated connection")
 var ErrKeyLimit = errors.New("the host active-key limit is reached; revoke unused installation grants and retry this request")
 var ErrConflict = errors.New("authorization changed; start again or review the existing choice")
 
@@ -30,16 +31,20 @@ const KeyLifetime = 30 * 24 * time.Hour
 const Interval = 5 * time.Second
 
 type Challenge struct {
-	Code        string    `json:"user_code"`
-	Label       string    `json:"client_name"`
-	Origin      string    `json:"client_origin"`
-	ReplaceKey  string    `json:"-"`
-	State       string    `json:"status"`
-	Expires     time.Time `json:"expires_at"`
-	Actor       string    `json:"-"`
-	Company     string    `json:"organization_id,omitempty"`
-	KeyID       string    `json:"key_id,omitempty"`
-	TokenCipher []byte    `json:"-"`
+	InstallationProof string    `json:"-"`
+	InstallationHash  []byte    `json:"-"`
+	Provisioning      string    `json:"provisioning,omitempty"`
+	CompanyName       string    `json:"company_name,omitempty"`
+	Code              string    `json:"user_code"`
+	Label             string    `json:"client_name"`
+	Origin            string    `json:"client_origin"`
+	ReplaceKey        string    `json:"-"`
+	State             string    `json:"status"`
+	Expires           time.Time `json:"expires_at"`
+	Actor             string    `json:"-"`
+	Company           string    `json:"organization_id,omitempty"`
+	KeyID             string    `json:"key_id,omitempty"`
+	TokenCipher       []byte    `json:"-"`
 }
 type Company struct {
 	ID   string `json:"id"`
@@ -47,13 +52,13 @@ type Company struct {
 }
 type Approval struct {
 	Company string `json:"organization_id"`
-	Name    string `json:"company_name"`
-	Website string `json:"company_website"`
 	Consent bool   `json:"consent"`
 	Deny    bool   `json:"deny"`
 	Replace bool   `json:"replace_previous"`
 }
 type Grant struct {
+	CompanyName  string     `json:"company_name"`
+	Provisioning string     `json:"provisioning"`
 	ID           string     `json:"id"`
 	Company      string     `json:"organization_id"`
 	Name         string     `json:"name"`
@@ -95,6 +100,11 @@ func ValidDevice(device string) bool {
 	return err == nil && len(raw) == 32
 }
 func (m *Manager) Start(ctx context.Context, device string, in Challenge) (Challenge, error) {
+	if !ValidDevice(in.InstallationProof) {
+		return Challenge{}, ErrLegacy
+	}
+	in.InstallationHash = Digest("installation:" + in.InstallationProof)
+	in.InstallationProof = ""
 	if !ValidDevice(device) || len(in.Label) < 1 || len(in.Label) > 80 || len(in.Origin) > 300 {
 		return Challenge{}, ErrUnavailable
 	}

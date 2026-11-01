@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -29,6 +30,7 @@ const Prefix = "/v1/system/remote-workspace/proxy"
 const MaxJSON = 4 << 20
 
 type Record struct {
+	Provisioning     string     `json:"provisioning,omitempty"`
 	Context          string     `json:"context,omitempty"`
 	OperationScope   string     `json:"operation_scope,omitempty"`
 	Owner            string     `json:"-"`
@@ -93,7 +95,15 @@ func Origin(raw string) (string, error) {
 	if e != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || (u.Path != "" && u.Path != "/") {
 		return "", errors.New("use the HTTPS server origin without a path, query or credentials")
 	}
-	return strings.TrimRight(u.String(), "/"), nil
+	// Equivalent URL spellings must retain the same durable installation proof.
+	host := strings.ToLower(strings.TrimSuffix(u.Hostname(), "."))
+	port := u.Port()
+	if port != "" && port != "443" {
+		host = net.JoinHostPort(host, port)
+	} else if strings.Contains(host, ":") {
+		host = "[" + host + "]"
+	}
+	return "https://" + host, nil
 }
 
 type KeyInfo struct {
@@ -111,6 +121,9 @@ type KeyInfo struct {
 }
 
 func (m *Manager) Connect(ctx context.Context, owner, origin, token, company string, version int64) (Record, error) {
+	return m.connect(ctx, owner, origin, token, company, version, "legacy")
+}
+func (m *Manager) connect(ctx context.Context, owner, origin, token, company string, version int64, provisioning string) (Record, error) {
 	origin, err := Origin(origin)
 	if err != nil {
 		return Record{}, err
@@ -149,7 +162,7 @@ func (m *Manager) Connect(ctx context.Context, owner, origin, token, company str
 	}
 	hash := sha256.Sum256([]byte(token))
 	now := time.Now().UTC()
-	return m.Repo.SaveRemoteWorkspace(ctx, Record{Owner: owner, Active: true, Origin: origin, OrganizationID: company, OrganizationName: info.Organization.Name, UserID: info.Key.UserID, KeyID: info.Key.ID, TokenHash: hash[:], Ciphertext: encrypted, VerifiedAt: &now}, version)
+	return m.Repo.SaveRemoteWorkspace(ctx, Record{Provisioning: provisioning, Owner: owner, Active: true, Origin: origin, OrganizationID: company, OrganizationName: info.Organization.Name, UserID: info.Key.UserID, KeyID: info.Key.ID, TokenHash: hash[:], Ciphertext: encrypted, VerifiedAt: &now}, version)
 }
 func (m *Manager) request(ctx context.Context, origin, token, method, path string, body io.Reader, idempotency string) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, method, origin+path, body)

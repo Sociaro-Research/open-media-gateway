@@ -77,3 +77,30 @@ func (r *SystemRepository) ClearAuthorizationAttempt(ctx context.Context, owner,
 	}
 	return tx.Commit()
 }
+
+// A random proof identifies this installation's connection to one central origin. Never derive it from display names, origins or browser state.
+// It survives disconnect and device request cancellation; only ciphertext is local.
+func (r *SystemRepository) InstallationIdentity(ctx context.Context, owner, origin string, candidate []byte) ([]byte, error) {
+	tx, err := beginAuditTx(ctx, r.db)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	if _, err = readSystemSettings(ctx, tx, true); err != nil {
+		return nil, err
+	}
+	if _, err = systemActor(ctx, tx, owner); err != nil {
+		return nil, err
+	}
+	var ciphertext []byte
+	if candidate == nil {
+		if err = tx.QueryRowContext(ctx, `SELECT proof_ciphertext FROM remote_installation_identities WHERE origin=$1`, origin).Scan(&ciphertext); err != nil {
+			return nil, err
+		}
+		return ciphertext, tx.Commit()
+	}
+	if err = tx.QueryRowContext(ctx, `INSERT INTO remote_installation_identities(created_by,origin,proof_ciphertext) VALUES($1,$2,$3) ON CONFLICT(origin) DO UPDATE SET origin=EXCLUDED.origin RETURNING proof_ciphertext`, owner, origin, candidate).Scan(&ciphertext); err != nil {
+		return nil, err
+	}
+	return ciphertext, tx.Commit()
+}

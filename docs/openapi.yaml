@@ -40,7 +40,7 @@ paths:
       operationId: startInstallationAuthorization
       summary: Start an explicit device-style installation request
       security: []
-      description: Requires host customer_workspaces and shared_resources opt-in. The installation backend generates a 32-byte random device_code; it never places it in a browser or URL. Starts are idempotent for the same device code and metadata. Rate limited. No identity, company, key or credit is created here. This bounded protocol is not an OAuth compatibility claim.
+      description: Requires host customer_workspaces and shared_resources opt-in. The installation backend persists a separate random 32-byte installation_proof across requests/renewal/reconnect and generates a temporary random device_code; neither enters a browser or URL. Proof digests bind one authenticated customer and one dedicated new company. Starts are idempotent for the same device code, proof and metadata. Rate limited. No identity, company, key or credit is created here. This bounded protocol is not an OAuth compatibility claim.
       requestBody:
         required: true
         content:
@@ -48,9 +48,10 @@ paths:
             schema:
               type: object
               additionalProperties: false
-              required: [device_code, client_name, client_origin]
+              required: [device_code, installation_proof, client_name, client_origin]
               properties:
                 device_code: {type: string, minLength: 43, maxLength: 43, writeOnly: true}
+                installation_proof: {type: string, minLength: 43, maxLength: 43, writeOnly: true, description: Durable backend-only random installation identity proof.}
                 client_name: {type: string, minLength: 1, maxLength: 80}
                 client_origin: {type: string, format: uri, maxLength: 300, description: 'Display-only installation origin, including private HTTP origins; never a callback destination.'}
                 replace_key_id: {type: string, format: uuid, description: 'Optional prior installation key; replacement still requires explicit consent by its owner.'}
@@ -70,7 +71,7 @@ paths:
           application/json:
             schema: {'$ref': '#/components/schemas/WorkspaceDeviceProof'}
       responses:
-        '200': {description: 'Backend-only token, organization_id and key_id; never forwarded by the local browser API.'}
+        '200': {description: 'Backend-only token, organization_id, key_id, provisioning (dedicated or legacy) and installation_id (proof digest); never forwarded by the local browser API.'}
         '403': {description: Host policy or membership no longer permits issuance}
         '410': {description: Expired, denied, cancelled or revoked authorization}
         '428': {description: Browser authorization pending}
@@ -92,25 +93,25 @@ paths:
   /v1/workspace-authorizations/inspect:
     post:
       operationId: inspectInstallationConsent
-      summary: Review an installation request and the signed-in customer's owned companies
+      summary: Review a new dedicated-company request or the installation's existing binding
       security: [{sessionAuth: []}]
-      description: Browser session only; API and deployment keys are rejected. Returns only companies with actual current Supermanager membership, never global administrator visibility. Code inspection does not approve or create anything. The client origin/name are unverified display data and must be checked against the initiating installation.
+      description: Browser session only; API and deployment keys are rejected. Existing companies are never offered. request.provisioning is new or renewal; renewal exposes only this proof-bound organization_id/company_name after verifying the initiating customer and current Supermanager membership. Code inspection does not approve or create anything. The client origin/name are unverified display data and must be checked against the initiating installation.
       requestBody:
         required: true
         content:
           application/json:
             schema: {type: object, required: [user_code], properties: {user_code: {type: string}}}
       responses:
-        '200': {description: 'request metadata, companies and can_create (one self-service company per account)'}
+        '200': {description: 'request metadata with provisioning=new|renewal and bound organization_id/company_name for renewal; companies is empty; can_create indicates new provisioning'}
         '401': {description: Sign in or register through existing host identity flows}
         '403': {description: Key authentication, sales account or disabled host}
         '410': {description: Missing or expired user code}
   /v1/workspace-authorizations/approve:
     post:
       operationId: approveInstallationConsent
-      summary: Explicitly authorize or deny one installation for an owned company
+      summary: Confirm a dedicated installation company or renew its own access
       security: [{sessionAuth: []}]
-      description: Browser session and cross-origin protection. Requires explicit consent plus existing actual Supermanager membership, or explicit creation of one own company with the existing name/website rules. Never accepts another recipient, billing credit, management scopes or provider keys. Company creation and approval are atomic/idempotent; keys are issued only on successful device proof. Optional rotation may revoke only the same approving customer's earlier installation key.
+      description: Browser session and cross-origin protection. Requires the initiating customer's explicit consent. A new durable installation proof atomically creates a dedicated company and Supermanager membership; renewal reuses only its immutable customer/company binding. The central owner's personal approval is not required. Never accepts another recipient, billing credit, management scopes or provider keys. Company creation and approval are atomic/idempotent; keys are issued only on successful device proof. Optional rotation may revoke only a prior key of this exact installation and customer; a key from another company/installation is rejected.
       requestBody:
         required: true
         content:
@@ -121,16 +122,13 @@ paths:
               required: [user_code]
               properties:
                 user_code: {type: string}
-                organization_id: {type: string, description: 'Choose an actually owned company; omit to create one.'}
-                company_name: {type: string, maxLength: 160}
-                company_website: {type: string}
                 consent: {type: boolean}
                 deny: {type: boolean}
                 replace_previous: {type: boolean, default: false}
       responses:
         '200': {description: Approved or denied metadata; no credential}
         '403': {description: Missing consent, wrong origin, role or company ownership}
-        '409': {description: Changed request or self-service company already created}
+        '409': {description: Changed request, legacy protocol or installation binding conflict}
         '410': {description: Expired or unavailable authorization}
   /v1/workspace-installations:
     get:
@@ -162,7 +160,7 @@ paths:
     post:
       operationId: beginLocalInstallationAuthorization
       summary: Request trusted-host signup/login and company consent
-      description: Current local Administrator plus explicit metadata-transfer consent. Preserves the current connection until the new company/key is verified. The backend stores an encrypted device secret and makes checked outbound HTTPS calls only; no local management credential is forwarded. Retries resume the same pending request.
+      description: Current local Administrator plus explicit metadata-transfer consent. Preserves the current dedicated connection and company until its renewed key is verified; active legacy connections require explicit legacy management. The backend retains a durable installation proof per normalized central origin and stores an encrypted device secret and makes checked outbound HTTPS calls only; no local management credential is forwarded. Retries resume the same pending request.
       requestBody:
         required: true
         content:
@@ -196,7 +194,7 @@ paths:
     post:
       operationId: completeLocalInstallationAuthorization
       summary: Poll consent and atomically connect the verified remote company
-      description: Uses only this local Administrator's encrypted device secret. Does not expose the resulting remote credential to the browser. Version checks reject replies after disconnect or replacement.
+      description: Uses this local Administrator's encrypted device secret and checks returned provisioning/proof identity before saving dedicated state. A legacy reply cannot silently become dedicated. Does not expose the resulting remote credential to the browser. Version checks reject replies after disconnect or replacement.
       requestBody:
         required: true
         content:
@@ -241,8 +239,8 @@ paths:
         '200': {description: Saved connection metadata including opaque context (revision/destination/account) and stable operation_scope, or connected false}
     post:
       operationId: connectRemoteWorkspace
-      summary: Verify and save one existing remote company using its generation-only key
-      description: Explicit consent required. HTTPS public server origin only. Does not create accounts, companies, grants or credit. Retries with identical target and credential retain the accepted connection version.
+      summary: Replace a key for an existing active legacy company connection
+      description: Explicit legacy-compatibility consent required. Only an active saved legacy connection with the same normalized origin, company, customer and version can be renewed. Fresh connections and dedicated connections must use installation onboarding. HTTPS public server origin only. Does not create accounts, companies, grants or credit. Retries with identical target and credential retain the accepted connection version.
       requestBody:
         required: true
         content:

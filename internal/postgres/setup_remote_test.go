@@ -197,8 +197,8 @@ func TestSetupUpgradeAndSwitchPreserveResources(t *testing.T) {
 				row = "(to_jsonb(t)-'deleting'-'template_published'-'storage_owner_id')"
 			}
 			if table == "tasks" {
-				// The combined Templates migration adds only nullable metadata.
-				row = "(to_jsonb(t)-'template_snapshot')"
+				// Later migrations add optional template metadata and an empty artifact list.
+				row = "(to_jsonb(t)-'template_snapshot'-'result_artifacts')"
 			}
 			if err := db.QueryRow(`SELECT COALESCE(jsonb_agg(` + row + ` ORDER BY ` + row + `::text),'[]')::text FROM ` + table + ` t`).Scan(&rows); err != nil {
 				t.Fatal(err)

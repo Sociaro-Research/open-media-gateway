@@ -74,11 +74,11 @@ func TestExpiredCancellationRevokesIssuedKeyBeforeClearingProof(t *testing.T) {
 	cipher, _ := providerconfig.NewCipher(strings.Repeat("c", 32))
 	authority := wa.New(repo, cipher)
 	device, _ := wa.DeviceCode()
-	request, e := authority.Start(ctx, device, wa.Challenge{Label: "Synthetic installation", Origin: "http://localhost:8088"})
+	request, e := authority.Start(ctx, device, wa.Challenge{InstallationProof: device, Label: "Synthetic installation", Origin: "http://localhost:8088"})
 	if e != nil {
 		t.Fatal(e)
 	}
-	if _, e = repo.Approve(ctx, owner.ID, request.Code, wa.Approval{Name: "Expired request company", Website: "expired.fixture.test", Consent: true}); e != nil {
+	if _, e = repo.Approve(ctx, owner.ID, request.Code, wa.Approval{Consent: true}); e != nil {
 		t.Fatal(e)
 	}
 	issued, token, e := authority.Poll(ctx, device)
@@ -97,7 +97,7 @@ func TestExpiredCancellationRevokesIssuedKeyBeforeClearingProof(t *testing.T) {
 	// Start cleanup may erase expired delivery ciphertext, but must retain the
 	// proof->issued-key relation needed by later cancellation.
 	another, _ := wa.DeviceCode()
-	if _, e = authority.Start(ctx, another, wa.Challenge{Label: "Other request", Origin: "http://localhost:8088"}); e != nil {
+	if _, e = authority.Start(ctx, another, wa.Challenge{InstallationProof: device, Label: "Other request", Origin: "http://localhost:8088"}); e != nil {
 		t.Fatal(e)
 	}
 	if _, e = db.Exec(`UPDATE system_settings SET customer_workspaces=FALSE`); e != nil {
@@ -171,5 +171,25 @@ func TestExpiredLocalAttemptCannotLoseRevocationProofOnNewStart(t *testing.T) {
 	kept, e := repo.AuthorizationAttempt(ctx, owner.ID)
 	if e != nil || kept.ID != original.ID {
 		t.Fatal("pending proof missing", e)
+	}
+}
+
+func TestLegacyIssuedReplyCannotBecomeDedicated(t *testing.T) {
+	calls := 0
+	host := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		if r.URL.Path != "/auth/workspace/poll" {
+			t.Error("legacy reply caused another outbound operation")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"token":"synthetic-legacy-token","organization_id":"11111111-1111-4111-8111-111111111111","provisioning":"legacy"}`)
+	}))
+	defer host.Close()
+	cipher, _ := providerconfig.NewCipher(strings.Repeat("t", 32))
+	encrypted, _ := cipher.Encrypt([]byte("synthetic-device-proof"))
+	repo := &cancelConfirmationFixture{attempt: remote.Attempt{ID: "attempt", Owner: "alice", Origin: host.URL, Cipher: encrypted}}
+	manager := remote.New(repo, cipher, host.Client())
+	if _, err := manager.PollAuthorization(context.Background(), "alice", "attempt"); !errors.Is(err, wa.ErrLegacy) || repo.cleared || calls != 1 {
+		t.Fatal("legacy reply relabeled or discarded", err, calls)
 	}
 }

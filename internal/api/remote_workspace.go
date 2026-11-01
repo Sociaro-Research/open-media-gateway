@@ -1,9 +1,11 @@
 package api
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/Sociaro-Research/open-media-gateway/internal/apikey"
 	"io"
 	"net/http"
 	"net/url"
@@ -71,6 +73,23 @@ func (s *Server) remoteWorkspace(w http.ResponseWriter, r *http.Request) {
 	}
 	if !in.Consent {
 		writeError(w, 400, "consent_required", "Confirm sending this workspace's requests and files to the remote service")
+		return
+	}
+	// Existing-company keys are only an explicit renewal of a saved legacy
+	// connection. Fresh third-mode connections must provision their own company.
+	current, err := s.remoteWorkspaceManager.Repo.RemoteWorkspace(r.Context(), owner)
+	origin, originErr := remote.Origin(in.Origin)
+	savedOrigin, savedOriginErr := remote.Origin(current.Origin)
+	if err != nil || originErr != nil || !current.Active || current.Provisioning == "dedicated" || savedOriginErr != nil || savedOrigin != origin || current.OrganizationID != in.OrganizationID {
+		writeError(w, 409, "legacy_connection_required", "Use installation onboarding for a new dedicated company; existing-key renewal preserves only an active legacy connection's original company")
+		return
+	}
+	if current.Version != in.Version {
+		if current.Version == in.Version+1 && subtle.ConstantTimeCompare(current.TokenHash, apikey.Hash(in.Token)) == 1 {
+			s.writeViewerJSON(w, r, 200, current)
+			return
+		}
+		remoteError(w, remote.ErrConflict)
 		return
 	}
 	record, err := s.remoteWorkspaceManager.Connect(r.Context(), owner, in.Origin, in.Token, in.OrganizationID, in.Version)

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/hex"
 	"errors"
 	"net"
 	"net/http"
@@ -16,6 +17,8 @@ import (
 
 func workspaceAuthorizationError(w http.ResponseWriter, err error) {
 	switch {
+	case errors.Is(err, wa.ErrLegacy):
+		writeError(w, 409, "installation_upgrade_required", wa.ErrLegacy.Error())
 	case errors.Is(err, wa.ErrKeyLimit) || errors.Is(err, limits.ErrActiveKeys):
 		writeError(w, 409, "active_key_limit", wa.ErrKeyLimit.Error())
 	case errors.Is(err, wa.ErrPending):
@@ -32,7 +35,7 @@ func workspaceAuthorizationError(w http.ResponseWriter, err error) {
 	case errors.Is(err, wa.ErrConflict):
 		writeError(w, 409, "workspace_authorization_changed", err.Error())
 	default:
-		writeError(w, 400, "workspace_authorization_invalid", "Check company name, website, existing ownership and host availability; no credit or access is granted on failure")
+		writeError(w, 400, "workspace_authorization_invalid", "Check installation identity, customer membership and host availability; no credit or access is granted on failure")
 	}
 }
 func (s *Server) workspaceThrottle(w http.ResponseWriter, r *http.Request, operation string, limit int) bool {
@@ -62,10 +65,11 @@ func (s *Server) startWorkspaceAuthorization(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	var in struct {
-		Device  string `json:"device_code"`
-		Name    string `json:"client_name"`
-		Origin  string `json:"client_origin"`
-		Replace string `json:"replace_key_id"`
+		Device            string `json:"device_code"`
+		Name              string `json:"client_name"`
+		Origin            string `json:"client_origin"`
+		Replace           string `json:"replace_key_id"`
+		InstallationProof string `json:"installation_proof"`
 	}
 	if !decodeSystem(w, r, &in) {
 		return
@@ -81,7 +85,7 @@ func (s *Server) startWorkspaceAuthorization(w http.ResponseWriter, r *http.Requ
 			return
 		}
 	}
-	challenge, err := s.workspaceAuthorization.Start(r.Context(), in.Device, wa.Challenge{Label: strings.TrimSpace(in.Name), Origin: strings.TrimRight(u.String(), "/"), ReplaceKey: in.Replace})
+	challenge, err := s.workspaceAuthorization.Start(r.Context(), in.Device, wa.Challenge{Label: strings.TrimSpace(in.Name), Origin: strings.TrimRight(u.String(), "/"), ReplaceKey: in.Replace, InstallationProof: in.InstallationProof})
 	if err != nil {
 		workspaceAuthorizationError(w, err)
 		return
@@ -104,7 +108,11 @@ func (s *Server) pollWorkspaceAuthorization(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	// Only the holder of the high-entropy device secret receives the customer key.
-	writeJSON(w, 200, map[string]any{"token": token, "organization_id": challenge.Company, "key_id": challenge.KeyID})
+	mode := "legacy"
+	if len(challenge.InstallationHash) == 32 {
+		mode = "dedicated"
+	}
+	writeJSON(w, 200, map[string]any{"token": token, "organization_id": challenge.Company, "key_id": challenge.KeyID, "provisioning": mode, "installation_id": hex.EncodeToString(challenge.InstallationHash)})
 }
 func (s *Server) cancelWorkspaceAuthorization(w http.ResponseWriter, r *http.Request) {
 	if !s.workspaceThrottle(w, r, "cancel", 30) {

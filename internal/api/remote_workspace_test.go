@@ -78,9 +78,20 @@ func TestRemoteProxyLocalPermissionsTenantAndNoSecrets(t *testing.T) {
 	if w := sendTest(h, "HEAD", "/v1/system/remote-workspace", string(body), "alice", ""); w.Code != 200 || repo.writes != 0 || calls != 0 || w.Body.Len() != 0 {
 		t.Fatal("HEAD caused effects", w.Code)
 	}
+	if w := sendTest(h, "POST", "/v1/system/remote-workspace", string(body), "alice", ""); w.Code != 409 || calls != 0 {
+		t.Fatal("fresh existing-key bypass", w.Code, calls)
+	}
+	repo.records["alice"] = remote.Record{Owner: "alice", Version: 1, Active: true, Provisioning: "legacy", Origin: upstream.URL, OrganizationID: company, UserID: "33333333-3333-4333-8333-333333333333"}
+	body, _ = json.Marshal(map[string]any{"origin": upstream.URL, "organization_id": company, "token": token, "version": 1, "consent": true})
 	w := sendTest(h, "POST", "/v1/system/remote-workspace", string(body), "alice", "")
 	if w.Code != 200 || strings.Contains(w.Body.String(), token) || strings.Contains(w.Body.String(), "cipher") {
 		t.Fatal(w.Code, w.Body)
+	}
+	acceptedVersion := repo.records["alice"].Version
+	acceptedKey := repo.records["alice"].KeyID
+	beforeRetry := calls
+	if retry := sendTest(h, "POST", "/v1/system/remote-workspace", string(body), "alice", ""); retry.Code != 200 || repo.records["alice"].Version != acceptedVersion || repo.records["alice"].KeyID != acceptedKey || calls != beforeRetry {
+		t.Fatal("lost legacy reply was not idempotent", retry.Code, calls)
 	}
 	policy.admins["bob"] = true
 	w = sendTest(h, "GET", "/v1/system/remote-workspace", "", "bob", "")

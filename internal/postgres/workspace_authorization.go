@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"time"
@@ -15,10 +16,10 @@ import (
 	"github.com/google/uuid"
 )
 
-const workspaceChallengeColumns = `user_code,client_name,client_origin,COALESCE(replace_key_id::text,''),status,expires_at,COALESCE(actor_id::text,''),COALESCE(organization_id::text,''),COALESCE(key_id::text,''),token_ciphertext`
+const workspaceChallengeColumns = `user_code,client_name,client_origin,COALESCE(replace_key_id::text,''),status,expires_at,COALESCE(actor_id::text,''),COALESCE(organization_id::text,''),COALESCE(key_id::text,''),token_ciphertext,installation_hash`
 
 func scanWorkspaceChallenge(row interface{ Scan(...any) error }) (v wa.Challenge, err error) {
-	err = row.Scan(&v.Code, &v.Label, &v.Origin, &v.ReplaceKey, &v.State, &v.Expires, &v.Actor, &v.Company, &v.KeyID, &v.TokenCipher)
+	err = row.Scan(&v.Code, &v.Label, &v.Origin, &v.ReplaceKey, &v.State, &v.Expires, &v.Actor, &v.Company, &v.KeyID, &v.TokenCipher, &v.InstallationHash)
 	if errors.Is(err, sql.ErrNoRows) {
 		err = wa.ErrUnavailable
 	}
@@ -65,7 +66,7 @@ func (r *SystemRepository) Start(ctx context.Context, hash []byte, in wa.Challen
 	if _, err = tx.ExecContext(ctx, `DELETE FROM workspace_authorizations WHERE expires_at<=NOW() AND key_id IS NULL`); err != nil {
 		return in, err
 	}
-	_, err = tx.ExecContext(ctx, `INSERT INTO workspace_authorizations(device_hash,user_code,client_name,client_origin,replace_key_id,status,expires_at) VALUES($1,$2,$3,$4,NULLIF($5,'')::uuid,'pending',$6) ON CONFLICT(device_hash) DO NOTHING`, hash, in.Code, in.Label, in.Origin, in.ReplaceKey, in.Expires)
+	_, err = tx.ExecContext(ctx, `INSERT INTO workspace_authorizations(device_hash,user_code,client_name,client_origin,replace_key_id,status,expires_at,installation_hash) VALUES($1,$2,$3,$4,NULLIF($5,'')::uuid,'pending',$6,$7) ON CONFLICT(device_hash) DO NOTHING`, hash, in.Code, in.Label, in.Origin, in.ReplaceKey, in.Expires, in.InstallationHash)
 	if err != nil {
 		return in, err
 	}
@@ -73,7 +74,7 @@ func (r *SystemRepository) Start(ctx context.Context, hash []byte, in wa.Challen
 	if err != nil {
 		return in, err
 	}
-	if current.Label != in.Label || current.Origin != in.Origin || current.ReplaceKey != in.ReplaceKey {
+	if current.Label != in.Label || current.Origin != in.Origin || current.ReplaceKey != in.ReplaceKey || !bytes.Equal(current.InstallationHash, in.InstallationHash) {
 		return in, wa.ErrConflict
 	}
 	return current, tx.Commit()
@@ -97,29 +98,27 @@ func (r *SystemRepository) Describe(ctx context.Context, actor, code string) (wa
 	if v.Actor != "" && v.Actor != actor {
 		return wa.Challenge{}, nil, false, wa.ErrForbidden
 	}
-	var created bool
-	if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM customer_workspace_owners WHERE user_id=$1)`, actor).Scan(&created); err != nil {
-		return v, nil, false, err
+	if len(v.InstallationHash) != 32 {
+		return v, nil, false, wa.ErrLegacy
 	}
-	rows, err := tx.QueryContext(ctx, `SELECT o.id,o.name FROM organizations o JOIN organization_members m ON m.organization_id=o.id WHERE m.user_id=$1 AND m.role='supermanager' AND m.removed_at IS NULL ORDER BY o.created_at,o.id`, actor)
-	if err != nil {
-		return v, nil, false, err
-	}
-	companies := []wa.Company{}
-	for rows.Next() {
-		var company wa.Company
-		if err = rows.Scan(&company.ID, &company.Name); err != nil {
-			rows.Close()
+	var owner, company, name string
+	err = tx.QueryRowContext(ctx, `SELECT i.user_id::text,i.organization_id::text,o.name FROM workspace_installations i JOIN organizations o ON o.id=i.organization_id WHERE i.installation_hash=$1`, v.InstallationHash).Scan(&owner, &company, &name)
+	if err == nil {
+		if owner != actor {
+			return wa.Challenge{}, nil, false, wa.ErrForbidden
+		}
+		if err = installationMembership(ctx, tx, actor, company); err != nil {
 			return v, nil, false, err
 		}
-		companies = append(companies, company)
-	}
-	err = rows.Err()
-	rows.Close()
-	if err != nil {
+		v.Provisioning = "renewal"
+		v.Company = company
+		v.CompanyName = name
+	} else if errors.Is(err, sql.ErrNoRows) {
+		v.Provisioning = "new"
+	} else {
 		return v, nil, false, err
 	}
-	return v, companies, !created, tx.Commit()
+	return v, []wa.Company{}, v.Provisioning == "new", tx.Commit()
 }
 func (r *SystemRepository) Approve(ctx context.Context, actor, code string, in wa.Approval) (wa.Challenge, error) {
 	var empty wa.Challenge
@@ -161,48 +160,43 @@ func (r *SystemRepository) Approve(ctx context.Context, actor, code string, in w
 		current.State = "denied"
 		return current, tx.Commit()
 	}
-	company := in.Company
-	if company == "" {
-		name := org.CompanyName(in.Name)
-		if name == "" || len(name) > 160 {
-			return empty, org.ErrInvalid
+	if in.Company != "" {
+		return empty, wa.ErrForbidden
+	}
+	if len(current.InstallationHash) != 32 {
+		return empty, wa.ErrLegacy
+	}
+	var company, bindingOwner string
+	err = tx.QueryRowContext(ctx, `SELECT user_id::text,organization_id::text FROM workspace_installations WHERE installation_hash=$1 FOR UPDATE`, current.InstallationHash).Scan(&bindingOwner, &company)
+	if err == nil {
+		if bindingOwner != actor {
+			return empty, wa.ErrForbidden
 		}
-		domain, e := org.CompanyDomain(in.Website)
-		if e != nil {
-			return empty, e
-		}
-		var created bool
-		if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM customer_workspace_owners WHERE user_id=$1)`, actor).Scan(&created); err != nil {
+		if err = installationMembership(ctx, tx, actor, company); err != nil {
 			return empty, err
 		}
-		if created {
-			return empty, wa.ErrConflict
-		}
-		if err = checkCompanyIdentity(ctx, tx, actor, "", name, domain); err != nil {
+	} else if errors.Is(err, sql.ErrNoRows) {
+		// Display names/origins are not identity. The proof hash is durable across device requests.
+		name := org.CompanyName(current.Label) + " · " + hex.EncodeToString(current.InstallationHash[:16])
+		if err = checkCompanyIdentity(ctx, tx, actor, "", name, ""); err != nil {
 			return empty, err
 		}
 		company = uuid.NewString()
-		if _, err = tx.ExecContext(ctx, `INSERT INTO organizations(id,name,domain) VALUES($1,$2,$3)`, company, name, domain); err != nil {
+		if _, err = tx.ExecContext(ctx, `INSERT INTO organizations(id,name) VALUES($1,$2)`, company, name); err != nil {
 			return empty, err
 		}
 		if _, err = tx.ExecContext(ctx, `INSERT INTO organization_members(organization_id,user_id,role) VALUES($1,$2,'supermanager')`, company, actor); err != nil {
 			return empty, err
 		}
-		if _, err = tx.ExecContext(ctx, `INSERT INTO customer_workspace_owners(user_id,organization_id) VALUES($1,$2)`, actor, company); err != nil {
+		if _, err = tx.ExecContext(ctx, `INSERT INTO workspace_installations(installation_hash,user_id,organization_id) VALUES($1,$2,$3)`, current.InstallationHash, actor, company); err != nil {
 			return empty, err
 		}
 	} else {
-		var owns bool
-		if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM organization_members WHERE organization_id::text=$1 AND user_id=$2 AND role='supermanager' AND removed_at IS NULL)`, company, actor).Scan(&owns); err != nil {
-			return empty, err
-		}
-		if !owns {
-			return empty, wa.ErrForbidden
-		}
+		return empty, err
 	}
 	if in.Replace && current.ReplaceKey != "" {
 		var own bool
-		if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM workspace_authorizations a JOIN user_api_keys k ON k.id=a.key_id WHERE a.key_id::text=$1 AND a.actor_id=$2 AND k.user_id=$2)`, current.ReplaceKey, actor).Scan(&own); err != nil {
+		if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM workspace_authorizations a JOIN user_api_keys k ON k.id=a.key_id WHERE a.key_id::text=$1 AND a.actor_id=$2 AND k.user_id=$2 AND a.installation_hash=$3 AND a.organization_id=$4)`, current.ReplaceKey, actor, current.InstallationHash, company).Scan(&own); err != nil {
 			return empty, err
 		}
 		if !own {
@@ -259,6 +253,18 @@ func (r *SystemRepository) Redeem(ctx context.Context, hash []byte, key apikey.K
 	}
 	if v.State != "approved" && v.State != "issued" {
 		return v, wa.ErrUnavailable
+	}
+	if len(v.InstallationHash) != 32 && v.State != "issued" {
+		return v, wa.ErrLegacy
+	}
+	if len(v.InstallationHash) == 32 {
+		var bound bool
+		if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM workspace_installations WHERE installation_hash=$1 AND user_id=$2 AND organization_id=$3)`, v.InstallationHash, v.Actor, v.Company).Scan(&bound); err != nil {
+			return v, err
+		}
+		if !bound {
+			return v, wa.ErrForbidden
+		}
 	}
 	// Revalidate actual membership, even if the browser consent was recent.
 	var permitted bool
@@ -334,7 +340,7 @@ func (r *SystemRepository) Cancel(ctx context.Context, hash []byte) error {
 	return tx.Commit()
 }
 func (r *SystemRepository) Grants(ctx context.Context, actor string) ([]wa.Grant, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT k.id,k.organization_id,k.name,a.client_origin,k.expires_at,k.revoked_at FROM workspace_authorizations a JOIN user_api_keys k ON k.id=a.key_id WHERE a.actor_id=$1 AND k.user_id=$1 ORDER BY k.created_at DESC LIMIT 100`, actor)
+	rows, err := r.db.QueryContext(ctx, `SELECT k.id,k.organization_id,k.name,a.client_origin,k.expires_at,k.revoked_at,o.name,CASE WHEN a.installation_hash IS NULL THEN 'legacy' ELSE 'dedicated' END FROM workspace_authorizations a JOIN user_api_keys k ON k.id=a.key_id JOIN organizations o ON o.id=k.organization_id WHERE a.actor_id=$1 AND k.user_id=$1 ORDER BY k.created_at DESC LIMIT 100`, actor)
 	if err != nil {
 		return nil, err
 	}
@@ -342,7 +348,7 @@ func (r *SystemRepository) Grants(ctx context.Context, actor string) ([]wa.Grant
 	out := []wa.Grant{}
 	for rows.Next() {
 		var g wa.Grant
-		if err = rows.Scan(&g.ID, &g.Company, &g.Name, &g.ClientOrigin, &g.Expires, &g.Revoked); err != nil {
+		if err = rows.Scan(&g.ID, &g.Company, &g.Name, &g.ClientOrigin, &g.Expires, &g.Revoked, &g.CompanyName, &g.Provisioning); err != nil {
 			return nil, err
 		}
 		out = append(out, g)
@@ -376,3 +382,15 @@ func (r *SystemRepository) Revoke(ctx context.Context, actor, id string) error {
 }
 
 var _ wa.Repository = (*SystemRepository)(nil)
+
+// The authenticated initiating customer owns the binding; system-admin visibility is insufficient.
+func installationMembership(ctx context.Context, tx *sql.Tx, actor, company string) error {
+	var owns bool
+	if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM organization_members WHERE organization_id::text=$1 AND user_id=$2 AND role='supermanager' AND removed_at IS NULL)`, company, actor).Scan(&owns); err != nil {
+		return err
+	}
+	if !owns {
+		return wa.ErrForbidden
+	}
+	return nil
+}

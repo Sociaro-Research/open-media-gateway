@@ -216,3 +216,17 @@ func TestProductionTransportRejectsPrivateTargetsAndMethods(t *testing.T) {
 		}
 	}
 }
+
+func TestCentralOriginCanonicalization(t *testing.T) {
+	for _, test := range []struct{ input, want string }{{"https://CENTRAL.Example:443/", "https://central.example"}, {"https://central.example./", "https://central.example"}, {"https://central.example:8443/", "https://central.example:8443"}, {"https://[::1]:443/", "https://[::1]"}} {
+		got, err := Origin(test.input)
+		if err != nil || got != test.want {
+			t.Fatalf("origin %q normalized to %q: %v", test.input, got, err)
+		}
+	}
+	for _, invalid := range []string{"", "http://central.example", "https://user:secret@central.example", "https://central.example/path", "https://central.example/?query=1", "https://central.example/#fragment"} {
+		if _, err := Origin(invalid); err == nil {
+			t.Fatal("invalid origin accepted")
+		}
+	}
+}

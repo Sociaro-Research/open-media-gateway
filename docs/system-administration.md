@@ -113,13 +113,32 @@ never asks for the remote password. Match the displayed code and reported
 installation. Its name/origin are supplied by the requesting installation and
 are not proof of domain ownership.
 
-On the host, select a company where you currently hold the **Supermanager** role,
-or explicitly create your own company using the existing name/website rules.
-The bounded pilot allows one self-service company creation per account; existing
-owned companies remain selectable. Approve the installation's generation-only
-access explicitly. Denying, closing or merely inspecting the request never
-issues a credential. Company creation and consent are atomic and retry-safe.
-No paid credit, member allowance or storage configuration is inferred.
+On the central server, sign in or register as the customer who initiated this
+external installation. Confirm the matching code. This is the customer's own
+confirmation; the central server owner does not approve another customer's
+connection and their company is never a default destination.
+
+The first confirmation for an installation atomically creates a **new dedicated
+company**, makes that customer its **Supermanager**, and records an immutable
+installation-to-customer/company binding. Existing companies are never offered
+or selected in this onboarding path. The company starts with the existing $0
+credit and allowance policy; no credit, payment or balance transfer is created.
+The customer manages funding, member limits and permitted keys through the
+normal company controls. Closing, denying or merely inspecting does not create
+a company or issue a credential.
+
+A separate random 32-byte installation proof identifies the physical local
+installation's connection to one normalized central HTTPS origin. It is shared
+by local administrators only through the protected backend, and is encrypted in
+the local database; the central server stores only its digest. It is never
+browser state, a display name, a reported client URL or a replaceable API key.
+Distinct installation databases receive distinct proofs and dedicated companies,
+even for the same customer and identical display names. Retries, cancelled or
+expired device requests, restarts, renewal and reconnect reuse the saved proof
+and original company. Another central customer cannot take over that binding.
+Preserve the database and encryption key when restoring an installation; a
+cloned database retains its installation identity and must be treated as a
+restore, not as a distinct new installation.
 
 The local backend polls with a random 32-byte device secret; the browser sees
 only a short verification code and safe metadata. No inbound callback, public
@@ -182,15 +201,20 @@ payments. The connection wizard performs no top-up transaction and introduces no
 new identity or billing system. Registration/email delivery, provider rights and
 host configuration remain prerequisites.
 
-**Renew or change company** requests a new explicit authorization while preserving
-the current local connection until replacement succeeds. In the trusted host
-window, the customer may explicitly revoke a prior installation key they own as
-the replacement is issued. This is atomic with new issuance. Automatic renewal
-and refresh tokens are outside this pilot; reauthorize before the 30-day expiry.
+**Renew connection** confirms a replacement generation-only key for the same
+installation company, preserving the current connection until verification
+succeeds. The customer may explicitly revoke this installation's own prior key
+as the replacement is issued. Keys from another installation cannot be rotated
+through this request, even when the customer owns both companies. Automatic
+renewal and refresh tokens are outside this flow; reauthorize before expiry.
 
-The host's account menu → **Connected installations** lists only that customer's
-own grants and allows revocation, including when new onboarding is disabled.
+The account menu shows **Installation access** only when that account has
+issued grant records. It lists that customer's own installation/company access,
+including clearly marked legacy grants, and permits revocation even when new
+onboarding is disabled. It is not a central administrator's list of all customer
+companies. Company administration remains in the existing company controls.
 Revoking a role/membership or key is enforced on subsequent requests.
+
 **Cancel connection request** serializes with issuance and revokes any key that
 request issued. Cancellation keeps remote company data and funds. Cancellation remains able to revoke a key after the ten-minute request deadline;
 expired consent/redemption remain forbidden. If cancellation is uncertain, retry
@@ -199,16 +223,38 @@ malformed replies and expiry do not authorize discarding or overwriting that pro
 
 **Disconnect** removes the local saved key and increments a tombstone version,
 preventing stale connection replies from restoring it. It preserves remote jobs,
-charges and files and does not itself revoke the host key; use **Connected
-installations** on the host for revocation or loss of an installation. Keys are
+charges and files and does not itself revoke the host key; use **Installation
+access** on the host for revocation or loss of an installation. Keys are
 scoped per installation and company. Other local Administrators cannot access a
 connection they did not create. Revoking the local Administrator role removes
 subsequent access to this local connector.
 
-The advanced existing-company-key form remains available for older compatible
-hosts or manually managed keys. It requires exactly the generation scope, shared
-resources and matching company binding. It is separate from the primary
-signup/login/company wizard.
+### Existing connections and rollback
+
+Migration 083 preserves existing companies, members, keys, balances, grants,
+history and files. Existing connections remain explicitly **legacy** and keep
+their original company. No migration infers that an existing company belongs to
+a new installation. Their existing requests continue to use the saved key and
+company snapshot. **Replace legacy key** accepts only a replacement
+generation-only shared key for that same active connection, origin, customer
+and company; it cannot create a fresh connection or change its billing company.
+The new-company wizard refuses an active legacy connection. To provision a
+separate dedicated company, explicitly disconnect first; old activity and grants
+remain in the original company. Disconnect does not revoke an old grant.
+
+Upgrade both peers before starting a new dedicated connection. A pending legacy
+request cannot be relabeled as dedicated. An already-issued legacy credential
+remains recoverable at the central protocol endpoint, but the new local wizard
+will preserve and report that pending legacy state rather than save it as a new
+company binding; positively cancel the request before beginning a fresh one.
+Cancellation preserves companies and history and explicitly revokes only the
+key issued by that cancelled request.
+
+Migration 083's Down preserves its additive tables, proof ciphertext and binding
+metadata. Reapplying Up reuses them. Roll back application binaries without
+dropping these structures, grants, credits or task snapshots. Old binaries do
+not understand dedicated onboarding: avoid starting new onboarding while running
+an older release, and keep a verified backup for an explicit disaster restore.
 
 ### Transfer and failure boundaries
 
