@@ -1615,7 +1615,7 @@ body:has(.detail-dialog[open]) { overflow:hidden; }
 :is(.reference-manual,.advanced-settings) > summary { font-size:13px; font-weight:700; line-height:1.5; color:var(--text); }
 :is(.reference-manual,.advanced-settings) > summary { display:flex; align-items:center; gap:12px; width:fit-content; max-width:100%; padding:0; list-style:none; cursor:pointer; }
 :is(.reference-manual,.advanced-settings) > summary::-webkit-details-marker { display:none; }
-:is(.reference-manual,.advanced-settings) > summary > .select-chevron { position:static; flex:none; transform:none; }
+:is(.reference-manual,.advanced-settings) > summary > .select-chevron { position:static; flex:none; transform:rotate(-90deg); }
 :is(.reference-manual,.advanced-settings)[open] > summary > .select-chevron { transform:rotate(180deg); }
 .reference-manual[open] > :not(summary) { margin-top:16px; }
 .advanced-settings { border-top:0; }
