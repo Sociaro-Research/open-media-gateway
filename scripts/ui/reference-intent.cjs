@@ -101,7 +101,7 @@ const server=http.createServer((req,res)=>{
    const [chooser]=await Promise.all([page.waitForEvent('filechooser'),activation==='click'?button.click():button.press(activation)]);
    assert.equal(await chooser.element().isDisabled(),false,'genuine chooser must target an enabled input');
    assert.equal(await chooser.element().getAttribute('id'),'audioReferenceFiles');
-   assert.equal(await chooser.element().getAttribute('accept'),'audio/mpeg,audio/wav,audio/x-wav,audio/ogg,audio/flac');
+   assert.equal(await chooser.element().getAttribute('accept'),'audio/mpeg,audio/aac,audio/mp4,audio/wave,audio/wav,audio/x-wav,audio/ogg,audio/flac');
    chooserEvents.push({activation,in_library:inLibrary,input_enabled:true});
    return chooser;
   }
@@ -190,7 +190,7 @@ const server=http.createServer((req,res)=>{
     await voice();let chooser=await openChooser(true);await chooser.setFiles({name:'invalid.txt',mimeType:'text/plain',buffer:audio});await waitUpload('use a supported audio file');
     assert.equal(operations().preparations,0);assert.equal(operations().uploads,0);assert.deepEqual((await read()).voices,{});
     const oversized=path.join(output,'oversized.mp3');fs.closeSync(fs.openSync(oversized,'w'));fs.truncateSync(oversized,50*1024*1024+1);
-    try{chooser=await openChooser(true);await chooser.setFiles(oversized);await waitUpload('up to 50 MB');}finally{fs.unlinkSync(oversized);}
+    try{chooser=await openChooser(true);await chooser.setFiles(oversized);await waitUpload('maximum 52428800 bytes');}finally{fs.unlinkSync(oversized);}
     assert.equal(operations().preparations,0);assert.equal(operations().uploads,0);
     await startVoiceUpload();await waitUpload();assert.deepEqual((await read()).voices,{[origin+'/references/test/i1']:origin+'/references/test/upload1'});assert.equal((await read()).audio,'');
    });

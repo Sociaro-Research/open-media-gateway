@@ -11,7 +11,7 @@ const {[process.env.UI_BROWSER_ENGINE||'chromium']:engine}=require('playwright')
   const publicPage=await anonymous.newPage();await publicPage.goto(base+'/privacy');await publicPage.locator('[data-legal-default]').waitFor({state:'visible'});assert.ok((await publicPage.locator('main').innerText()).includes('Operator setup required'));
   for(const context of [anonymous,member]){const want=context===anonymous?401:403;assert.equal((await context.request.get(base+'/v1/system/legal/privacy')).status(),want);assert.equal((await context.request.put(base+'/v1/system/legal/privacy',{data:{text:'Forbidden',version:1}})).status(),want)}
   const page=await admin.newPage();page.setDefaultTimeout(15000);page.on('pageerror',e=>errors.push(e.message));
-  await page.goto(base+'/system');await page.locator('[data-system-page=settings]').click();await page.getByRole('tab',{name:'Payments',exact:true}).click();
+  await page.goto(base+'/system');await page.getByRole('tab',{name:'Payments',exact:true}).click();
   const seller=page.locator('.seller-vat-settings');await seller.getByRole('button',{name:'Edit Privacy Policy'}).click();
   const dialog=page.getByRole('dialog'),input=dialog.locator('textarea'),save=dialog.getByRole('button',{name:'Save',exact:true});await page.waitForFunction(()=>!document.querySelector('dialog.legal-editor textarea').disabled);
   assert.ok((await input.inputValue()).includes('Operator setup required'));

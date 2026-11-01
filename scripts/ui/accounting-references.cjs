@@ -4,7 +4,8 @@ const {evidencePath} = require('./evidence.cjs');
 const {chromium}=require('playwright');
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const root=process.env.UI_SOURCE_DIR||path.resolve(__dirname,'../../web/public/ui');
-const server=http.createServer((req,res)=>{const file=path.join(root,req.url==='/'?'index.html':path.basename(req.url.split('?')[0]));if(!fs.existsSync(file))return res.writeHead(404).end();res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html');res.end(fs.readFileSync(file));});
+const syntheticPNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=','base64');
+const server=http.createServer((req,res)=>{if(/^\/references\/test\/i[12]$/.test(req.url)){res.setHeader('Content-Type','image/png');return res.end(syntheticPNG);}const file=path.join(root,req.url==='/'?'index.html':path.basename(req.url.split('?')[0]));if(!fs.existsSync(file))return res.writeHead(404).end();res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html');res.end(fs.readFileSync(file));});
 (async()=>{
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
  const browser=await chromium.launch({headless:true,...(process.env.UI_BROWSER_PATH?{executablePath:process.env.UI_BROWSER_PATH}:{})});
@@ -34,22 +35,22 @@ const server=http.createServer((req,res)=>{const file=path.join(root,req.url==='
  });
  try{
  await page.goto(`http://127.0.0.1:${server.address().port}`);await page.waitForFunction(()=>consoleInitialized&&window.Workspace?.ready());await useFixtureKey(page,'fixture-key');await page.waitForFunction(()=>document.querySelector('#model').value.includes('seedance'));
- await page.locator('#generationKeyBudget').getByText('Test organization · Shared providers and storage',{exact:true}).waitFor();
+ await page.locator('#generationKeyBudget .generation-key-name').getByText('Reference fixture',{exact:true}).waitFor();assert.equal(await page.locator('#generationKeyBudget dt').innerText(),'Weekly limit');assert.equal(await page.locator('#generationKeyBudget dd').innerText(),'$0 / Unlimited');
  assert.equal(await page.locator('#generationKeyBudget').getByText('Organization allowance unavailable.',{exact:true}).count(),0);
- await page.locator('#chooseReferences').click();await page.getByRole('button',{name:'Use first.png in generation'}).click();await page.getByRole('button',{name:'Use last.png in generation'}).click();
+ await page.locator('#chooseReferences').click();await page.getByRole('button',{name:'Use first.png in generation'}).locator('.reference-name > span').click();await page.getByRole('button',{name:'Use last.png in generation'}).locator('.reference-name > span').click();
  assert.match(await page.locator('#referenceLibrary .reference-card').first().innerText(),/32 KB/);
- await page.getByRole('button',{name:'Close library',exact:true}).click();assert.match(await page.locator('#selectedReferences').innerText(),/First frame/);assert.match(await page.locator('#selectedReferences').innerText(),/Last frame/);
+ await page.getByRole('button',{name:'Close library',exact:true}).click();assert.match(await page.locator('#selectedReferences').innerText(),/@Image1\. first\.png/);assert.match(await page.locator('#selectedReferences').innerText(),/@Image2\. last\.png/);assert.equal(await page.locator('#referenceModeHint').innerText(),'Image order: First frame → Last frame.');
  assert.equal(await page.locator('#videoURLField').isVisible(),false);
  await page.locator('#referenceMode').selectOption('references');await page.locator('#videoChooseReferences').click();
  await page.locator('#videoReferenceLibrary .reference-card').waitFor();assert.equal(await page.locator('#videoReferenceLibrary .reference-card').count(),1);assert.match(await page.locator('#videoReferenceLibrary .reference-card').innerText(),/1.5 MB/);
- await page.getByRole('button',{name:'Use motion.mp4 in generation'}).click();await page.locator('#videoReferenceLibrary').getByRole('button',{name:'Close library',exact:true}).click();
- await page.locator('#audioChooseReferences').click();await page.locator('#audioReferenceLibrary .reference-card').waitFor();assert.equal(await page.locator('#audioReferenceLibrary .reference-card').count(),1);await page.getByRole('button',{name:'Use voice.mp3 in generation'}).click();await page.locator('#audioReferenceLibrary').getByRole('button',{name:'Close library',exact:true}).click();
+ await page.getByRole('button',{name:'Use motion.mp4 in generation'}).locator('.reference-name > span').click();await page.locator('#videoReferenceLibrary').getByRole('button',{name:'Close library',exact:true}).click();
+ await page.locator('#audioChooseReferences').click();await page.locator('#audioReferenceLibrary .reference-card').waitFor();assert.equal(await page.locator('#audioReferenceLibrary .reference-card').count(),1);await page.getByRole('button',{name:'Use voice.mp3 in generation'}).locator('.reference-name > span').click();await page.locator('#audioReferenceLibrary').getByRole('button',{name:'Close library',exact:true}).click();
  await page.locator('#prompt').fill('A scene with image, video and audio references');await page.locator('#submitButton').click();await page.locator('#confirmSubmit').click();await page.waitForFunction(()=>!document.querySelector('#confirmDialog').open);
  assert.equal(posts.length,1);assert.equal(posts[0].options.reference_mode,'references');assert.equal(posts[0].options.video_urls.length,1);assert.equal(posts[0].options.audio_urls.length,1);assert.equal(posts[0].input_reference.length,2);
  await page.locator('#model').selectOption(JSON.stringify([provider.id,wan.id]));
  await page.locator('#prompt').fill('A character speaking with the selected voice');
  await page.getByRole('button',{name:'Voice reference for first.png',exact:true}).click();
- await page.getByRole('button',{name:'Use voice.mp3 in generation'}).click();
+ await page.getByRole('button',{name:'Use voice.mp3 in generation'}).locator('.reference-name > span').click();
  await page.locator('#submitButton').click();await page.locator('#confirmSubmit').click();await page.waitForFunction(()=>!document.querySelector('#confirmDialog').open);
  assert.equal(posts.length,2);assert.equal(Object.keys(posts[1].options.reference_voices).length,1);assert.ok(Object.values(posts[1].options.reference_voices)[0].endsWith('/a1'));
  await page.locator('#workspaceOpen').click();await page.locator('.organization-tabs').getByRole('tab',{name:'Billing',exact:true}).click();await page.locator('.report-table tbody tr').first().waitFor();

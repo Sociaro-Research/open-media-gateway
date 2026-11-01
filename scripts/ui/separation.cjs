@@ -10,6 +10,7 @@ const brand={name:'White <Label>',description:'Independent frontend',contact_ema
 const upstream=http.createServer((req,res)=>{
  const p=new URL(req.url,'http://localhost').pathname;
  const json=data=>{res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify(data));};
+ if(p==='/provider-assets/alice/mock/icon.png'){const cookie=req.headers.cookie?.includes('test_session=alice'),bearer=req.headers.authorization==='Bearer fixture-key';return res.writeHead(cookie||bearer?200:401,{'Content-Type':'image/png','Cache-Control':'private, no-store'}).end(cookie||bearer?'synthetic-logo':'');}
  if(p==='/auth/session')return res.writeHead(req.headers.cookie?.includes('test_session=alice')?204:401,{'Cache-Control':'no-store'}).end();
  if(p==='/legal/privacy'||p==='/legal/terms')return json({text:''});
  if(p==='/site.json')return json({branding:brand,api_url:'https://api.example.test',ui_url:'https://console.example.test',docs_url:''});
@@ -36,7 +37,9 @@ const upstream=http.createServer((req,res)=>{
  });
  for(const p of ['/','/system','/organizations','/profile','/api-keys','/configuration']){const r=await request(p,200);assert.match(await r.text(),/Sign in to get started/);assert.equal(r.headers.get('cache-control'),'no-store');assert.ok(r.headers.get('vary').split(',').map(s=>s.trim()).includes('Cookie'));}
  assert.match(await (await request('/',200,{Authorization:'Bearer fixture-key'})).text(),/Sign in to get started/);
- for(const p of ['/ui/app.js','/ui/payments.js','/provider-assets/mock/icon.png'])await request(p,401);
+ for(const p of ['/ui/app.js','/ui/payments.js','/provider-assets/alice/mock/icon.png'])await request(p,401);
+ // Logos use the upstream's owner-aware cookie/Bearer authorization, not a cookie-only Caddy gate.
+ for(const headers of [{Cookie:'test_session=alice'},{Authorization:'Bearer fixture-key'}]){const logo=await request('/provider-assets/alice/mock/icon.png',200,headers);assert.equal(await logo.text(),'synthetic-logo');assert.deepEqual([...new Set(logo.headers.get('cache-control').split(',').map(x=>x.trim()))].sort(),['no-store','private']);}
  for(const p of ['/ui/index.html','/ui/privacy.html','/ui/terms.html','/ui/']){await request(p,404);await request(p,404,{Cookie:'test_session=alice'});}
  for(const p of ['/ui/app.js','/ui/report-details.js'])await request(p,200,{Cookie:'test_session=alice'});
  assert.match(await (await request('/system',200,{Cookie:'test_session=alice'})).text(),/generationView/);

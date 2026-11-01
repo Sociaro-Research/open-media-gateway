@@ -114,7 +114,10 @@ const server = http.createServer((req, res) => {
     await page.locator('#selectedReferences .reference-card').nth(1).dragTo(page.locator('#selectedReferences .reference-card').first());
     assert.equal(uploadCount,beforeReorder,'Reordering must not upload a duplicate');
     assert.equal((await page.locator('#imageURLs').inputValue()).split('\n')[1],first);
+    const beforeReplacement=await page.locator('#imageURLs').inputValue(),uploadsBeforeReplacement=uploadCount;
     await drop('#selectedReferences .reference-card:first-child','replacement.png');
+    await waitMessage('Remove this reference before choosing another file.');assert.equal(uploadCount,uploadsBeforeReplacement);assert.equal(await page.locator('#imageURLs').inputValue(),beforeReplacement);assert.equal(await page.locator('#selectedReferences .reference-card').count(),2);
+    await page.locator('#selectedReferences').getByRole('button',{name:/^Remove .+ from generation$/}).first().click();await drop('#referenceDropzone','replacement.png');
     await waitMessage('1 file saved');await page.waitForFunction(()=>document.querySelector('#imageURLs').value.includes('/3?'));
     assert.equal(await page.locator('#selectedReferences .reference-card').count(),2);
     await page.locator('#chooseReferences').click();await page.waitForFunction(()=>document.querySelectorAll('#referenceLibrary .reference-card').length===2);
@@ -138,8 +141,8 @@ const server = http.createServer((req, res) => {
     assert.equal(posts.length,1);assert.equal(posts[0].input_reference.length,2);assert.equal(posts[0].model.split('/')[0],'mock');
     await page.locator('#model').selectOption(JSON.stringify(['mock','image']));
     await page.locator('#submitButton').click();await waitMessage('up to 1');
-    await page.locator('#selectedReferences .reference-remove').first().click();
-    await page.locator('#selectedReferences .reference-remove').first().click();
+    await page.locator('#selectedReferences').getByRole('button',{name:/^Remove .+ from generation$/}).first().click();
+    await page.locator('#selectedReferences').getByRole('button',{name:/^Remove .+ from generation$/}).first().click();
     await page.locator('#submitButton').click();await waitMessage('at least 1');
     const uploadsBefore=uploadCount;
     await page.locator('#referenceFiles').setInputFiles({name:'bad.svg',mimeType:'image/svg+xml',buffer:Buffer.from('<svg/>')});await waitMessage('supported image');assert.equal(uploadCount,uploadsBefore);

@@ -55,7 +55,7 @@ const server = http.createServer((req, res) => {
     assert.deepEqual(await page.locator('#model optgroup').evaluateAll(es=>es.map(e=>[e.label,e.children.length])),[['Alibaba',2],['BytePlus',2]]);
     const choose=async(label,option)=>{await page.getByRole('combobox',{name:label,exact:true}).click();await page.getByRole('option',{name:option}).click();};
     await page.getByRole('combobox',{name:'Model',exact:true}).click();
-    assert.deepEqual(await page.locator('.picker-group').allTextContents(),['Alibaba','BytePlus']);
+    assert.deepEqual(await page.locator('.picker-group .model-picker-provider-name').allTextContents(),['Alibaba','BytePlus']);
     await page.screenshot({path:path.join(output,'grouped-models-desktop.png')});
     await page.getByRole('option',{name:/Video B/}).click();
     assert.equal(await page.locator('#resolution').inputValue(),'1080p');
@@ -80,7 +80,7 @@ const server = http.createServer((req, res) => {
     for(const width of [390,320]){
       await page.setViewportSize({width,height:900});
       await page.getByRole('combobox',{name:'Model',exact:true}).click();
-      assert.deepEqual(await page.locator('.picker-group').allTextContents(),['Alibaba','BytePlus']);
+      assert.deepEqual(await page.locator('.picker-group .model-picker-provider-name').allTextContents(),['Alibaba','BytePlus']);
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
       await page.screenshot({path:path.join(output,`grouped-models-${width}.png`)});
       await page.getByRole('option',{name:/Video B/}).click();
@@ -192,7 +192,10 @@ const server = http.createServer((req, res) => {
       await page.getByRole('combobox',{name:'Reference mode',exact:true}).focus();
       await page.keyboard.press('ArrowDown');await page.keyboard.press('Enter');
       assert.equal(await page.locator('#referenceMode').inputValue(),'first_frame');
-      assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+      await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+      const geometry=await page.evaluate(()=>({width:innerWidth,scrollWidth:document.documentElement.scrollWidth,offenders:[...document.querySelectorAll('body *')].map(n=>({tag:n.tagName,className:typeof n.className==='string'?n.className:'',right:n.getBoundingClientRect().right})).filter(n=>n.right>innerWidth+1).slice(0,12)}));
+      if(geometry.scrollWidth>geometry.width){console.error('MODEL_GEOMETRY',JSON.stringify({theme,...geometry}));await page.screenshot({path:path.join(output,'model-overflow-'+theme+'-'+width+'.png')});}
+      assert.ok(geometry.scrollWidth<=geometry.width);
     }
     catalog=[];await page.evaluate(()=>loadProviders());
     assert.equal(await page.locator('#model').isDisabled(),true);

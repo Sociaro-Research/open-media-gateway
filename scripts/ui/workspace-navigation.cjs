@@ -22,6 +22,8 @@ const server=http.createServer((req,res)=>{
   await context.route('**/*',route=>new URL(route.request().url()).origin===base?route.fallback():route.abort());
   await page.route('**/v1/**',async route=>{
    const request=route.request(),p=new URL(request.url()).pathname;
+   // Automatic managed-key restore is a read-only lookup transported as POST; creation remains forbidden.
+   if(p==='/v1/playground-key/restore'){assert.equal(request.method(),'POST');const body=request.postDataJSON();assert.deepEqual(Object.keys(body),['organization_id']);assert.equal(typeof body.organization_id,'string');return route.fulfill({status:404,json:{error:{message:'No synthetic saved key'}}});}
    assert.equal(request.method(),'GET','Navigation must not write account data');
    const gate=gates.find(g=>!g.used&&p==='/v1/organizations/'+g.id);
    if(gate){gate.used=true;gate.arrive();return route.fulfill(await gate.response);}

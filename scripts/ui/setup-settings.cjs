@@ -3,6 +3,7 @@ const {chromium,webkit}=require('playwright');
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const root=path.resolve(__dirname,'../../web/public/ui');
 const defaults=()=>({shared_resources:false,generation_ui:true,personal_providers:true,allow_inline_references:true,customer_workspaces:false,setup_pending:false,markup_percent:0,version:1});
+let activeProfileResponses=0;
 let state=defaults(),writes=[],failProfile=false,readGate=null,profileGate=null,saveGate=null,markupGate=null,markupSaveGate=null,mountGate=null,settingsReads=[];
 const gates=new Set();
 function gate(){let arrive,release;const item={arrived:new Promise(r=>arrive=r),wait:new Promise(r=>release=r),arrive,release};gates.add(item);return item;}
@@ -20,7 +21,7 @@ const server=http.createServer(async(req,res)=>{
     writes.push({path:p,data});if(failProfile)return json({error:{message:'Fixture apply failed'}},503);
     if(data.version!==state.version)return json({error:{message:'Settings changed'}},409);
     state={...state,setup_pending:false,shared_resources:data.profile==='operator',personal_providers:data.profile==='personal'||data.allow_personal,version:state.version+1};
-    const saved={...state},held=profileGate;profileGate=null;if(held){held.arrive();await held.wait;}return json(saved);
+    const saved={...state},held=profileGate;profileGate=null;activeProfileResponses++;try{if(held){held.arrive();await held.wait;}return json(saved);}finally{activeProfileResponses--;}
    }
    if(p==='/v1/system/settings'){
     if(req.method==='PUT'){
@@ -49,8 +50,9 @@ const server=http.createServer(async(req,res)=>{
  const base='http://127.0.0.1:'+server.address().port,engine=process.env.UI_BROWSER_ENGINE||'chromium';
  const browser=await(engine==='webkit'?webkit:chromium).launch({headless:true,...(process.env.UI_BROWSER_PATH?{executablePath:process.env.UI_BROWSER_PATH}:{})});
  const page=await browser.newPage({viewport:{width:1440,height:1000}});page.setDefaultTimeout(10000);
- const inFlight=new Set();page.on('request',r=>{if(new URL(r.url()).pathname.startsWith('/v1/'))inFlight.add(r);});for(const event of ['requestfinished','requestfailed'])page.on(event,r=>inFlight.delete(r));
- async function settled(){const end=Date.now()+10000;let quiet=Date.now();while(Date.now()<end){if(inFlight.size)quiet=Date.now();else if(Date.now()-quiet>=100)return;await page.waitForTimeout(20);}assert.equal(inFlight.size,0,'previous fixture case left API requests unresolved');}
+ const inFlight=new Set(),requestEpoch=new WeakMap();let documentEpoch=0;page.on('response',r=>{const request=r.request();if(request.isNavigationRequest()&&request.resourceType()==='document'&&request.frame()===page.mainFrame())documentEpoch++;});page.on('request',r=>{if(new URL(r.url()).pathname.startsWith('/v1/')){inFlight.add(r);requestEpoch.set(r,documentEpoch);}});for(const event of ['requestfinished','requestfailed'])page.on(event,r=>inFlight.delete(r));
+ const currentRequests=()=>[...inFlight].filter(r=>requestEpoch.get(r)===documentEpoch);
+ async function settled(){const end=Date.now()+10000;let quiet=Date.now();while(Date.now()<end){if(currentRequests().length||activeProfileResponses)quiet=Date.now();else if(Date.now()-quiet>=100)return;await page.waitForTimeout(20);}console.error('SETTLE_DIAGNOSTIC',JSON.stringify({caseName,documentEpoch,activeProfileResponses,requests:currentRequests().map(r=>({method:r.method(),path:new URL(r.url()).pathname}))}));assert.equal(currentRequests().length,0,'current document left API requests unresolved');assert.equal(activeProfileResponses,0,'server setup response must finish after release');}
  let caseName='initial';const errors=[],results=[],externalRequests=[],failedRequests=[];page.on('requestfailed',r=>failedRequests.push({path:new URL(r.url()).pathname,error:r.failure()?.errorText}));page.on('pageerror',e=>{if(!e.message.includes('ResizeObserver loop completed'))errors.push({case:caseName,message:e.message});});
  await page.route(url=>url.origin!==base,route=>{externalRequests.push(route.request().url());return route.abort();});
  const form=()=>page.locator('form.system-settings'),dialog=()=>page.locator('dialog.setup-dialog[open]');

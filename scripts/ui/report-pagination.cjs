@@ -25,6 +25,8 @@ const server=http.createServer((req,res)=>{let file=path.join(root,path.basename
   const url=new URL(route.request().url()),p=url.pathname,json=data=>route.fulfill({json:data});
   if(url.origin!==base)throw new Error('External request forbidden: '+url.origin);
   if(!p.startsWith('/v1/'))return route.continue();
+  // Automatic managed-key restore is a read-only lookup transported as POST; creation remains forbidden.
+  if(p==='/v1/playground-key/restore'){assert.equal(route.request().method(),'POST');const body=route.request().postDataJSON();assert.deepEqual(Object.keys(body),['organization_id']);assert.equal(typeof body.organization_id,'string');return route.fulfill({status:404,json:{error:{message:'No synthetic saved key'}}});}
   assert.equal(route.request().method(),'GET','Fixture allows reads only');
   if(p==='/v1/info')return json({auth_mode:'google',provider:'mock',console:{generation_ui:true,personal_providers:true,shared_resources:true,version:1}});
   if(p==='/v1/me')return json({id:'fixture-admin',name:'Pagination tester',email:'tester@example.test',is_system_admin:true,report_columns:['generation_id','user','date']});
