@@ -425,13 +425,7 @@ reuse the same naming helper; filtering does not rename the remaining choices.
 
 ## Playground project actions
 
-The Journal's shared Project dropdown selects All projects, No project or a project.
-Its 240px field fits roughly 20 typical characters with the shared padding and
-indicator; the 344px action group shrinks to available space. Labels use shared
-ellipsis while retaining their full text. No project filters unassigned history
-and cannot be renamed, deleted or submitted as a project identity.
-A separate **+** creates a project; the adjacent **⋯** menu offers Rename and
-Delete for the selected project and is disabled for All projects or no key.
+The Journal's shared Project dropdown contains **All Projects**, **No Projects**, **New Project…**, a divider, then existing projects. New Project opens the existing creation dialog without changing the filter; cancelling retains the filter. No Projects filters unassigned history and never becomes a submitted project identity. Keep the field 240px wide where space permits, shrinking to available width, with shared ellipsis and full accessible text. A real selected project shows **Edit** inside the field at the right, vertically centered; it opens Rename/Delete independently of the combobox. All/No Projects hide Edit. Keep Edit a sibling of the combobox button, never nested interactive markup. No external plus or ellipsis buttons remain.
 Reuse `FormUI.dialogHeading`, floating fields and the shared compact actions.
 Deletion requires confirmation and clears tags only, retaining generations/media.
 

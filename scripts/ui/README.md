@@ -752,6 +752,6 @@ Run each fixture with Node/Playwright, then repeat with `UI_BROWSER_ENGINE=webki
 - `disclosures.cjs`: native keyboard disclosure semantics, repeated collapse/expand retaining values, trailing shared chevrons, matching heading typography, expanded spacing and separate Override Sound panels.
 - `button-alignment.cjs`: primary/secondary glyph geometry in normal, compact, icon, disabled, pending and dialog contexts.
 - `interaction-borders.cjs`: one actual border perimeter, custom accent, selected/keyboard/invalid/disabled states, stable outer/content geometry and forced colors.
-
+- `playground-projects.cjs`, `playground-project-filter.cjs` and `project-journal-state.cjs`: selector actions/internal Edit, scope/filter/CRUD races and media-preserving Journal updates.
 
 Inspect the resulting pixels and compare with the design-system spacing gate. Passing geometry assertions does not replace visual acceptance. Keep previous failures alongside successful reruns; report the exact executed browser/state matrix and any unexecuted limits.

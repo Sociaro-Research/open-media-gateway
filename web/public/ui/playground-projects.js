@@ -1,21 +1,23 @@
 (() => {
  'use strict';
- const NO_PROJECT='none'; // Read-only filter; real project IDs are UUIDs.
+ const NO_PROJECT='none',NEW_PROJECT='new-project-action'; // Read-only filter; real project IDs are UUIDs.
  const select=document.querySelector('#journalProject'), message=document.querySelector('#projectMessage');
  let canManage=true,company=false,hasConnectedKey=false;
  let projects=[],selected='',epoch=0,reading=null,readingQuiet=false,write=null,dialog=null,assignmentMenu=null;
- const createButton=document.querySelector('#createProject'),manageButton=document.querySelector('#manageProject');
+ const manageButton=document.querySelector('#manageProject');
  const current=()=>projects.find(p=>p.id===selected);
  const projectLabel=p=>{const duplicates=projects.filter(other=>other.name.toLocaleLowerCase()===p.name.toLocaleLowerCase());return duplicates.length>1?p.name+' · '+(duplicates.some(other=>other.id!==p.id&&other.id.slice(0,8)===p.id.slice(0,8))?p.id:p.id.slice(0,8)):p.name;};
  const remember=()=>{try{sessionStorage.setItem('gateway-journal-project',selected);}catch{}};
  const feedback=(text='')=>{FormUI.message(message,text,'error');message.hidden=!text;};
  const changed=(metadata=false)=>{remember();window.dispatchEvent(new CustomEvent('gateway-project-change',{detail:{metadata}}));};
  const render=()=>{
-  const options=[new Option('All projects',''),new Option('No project',NO_PROJECT),...projects.map(p=>new Option(projectLabel(p),p.id))];
-  createButton.disabled=!window.GenerationKey?.value()||!canManage;manageButton.disabled=createButton.disabled||!current();
+  const create=new Option('New Project…',NEW_PROJECT);create.disabled=!window.GenerationKey?.value()||!canManage;create.pickerAction=()=>editor();
+  const existing=projects.map(p=>new Option(projectLabel(p),p.id));if(existing[0])existing[0].dataset.separatorBefore='true';
+  const options=[new Option('All Projects',''),new Option('No Projects',NO_PROJECT),create,...existing];
+  manageButton.disabled=!window.GenerationKey?.value()||!canManage||!current();manageButton.hidden=manageButton.disabled;if(manageButton.hidden)ControlPickers.dismiss(manageButton);
   select.replaceChildren(...options);select.value=selected;select.disabled=!window.GenerationKey?.value();window.ControlPickers?.sync(select);
   const trigger=select.closest('.floating-field')?.querySelector('.select-trigger'),label=select.selectedOptions[0]?.textContent||'';
-  if(trigger){trigger.title=label;trigger.setAttribute('aria-description',label);}
+  if(trigger){trigger.title=label;trigger.setAttribute('aria-description',label);const wrap=trigger.closest('.floating-field');if(manageButton.parentElement!==wrap)wrap.append(manageButton);wrap.classList.toggle('has-project-edit',!manageButton.hidden);}
  };
  function accepted(previous){epoch++;reading=null;ControlPickers.dismiss(manageButton);render();feedback();changed(selected===previous);}
  async function load({quiet=false}={}){
@@ -61,6 +63,7 @@
   return {form,status,save,finish,submit,version,key,panel};
  }
  function editor(project=null){
+  if(!canManage||!window.GenerationKey?.value())return;
   let baseline=project?{...project}:null;
   const ui=open(project?'Rename project':'Create project');if(!ui)return;
   const label=document.createElement('label');label.textContent='Project name';
@@ -111,7 +114,7 @@
     if(error.status===400){await load({quiet:true});if(fresh())popup.update(choices());}
     throw error;
    }finally{pending=false;if(version===epoch&&write===controller)write=null;}
-  }})):[{label:'No projects yet. Use + beside the Journal filter.',disabled:true}];
+  }})):[{label:'No projects yet. Choose New Project… in the Journal selector.',disabled:true}];
   const ok=await load({quiet:true});if(!fresh())return;
   popup.update(ok?choices():[{label:'Could not load projects. Close and reopen to retry.',disabled:true}]);if(focus)popup.focus();
  }
@@ -127,9 +130,8 @@
    interaction.rebind(task,trigger,restoreFocus);
   };
  }
- select.addEventListener('change',()=>{selected=select.value;render();changed();});
- createButton.onclick=()=>editor();
- manageButton.onclick=()=>{const project=current();if(!project)return;ControlPickers.menu(manageButton,{label:'Project actions',items:[{label:'Rename',onSelect:()=>editor(current())},{label:'Delete',onSelect:()=>remove(current())}]});};
+ select.addEventListener('change',()=>{if(select.value===NEW_PROJECT){render();editor();return;}selected=select.value;render();changed();});
+ manageButton.onclick=event=>{event.preventDefault();event.stopPropagation();const project=current();if(!project||manageButton.disabled||!canManage)return;ControlPickers.menu(manageButton,{label:'Project actions',items:[{label:'Rename',onSelect:()=>editor(current())},{label:'Delete',onSelect:()=>remove(current())}]});};
  window.addEventListener('gateway-key-change',()=>{
   epoch++;reading=null;assignmentMenu?.popup.close(false);ControlPickers.dismiss(manageButton);write?.abort();write=null;if(dialog){dialog.close();dialog.remove();dialog=null;}projects=[];canManage=true;company=false;selected='';if(hasConnectedKey)remember();if(window.GenerationKey?.value())hasConnectedKey=true;feedback();render();load();
  });

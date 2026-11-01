@@ -718,7 +718,7 @@ table .floating-field > .select-trigger { min-height:44px; padding:9px 42px 9px 
 .control-popup { position:fixed; inset:auto; margin:0; z-index:10000; box-sizing:border-box; padding:6px; border:1px solid var(--line); border-radius:12px; background:var(--popup); color:var(--text); font-family:inherit; font-size:13px; font-weight:400; line-height:1.5; box-shadow:var(--popup-shadow); overflow:auto; }
 .control-popup::backdrop { background:transparent; }
 .select-popup { outline:none; }
-.picker-option { position:relative; padding:10px 34px 10px 12px; border-radius:7px; cursor:pointer; }
+.picker-option { overflow-wrap:anywhere; position:relative; padding:10px 34px 10px 12px; border-radius:7px; cursor:pointer; }
 .picker-option.highlighted,.picker-option:hover:not([aria-disabled=true]) { background:color-mix(in srgb,var(--accent) 9.41%,transparent); }
 .picker-option[aria-selected=true] { color:var(--accent-text,var(--accent)); }
 .picker-option[aria-selected=true]::after { content:'✓'; position:absolute; right:12px; }
@@ -1678,6 +1678,12 @@ input[type=color]:focus-visible { outline:none; box-shadow:none; border:2px soli
  input[type=checkbox]:focus-visible::before { background:Highlight; }
  .primary:focus-visible { background:Canvas; color:CanvasText; }
 }
+
+.picker-separator { height:1px; margin:8px 0; background:var(--line); }
+.journal-project-controls { width:min(240px,100%); }
+.journal-project-controls .journal-project { width:100%; flex:1 1 240px; }
+.journal-project-edit { position:absolute; z-index:2; top:50%; right:32px; transform:translateY(-50%); width:44px; min-width:44px; height:44px; min-height:44px; padding:6px; font-size:12px; line-height:20px; }
+.has-project-edit > .select-trigger { padding-right:92px; }
 
 /* Scrollable owners retain their native perimeter; compensate its extra pixel
    with reserved padding so focus never shifts content or adds an outline. */
