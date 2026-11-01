@@ -60,14 +60,15 @@ const server = http.createServer((req, res) => {
     await page.screenshot({path:path.join(output,'grouped-models-desktop.png')});
     await page.getByRole('option',{name:/Video B/}).click();
     assert.equal(await page.locator('#resolution').inputValue(),'1080p');
-    assert.equal(await page.locator('#duration').inputValue(),'8');
+    // Compatible duration survives the target model's different default.
+    assert.equal(await page.locator('#duration').inputValue(),'5');
     await page.locator('#prompt').fill('A free fixture generation');
     await page.waitForFunction(()=>document.querySelector('#priceValue').textContent==='Free');
-    assert.equal(estimates.at(-1).provider,undefined);assert.equal(estimates.at(-1).model,'other/shared-id');
+    assert.equal(estimates.at(-1).provider,undefined);assert.equal(estimates.at(-1).model,'other/shared-id');assert.equal(estimates.at(-1).seconds,'5');
     await page.locator('#submitButton').click();
     assert.match(await page.locator('#confirmFields').innerText(),/Alibaba/);
     await page.locator('#confirmSubmit').click();await page.waitForFunction(()=>!document.querySelector('#confirmDialog').open);
-    assert.equal(posts[0].provider,undefined);assert.equal(posts[0].model,'other/shared-id');
+    assert.equal(posts[0].provider,undefined);assert.equal(posts[0].model,'other/shared-id');assert.equal(posts[0].seconds,'5');
     await choose('Model',/Image A/);
     assert.equal(await page.locator('#durationField').isVisible(),false);
     await choose('Model',/Speech B/);
