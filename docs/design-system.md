@@ -560,7 +560,7 @@ required.
 
 Playground and Templates move the same key panel between their hosts. Keep the
 credential field, Forget key and a secondary Manage keys button, followed by
-the key name and weekly limit. Omit saved-state actions, policy/billing prose,
+the key name and current weekly usage / total limit from the existing key budget response. Unknown usage or bounds remain unavailable, zero remains zero, and a null total is Unlimited. Omit saved-state actions, policy/billing prose,
 reset dates and storage usage. Show creation/restoration actions only without an
 active key. Preserve transient loading/error feedback, keyboard focus after
 Forget and existing storage/generation enforcement outside this panel. Actions

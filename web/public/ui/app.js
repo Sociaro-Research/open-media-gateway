@@ -1034,7 +1034,9 @@ async function refreshGenerationBudget() {
   const o=result.organization;
   const stats=node('dl','','generation-budget-stats');
   const item=node('div','');
-  const limit=result.key.resource_mode!=='shared'?'Not applicable':!o?'Unavailable':o.weekly_limit_usd==null?'Unlimited':usd(o.weekly_limit_usd);
+  const used=Number.isFinite(o?.weekly_committed_usd)?usd(o.weekly_committed_usd):'Unavailable';
+  const total=o?.weekly_limit_usd===null?'Unlimited':Number.isFinite(o?.weekly_limit_usd)?usd(o.weekly_limit_usd):'Unavailable';
+  const limit=result.key.resource_mode!=='shared'?'Not applicable':!o?'Unavailable':used+' / '+total;
   item.append(node('dt','Weekly limit'),node('dd',limit));stats.append(item);panel.append(stats);
   if(result.key.resource_mode==='shared'&&o){
    const weeklyRemaining=o.weekly_limit_usd==null?Infinity:o.weekly_limit_usd-o.weekly_committed_usd;
@@ -1043,7 +1045,7 @@ async function refreshGenerationBudget() {
 
  } catch (error) {
   if (sequence !== budgetSequence || key !== window.GenerationKey.value()) return;
-  panel.dataset.keyState = ''; panel.replaceChildren(node('p','Budget unavailable. Retry by refreshing the page.','operation-error'));
+  panel.dataset.keyState = ''; panel.replaceChildren(node('p','Budget unavailable. Retrying automatically.','operation-error'));
  }
 }
 
