@@ -1,7 +1,7 @@
 // Shared post-generation audio control. Uploads use the existing media transport.
 window.OverrideSound=(()=>{
  function create(config){
-  const section=document.createElement('section');section.dataset.overrideSound='';
+  const section=document.createElement('section');section.dataset.overrideSound='';section.className='generation-settings override-sound-panel';
   const heading=document.createElement('h3');heading.textContent='Override Sound';section.append(heading);
   const hint=document.createElement('p');hint.className='field-hint';hint.textContent='Replace the video’s original sound. Longer audio is trimmed; shorter audio leaves silence. Video quality and duration stay unchanged.';section.append(hint);
   let value=config.value||'',url='',busy=false;

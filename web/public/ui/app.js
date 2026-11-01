@@ -833,7 +833,7 @@ window.addEventListener('gateway-reference-deleted',event=>{
 function syncOverrideSound(model){
  if(!playgroundSound){
  playgroundSound=OverrideSound.create({upload:(file,signal)=>ReferenceValidation.upload(file,{signal,expectedKey:elements.apiKey.value.trim()}),onChange:()=>updatePrice(),onBusy:busy=>{elements.submit.disabled=busy;}});
- document.querySelector('#generationSettings').append(playgroundSound.root);
+ document.querySelector('#generationSettings').after(playgroundSound.root);
  }
  playgroundSound.root.hidden=model?.media_type!=='video';
 }
@@ -1121,7 +1121,7 @@ window.addEventListener('gateway-key-change', () => {
   elements.priceValue.textContent = 'Key required'; elements.priceDetails.textContent = '';
   const ready = !!window.GenerationKey.value(); elements.submit.disabled = !ready;
   document.querySelector('#generationFields').hidden = !ready;
-  document.querySelector('#generationSettings').hidden = true;
+  document.querySelector('#generationSettings').hidden = true;if(playgroundSound)playgroundSound.root.hidden=true;
   elements.priceCard.hidden = !ready; elements.submit.hidden = !ready;
   document.querySelector('#generationKeyBudget').dataset.keyState = '';
   refreshGenerationBudget();
