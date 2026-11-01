@@ -59,8 +59,26 @@ edit token.
 
 Migration Down restores the old column layout with both aliases set from the
 current definition, rather than reactivating an obsolete publication. It retains
-the inert backup. Reapplying Up does not overwrite that original backup. Database
-schema and application binaries must transition together; HTTP compatibility does
+the inert backup. A separate `recovery_states` JSON array preserves distinct
+current states before Down and distinct old-schema states before Up. This retains
+new drafts written by an old application during a rollback window, even when the
+original `legacy_state` already exists. Exact duplicate states are not appended;
+unchanged repeated transitions do not grow the archive. Earlier recovery evidence
+is never overwritten. Runtime/API code never reads either recovery column, and
+re-upgrade still chooses the previously visible content rather than activating an
+unvalidated old draft. These are inert recovery records, not a template history API.
+
+Prepare the pinned Goose migration utility for the target architecture, verify
+backups and the exact active version before using `down-to 80`, and stop all
+application writers throughout the transition. Verify schema 80 before starting
+old binaries; image-only rollback is incompatible. Use Goose for migration
+bookkeeping and protect database connection diagnostics from credential logging.
+The improved 081 is an unreleased migration intended for installations still on
+schema 80; deployments already at 81 require a separately reviewed compatibility
+plan rather than assuming an edited Up migration will run again. Its Down also
+initializes missing recovery storage before preserving current data.
+
+Database schema and application binaries must transition together; HTTP compatibility does
 not make old and new binaries safe to run simultaneously against one schema.
 Prepare backups and a coordinated application/schema rollback before deployment.
 The migration itself is tested with disposable data; checking it into source does
