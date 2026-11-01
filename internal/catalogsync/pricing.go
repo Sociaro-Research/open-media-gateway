@@ -54,6 +54,22 @@ func Reprice(base core.TaskCost, rate Rate) (core.TaskCost, error) {
 				return base, fmt.Errorf("new or missing usage metric")
 			}
 		}
+		// Price is the source's declared scalar tariff, not an additional fee.
+		// A nonzero scalar must agree with a validated component at this
+		// divisor; component-only tariffs retain their explicit zero scalar.
+		if rate.Price > 0 {
+			matched := false
+			for _, component := range components {
+				if component.Per == rate.Per && component.Price == rate.Price {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				return base, fmt.Errorf("primary tariff differs from the validated components")
+			}
+		}
+		base.Pricing.Price = rate.Price
 		base.Pricing.Components = components
 		base.ExpectedUSD = total
 	} else {

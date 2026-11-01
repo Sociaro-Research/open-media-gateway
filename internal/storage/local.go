@@ -181,10 +181,16 @@ func supportedMediaType(contentType string) bool {
 
 func mediaFileName(contentType string) (string, string) {
 	switch contentType {
+	case "application/octet-stream":
+		return "data", ".bin"
 	case "text/plain":
 		return "text", ".txt"
 	case "application/json":
 		return "data", ".json"
+	case "video/mp4":
+		return "video", ".mp4"
+	case "video/quicktime":
+		return "video", ".mov"
 	case "video/webm":
 		return "video", ".webm"
 	case "image/png":
@@ -193,16 +199,22 @@ func mediaFileName(contentType string) (string, string) {
 		return "image", ".jpg"
 	case "image/webp":
 		return "image", ".webp"
-	case "audio/aac":
+	case "image/gif":
+		return "image", ".gif"
+	case "image/heic", "image/heif":
+		return "image", ".heic"
+	case "audio/aac", "audio/x-aac":
 		return "audio", ".aac"
-	case "audio/mp4":
+	case "audio/mp4", "audio/x-m4a", "audio/m4a":
 		return "audio", ".m4a"
 	case "audio/mpeg":
 		return "audio", ".mp3"
-	case "audio/wav", "audio/x-wav":
+	case "audio/wave", "audio/wav", "audio/x-wav":
 		return "audio", ".wav"
 	case "audio/ogg":
 		return "audio", ".ogg"
+	case "audio/flac":
+		return "audio", ".flac"
 	default:
 		if strings.HasPrefix(contentType, "image/") {
 			return "image", extensionForType(contentType, ".img")
@@ -240,11 +252,37 @@ func (s *Local) Open(_ context.Context, key string) (Object, error) {
 		return Object{}, fmt.Errorf("stat stored media: %w", err)
 	}
 	contentType := mime.TypeByExtension(filepath.Ext(path))
-	switch filepath.Ext(path) {
+	// Known inspected formats must reopen identically on every host. Keep the
+	// registry fallback only for formats outside this explicit storage contract.
+	switch strings.ToLower(filepath.Ext(path)) {
+	case ".png":
+		contentType = "image/png"
+	case ".jpg", ".jpeg", ".jpe":
+		contentType = "image/jpeg"
+	case ".webp":
+		contentType = "image/webp"
+	case ".gif":
+		contentType = "image/gif"
+	case ".heic", ".heif":
+		contentType = "image/heic"
+	case ".mp4":
+		contentType = "video/mp4"
+	case ".mov":
+		contentType = "video/quicktime"
+	case ".webm":
+		contentType = "video/webm"
+	case ".mp3":
+		contentType = "audio/mpeg"
+	case ".wav", ".wave":
+		contentType = "audio/wave"
 	case ".aac":
 		contentType = "audio/aac"
 	case ".m4a":
 		contentType = "audio/mp4"
+	case ".ogg":
+		contentType = "audio/ogg"
+	case ".flac":
+		contentType = "audio/flac"
 	}
 	return Object{Key: key, ContentType: contentType, SizeBytes: info.Size(), ModTime: info.ModTime(), Reader: file}, nil
 }

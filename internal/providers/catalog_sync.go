@@ -271,6 +271,10 @@ func applyCatalogQuote(base core.TaskCost, err error, model core.MediaModel, req
 	if err != nil || model.Manual || base.Pricing.AccountSpecific {
 		return base, err
 	}
+	counts, countErr := core.CountMediaInputs(model, request.Options)
+	if countErr != nil {
+		return base, nil
+	}
 	// Input-reference and fixed surcharges cannot inherit a no-reference tariff.
 	reviewedAudioRefs := false
 	switch model.ID {
@@ -278,7 +282,7 @@ func applyCatalogQuote(base core.TaskCost, err error, model core.MediaModel, req
 		reviewedAudioRefs = true
 	}
 	entry, ok := state.Models[model.ID]
-	if len(request.Options.Audios()) > 0 && !reviewedAudioRefs {
+	if counts.Audios > 0 && !reviewedAudioRefs {
 		explicit := false
 		for _, rate := range entry.Rates {
 			if rate.AudioInput != nil && *rate.AudioInput && rate.MatchesConditions(model, request) {
@@ -320,7 +324,7 @@ func applyCatalogQuote(base core.TaskCost, err error, model core.MediaModel, req
 		if r.Quality != "" && r.Quality != request.Options.Quality {
 			continue
 		}
-		hasVideo := len(request.Options.Videos()) > 0
+		hasVideo := counts.Videos > 0
 		if r.VideoInputIncludesResources {
 			for _, resource := range request.Options.ResourceSnapshots {
 				if resource.Kind == "element" && resource.Subtype == "video_character" {

@@ -49,13 +49,17 @@ func (r Rate) MatchesConditions(model core.MediaModel, request core.MediaRequest
 	if r.ValidateConditions() != nil {
 		return false
 	}
-	if r.AudioInput != nil && *r.AudioInput != (len(request.Options.Audios()) > 0) {
+	counts, err := core.CountMediaInputs(model, request.Options)
+	if err != nil {
+		return false
+	}
+	if r.AudioInput != nil && *r.AudioInput != (counts.Audios > 0) {
 		return false
 	}
 	if r.VoiceInput != nil && *r.VoiceInput != (request.Options.Voice != "") {
 		return false
 	}
-	if r.ImageInput != nil && *r.ImageInput != (len(request.Options.ImageURLs) > 0) {
+	if r.ImageInput != nil && *r.ImageInput != (counts.Images > 0) {
 		return false
 	}
 	for key, want := range r.Parameters {
@@ -85,15 +89,7 @@ func (r Rate) MatchesConditions(model core.MediaModel, request core.MediaRequest
 	}
 	for _, selector := range r.ReferenceRoles {
 		count := 0
-		total := 0
-		switch selector.Kind {
-		case "image":
-			total = len(request.Options.ImageURLs)
-		case "video":
-			total = len(request.Options.Videos())
-		case "audio":
-			total = len(request.Options.Audios())
-		}
+		total := counts.Count(selector.Kind)
 		for i := 0; i < total; i++ {
 			if core.ReferenceRole(model, request.Options, selector.Kind, i) == selector.Role {
 				count++
