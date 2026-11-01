@@ -1,3 +1,4 @@
+const {generationFixtureResponse}=require('./generation-page-fixture.cjs');
 // Compatible Playground drafts survive model switches; synthetic loopback APIs only.
 const {chromium,webkit}=require('playwright'),http=require('node:http'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const {useFixtureKey}=require('./fixture-key.cjs');
@@ -11,7 +12,7 @@ const external=[],errors=[],requests=[];let heldCatalog=[],delayCatalog=false,he
 const server=http.createServer(async(req,res)=>{
  const url=new URL(req.url,'http://fixture'),p=url.pathname;
  const chunks=[];for await(const b of req)chunks.push(b);let body;try{body=JSON.parse(Buffer.concat(chunks));}catch{}
- const json=(data,status=200)=>{res.writeHead(status,{'Content-Type':'application/json'});res.end(JSON.stringify(data));};
+ const json=(data,status=200)=>{res.writeHead(status,{'Content-Type':'application/json'});res.end(JSON.stringify(generationFixtureResponse(req,data,status)));};
  if(p.startsWith('/v1/')){
   requests.push({path:p,method:req.method,body});
   if(p==='/v1/info')return json({auth_mode:'google',provider:'first',console:{generation_ui:true}});

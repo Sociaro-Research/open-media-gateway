@@ -1,3 +1,4 @@
+const {generationFixtureResponse}=require('./generation-page-fixture.cjs');
 const {useFixtureKey}=require('./fixture-key.cjs');
 const {evidencePath} = require('./evidence.cjs');
 // OpenAI capability UI and uploaded-PNG contract. All API calls use local fixtures.
@@ -21,7 +22,7 @@ const provider={fields:[{key:'api_key',label:'API key',secret:true,required:true
  const page=await browser.newPage({viewport:{width:1440,height:1100}}),errors=[],estimates=[];
  page.on('pageerror',e=>{errors.push(e.message);console.error(e.message);});
  await page.route('**/v1/**',async route=>{
-  const p=new URL(route.request().url()).pathname,json=body=>route.fulfill({json:body});
+  const p=new URL(route.request().url()).pathname,json=body=>route.fulfill({json:generationFixtureResponse(route.request(),body)});
   if(p==='/v1/info')return json({provider:'openai',auth_mode:'google',console:{generation_ui:true,personal_providers:true,allowed_providers:['openai','mock','alibaba','bytedance']}});
   if(p==='/v1/me')return json({id:'fixture-user',name:'Test developer',email:'test@example.test',is_system_admin:true});
   if(p==='/v1/api-keys'&&route.request().method()==='POST')return json({name:'OpenAI fixture',secret:'fixture-generation-key'});

@@ -1,3 +1,4 @@
+const {generationFixtureResponse}=require('./generation-page-fixture.cjs');
 const {useFixtureKey}=require('./fixture-key.cjs');
 const {evidencePath} = require('./evidence.cjs');
 // Deterministic browser request/DOM budgets. Real backend load is measured separately.
@@ -25,7 +26,7 @@ fs.writeFileSync(path.join(output,`ui-${engine===webkit?'webkit':'chromium'}-sou
   const model={id:'test-video',display_name:'Test video',media_type:'video',ratios:['16:9'],min_duration:2,max_duration:30,default_duration:5,pricing:{known:true,reference_price_usd:0}};
   const tasks=()=>Array.from({length:50},(_,i)=>({id:'task-'+i,provider:'mock',model:'mock/test-video',media_type:i%3===0?'image':i%3===1?'video':'speech',prompt:'Fixture '+i,input:'Fixture '+i,status:i===0?'in_progress':'completed',created_at:1700000000,updated_at:1700000010+(i===0?version:0),options:{},content_url:i===0?null:'/v1/generations/task-'+i+'/content',stored_at:i===0?null:'2026-10-01T00:00:00Z',result_content_type:i%3===0?'image/svg+xml':i%3===1?'video/mp4':'audio/wav',has_stored_result:i!==0,cost:{expected_usd:0,actual_source:'free_provider'}}));
   await page.route('**/*',async route=>{
-   const url=new URL(route.request().url());const json=body=>route.fulfill({json:body});
+   const url=new URL(route.request().url());const json=body=>route.fulfill({json:generationFixtureResponse(route.request(),body)});
    if(url.pathname==='/v1/info')return json({provider:'mock',auth_mode:'google'});
    if(url.pathname==='/v1/me')return json({id:'preview',name:'Performance',email:'preview@example.test',session_id:'perf',is_system_admin:true});
    if(url.pathname==='/v1/organizations')return json({data:[]});
@@ -47,7 +48,7 @@ fs.writeFileSync(path.join(output,`ui-${engine===webkit?'webkit':'chromium'}-sou
   await page.addInitScript(()=>{
    window.perfLongTasks=[];try{new PerformanceObserver(list=>window.perfLongTasks.push(...list.getEntries().map(e=>e.duration))).observe({type:'longtask',buffered:true});}catch{}
   });
-  await page.goto(`http://127.0.0.1:${server.address().port}`);await useFixtureKey(page,'fixture-generation-key');await page.waitForFunction(()=>document.querySelectorAll('.task').length===50);
+  await page.goto(`http://127.0.0.1:${server.address().port}`);await useFixtureKey(page,'fixture-generation-key');await page.waitForFunction(()=>document.querySelectorAll('.task').length===10);while(await page.locator('.task').count()<50){const loaded=await page.locator('.task').count();await page.evaluate(()=>document.querySelector('#journalLoadMore').click());await page.waitForFunction(n=>document.querySelectorAll('.task').length>=n,Math.min(loaded+10,50));}assert.equal(await page.locator('.task').count(),50);
   await page.waitForFunction(()=>[...document.querySelectorAll('.task-media')].every(e=>e.getAttribute('src')));
   await page.evaluate(()=>{window.preservedCard=document.querySelector('[data-task-id="task-1"]');window.preservedPlayer=window.preservedCard.querySelector('.task-media');});
   await page.evaluate(async()=>{window.preservedPlayer.muted=true;window.preservedPlayer.loop=true;await window.preservedPlayer.play();});

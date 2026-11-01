@@ -1,3 +1,4 @@
+const {generationFixtureResponse}=require('./generation-page-fixture.cjs');
 const {useFixtureKey}=require('./fixture-key.cjs');
 const {evidencePath} = require('./evidence.cjs');
 // Shared model selector: real UI, isolated API fixtures, no paid generations.
@@ -17,7 +18,7 @@ catalog[1].icon_url='/provider-assets/fixture/openai/icon.png';catalog[1].icon_m
   if(engine===webkit&&e.message==='ResizeObserver loop completed with undelivered notifications.'){console.warn('WebKit resize notice: '+e.message);return;}
   errors.push(e.message);
  });page.setDefaultTimeout(8000);
- await page.route('**/v1/**',route=>{const p=new URL(route.request().url()).pathname,json=x=>route.fulfill({json:x});
+ await page.route('**/v1/**',route=>{const p=new URL(route.request().url()).pathname,json=x=>route.fulfill({json:generationFixtureResponse(route.request(),x)});
   if(p==='/v1/info')return json({auth_mode:'google',provider:'mock'});
   if(p==='/v1/me')return json({id:'admin',name:'Tester',session_id:'test',is_system_admin:true});
   if(p==='/v1/organizations')return json({data:[{id:'11111111-1111-4111-8111-111111111111',name:'Studio',role:'admin'}]});
@@ -39,7 +40,7 @@ catalog[1].icon_url='/provider-assets/fixture/openai/icon.png';catalog[1].icon_m
     {id:'openai--two',name:'Main',models:[{id:'a',display_name:'Shared'}]},
     {id:'bytedance',name:'Other provider',models:[{id:'a',display_name:'Shared'}]}
    ];
-   for(const p of raw)for(const m of p.models){m.public_id=p.id+'/'+m.id;m.pricing={known:true,reference_price_usd:.123};m.metadata={version_date:'2026-01-01'};}
+   for(const p of raw)for(const m of p.models){m.media_type='video';m.public_id=p.id+'/'+m.id;m.pricing={known:true,reference_price_usd:.123};m.metadata={version_date:'2026-01-01'};}
    const snapshot=JSON.stringify(raw),normalized=s=>s.normalize('NFKC').replace(/\s+/g,' ').trim().toLowerCase();
    const flatten=providers=>providers.flatMap(p=>p.models.map(m=>[ModelPicker.key(p.id,m.id),m]));
    const named=ModelPicker.uniqueCatalog(raw),entries=flatten(named),labels=entries.map(([,m])=>normalized(m.display_name));
@@ -109,7 +110,7 @@ catalog[1].icon_url='/provider-assets/fixture/openai/icon.png';catalog[1].icon_m
   await page.evaluate(async catalog=>{GenerationKey.forget();document.querySelector('main').replaceChildren();const parent=document.querySelector('main');window.testGrants=[];const models=catalog.flatMap(p=>p.models.map((m,i)=>({id:p.id+'-'+i,provider:p.id,provider_name:p.name,provider_icon_url:p.icon_url,provider_icon_monochrome:p.icon_monochrome,model:m.id,name:m.display_name,public_id:m.public_id,enabled_by_default:false,capabilities:m})));await ModelAccess.organization(parent,async(_,options)=>options?(window.testGrants=JSON.parse(options.body).model_ids,{model_ids:window.testGrants,version:2}):({data:models,model_ids:[],version:1}),{organization:'test'});FormUI.refresh();},catalog);
   await page.getByRole('combobox',{name:'Model to enable'}).click();await search().fill('gamma');await date().fill('2026-03-01');assert.equal((await names()).length,1);await popup.getByRole('option').click();await page.getByRole('button',{name:'Add model',exact:true}).click();await page.getByRole('button',{name:'Save',exact:true}).click();assert.deepEqual(await page.evaluate(()=>window.testGrants),['other-0']);
   await page.getByRole('combobox',{name:'Model to enable'}).click();await popup.getByRole('button',{name:'Clear model filters'}).click();assert.equal(await popup.locator('img').first().getAttribute('data-logo-url'),catalog[0].icon_url,'organization grants retain provider artwork');await page.keyboard.press('Escape');
-  await page.evaluate(()=>{const select=document.querySelector('.organization-model-access select');ModelPicker.populate(select,[{id:'a',name:'Duplicate Studio',icon_url:'/provider-assets/fixture/sonilo/icon.png',models:[{id:'one'}]},{id:'b',name:'Duplicate Studio',icon_url:'/provider-assets/fixture/agnes/icon.png',models:[{id:'two'}]},{id:'c',name:'Very long provider connection name that must wrap on a small screen',icon_url:'/provider-assets/fixture/missing/icon.png',models:[{id:'three'}]}],{allModels:true});FormUI.refresh();});
+  await page.evaluate(()=>{const select=document.querySelector('.organization-model-access select');ModelPicker.populate(select,[{id:'a',name:'Duplicate Studio',icon_url:'/provider-assets/fixture/sonilo/icon.png',models:[{id:'one',media_type:'video'}]},{id:'b',name:'Duplicate Studio',icon_url:'/provider-assets/fixture/agnes/icon.png',models:[{id:'two',media_type:'video'}]},{id:'c',name:'Very long provider connection name that must wrap on a small screen',icon_url:'/provider-assets/fixture/missing/icon.png',models:[{id:'three',media_type:'video'}]}],{allModels:true});FormUI.refresh();});
   await page.setViewportSize({width:320,height:900});await page.getByRole('combobox',{name:'Model to enable'}).click();if(await popup.getByRole('button',{name:'Clear model filters'}).isEnabled())await popup.getByRole('button',{name:'Clear model filters'}).click();
   assert.equal(await popup.locator('.model-picker-provider').count(),3,'separate connections with equal names retain separate groups');
   await page.waitForFunction(()=>document.querySelectorAll('.model-picker-provider-mark')[2]?.children.length===0);

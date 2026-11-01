@@ -1,3 +1,4 @@
+const {generationFixtureResponse}=require('./generation-page-fixture.cjs');
 const {useFixtureKey}=require('./fixture-key.cjs');
 const {evidencePath} = require('./evidence.cjs');
 // Reference picker smoke tests. Uses only mocked providers and temporary images.
@@ -53,7 +54,7 @@ const server = http.createServer((req, res) => {
   const directURL=`https://127.0.0.1:${storageServer.address().port}/file?signature=test`;
   await page.route('**/v1/**',async route=>{
     const request=route.request(), url=new URL(request.url());
-    const json=value=>route.fulfill({json:value});
+    const json=value=>route.fulfill({json:generationFixtureResponse(route.request(),value)});
     if(url.pathname==='/v1/info')return json({auth_mode:'google',provider:'mock'});
     if(url.pathname==='/v1/me')return json({id:'test',session_id:'test-session',name:'Reference test',email:'test@example.test'});
     if(url.pathname==='/v1/organizations')return json({data:[{id:'11111111-1111-4111-8111-111111111111',name:'Test organization',role:'admin',balance_usd:0,available_usd:0,storage_bytes:2500}]});

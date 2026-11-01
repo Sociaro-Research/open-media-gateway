@@ -1,3 +1,4 @@
+const {generationFixtureResponse}=require('./generation-page-fixture.cjs');
 // Real UI and synthetic APIs only. Held reads prove independence without media completion.
 const {chromium,webkit}=require('playwright');
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
@@ -19,7 +20,7 @@ const server=http.createServer((req,res)=>{void(async()=>{
  const u=new URL(req.url,'http://fixture');const type=u.pathname==='/v1/system/templates'?'admin':u.pathname==='/v1/templates'?'gallery':/^\/v1\/templates\/(first|second)$/.test(u.pathname)?'detail':u.pathname.startsWith('/fixture-media/')?'media':'other';
  if(type!=='other')reads.push({kind:type,at:performance.now(),finished:false});
  const entry=type==='other'?null:reads.at(-1);res.once('finish',()=>{if(entry)entry.finished=true;});
- const json=(body,status=200)=>{if(res.destroyed)return;res.writeHead(status,{'Content-Type':'application/json'});res.end(JSON.stringify(body));};
+ const json=(body,status=200)=>{if(res.destroyed)return;res.writeHead(status,{'Content-Type':'application/json'});res.end(JSON.stringify(generationFixtureResponse(req,body,status)));};
  if(type==='media'){
   if(mediaMode==='hung'){heldMedia.add(res);await new Promise(r=>res.once('close',r));heldMedia.delete(res);return;}
   if(mediaMode==='fail'){res.writeHead(503);return res.end();}

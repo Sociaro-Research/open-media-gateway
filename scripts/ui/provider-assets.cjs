@@ -1,3 +1,4 @@
+const {generationFixtureResponse}=require('./generation-page-fixture.cjs');
 const {useFixtureKey}=require('./fixture-key.cjs');
 const {evidencePath} = require('./evidence.cjs');
 // Synthetic UI/API fixture. No live account, library upload or paid generation.
@@ -11,7 +12,7 @@ const server=http.createServer((req,res)=>{if(req.url.startsWith('/preview/')){r
  const model={id:'seedance',display_name:'Seedance assets',reference_prompt_syntax:'numbered',media_type:'video',supports_asset_references:true,supports_image_input:true,max_image_inputs:9,resolutions:['720p'],ratios:['16:9'],default_duration:5,min_duration:4,max_duration:15,reference_modes:[{id:'references',label:'References',min_images:0,max_images:9,min_videos:0,max_videos:0,min_audios:0,max_audios:0}],pricing:{known:true,reference_price_usd:0}};
  let generationPosts=0;
  let groups=[],assets=[],imports=0,creates=0,reads=0,deleteBlocked=true,library=[];const org='11111111-1111-4111-8111-111111111111';
- await page.route('**/v1/**',route=>{const req=route.request(),url=new URL(req.url()),p=url.pathname,json=data=>route.fulfill({json:data});
+ await page.route('**/v1/**',route=>{const req=route.request(),url=new URL(req.url()),p=url.pathname,json=data=>route.fulfill({json:generationFixtureResponse(route.request(),data)});
  if(p==='/v1/info')return json({auth_mode:'google',provider:'bytedance'});if(p==='/v1/me')return json({id:'admin',name:'Admin',session_id:'fixture',is_system_admin:true});
  if(p==='/v1/organizations')return json({data:[{id:org,name:'Studio',role:'supermanager',available_usd:10}]});if(p==='/v1/api-keys'&&req.method()==='POST')return json({secret:'fixture-key'});
  if(p==='/v1/key')return json({key:{id:'fixture-key',organization_id:org,resource_mode:'shared',scopes:['generation']},usage:{},organization:{id:org,name:'Studio',role:'supermanager'}});

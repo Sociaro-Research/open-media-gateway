@@ -1,3 +1,4 @@
+const {generationFixtureResponse}=require('./generation-page-fixture.cjs');
 const {evidencePath} = require('./evidence.cjs');
 // Organization console fixtures: no provider calls or production data.
 const {[process.env.UI_BROWSER_ENGINE||'chromium']:chromium}=require('playwright'),http=require('node:http'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
@@ -6,7 +7,7 @@ const root=path.resolve(__dirname,'../../web/public/ui');const server=http.creat
 const oid='22222222-2222-4222-8222-222222222222',uid='11111111-1111-4111-8111-111111111111';const organization=()=>({id:oid,name:'Example team',role,balance_usd:balance,available_usd:balance,credit_limit_usd:0,default_weekly_limit_usd:0,weekly_limit_usd:20,weekly_committed_usd:5,storage_bytes:2048,client_manager_email:assignedManager});
  let invitationMethods={email:true,google:false},invitationMethodReads=0;
  await page.route('**/auth/methods',async route=>{invitationMethodReads++;return route.fulfill({json:invitationMethods});});
-await page.route('**/v1/**',async route=>{const req=route.request(),u=new URL(req.url()),p=u.pathname,method=req.method(),data=req.postData()?req.postDataJSON():null,json=value=>route.fulfill({json:value});if(method!=='GET')writes.push({p,method,data});
+await page.route('**/v1/**',async route=>{const req=route.request(),u=new URL(req.url()),p=u.pathname,method=req.method(),data=req.postData()?req.postDataJSON():null,json=value=>route.fulfill({json:generationFixtureResponse(route.request(),value)});if(method!=='GET')writes.push({p,method,data});
 if(p==='/v1/info')return json({auth_mode:'google',provider:'mock',console:{generation_ui:true,personal_providers:true,shared_resources:true,version:1}});
 if(p==='/v1/me')return json({id:uid,name:'Organization tester',email:'tester@example.test',is_system_admin:admin,is_client_manager:clientManagerFixture,session_id:'fixture'});
 if(p==='/v1/client-onboardings'){

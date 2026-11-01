@@ -1,3 +1,4 @@
+const {generationFixtureResponse,generationPage}=require('./generation-page-fixture.cjs');
 // Real registered-manager endpoint descriptors; outputs and mutations are localhost fixtures.
 const {chromium,webkit}=require('playwright'),http=require('node:http'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),crypto=require('node:crypto');
 const engine=process.env.UI_BROWSER_ENGINE||'chromium',root=path.resolve(process.env.UI_SOURCE_DIR||'web/public/ui'),out=path.resolve(process.env.UI_EVIDENCE_DIR||'.local/minimax-ui/'+engine),descriptor=process.env.UI_MINIMAX_DESCRIPTOR_FILE,source=fs.readFileSync(descriptor||(()=>{throw Error('Set UI_MINIMAX_DESCRIPTOR_FILE to a sanitized locally generated actual /v1/providers response.');})()),catalog=JSON.parse(source),provider=catalog.data[0],connection=provider.id;fs.mkdirSync(out,{recursive:true});
@@ -5,7 +6,7 @@ const ids={image:'11111111-1111-4111-8111-111111111111',video:'22222222-2222-422
 const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGNoaGgAAAMEAYFL09IQAAAAAElFTkSuQmCC','base64'),references=['image','video','audio'].map(kind=>({id:ids[kind],name:kind+'.'+({image:'png',video:'mp4',audio:'wav'}[kind]),content_type:{image:'image/png',video:'video/mp4',audio:'audio/wav'}[kind],url:'/references/fixture/'+ids[kind],size_bytes:8}));
 const resource={id:ids.binding,provider:connection,name:'Managed image',kind:'file_resource',subtype:'image',status:'succeeded',usable:true};let requests=[],tasks=[],grantReads=[],artifacts=[];const text='<script>window.__providerInjected=true</script>\nPrepared scene from owned context.';
 const completed=(id,model,media,outputs)=>({id,provider:connection,model,provider_model:model,media_type:media,prompt:'Fixture '+model,status:'completed',created_at:Math.floor(Date.now()/1000),updated_at:Math.floor(Date.now()/1000),options:{},artifacts:outputs});
-const server=http.createServer(async(req,res)=>{const u=new URL(req.url,'http://fixture'),p=u.pathname,chunks=[];for await(const c of req)chunks.push(c);let body;try{body=JSON.parse(Buffer.concat(chunks))}catch{}const json=(value,status=200)=>{res.writeHead(status,{'Content-Type':'application/json'});res.end(JSON.stringify(value));};
+const server=http.createServer(async(req,res)=>{const u=new URL(req.url,'http://fixture'),p=u.pathname,chunks=[];for await(const c of req)chunks.push(c);let body;try{body=JSON.parse(Buffer.concat(chunks))}catch{}const json=(value,status=200)=>{res.writeHead(status,{'Content-Type':'application/json'});res.end(JSON.stringify(generationFixtureResponse(req,value,status)));};
  if(p.startsWith('/v1/')){requests.push({path:p,method:req.method,body});
   if(p==='/v1/info')return json({auth_mode:'google',provider:'fixture',console:{generation_ui:true,personal_providers:true,installation_role:'ordinary'}});
   if(p==='/v1/me')return json({id:'fixture',session_id:'local',name:'Fixture',email:'fixture@example.test',is_system_admin:false});
@@ -20,7 +21,7 @@ const server=http.createServer(async(req,res)=>{const u=new URL(req.url,'http://
   if(p==='/v1/generations/estimate')return body.model===connection+'/image-01'?json({cost:{expected_usd:.0035*(body.options?.output_count||1)},can_generate:true}):json({cost:{quantity_unknown:true},can_generate:false});
   if(p==='/v1/provider-resources/estimate')return json({error:{code:'pricing_unavailable',message:'Verified file-operation tariff unavailable'}},422);
   if(p==='/v1/generations'&&req.method==='POST'){assert.equal(body.model,connection+'/image-01');assert.equal(body.options.output_count,9);assert.ok(req.headers['idempotency-key']);const task=completed(ids.batch,'image-01','image',Array.from({length:9},(_,i)=>({id:String(i+1),media_type:'image',format:'png',content_type:'image/png',size_bytes:png.length})));task.options=body.options;tasks=[task];return json(task,202);}
-  if(p==='/v1/generations')return json({data:tasks,has_more:false});
+  if(p==='/v1/generations'&&req.method==='GET')return json(generationPage(u,tasks));
   if(p.endsWith('/media-access')){const id=p.split('/')[3],task=tasks.find(t=>t.id===id);return json({artifacts:(task?.artifacts||[]).map(a=>({id:a.id,preview_url:id===ids.context?'/signed/context.txt':'/signed/image-'+a.id+'.png',download_url:id===ids.context?'/signed/context.txt?download=1':'/signed/image-'+a.id+'.png?download=1'}))});}
   return json({data:[]});
  }

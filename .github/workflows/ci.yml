@@ -235,6 +235,7 @@ jobs:
         run: |
           make build-ui
           node --test scripts/ui/auto-update-test.cjs
+          node scripts/ui/generation-page-fixture.test.cjs
           node scripts/ui/automatic-update-dom.cjs
           UI_BROWSER_ENGINE=webkit node scripts/ui/automatic-update-dom.cjs
           node scripts/ui/templates.cjs

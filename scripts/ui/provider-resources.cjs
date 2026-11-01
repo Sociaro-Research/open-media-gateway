@@ -1,3 +1,4 @@
+const {generationFixtureResponse,generationPage}=require('./generation-page-fixture.cjs');
 // Stable provider-neutral metadata contracts; loopback data only, no provider calls.
 const {chromium,webkit}=require('playwright'),http=require('node:http'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const engine=process.env.UI_BROWSER_ENGINE||'chromium',root=path.resolve(process.env.UI_SOURCE_DIR||'web/public/ui'),out=path.resolve(process.env.UI_EVIDENCE_DIR||'.local/provider-ui/'+engine);fs.mkdirSync(out,{recursive:true});
@@ -17,7 +18,7 @@ let definition={title:'Provider template',description:'Descriptor-driven control
 let version=1,unknown=true,zero=false,requests=[],tasks=[];
 const wave=Buffer.alloc(44+1600);wave.write('RIFF');wave.writeUInt32LE(wave.length-8,4);wave.write('WAVEfmt ',8);wave.writeUInt32LE(16,16);wave.writeUInt16LE(1,20);wave.writeUInt16LE(1,22);wave.writeUInt32LE(8000,24);wave.writeUInt32LE(16000,28);wave.writeUInt16LE(2,32);wave.writeUInt16LE(16,34);wave.write('data',36);wave.writeUInt32LE(1600,40);
 const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGNoaGgAAAMEAYFL09IQAAAAAElFTkSuQmCC','base64');
-const server=http.createServer(async(req,res)=>{const u=new URL(req.url,'http://fixture'),p=u.pathname;const chunks=[];for await(const b of req)chunks.push(b);let body;try{body=JSON.parse(Buffer.concat(chunks))}catch{}const json=(v,c=200)=>{res.writeHead(c,{'Content-Type':'application/json'});res.end(JSON.stringify(v));};
+const server=http.createServer(async(req,res)=>{const u=new URL(req.url,'http://fixture'),p=u.pathname;const chunks=[];for await(const b of req)chunks.push(b);let body;try{body=JSON.parse(Buffer.concat(chunks))}catch{}const json=(v,c=200)=>{res.writeHead(c,{'Content-Type':'application/json'});res.end(JSON.stringify(generationFixtureResponse(req,v,c)));};
  if(p.startsWith('/v1/')){requests.push({path:p,method:req.method,body,idempotency:req.headers['idempotency-key'],query:u.search});
   if(p==='/v1/info')return json({auth_mode:'google',provider:'fixture',console:{generation_ui:true,personal_providers:true,installation_role:'ordinary',central_origin:'https://console.sociaro.ai'}});
   if(p==='/v1/me')return json({id:'fixture-owner',session_id:'local',name:'Fixture',email:'fixture@example.test',is_system_admin:true});
@@ -39,7 +40,7 @@ const server=http.createServer(async(req,res)=>{const u=new URL(req.url,'http://
   if(p==='/v1/generations/'+sourceID)return json(sourceTask);
   if(p==='/v1/generations/'+sourceID+'/media-access')return json({artifacts:[{id:'1',media_type:'video',format:'mp4',preview_url:'/fixture.mp4',download_url:'/fixture.mp4?download=1'}],expires_at:new Date(Date.now()+60000).toISOString()});
   if(p.endsWith('/media-access'))return json({preview_url:'/fixture.png?primary=1',download_url:'/fixture.png?download=1',expires_at:new Date(Date.now()+1000).toISOString(),artifacts:[{id:'1',media_type:'image',format:'png',preview_url:'/fixture.png?artifact=1',download_url:'/fixture.png?download=1&artifact=1'},{id:'2',media_type:'image',format:'png',preview_url:'/fixture.png?artifact=2',download_url:'/fixture.png?download=1&artifact=2'}]});
-  if(p==='/v1/generations'&&req.method==='GET')return json({data:[...tasks,sourceTask],has_more:false});
+  if(p==='/v1/generations'&&req.method==='GET')return json(generationPage(u,[...tasks,sourceTask]));
   if(p.endsWith('/estimate'))return json({cost:unknown?{quantity_unknown:true,pricing:{price:1,unit:'second',per:1}}:{expected_usd:zero?0:.25,customer_expected_usd:zero?0:.25},can_generate:!unknown});
   if(p==='/v1/generations'&&req.method==='POST')return json({id:'not-auto-generated',status:'queued'});
   if(p==='/v1/system/templates'&&req.method==='GET')return json({data:[{id:'template',version,revision:version,content:definition,is_published:true}],catalog});

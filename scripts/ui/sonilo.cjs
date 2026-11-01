@@ -1,3 +1,4 @@
+const {generationFixtureResponse}=require('./generation-page-fixture.cjs');
 const {useFixtureKey}=require('./fixture-key.cjs');
 const {evidencePath} = require('./evidence.cjs');
 // Cross-contract UI checks use Sonilo's actual Go catalog and local API fixtures.
@@ -23,7 +24,7 @@ const server=http.createServer((req,res)=>{
  const page=await browser.newPage({viewport:{width:1440,height:1100}}),errors=[],submissions=[];
  page.on('pageerror',e=>errors.push(e.message));
  await page.route('**/v1/**',async route=>{
-  const req=route.request(),p=new URL(req.url()).pathname,json=body=>route.fulfill({json:body});
+  const req=route.request(),p=new URL(req.url()).pathname,json=body=>route.fulfill({json:generationFixtureResponse(route.request(),body)});
   if(p==='/v1/info')return json({provider:'sonilo',auth_mode:'google',console:{generation_ui:true,personal_providers:true}});
   if(p==='/v1/me')return json({id:'fixture-user',name:'Developer',email:'test@example.test',is_system_admin:true});
   if(p==='/v1/api-keys'&&req.method()==='POST')return json({name:'Sonilo fixture',secret:'fixture-generation-key'});

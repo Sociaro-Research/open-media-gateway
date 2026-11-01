@@ -1,3 +1,4 @@
+const {generationFixtureResponse}=require('./generation-page-fixture.cjs');
 const {useFixtureKey}=require('./fixture-key.cjs');
 const {evidencePath} = require('./evidence.cjs');
 // Run with Node and Playwright installed (NODE_PATH may point to a shared runtime).
@@ -33,7 +34,7 @@ const providers = [{id:'mock',name:'Test provider',live:false,credentials_config
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   await page.route('**/v1/**', async route => {
     const url = new URL(route.request().url());
-    const json = body => route.fulfill({json:body});
+    const json = body => route.fulfill({json:generationFixtureResponse(route.request(),body)});
     if (url.pathname === '/v1/info') return json({provider:'mock',auth_mode:'google'});
     if (url.pathname === '/v1/me') return json({name:'Design Preview', email:'preview@example.com',id:'preview',session_id:'preview-session',is_system_admin:true});
     if(url.pathname==='/v1/organizations/11111111-1111-4111-8111-111111111111')return json({id:'11111111-1111-4111-8111-111111111111',name:'Test organization',role:'admin'});

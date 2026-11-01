@@ -1,3 +1,4 @@
+const {generationFixtureResponse}=require('./generation-page-fixture.cjs');
 const {useFixtureKey}=require('./fixture-key.cjs');
 const {evidencePath}=require('./evidence.cjs');
 // Delayed synthetic API responses exercise picker continuations, never BytePlus.
@@ -33,7 +34,7 @@ const server=http.createServer((req,res)=>{
    if(!p.startsWith('/v1/'))return route.continue();
    const gate=state.gate;
    if(gate&&gate.match(p,req.method())){state.gate=null;gate.arrived.resolve();await gate.release.promise;}
-   const json=async data=>{const snapshot=structuredClone(data),pending=state.responseGate;if(pending&&pending.match(p,req.method())){state.responseGate=null;pending.arrived.resolve();await pending.release.promise;await route.fulfill({json:snapshot}).catch(()=>{});pending.finished.resolve();return;}return route.fulfill({json:snapshot}).catch(()=>{});};
+   const json=async data=>{const snapshot=structuredClone(data),pending=state.responseGate;if(pending&&pending.match(p,req.method())){state.responseGate=null;pending.arrived.resolve();await pending.release.promise;await route.fulfill({json:generationFixtureResponse(route.request(),snapshot)}).catch(()=>{});pending.finished.resolve();return;}return route.fulfill({json:generationFixtureResponse(route.request(),snapshot)}).catch(()=>{});};
    if(p==='/v1/info')return json({auth_mode:'google',provider:'bytedance'});
    if(p==='/v1/me')return json({id:'synthetic-admin',session_id:'fixture',name:'Synthetic admin',is_system_admin:true});
    if(p==='/v1/organizations')return json({data:[org]});

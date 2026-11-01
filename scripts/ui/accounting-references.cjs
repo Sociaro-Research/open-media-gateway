@@ -1,3 +1,4 @@
+const {generationFixtureResponse}=require('./generation-page-fixture.cjs');
 const {useFixtureKey}=require('./fixture-key.cjs');
 const {evidencePath} = require('./evidence.cjs');
 // Exercise account reports and model-specific media selection without paid calls.
@@ -18,7 +19,7 @@ const server=http.createServer((req,res)=>{if(/^\/references\/test\/i[12]$/.test
  const library=[{id:'i1',name:'first.png',content_type:'image/png',size_bytes:32768},{id:'i2',name:'last.png',content_type:'image/png',size_bytes:65536},{id:'v1',name:'motion.mp4',content_type:'video/mp4',size_bytes:1572864},{id:'a1',name:'voice.mp3',content_type:'audio/mpeg',size_bytes:2048}].map(item=>({...item,url:'/references/test/'+item.id}));
  const organization={id:'11111111-1111-4111-8111-111111111111',name:'Test organization',role:'admin',balance_usd:0,available_usd:0,storage_bytes:2500,weekly_limit_usd:null,weekly_committed_usd:0};
  let reportQueries=[],posts=[];
- await page.route('**/v1/**',route=>{const req=route.request(),url=new URL(req.url()),json=data=>route.fulfill({json:data});
+ await page.route('**/v1/**',route=>{const req=route.request(),url=new URL(req.url()),json=data=>route.fulfill({json:generationFixtureResponse(route.request(),data)});
   if(url.pathname==='/v1/info')return json({auth_mode:'google',provider:'mock'});
   if(url.pathname==='/v1/me')return json({id:'test',session_id:'session',name:'Test account',is_system_admin:true,report_columns:['date','api_key','model','status','tokens','estimated_cost','cost','confirmed_cost','settlement']});
   if(url.pathname==='/v1/organizations/11111111-1111-4111-8111-111111111111')return json(organization);

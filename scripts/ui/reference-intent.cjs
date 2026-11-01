@@ -1,3 +1,4 @@
+const {generationFixtureResponse}=require('./generation-page-fixture.cjs');
 const {useFixtureKey}=require('./fixture-key.cjs');
 const {evidencePath} = require('./evidence.cjs');
 // Real browser controls; every API/file response is a synthetic localhost fixture.
@@ -69,7 +70,7 @@ const server=http.createServer((req,res)=>{
    finally{gate?.finished.resolve();}
   };
   await context.route(url=>url.origin!==origin||url.pathname!=='/v1/references',async route=>{
-   const req=route.request(),url=new URL(req.url()),json=data=>route.fulfill({json:data});
+   const req=route.request(),url=new URL(req.url()),json=data=>route.fulfill({json:generationFixtureResponse(route.request(),data)});
    if(url.origin!==origin){external.push(req.url());return route.abort();}
    if(!url.pathname.startsWith('/v1/'))return route.continue();
    if(url.pathname==='/v1/info')return json({auth_mode:'google',provider:'mock'});

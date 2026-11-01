@@ -1,3 +1,4 @@
+const {generationFixtureResponse}=require('./generation-page-fixture.cjs');
 const {evidencePath} = require('./evidence.cjs');
 // Isolated workspace navigation and key-context tests. No provider or production requests.
 const {chromium}=require('playwright'),http=require('node:http'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
@@ -8,7 +9,7 @@ const a='11111111-1111-4111-8111-111111111111',b='22222222-2222-4222-8222-222222
 const org=id=>({id,name:id===a?'Sunday Games':'Second organization',role:manager?'client_manager':'admin',balance_usd:50,credit_limit_usd:1000,available_usd:1050,weekly_limit_usd:10,weekly_committed_usd:0,default_weekly_limit_usd:10,storage_bytes:1000});
 const keys=[{id:'key-a',name:'Organization A key',organization_id:a,resource_mode:'shared',scopes:['generation'],prefix:'gw_a',created_at:new Date().toISOString()},{id:'key-b',name:'Organization B key',organization_id:b,resource_mode:'shared',scopes:['generation'],prefix:'gw_b',created_at:new Date().toISOString()},{id:'key-personal',name:'Personal key',resource_mode:'personal',scopes:['generation'],prefix:'gw_p',created_at:new Date().toISOString()}];
 const secrets={'fixture-a':keys[0],'fixture-b':keys[1],'fixture-personal':keys[2]};
-await page.route('**/v1/**',async route=>{const req=route.request(),url=new URL(req.url()),p=url.pathname,method=req.method(),data=req.postData()?req.postDataJSON():null,json=value=>route.fulfill({json:value});if(method!=='GET')writes.push({p,method,data});if(failure&&method===failure.method&&p.includes(failure.path))return route.fulfill({status:500,json:{error:{message:'Operation failed for testing'}}});
+await page.route('**/v1/**',async route=>{const req=route.request(),url=new URL(req.url()),p=url.pathname,method=req.method(),data=req.postData()?req.postDataJSON():null,json=value=>route.fulfill({json:generationFixtureResponse(route.request(),value)});if(method!=='GET')writes.push({p,method,data});if(failure&&method===failure.method&&p.includes(failure.path))return route.fulfill({status:500,json:{error:{message:'Operation failed for testing'}}});
 if(p==='/v1/info')return json({auth_mode:'google',provider:'mock',console:{generation_ui:true,personal_providers:personal,shared_resources:true,version:1}});
 if(p==='/v1/me')return json({id:uid,email:'tester@example.test',name:'Tester',theme:process.env.UI_THEME||'dark',session_id:'session',is_system_admin:admin,is_client_manager:manager});
 if(p==='/v1/organizations')return json({data:emptyMembers&&!url.searchParams.has('all')?[]:[org(a),org(b)].slice(0,organizationCount)});
