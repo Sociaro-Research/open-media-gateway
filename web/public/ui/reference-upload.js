@@ -8,20 +8,20 @@
  const equivalent=type=>['audio/wav','audio/x-wav'].includes(type)?'audio/wave':type;
  function fileTypes(kind,rule){const declared=rule?.content_types;return declared?.length?[...types[kind],...extended[kind]].filter(type=>declared.some(item=>equivalent(item)===equivalent(type))):types[kind];}
  const el=(tag,text='',cls='')=>{const node=document.createElement(tag);node.textContent=text;node.className=cls;return node;};
- function formatLimit(bytes,unit='MB'){const value=bytes/(unit==='MiB'?1024*1024:1_000_000),digits=value>=1?2:Math.min(6,Math.max(2,Math.ceil(-Math.log10(value))+1));return new Intl.NumberFormat('en-US',{maximumFractionDigits:digits}).format(value)+' '+unit;}
+ const formatLimit=bytes=>FileSize.megabytes(bytes);
  function create(config){
-  const id='referenceUpload'+(++sequence),root=el('div','','reference-dropzone'),input=el('input'),title=el('p',config.title),actions=el('div','','reference-actions'),hint=el('small'),status=el('p','','reference-status'),preview=el('div','','reference-card template-reference-preview');
+  const id='referenceUpload'+(++sequence),root=el('div','','reference-dropzone'),input=el('input'),title=el('p',config.title),actions=el('div','','reference-actions'),hint=el('small'),precision=el('span','','sr-only'),status=el('p','','reference-status'),preview=el('div','','reference-card template-reference-preview');
   root.setAttribute('role','group');root.setAttribute('aria-label',config.label);root.dataset.referenceUpload='';
   input.type='file';input.hidden=true;input.setAttribute('aria-label',config.label+' file');
   input.accept=config.kinds.flatMap(kind=>types[kind]).join(',');
-  hint.id=id+'Hint';status.id=id+'Status';status.setAttribute('role','status');status.setAttribute('aria-live','polite');
+  hint.id=id+'Hint';precision.id=id+'Exact';status.id=id+'Status';status.setAttribute('role','status');status.setAttribute('aria-live','polite');
   const button=(text,fn)=>{const node=el('button',text,'secondary');node.type='button';node.onclick=fn;return node;};
-  const upload=button(config.uploadLabel,()=>{if(!busy){returnFocus=true;input.click();}});upload.dataset.uploadPicker='';upload.setAttribute('aria-label',config.uploadLabel+' for '+config.label);upload.setAttribute('aria-describedby',hint.id);
+  const upload=button(config.uploadLabel,()=>{if(!busy){returnFocus=true;input.click();}});upload.dataset.uploadPicker='';upload.setAttribute('aria-label',config.uploadLabel+' for '+config.label);upload.setAttribute('aria-describedby',hint.id+' '+precision.id);
   const library=config.onLibrary?button('Choose from library',()=>{if(!busy)config.onLibrary(api);}):null;
   const cancel=button('Cancel upload',()=>operation?.abort());cancel.dataset.uploadCancel='';cancel.hidden=true;
   const retry=button('Retry upload',()=>{returnFocus=true;if(lastFile)select([lastFile]);});retry.hidden=true;
   actions.append(upload);if(library)actions.append(library);actions.append(cancel,retry);
-  preview.hidden=true;root.append(preview,title,actions,hint,status,input);
+  preview.hidden=true;root.append(preview,title,actions,hint,precision,status,input);
   let busy=false,operation=null,lastFile=null,depth=0,returnFocus=false,assignedName='',selected=false;
   const remove=config.onRemove?button('Remove',event=>{event.stopPropagation();if(busy||config.locked?.())return;config.onRemove();if(root.isConnected)focusAction();}):null;
   if(remove){remove.dataset.uploadRemove='';actions.append(remove);}
@@ -30,7 +30,7 @@
   const allowedTypes=kind=>fileTypes(kind,config.limits?.(kind));
   function limits(kind){const base={image:30,video:200,audio:50}[kind]*1024*1024,shared=config.maxBytes?.(kind)??base,rule=config.limits?.(kind)||{};return {shared,rule};}
   function message(text='',error=false){status.textContent=text;status.classList.toggle('error',error);}
-  function sync(){const locked=busy||!!config.locked?.();if(remove){upload.hidden=selected;if(library)library.hidden=selected;remove.hidden=!selected;remove.disabled=locked;title.hidden=selected&&!config.selectedTitle;title.textContent=selected&&config.selectedTitle?config.selectedTitle:config.title;hint.hidden=selected;if(selected)retry.hidden=true;}upload.disabled=locked;input.disabled=locked;if(library)library.disabled=locked;retry.disabled=locked;cancel.disabled=!busy;cancel.hidden=!busy||config.cancelable?.()===false;root.setAttribute('aria-busy',String(busy));input.accept=config.kinds.flatMap(allowedTypes).join(',');hint.textContent=config.hint||config.kinds.map(kind=>{const {shared,rule}=limits(kind);return kind+' · '+(rule.max_bytes&&rule.max_bytes-(rule.max_bytes_inclusive?0:1)<=shared?formatLimit(rule.max_bytes-(rule.max_bytes_inclusive?0:1)):formatLimit(shared,'MiB'))+' maximum';}).join(' · ');}
+  function sync(){const locked=busy||!!config.locked?.();if(remove){upload.hidden=selected;if(library)library.hidden=selected;remove.hidden=!selected;remove.disabled=locked;title.hidden=selected&&!config.selectedTitle;title.textContent=selected&&config.selectedTitle?config.selectedTitle:config.title;hint.hidden=selected;if(selected)retry.hidden=true;}upload.disabled=locked;input.disabled=locked;if(library)library.disabled=locked;retry.disabled=locked;cancel.disabled=!busy;cancel.hidden=!busy||config.cancelable?.()===false;root.setAttribute('aria-busy',String(busy));input.accept=config.kinds.flatMap(allowedTypes).join(',');precision.textContent=hint.title=config.kinds.map(kind=>{const {shared,rule}=limits(kind);return kind+': '+FileSize.exact(Math.min(shared,rule.max_bytes?rule.max_bytes-(rule.max_bytes_inclusive?0:1):shared))+' maximum';}).join(' · ');hint.textContent=config.hint||config.kinds.map(kind=>{const {shared,rule}=limits(kind);return kind+' · '+(rule.max_bytes&&rule.max_bytes-(rule.max_bytes_inclusive?0:1)<=shared?formatLimit(rule.max_bytes-(rule.max_bytes_inclusive?0:1)):formatLimit(shared))+' maximum';}).join(' · ');}
   function error(file){
    const kind=config.kinds.find(kind=>allowedTypes(kind).includes(file.type));
    if(!kind)return file.name+': format '+(file.type||'unknown')+'; use a supported '+config.kinds.join(' or ')+' file ('+config.kinds.flatMap(kind=>types[kind]).join(', ')+').';

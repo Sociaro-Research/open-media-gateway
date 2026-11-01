@@ -17,7 +17,7 @@
 		rewrite * /ui/documentation.html
 		file_server
 	}
-	@assets path /ui/site.js /ui/theme.js /ui/layout.js /ui/styles.css /ui/docs.css /ui/form-ui.js /ui/docs.js
+	@assets path /ui/site.js /ui/theme.js /ui/layout.js /ui/styles.css /ui/docs.css /ui/form-ui.js /ui/file-size.js /ui/docs.js
 	handle @assets {
 		file_server
 	}
@@ -88,7 +88,7 @@
 	handle @rawHTML {
 		respond 404
 	}
-	@publicAssets path /ui/legal.css /ui/legal.js /ui/site.js /ui/theme.js /ui/layout.js /ui/styles.css /ui/docs.css /ui/form-ui.js /ui/email-login.js /ui/login.js /ui/google-icon.svg
+	@publicAssets path /ui/legal.css /ui/legal.js /ui/site.js /ui/theme.js /ui/layout.js /ui/styles.css /ui/docs.css /ui/form-ui.js /ui/file-size.js /ui/email-login.js /ui/login.js /ui/google-icon.svg
 	handle @publicAssets {
 		file_server
 	}

@@ -257,7 +257,7 @@ func validateBody(body map[string]any) error {
 	}
 	raw, err := json.Marshal(body)
 	if err != nil || len(raw) > 65536 {
-		return errors.New("extra body must be a JSON object below 64 KiB")
+		return errors.New("extra body must be a JSON object at most ≈65.54 KB (65536 bytes)")
 	}
 	return nil
 }

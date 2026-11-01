@@ -22,7 +22,7 @@ import (
 
 const MaxBytes int64 = 200 << 20
 
-var ErrInvalidImage = errors.New("use PNG, JPEG, WebP, GIF or still HEIC/HEIF (30 MB), MP4, MOV or WebM (200 MB), or MP3, WAV, AAC, M4A, OGG or FLAC (50 MB)")
+var ErrInvalidImage = errors.New("use PNG, JPEG, WebP, GIF or still HEIC/HEIF (≈31.46 MB; 31457280 bytes), MP4, MOV or WebM (≈209.72 MB; 209715200 bytes), or MP3, WAV, AAC, M4A, OGG or FLAC (≈52.43 MB; 52428800 bytes)")
 var ErrDuplicate = errors.New("reference content already exists")
 var ErrInUse = errors.New("reference is retained by a template or is being prepared by a provider; remove retained usage before deleting the original")
 var ErrUploadBusy = errors.New("another reference upload is in progress; retry shortly")

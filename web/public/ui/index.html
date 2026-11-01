@@ -145,7 +145,7 @@
                   <div id="referenceDropzone" class="reference-dropzone" role="group" aria-labelledby="referencesLabel">
                     <p>Drop images here</p>
                     <div class="reference-actions"><button id="uploadReference" type="button" class="secondary">Upload images</button><button id="chooseReferences" type="button" class="secondary">Choose from library</button></div>
-                    <small>PNG, JPEG, WebP or GIF · Up to 30 MB each</small>
+                    <small>PNG, JPEG, WebP or GIF · Up to ≈31.46 MB each</small>
                   </div>
                   <input id="referenceFiles" type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden>
                   <div id="selectedReferences" class="selected-references"></div>
@@ -439,6 +439,7 @@
     </article>
   </template>
 
+  <script src="/ui/file-size.js?v=20261101-decimal-mb"></script>
   <script src="/ui/user-ui.js?v=20261030-recovered-batch" defer></script>
   <script src="/ui/model-info.js?v=20261031-provider-controls" defer></script>
   <script src="/ui/provider-logos.js?v=20261031-gw248"></script>

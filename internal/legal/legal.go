@@ -27,7 +27,7 @@ func (d Document) Validate() error {
 		return errors.New("version is required")
 	}
 	if !utf8.ValidString(d.Text) || len(d.Text) > MaxTextBytes || strings.IndexFunc(d.Text, func(r rune) bool { return unicode.IsControl(r) && r != '\n' && r != '\r' && r != '\t' }) >= 0 {
-		return errors.New("document must be plain text up to 64 KiB without control characters")
+		return errors.New("document must be plain text up to ≈65.54 KB (65536 bytes) without control characters")
 	}
 	return nil
 }

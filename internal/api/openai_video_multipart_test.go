@@ -56,7 +56,7 @@ func TestVideoMultipartAdmissionAndValidation(t *testing.T) {
 		{name: "duplicate_prompt", fields: [][2]string{{"prompt", "duplicate"}}, want: 400, wantMessage: "field must appear once"},
 		{name: "invalid_options_json", fields: [][2]string{{"options", "{"}}, want: 400},
 		{name: "invalid_seconds", fields: [][2]string{{"seconds", "0"}}, want: 400, wantMessage: "seconds"},
-		{name: "oversize_field", fields: [][2]string{{"extra", strings.Repeat("x", (64<<10)+1)}}, want: 400, wantMessage: "field exceeds 64 KiB"},
+		{name: "oversize_field", fields: [][2]string{{"extra", strings.Repeat("x", (64<<10)+1)}}, want: 400, wantMessage: "field exceeds ≈65.54 KB (65536 bytes)"},
 		{name: "two_video_references", files: 2, want: 400, wantMessage: "one video input reference"},
 		{name: "unsupported_file_field", fileKey: "other", files: 1, want: 400, wantMessage: "unsupported file field"},
 		{name: "file_and_url", fields: [][2]string{{"input_reference", "https://example.test/image.png"}}, files: 1, want: 400, wantMessage: "send files or URLs"},

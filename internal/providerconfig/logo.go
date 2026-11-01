@@ -18,7 +18,7 @@ type LogoRepository interface {
 
 func ValidateLogo(data []byte) error {
 	if len(data) > MaxLogoBytes {
-		return errors.New("logo must be at most 1 MiB")
+		return errors.New("logo must be at most ≈1.05 MB (1048576 bytes)")
 	}
 	if !bytes.HasPrefix(data, []byte("\x89PNG\r\n\x1a\n")) {
 		return errors.New("logo must be a PNG image with transparency; other formats are unsupported")

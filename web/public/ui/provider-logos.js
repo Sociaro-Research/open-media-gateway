@@ -157,7 +157,7 @@
   }
 
   async function validate(file) {
-    if (file.size > limit) throw new Error('Logo must be at most 1 MiB.');
+    if (file.size > limit) throw new Error('Logo must be at most '+FileSize.megabytes(limit)+' ('+FileSize.exact(limit)+').');
     const bytes = new Uint8Array(await file.arrayBuffer());
     if (!/\.png$/i.test(file.name) || (file.type && file.type !== 'image/png') || !signature.every((b,i) => bytes[i] === b)) {
       throw new Error('Choose a PNG image with transparency. Other formats are unsupported.');
@@ -187,7 +187,7 @@
     let operationState, intent='upload', shown=Symbol('initial');
     const upload=ReferenceUpload.create({
       label:provider.name+' logo', title:'No logo. Drop a PNG here',selectedTitle:provider.name+' logo',uploadLabel:'Upload Logo',kinds:['image'],onRemove:removeLogo,
-      hint:'PNG with transparency · up to 1 MiB · maximum 2048 × 2048 px',
+      hint:'PNG with transparency · up to '+FileSize.megabytes(limit)+' · maximum 2048 × 2048 px',maxBytes:()=>limit,
       limits:()=>({content_types:['image/png']}), locked:()=>uploads.has(identity), cancelable:()=>false,
       retainedMessage:()=>provider.icon_url?' Current logo retained.':' No logo installed.',
       onBusy:busy=>{

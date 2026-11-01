@@ -2,7 +2,7 @@
  'use strict';
  const node=(tag,text='',cls='')=>{const n=document.createElement(tag);n.textContent=text;if(cls)n.className=cls;return n;};
  const button=(text,label,action)=>{const n=node('button',text,'secondary');n.type='button';n.setAttribute('aria-label',label);n.onclick=action;return n;};
- const size=value=>value==null?'':value<1024?`${value} B`:value<1024*1024?`${(value/1024).toFixed(1).replace(/\.0$/,'')} KB`:`${(value/1024/1024).toFixed(1).replace(/\.0$/,'')} MB`;
+ const size=value=>FileSize.format(value);
  function stop(root){for(const media of root.querySelectorAll('video,audio')){media.pause();media.removeAttribute('src');media.load();}}
  // Transport, authorization and slot validation belong to the caller. This is
  // the single Playground/library presentation, shared by every reference scope.

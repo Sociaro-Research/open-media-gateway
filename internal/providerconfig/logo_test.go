@@ -49,7 +49,7 @@ func TestLogoValidation(t *testing.T) {
 	}{
 		{[]byte(`<svg onload="alert(1)"/>`), "unsupported"},
 		{[]byte("\x89PNG\r\n\x1a\nmalformed"), "invalid PNG"},
-		{make([]byte, MaxLogoBytes+1), "1 MiB"},
+		{make([]byte, MaxLogoBytes+1), "1.05 MB"},
 	} {
 		if err := ValidateLogo(tc.data); err == nil || !strings.Contains(err.Error(), tc.want) {
 			t.Fatal(err)

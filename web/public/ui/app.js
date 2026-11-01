@@ -219,9 +219,7 @@ function taskSettings(task) {
 }
 
 function formatBytes(value) {
-  if (!Number.isFinite(value) || value < 1) return '';
-  if (value < 1024 * 1024) return `${Math.ceil(value / 1024)} KB`;
-  return `${(value / 1024 / 1024).toFixed(1)} MB`;
+  return FileSize.format(value);
 }
 
 function usageSummary(usage, provider) {

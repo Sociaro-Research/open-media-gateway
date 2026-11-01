@@ -59,7 +59,7 @@ func (s *Server) multipartGeneration(w http.ResponseWriter, r *http.Request) (ma
 		if r.MultipartForm != nil {
 			_ = r.MultipartForm.RemoveAll()
 		}
-		invalidParameter(w, "body", "invalid multipart request or upload exceeds 32 MiB")
+		invalidParameter(w, "body", "invalid multipart request or upload exceeds ≈33.55 MB (33554432 bytes)")
 		return nil, false
 	}
 	defer r.MultipartForm.RemoveAll()
@@ -173,7 +173,7 @@ func videoMultipartFields(w http.ResponseWriter, r *http.Request) (map[string]js
 			return fields, false, ok
 		}
 		if err != nil {
-			invalidParameter(w, "body", "invalid multipart request or upload exceeds 32 MiB")
+			invalidParameter(w, "body", "invalid multipart request or upload exceeds ≈33.55 MB (33554432 bytes)")
 			return nil, false, false
 		}
 		if parts >= 1000 {
@@ -190,12 +190,12 @@ func videoMultipartFields(w http.ResponseWriter, r *http.Request) (map[string]js
 		name := part.FormName()
 		value, err := io.ReadAll(io.LimitReader(part, (64<<10)+1))
 		if err != nil || len(value) > 64<<10 {
-			invalidParameter(w, name, "field exceeds 64 KiB or could not be read")
+			invalidParameter(w, name, "field exceeds ≈65.54 KB (65536 bytes) or could not be read")
 			return nil, false, false
 		}
 		// Match the standard form parser's bounded in-memory field budget.
 		if prefix.Len() > 11<<20 {
-			invalidParameter(w, "body", "multipart fields exceed 11 MiB")
+			invalidParameter(w, "body", "multipart fields exceed ≈11.53 MB (11534336 bytes)")
 			return nil, false, false
 		}
 		values[name] = append(values[name], string(value))
@@ -211,7 +211,7 @@ func multipartGenerationFields(w http.ResponseWriter, values map[string][]string
 		}
 		value := values[0]
 		if len(value) > 64<<10 {
-			invalidParameter(w, key, "field exceeds 64 KiB")
+			invalidParameter(w, key, "field exceeds ≈65.54 KB (65536 bytes)")
 			return nil, false
 		}
 		switch key {

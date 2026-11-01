@@ -114,7 +114,7 @@ function hashReferenceFile(file,signal){
     if(kind==='audio')files.disabled=field.closest('#audioURLField').hidden&&!(library.open&&voiceTarget&&mode()?.supports_reference_voice);
   }
   function render() {
-    const text='Up to '+limitText()+' each';dropzone.querySelector('small').textContent=text;library.querySelector('#libraryDropzone small').textContent=text;
+    const text='Up to '+limitText()+' each',exact=FileSize.exact(maxBytes())+' maximum';for(const [index,zone] of [dropzone,library.querySelector('#libraryDropzone')].entries()){const hint=zone.querySelector('small');hint.textContent=text;hint.title=exact;hint.id=kind+'Limit'+index;let precision=zone.querySelector('[data-byte-limit]');if(!precision){precision=document.createElement('span');precision.dataset.byteLimit='';precision.className='sr-only';precision.id=hint.id+'Exact';zone.append(precision);}precision.textContent=exact;for(const action of zone.querySelectorAll('button'))action.setAttribute('aria-describedby',hint.id+' '+precision.id);}
     syncFileInput();files.accept=accept();
     recheck();
     for(const node of document.querySelectorAll(`[data-reference-cancel="${kind}"]`))node.hidden=!busy;

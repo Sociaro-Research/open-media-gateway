@@ -66,7 +66,7 @@ func (s *Server) uploadProviderLogo(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	data, err := io.ReadAll(r.Body)
 	if err != nil {
-		writeError(w, 400, "invalid_logo", "upload did not complete or exceeded 1 MiB; choose a PNG and retry")
+		writeError(w, 400, "invalid_logo", "upload did not complete or exceeded ≈1.05 MB (1048576 bytes); choose a PNG and retry")
 		return
 	}
 	if err := providerconfig.ValidateLogo(data); err != nil {

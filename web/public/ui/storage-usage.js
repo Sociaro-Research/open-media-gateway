@@ -1,7 +1,7 @@
 (() => {
  const warning='Shared storage limit exceeded. Delete references or stored generation results before uploading files or starting another generation.';
  let current=null,sequence=0;
- function size(bytes){if(bytes==null)return 'Unknown';const units=['B','KB','MB','GB','TB'];let value=bytes,index=0;while(value>=1000&&index<units.length-1){value/=1000;index++;}return `${Number(value.toFixed(2))} ${units[index]}`;}
+ function size(bytes){return FileSize.format(bytes)||'Unknown';}
  function render(){
   document.querySelectorAll('.reference-dropzone').forEach(zone=>{let note=zone.querySelector('[data-storage-quota]');if(!note){note=document.createElement('p');note.dataset.storageQuota='';note.className='reference-status error';zone.append(note);}note.textContent=current?.exceeded?warning:'';note.hidden=!current?.exceeded;zone.querySelectorAll('[data-upload],#uploadReference,#videoUploadReference,#audioUploadReference').forEach(button=>{button.disabled=!!current?.exceeded;});});
  }

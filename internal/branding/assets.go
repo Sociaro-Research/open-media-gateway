@@ -29,7 +29,7 @@ func contains(list []string, value string) bool {
 }
 func (a Asset) Validate(key string) error {
 	if len(a.Data) == 0 || len(a.Data) > MaxAssetBytes {
-		return errors.New("image must be at most 512 KiB")
+		return errors.New("image must be at most ≈524.29 KB (524288 bytes)")
 	}
 	if a.MIME == "image/svg+xml" {
 		if key == "touch_icon" || key == "email_logo" {

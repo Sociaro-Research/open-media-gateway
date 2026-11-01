@@ -52,11 +52,11 @@ const cleanup=[];
     ['opaque RGB',fixtures.opaqueRGB,'logo.png','image/png','contain transparency'],
     ['opaque RGBA',fixtures.opaqueRGBA,'logo.png','image/png','contain transparency'],
     ['opaque16',fixtures.opaque16,'logo.png','image/png','contain transparency'],
-    ['oversize',Buffer.alloc(1048577),'logo.png','image/png','1 MiB'],
+    ['oversize',Buffer.alloc(1048577),'logo.png','image/png','1.05 MB'],
     ['dimensions',fixtures.make({width:2049}),'logo.png','image/png','dimensions']
    ]){await input().setInputFiles({name,mimeType,buffer});await editor().getByRole('status').filter({hasText:message}).waitFor();assert.equal(writes,0,label+' reached server');assert.equal(await input().isEnabled(),true);assert.equal(await editor().locator('img').count(),0);}
    // Independently exercise the real server with all same content failures.
-   for(const [buffer,mimeType,message] of [[Buffer.from('<svg/>'),'image/png','unsupported'],[fixtures.valid,'image/jpeg','Content-Type'],[fixtures.valid.subarray(0,35),'image/png','invalid PNG'],[fixtures.opaqueRGB,'image/png','transparency'],[fixtures.opaqueRGBA,'image/png','transparency'],[fixtures.opaque16,'image/png','transparency'],[Buffer.alloc(1048577),'image/png','1 MiB'],[fixtures.make({width:2049}),'image/png','dimensions']]){
+   for(const [buffer,mimeType,message] of [[Buffer.from('<svg/>'),'image/png','unsupported'],[fixtures.valid,'image/jpeg','Content-Type'],[fixtures.valid.subarray(0,35),'image/png','invalid PNG'],[fixtures.opaqueRGB,'image/png','transparency'],[fixtures.opaqueRGBA,'image/png','transparency'],[fixtures.opaque16,'image/png','transparency'],[Buffer.alloc(1048577),'image/png','1.05 MB'],[fixtures.make({width:2049}),'image/png','dimensions']]){
     const r=await context.request.put(base+'/v1/admin/providers/openai/logo',{data:buffer,headers:{'Content-Type':mimeType}});assert.equal(r.status(),400);assert.match(await r.text(),new RegExp(message));assert.equal(await iconURL('openai'),undefined);
    }
    // Valid16-bit near-opaque alpha must pass both validators.

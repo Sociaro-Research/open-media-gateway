@@ -111,7 +111,7 @@ func (s *Server) remoteWorkspaceProxy(w http.ResponseWriter, r *http.Request) {
 	}
 	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, remote.MaxJSON))
 	if err != nil {
-		writeError(w, 413, "request_too_large", "Remote requests are limited to 4 MiB")
+		writeError(w, 413, "request_too_large", "Remote requests are limited to ≈4.19 MB (4194304 bytes)")
 		return
 	}
 	query, err := url.ParseQuery(r.URL.RawQuery)
@@ -157,7 +157,7 @@ func (s *Server) remoteWorkspaceProxy(w http.ResponseWriter, r *http.Request) {
 		defer response.Body.Close()
 	}
 	if response.ContentLength > 512<<20 {
-		writeError(w, 502, "remote_file_too_large", "Remote downloads are limited to 512 MiB")
+		writeError(w, 502, "remote_file_too_large", "Remote downloads are limited to ≈536.87 MB (536870912 bytes)")
 		return
 	}
 	w.Header().Set("Cache-Control", "no-store")

@@ -19,7 +19,7 @@
    const open=el('button','Edit '+title,'secondary');open.type='button';group.append(open);
    open.onclick=async()=>{
     if(open.disabled)return;open.disabled=true;
-    const dialog=el('dialog',undefined,'keys-revoke-dialog sales-dialog legal-editor'),form=el('form'),status=el('p'),actions=el('div',undefined,'dialog-actions'),save=el('button','Save','primary'),cancel=el('button','Cancel','secondary'),reset=el('button','Use default template','secondary'),text=el('textarea'),label=el('label',title),help=el('p','Plain text only; line breaks are preserved. HTML and links are displayed as text. Up to 64 KiB. Saving publishes immediately. An empty document uses the bundled template.','field-explanation');
+    const dialog=el('dialog',undefined,'keys-revoke-dialog sales-dialog legal-editor'),form=el('form'),status=el('p'),actions=el('div',undefined,'dialog-actions'),save=el('button','Save','primary'),cancel=el('button','Cancel','secondary'),reset=el('button','Use default template','secondary'),text=el('textarea'),label=el('label',title),help=el('p','Plain text only; line breaks are preserved. HTML and links are displayed as text. Up to '+FileSize.limit(65536)+'. Saving publishes immediately. An empty document uses the bundled template.','field-explanation');
     let busy=false,loaded=false,initial='',version;
     const dismiss=()=>{if(!busy)dialog.close();};
     const {close}=FormUI.dialogHeading(form,title,dismiss);dialog.setAttribute('aria-label',title);
@@ -35,7 +35,7 @@
      const data=await api('/v1/system/legal/'+kind);if(!dialog.isConnected)return;if(!current()){dialog.close();return}
      version=data.version;initial=data.text;if(!initial){const response=await fetch('/'+kind,{credentials:'omit',cache:'no-store'});if(!response.ok)throw Error('Could not load the default template.');const document=new DOMParser().parseFromString(await response.text(),'text/html'),content=document.querySelector('[data-legal-default]');if(!content)throw Error('Could not load the default template.');initial=[...content.children].map(n=>n.textContent.trim()).filter(Boolean).join('\n\n');}if(!dialog.isConnected)return;text.value=initial;loaded=true;text.disabled=false;reset.disabled=false;FormUI.message(status,'');text.focus();
      FormUI.watch(form,save,{placement:'footer',read:()=>text.value,valid:()=>!busy&&new TextEncoder().encode(text.value).length<=65536});
-     text.oninput=()=>{const tooLarge=new TextEncoder().encode(text.value).length>65536;text.setCustomValidity(tooLarge?'Document must be at most 64 KiB.':'');FormUI.message(status,text.value!==initial?'Unsaved changes. Cancel or Close discards this draft.':'');FormUI.update(form)};
+     text.oninput=()=>{const tooLarge=new TextEncoder().encode(text.value).length>65536;text.setCustomValidity(tooLarge?'Document must be at most '+FileSize.limit(65536)+' ('+FileSize.exact(65536)+').':'');FormUI.message(status,text.value!==initial?'Unsaved changes. Cancel or Close discards this draft.':'');FormUI.update(form)};
      FormUI.refresh();
     }catch(e){if(dialog.isConnected)FormUI.message(status,e.message,'error')}
     form.onsubmit=async e=>{

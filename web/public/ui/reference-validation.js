@@ -37,6 +37,6 @@ window.ReferenceValidation=(()=>{
   if(kind==='video'&&!model?.manual&&model?.supports_video_input&&videoMode&&declared>base)limit=Math.min(300000000,declared);
   return declared===null?limit:Math.min(limit,declared);
  }
- function limitLabel(model,kind,options={}){const bytes=fileLimit(model,kind,options),base=({image:30,video:200,audio:50}[kind]||0)*1024*1024;return ReferenceUpload.formatLimit(bytes,bytes===base?'MiB':'MB');}
+ function limitLabel(model,kind,options={}){return ReferenceUpload.formatLimit(fileLimit(model,kind,options));}
  return {target,signature,ids,check,upload,fileLimit,limitLabel};
 })();

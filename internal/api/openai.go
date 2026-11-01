@@ -282,7 +282,7 @@ func (s *Server) createOpenAIGeneration(w http.ResponseWriter, r *http.Request) 
 		r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
 		d := json.NewDecoder(r.Body)
 		if err := d.Decode(&fields); err != nil || fields == nil || d.Decode(&struct{}{}) != io.EOF {
-			invalidParameter(w, "body", "send one JSON object, up to 64 KiB")
+			invalidParameter(w, "body", "send one JSON object, up to ≈65.54 KB (65536 bytes)")
 			return
 		}
 	}

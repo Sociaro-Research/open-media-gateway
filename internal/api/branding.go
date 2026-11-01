@@ -43,7 +43,7 @@ func (s *Server) brandingSettings(w http.ResponseWriter, r *http.Request) {
 	d := json.NewDecoder(r.Body)
 	d.DisallowUnknownFields()
 	if err := d.Decode(&next); err != nil || d.Decode(&struct{}{}) != io.EOF {
-		writeError(w, 400, "invalid_request", "send one appearance object up to 6 MiB")
+		writeError(w, 400, "invalid_request", "send one appearance object up to ≈6.29 MB (6291456 bytes)")
 		return
 	}
 	if err := next.Validate(); err != nil {

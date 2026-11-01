@@ -837,3 +837,14 @@ its own synthetic clip with FFmpeg; it uses no live provider calls. Server-side
 scope, current consumer authorization under the admission transaction, native
 preparation dispatch, historical jobs and all eight provider catalogues are
 covered separately by Go tests.
+
+### Decimal file-size display
+
+Run `node scripts/ui/file-size-display.cjs` in both browser engines. The local
+fixture checks shared Library/Template/audio labels, decimal thresholds and
+rounding, unknown/zero sizes, exact inclusive upload boundaries and native versus
+manual model limits. It captures both themes at 1440/390/320 px. Reuse
+`upload-limit-format.cjs` for strict provider boundaries and tiny nonzero limits;
+`provider-upload-context.cjs` additionally requires its sanitized actual descriptor
+export through `UI_PROVIDER_DESCRIPTOR_FILE`. Human labels are rounded; byte
+validation and the exact-byte limit tooltip remain authoritative.
