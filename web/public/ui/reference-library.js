@@ -28,13 +28,13 @@
     // Native playback is outside the selection button, so playing media never
     // assigns a slot or nests interactive controls inside another control.
     if(kind==='video'||kind==='audio'){
-     const play=button('▶','Play '+name,()=>{
+     const play=button('▶','Play '+name,event=>{event.stopPropagation();
       let player=card.querySelector('[data-player]');
       if(!player){player=node(kind);player.dataset.player='';player.src=item.url;player.controls=true;player.preload='metadata';player.playsInline=true;player.tabIndex=0;player.setAttribute('aria-label','Preview '+name);
-       player.onerror=()=>{const focused=document.activeElement===player;player.pause();player.removeAttribute('src');player.load();player.remove();play.hidden=false;play.textContent='↻';play.setAttribute('aria-label','Retry preview '+name);play.title='Retry preview '+name;if(focused)play.focus();};card.append(player);
+       const recover=()=>{const focused=document.activeElement===player;player.pause();player.removeAttribute('src');player.load();player.remove();card.classList.remove('reference-media-playing');play.hidden=false;play.textContent='↻';play.setAttribute('aria-label','Retry preview '+name);play.title='Retry preview '+name;if(focused&&dialog.open)play.focus();};player.onerror=recover;player.recover=recover;card.append(player);
       }
-      play.hidden=true;player.focus({preventScroll:true});player.play().catch(error=>{if(error.name!=='AbortError'&&player.isConnected)play.hidden=false;});
-     });play.classList.add('reference-play');play.title='Play '+name;play.disabled=busy||!!item.deleting;card.append(play);
+      card.classList.add('reference-media-playing');play.hidden=true;player.focus({preventScroll:true});player.play().catch(error=>{if(error.name!=='AbortError'&&player.isConnected)player.recover();});
+     });play.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>';play.classList.add('reference-play');play.title='Play '+name;play.disabled=busy||!!item.deleting;card.append(play);
     }else{const retry=button('Retry preview','Retry preview',()=>{choose.querySelector('.reference-placeholder')?.remove();visual.hidden=false;visual.src=item.url;retry.hidden=true;});retry.classList.add('reference-play');retry.textContent='↻';retry.title='Retry preview';retry.hidden=true;visual.addEventListener('error',()=>{retry.hidden=false;});card.append(retry);}
     if(onDelete){const remove=button('Delete','Delete '+name+' from library',()=>{if(card.querySelector('.reference-delete-warning'))return;const warning=node('p','Delete this file permanently? Pending generations using it may fail.','reference-delete-warning'),actions=node('div','','reference-card-actions');actions.append(button('Cancel','Keep '+name,()=>{warning.remove();actions.remove();remove.disabled=busy;remove.focus();}),button('Delete file','Confirm delete '+name,()=>onDelete(item)));remove.disabled=true;card.append(warning,actions);});remove.classList.add('reference-delete');remove.disabled=busy;card.append(remove);}
     if(item.deleting)card.append(node('p','Deletion pending. An administrator can retry deletion.','reference-status'));

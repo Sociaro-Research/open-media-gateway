@@ -69,3 +69,10 @@ textarea.reference-hover { cursor:pointer; }
 .reference-library .reference-play { position:absolute; top:68px; left:50%; transform:translate(-50%,-50%); display:grid; place-items:center; width:44px; min-width:44px; height:44px; min-height:44px; padding:0; border-radius:50%; background:var(--panel); color:var(--text); border:1px solid var(--line); }
 
 .reference-card .reference-selection-remove { display:block; margin:12px auto 8px; min-height:44px; padding:8px 12px; }
+
+/* Playback occupies the existing thumbnail, outside the selection button. */
+.reference-library-grid .reference-media-playing .reference-choice > :is(img,video,.reference-placeholder) { visibility:hidden; }
+.reference-library-grid .reference-card > [data-player] { position:absolute; top:8px; left:8px; width:calc(100% - 16px); height:120px; max-height:120px; margin:0; z-index:2; object-fit:contain; background:var(--bg); }
+.reference-library .reference-play { z-index:3; background:color-mix(in srgb,var(--panel) 60%,transparent); font-size:24px; line-height:1; }
+.reference-library .reference-play svg { width:24px; height:24px; display:block; }
+.reference-library-grid .reference-delete { z-index:3; }

@@ -592,3 +592,5 @@ The **Show Playground / Templates** setting controls both console sections toget
 Installation mode choices retain the native unselected radio and a thin configured-accent filled selected dot. Skip for now belongs only to initial onboarding. Settings Apply appears only for a valid changed choice, hides on revert or success, and remains available after failure.
 
 The Installation Mode summary uses Change Mode and the shared 16px heading-to-content grid gap without stacked heading/paragraph margins.
+
+Library Play uses a translucent overlay with a larger shared play glyph. Playback replaces the poster in the same card media area; it never adds a second preview region. Keep native controls separate from selection, restore the poster and retry on failure, and dispose playback on close, filter, deletion and navigation.
