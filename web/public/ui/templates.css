@@ -125,3 +125,9 @@
 #templatesGallery .template-card:has(video:focus-visible) { --interaction-border-color:var(--accent); --interaction-border-width:2px; }
 #templatesGallery .template-card.selected:has(video:focus-visible) { --interaction-border-width:3px; }
 @media(forced-colors:active) { #templatesGallery .template-card:has(video:focus-visible) { --interaction-border-color:Highlight; } }
+
+.template-browser:not(.has-selection) { grid-template-columns:minmax(0,1fr); }
+#templateSelection #templateKeyHost .generation-key { margin:0; }
+
+#templateSelection { display:grid; gap:20px; }
+#templateKeyAccess:not([hidden]) { max-width:400px; margin-bottom:24px; }

@@ -6,8 +6,7 @@ retain the normal personal/organization ownership, project, billing, retention
 and history rules. Templates uses the existing Playground session key control.
 Forgetting, switching or revoking a key invalidates pending reads and inputs.
 
-Select a template title in the gallery. Its details, missing typed references and
-generation action appear in the left panel beneath the Playground key control.
+Select any part of a published gallery card except its administrator Edit action. Before selection only the gallery is shown. The selected template title, details and missing typed references appear in the left panel; the shared key/weekly usage control sits immediately before its final generation action.
 Fixed image/video references fill one equal-width row below the description. Each keeps its natural aspect ratio; videos play muted, inline and continuously without opening a separate preview. Only
 the model and free reference slots are editable. Review the existing generation
 estimate after supplying the missing references. **Advanced editing** directly replaces the Playground draft with the published prompt, settings, selected model

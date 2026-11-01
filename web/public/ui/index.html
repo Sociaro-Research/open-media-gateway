@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="/ui/styles.css?v=20261031-gw247">
   <link rel="stylesheet" href="/ui/docs.css?v=20261030-recovered-batch">
   <link rel="stylesheet" href="/ui/references.css?v=20261031-ui-batch">
-  <link rel="stylesheet" href="/ui/templates.css?v=20261031-gw238">
+  <link rel="stylesheet" href="/ui/templates.css?v=20261031-gw242">
 <script src="/ui/site.js" defer></script></head>
 <body>
   <div class="shell">
@@ -85,12 +85,12 @@
         <div class="form-heading console-section-heading"><h1>Templates</h1><div id="templateHeadingActions" class="form-heading-actions" role="group" aria-label="Template actions" hidden></div></div>
         <p id="templatesStatus" role="status" aria-live="polite"></p>
         <div id="templatesBrowser" class="template-browser">
-          <aside class="card template-selection-panel" aria-label="Use a template">
-            <h2>Use a template</h2>
+          <aside class="card template-selection-panel" aria-label="Selected template" hidden>
+            <div id="templateSelection"></div>
             <div id="templateKeyHost"></div>
-            <div id="templateSelection"><p>Select a template from the gallery.</p></div>
           </aside>
           <section class="template-browse-panel" aria-label="Template gallery">
+            <div id="templateKeyAccess" hidden></div>
             <div id="templatesGallery" class="template-gallery"></div>
           </section>
         </div>
@@ -478,7 +478,7 @@
   <script src="/ui/prompt-reference-editor.js?v=20261031-ui-batch" defer></script>
   <script src="/ui/reference-upload.js?v=20261031-gw241" defer></script>
   <script src="/ui/reference-library.js?v=20261031-ui-batch" defer></script>
-  <script src="/ui/templates.js?v=20261031-gw238" defer></script>
+  <script src="/ui/templates.js?v=20261031-gw242" defer></script>
   <script src="/ui/override-sound.js?v=20261031-ui-batch" defer></script>
   <script src="/ui/app.js?v=20261031-gw240" defer></script>
   <script src="/ui/email-delivery.js?v=20261030-recovered-batch" defer></script>

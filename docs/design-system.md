@@ -513,11 +513,10 @@ for adding files; each selected file card has its own internal Remove action.
 
 The shared gallery reuses cards, fields, `ModelPicker`, reference-library dialogs,
 `FormUI` heading Save, existing key/budget controls and generation confirmation.
-The left panel contains the Playground key control, selected template details,
-missing slots and generation action. The right gallery uses three, two or one
+Before selection, show only the gallery with no empty left panel or unused grid track. After selection the left panel starts with the template title, description, fixed previews and missing slots, then Advanced editing, the shared Playground key/weekly usage control and the generation action last. Keep the key input outside the generation form so Enter cannot submit it. Without a connected key, expose the same shared key panel in the gallery authentication area without an empty left column; Forget and key restoration remain usable. Omit the redundant Use a Template heading. The right gallery uses three, two or one
 columns as available width decreases, and stacks below the panel on narrow
 screens. All roles share this screen; existing edit permission adds inline Create
-and Edit actions. Create Template and Template References share the page heading row, aligned right; the first gallery row aligns with the Use Template panel. On narrow screens heading actions wrap with the shared 12px gap. The complete published card selects its template, including media, text and padding. Keep a native title button for Enter/Space access; the structural article must not become a nested button around Edit or media. Edit alone opens authoring and stops selection propagation. Card focus/selection uses one configured accent perimeter, including keyboard media preview focus. There is no management-mode switch.
+and Edit actions. Create Template and Template References share the page heading row, aligned right; the first gallery row aligns with the selected Template panel. On narrow screens heading actions wrap with the shared 12px gap. The complete published card selects its template, including media, text and padding. Keep a native title button for Enter/Space access; the structural article must not become a nested button around Edit or media. Edit alone opens authoring and stops selection propagation. Card focus/selection uses one configured accent perimeter, including keyboard media preview focus. There is no management-mode switch.
 
 Authors explicitly choose an image/video gallery cover using the shared file and
 Template library picker, with no cover-mode dropdown or automatic fixed-reference

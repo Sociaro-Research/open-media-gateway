@@ -65,7 +65,7 @@
   return gallery();
  }
  function showBrowser(){headingActions.hidden=!canEdit;browser.hidden=false;content.hidden=true;stopMedia(content);content.replaceChildren();}
- function emptySelection(){stopMedia(selection);selection.replaceChildren(el('p',GenerationKey.value()?'Select a template from the gallery.':'Enter a Gateway API key to select and use a template.'));useUpdate=null;}
+ function emptySelection(){const keyHost=document.querySelector('#templateKeyHost'),access=document.querySelector('#templateKeyAccess');access.hidden=!!GenerationKey.value();if(access.hidden){if(keyHost.parentElement!==selection.parentElement)selection.after(keyHost);}else if(keyHost.parentElement!==access)access.append(keyHost);stopMedia(selection);selection.replaceChildren();selection.closest('aside').hidden=!browseID;browser.classList.toggle('has-selection',!!browseID);useUpdate=null;}
  async function gallery(){
   const id=browseID;next();view=id?'use':'gallery';editing=null;showBrowser();emptySelection();document.querySelector('#priceCard').hidden=true;
   return updates.refresh({restart:true,quiet:false});
@@ -157,10 +157,11 @@
   return ReferenceValidation.upload(file,{signal,validation,onProgress,expectedKey:GenerationKey.value()});
  }
  async function use(id){
-  next();activeRevision=null;view='use';editing=null;browseID=id;showBrowser();emptySelection();selection.replaceChildren(el('p','Loading selected template…'));selectedCard();return updates.refresh({restart:true,quiet:false});
+  next();const token=epoch;activeRevision=null;view='use';editing=null;browseID=id;showBrowser();emptySelection();selection.replaceChildren(el('p','Loading selected template…'));useUpdate=detail=>{if(!fresh(token)||browseID!==id)return;if(detail)renderUse(detail,token,id);else clearSelected(id);};selectedCard();return updates.refresh({restart:true,quiet:false});
  }
+ function clearSelected(id){runnerDrafts.delete(id);window.GatewayTemplateConfirmations?.invalidate(id);browseID='';activeRevision=null;controller.abort();controller=new AbortController();emptySelection();selectedCard();say('This template is unavailable. Choose another template.','error');}
  function renderUse(view,token,id){
-   activeRevision=view.revision;const d=view.content||view.template,form=el('form','','card template-use');form.autocomplete='off';
+   activeRevision=view.revision;const d=view.content||view.template,form=el('form','','card template-use');form.id='templateUseForm';form.autocomplete='off';
    form.append(el('h2',d.title));if(d.description)form.append(el('p',d.description));
    const fixedRow=el('div','','template-fixed-references');fixedRow.setAttribute('aria-label','Template references');
    for(const slot of d.slots.filter(s=>s.asset_id)){
@@ -215,16 +216,17 @@
      await openTemplateInPlayground(source,controller.signal);}
     catch(e){if(e.code==='template_conflict'&&fresh(token))await currentChanged(id,view.revision);else fail(e,token);}finally{pending--;if(fresh(token))ready();}
    });form.append(advanced);
-   const generate=el('button','Review generation','primary');generate.type='submit';form.append(generate);model.onchange=async()=>{draft.model=model.value;const sequence=++validationSequence,selection=JSON.stringify(inputs);pending++;validationIssue='';ready();say('Checking reference compatibility…');try{await checkInputs();if(fresh(token)&&sequence===validationSequence&&selection===JSON.stringify(inputs))say('References checked.');}catch(e){if(fresh(token)&&sequence===validationSequence&&selection===JSON.stringify(inputs)){validationIssue=e.message;say(e.message,'error');}}finally{pending--;if(fresh(token))ready();}};
+   const generate=el('button','Review generation','primary');generate.type='submit';generate.setAttribute('form',form.id);model.onchange=async()=>{draft.model=model.value;const sequence=++validationSequence,selection=JSON.stringify(inputs);pending++;validationIssue='';ready();say('Checking reference compatibility…');try{await checkInputs();if(fresh(token)&&sequence===validationSequence&&selection===JSON.stringify(inputs))say('References checked.');}catch(e){if(fresh(token)&&sequence===validationSequence&&selection===JSON.stringify(inputs)){validationIssue=e.message;say(e.message,'error');}}finally{pending--;if(fresh(token))ready();}};
    const messages=[];if(view.workflow_error)messages.push(view.workflow_error);else{if(!view.default_available)messages.push('The configured default model is unavailable to this key. Choose an allowed alternative.');if(!view.catalog.some(p=>p.models.length))messages.push('No compatible models are available to this key.');}if(view.asset_error)messages.push(view.asset_error);say(messages.join(' '),messages.length?'error':'');
    form.onsubmit=e=>{e.preventDefault();if(generate.disabled||!form.reportValidity())return;const [provider,modelID]=JSON.parse(model.value);const source={prompt:d.prompt,provider,model:modelID,media_type:d.media_type,options:d.options,template_catalog:view.catalog,template:{id,revision:view.revision,inputs:{...inputs}}};const project=window.GatewayProjects?.selected();if(project)source.project_id=project;openGenerationConfirmation(source,generate);};
    useUpdate=latest=>{
+    if(!latest){clearSelected(id);return;}
     if(latest&&(latest.revision!==view.revision||draftStamp(latest.content||latest.template)!==draftStamp(d))){replaceUse(latest,id);return;}
     // Preserve local inputs only while the current server content is unchanged.
     unavailable=!latest||latest.revision!==view.revision||!!latest.asset_error||!!latest.workflow_error||!latest.catalog?.some(p=>p.models.some(m=>ModelPicker.key(p.id,m.id)===model.value));
     ready();say(latest?.workflow_error||(unavailable?'This template is unavailable. Choose another template.':''),unavailable?'error':'');
    };
-   selection.replaceChildren(form);FormUI.refresh();ready();
+   document.querySelector('#templateKeyAccess').hidden=true;selection.replaceChildren(form,document.querySelector('#templateKeyHost'),generate);selection.closest('aside').hidden=false;browser.classList.add('has-selection');FormUI.refresh();ready();
  }
  async function create(){if(writing||!canEdit)return;const token=epoch;writing=true;
   try{const provider=adminCatalog[0],model=provider?.models[0];if(!model){say('Choose an available model with a References workflow.','error');return;}const id=createID||(createID=crypto.randomUUID()),record=await api('/v1/system/templates',{method:'POST',body:JSON.stringify({id,version:0,content:{title:'',media_type:model.media_type,prompt:'',provider:provider.id,model:model.id,syntax:'',slots:[],options:{reference_mode:'references'},cover_id:''}}),signal:controller.signal});if(fresh(token)){createID='';renderEditor(record);}}catch(e){fail(e,token)}finally{writing=false;}
