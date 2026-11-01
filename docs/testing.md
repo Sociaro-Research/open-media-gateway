@@ -74,3 +74,23 @@ checks verify routing and certificate handling; public ACME/DNS need a separate
 controlled environment. Capacity, soak and recovery results are machine- and
 workload-specific. Rerun the relevant scenario after a material change rather
 than treating historical numbers as a universal guarantee.
+
+## Accepted synchronous results
+
+Workers persist a private accepted-result receipt before archiving synchronous
+outputs. Receipt recovery tests must interrupt before the first artifact and
+between artifacts, reopen the database, adapter and storage, and verify one
+native submission, stable output IDs, complete bytes and unchanged usage cost.
+Pending source URLs, inline media and authenticated provider handles must stay
+out of task/list/report/options responses. Include stale claims, mismatched
+owner/connection revisions, bounded inline payloads, canceled checkpoint reads
+and terminal cleanup in the affected race suite.
+
+Migration 086 retains pending receipts and archive checkpoints through the
+schema-81 rollback window. Test an 81-to-86-to-81-to-86 cycle with real pending
+paid results: unsupported legacy terminal writes must fail without changing the
+receipt, progress or cost; receipt-aware recovery completes the original outputs
+after re-upgrade. Ordinary old-version updates remain supported. A crash before
+the accepted response is durably committed remains uncertain acceptance and must
+never trigger automatic generation resubmission. An object written just before
+its checkpoint commit can still need normal attempt-object cleanup.

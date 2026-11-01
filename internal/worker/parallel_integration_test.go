@@ -3,7 +3,9 @@ package worker
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -55,7 +57,8 @@ func (p *parallelProvider) GetTask(context.Context, string) (core.ProviderResult
 type concurrentStorage struct{}
 
 func (concurrentStorage) Archive(ctx context.Context, id, source string) (core.StoredMedia, error) {
-	return core.StoredMedia{StorageKey: id + "/video.mp4", ContentType: "video/mp4", SizeBytes: 12, SHA256: "fixture"}, ctx.Err()
+	content := []byte("fixture-data") // Fixed 12-byte synthetic archive.
+	return core.StoredMedia{StorageKey: id + "/video.mp4", ContentType: "video/mp4", SizeBytes: int64(len(content)), SHA256: fmt.Sprintf("%x", sha256.Sum256(content))}, ctx.Err()
 }
 
 // Real HTTP admission, PostgreSQL claims, Redis and independent workers.

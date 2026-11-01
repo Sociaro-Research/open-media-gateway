@@ -88,6 +88,18 @@ func (w *Worker) process(ctx context.Context, id string) error {
 		return w.repo.MarkFailed(ctx, id, "provider "+task.Provider+" is not configured")
 	}
 
+	if task.Status == core.TaskRunning {
+		if receiptRepo, ok := w.repo.(core.AcceptedReceiptRepository); ok {
+			receipt, err := receiptRepo.LoadAcceptedReceipt(ctx, task)
+			if err != nil {
+				return err
+			}
+			if receipt != nil {
+				return w.resumeAcceptedResult(ctx, provider, task, *receipt)
+			}
+		}
+	}
+
 	providerTaskID := ""
 	if task.ProviderTaskID != nil {
 		providerTaskID = *task.ProviderTaskID
@@ -116,20 +128,17 @@ func (w *Worker) process(ctx context.Context, id string) error {
 			return w.repo.MarkFailed(ctx, id, "provider submission failed: "+err.Error())
 		}
 		providerTaskID = providerTask.ID
-		if err := w.repo.SetProviderTaskID(ctx, id, providerTaskID); err != nil {
+		if hasImmediateResult(providerTask) {
+			return w.acceptImmediateResult(ctx, provider, task, providerTask)
+		}
+		persist, stop := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		err = w.repo.SetProviderTaskID(persist, id, providerTaskID)
+		stop()
+		if err != nil {
 			return err
 		}
 		if err := w.storeUsage(ctx, provider, task, providerTask.Usage); err != nil {
 			return err
-		}
-		if len(providerTask.Artifacts) > 0 {
-			return w.archiveArtifacts(ctx, ctx, provider, task, providerTask.ResultURL, providerTask.LastFrameURL, providerTask.Artifacts, providerTask.Resources)
-		}
-		if providerTask.ResultURL != "" {
-			return w.archiveResult(ctx, ctx, task, providerTask.ResultURL, providerTask.LastFrameURL, providerTask.Resources)
-		}
-		if len(providerTask.Resources) > 0 {
-			return w.repo.MarkSucceeded(ctx, task.ID, core.StoredMedia{Resources: providerTask.Resources}, "")
 		}
 		return &pollLater{}
 	} else if providerTaskID == "" {
@@ -334,6 +343,10 @@ func (w *Worker) archiveResults(ctx, archiveCtx context.Context, task core.Task,
 		}
 		destination = selected
 	}
+	progress, err := w.loadArchiveProgress(ctx, task)
+	if err != nil {
+		return err
+	}
 	// Database fencing cannot undo a late filesystem rename or remote upload.
 	// Give each delivery its own object paths so an expired/cancelled worker
 	// cannot overwrite artifacts already committed by its successor.
@@ -343,7 +356,14 @@ func (w *Worker) archiveResults(ctx, archiveCtx context.Context, task core.Task,
 	}
 	var media core.StoredMedia
 	var archiveErr error
-	if task.Options.OverrideSoundID != "" {
+	var restored bool
+	media, restored, archiveErr = progress.restored(archiveCtx, w.storage, 0, false)
+	if archiveErr != nil {
+		return archiveErr
+	}
+	if restored {
+		// Reuse a verified, previously committed prefix without another fetch.
+	} else if task.Options.OverrideSoundID != "" {
 		if len(artifacts) > 0 && artifacts[0].URL == "" {
 			return w.repo.MarkFailed(ctx, task.ID, "Override Sound requires an archived media URL")
 		}
@@ -369,6 +389,17 @@ func (w *Worker) archiveResults(ctx, archiveCtx context.Context, task core.Task,
 		return w.repo.MarkFailed(context.WithoutCancel(ctx), task.ID, "store provider result: "+archiveErr.Error())
 	}
 
+	primary := core.ProviderArtifact{URL: resultURL, MediaType: task.MediaType}
+	if len(artifacts) > 0 {
+		primary = artifacts[0]
+	}
+	if len(artifacts) > 0 && !artifactMatchesMedia(artifacts[0], media) {
+		return w.repo.MarkFailed(ctx, task.ID, "stored primary artifact does not match its declared media type")
+	}
+	if err := progress.record(ctx, storedArtifact(primary, media, 0), 0, false); err != nil {
+		return err
+	}
+
 	if len(artifacts) > 0 {
 		if !artifactMatchesMedia(artifacts[0], media) {
 			return w.repo.MarkFailed(ctx, task.ID, "stored primary artifact does not match its declared media type")
@@ -378,7 +409,14 @@ func (w *Worker) archiveResults(ctx, archiveCtx context.Context, task core.Task,
 			artifactID := archiveID + "/artifacts/" + strconv.Itoa(i+2)
 			var item core.StoredMedia
 			var err error
-			if task.Options.OverrideSoundID != "" && a.MediaType == "video" {
+			var restored bool
+			item, restored, err = progress.restored(archiveCtx, w.storage, i+1, false)
+			if err != nil {
+				return err
+			}
+			if restored {
+				// The receipt owns this immutable completed artifact.
+			} else if task.Options.OverrideSoundID != "" && a.MediaType == "video" {
 				processor, ok := w.storage.(interface {
 					ArchiveOverride(context.Context, storage.Store, string, string, core.SoundOverride) (core.StoredMedia, error)
 				})
@@ -399,16 +437,31 @@ func (w *Worker) archiveResults(ctx, archiveCtx context.Context, task core.Task,
 			if !artifactMatchesMedia(a, item) {
 				return w.repo.MarkFailed(ctx, task.ID, "stored artifact does not match its declared media type")
 			}
-			media.Artifacts = append(media.Artifacts, storedArtifact(a, item, i+1))
+			archived := storedArtifact(a, item, i+1)
+			if err := progress.record(ctx, archived, i+1, false); err != nil {
+				return err
+			}
+			media.Artifacts = append(media.Artifacts, archived)
 		}
 	}
 	if lastFrameURL != "" {
-		frame, err := destination.Archive(archiveCtx, archiveID+"/last-frame", lastFrameURL)
+		frame, restored, err := progress.restored(archiveCtx, w.storage, 0, true)
+		if err != nil {
+			return err
+		}
+		if !restored {
+			frame, err = destination.Archive(archiveCtx, archiveID+"/last-frame", lastFrameURL)
+		}
 		if err != nil {
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
 			return w.repo.MarkFailed(context.WithoutCancel(ctx), task.ID, "store last frame: "+err.Error())
+		}
+		frameArtifact := storedArtifact(core.ProviderArtifact{MediaType: "image"}, frame, 64)
+		frameArtifact.ID = "last-frame"
+		if err := progress.record(ctx, frameArtifact, 0, true); err != nil {
+			return err
 		}
 		media.LastFrameStorageKey = frame.StorageKey
 		lastFrameURL = "/v1/generations/" + task.ID + "/last-frame"

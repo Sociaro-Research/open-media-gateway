@@ -281,3 +281,24 @@ private losing objects are not backfilled. New private attempts retain access
 to their original S3 connection through the live owner-scoped index when the
 current resource mode changes. Preserve the existing storage connection records
 and encryption configuration through application rollback.
+
+### Accepted synchronous results (migration 086)
+
+A receipt-aware worker persists accepted synchronous outputs privately before
+archiving them. Interrupted archival resumes from that receipt with the original
+usage and verified completed-artifact checkpoints; it does not submit generation
+again or query an unsupported endpoint. Pending receipt envelopes are bounded at
+272 MiB, including up to 256 MiB of already-supported inline provider output and
+16 MiB of metadata. Public request and upload limits are unchanged. Successful or
+failed receipt-aware terminal transactions remove the private pending metadata;
+normal result deletion still handles recorded attempt objects.
+
+Preserve the table, its trigger, media, storage connections and encrypted
+provider-revision history during application rollback. Pending receipts require
+a receipt-aware worker. The retained database guard rejects an older worker's
+unsupported terminal write instead of losing an already paid response; ordinary
+legacy updates remain available. Re-upgrade and recover those pending tasks
+before treating the worker drain as clean. This protection does not make an old
+adapter able to process newly supported synchronous models. A failure before the
+receipt commit remains uncertain acceptance and must not be retried as a new
+provider submission. Follow the existing backup and clean-drain gates.

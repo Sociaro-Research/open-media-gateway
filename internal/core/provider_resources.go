@@ -5,9 +5,10 @@ import "context"
 // ResourceSourceInput is resolved by the host from an authorized inspected
 // reference. It is never decoded directly from a public request.
 type ResourceSourceInput struct {
-	FrameCount   int64 `json:"frame_count,omitempty"`
-	AudioStreams *int  `json:"audio_streams,omitempty"`
-	VideoStreams *int  `json:"video_streams,omitempty"`
+	FPS          float64 `json:"fps,omitempty"`
+	FrameCount   int64   `json:"frame_count,omitempty"`
+	AudioStreams *int    `json:"audio_streams,omitempty"`
+	VideoStreams *int    `json:"video_streams,omitempty"`
 	ReferenceID  string
 	URL          string
 	MediaType    string

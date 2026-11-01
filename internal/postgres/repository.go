@@ -345,6 +345,14 @@ func (r *TaskRepository) transition(ctx context.Context, id string, eventType co
 	if err = checkTaskClaim(ctx, tx, id); err != nil {
 		return err
 	}
+	// Keep pending paid receipts safe from legacy terminal writes after a
+	// non-destructive rollback. Only the already verified live worker claim
+	// authorizes cleanup, locally to this exact task and transaction.
+	if core.ClaimToken(ctx) != "" {
+		if _, err = tx.ExecContext(ctx, `SELECT set_config('gateway.accepted_receipt_terminal',$1,true)`, id); err != nil {
+			return err
+		}
+	}
 	for _, hook := range hooks {
 		if err := hook(tx); err != nil {
 			return err

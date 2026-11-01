@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"testing"
@@ -66,7 +67,8 @@ func (s *storageStub) Archive(_ context.Context, taskID, sourceURL string) (core
 	if s.err != nil {
 		return core.StoredMedia{}, s.err
 	}
-	return core.StoredMedia{StorageKey: taskID + "/video.mp4", ContentType: "video/mp4", SizeBytes: 12, SHA256: "abc"}, nil
+	content := []byte("fixture-data") // Fixed 12-byte synthetic archive.
+	return core.StoredMedia{StorageKey: taskID + "/video.mp4", ContentType: "video/mp4", SizeBytes: int64(len(content)), SHA256: fmt.Sprintf("%x", sha256.Sum256(content))}, nil
 }
 
 func (p *providerStub) Name() string {
