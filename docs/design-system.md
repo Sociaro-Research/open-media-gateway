@@ -517,7 +517,7 @@ The left panel contains the Playground key control, selected template details,
 missing slots and generation action. The right gallery uses three, two or one
 columns as available width decreases, and stacks below the panel on narrow
 screens. All roles share this screen; existing edit permission adds inline Create
-and Edit actions. There is no management-mode switch.
+and Edit actions. Create Template and Template References share the page heading row, aligned right; the first gallery row aligns with the Use Template panel. On narrow screens heading actions wrap with the shared 12px gap. There is no management-mode switch.
 
 Authors explicitly choose an image/video gallery cover using the shared file and
 Template library picker, with no cover-mode dropdown or automatic fixed-reference

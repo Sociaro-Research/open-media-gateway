@@ -65,8 +65,7 @@
 #templateSelection > p { color:var(--muted); }
 .template-browse-panel { min-width:0; }
 #templatesGallery { grid-template-columns:repeat(3,minmax(0,1fr)); gap:20px; align-items:start; }
-#templatesGallery .template-card,#templatesGallery .template-create-card { padding:16px; gap:16px; min-width:0; }
-.template-create-card { display:grid; }
+#templatesGallery .template-card { padding:16px; gap:16px; min-width:0; }
 .template-card > p { margin:0; overflow-wrap:anywhere; }
 #templatesView .template-media { aspect-ratio:auto; display:block; overflow:visible; }
 #templatesView .template-media :is(img,video) { display:block; width:100%; height:auto; aspect-ratio:auto; object-fit:contain; border-radius:12px; background:var(--field); }
@@ -84,14 +83,11 @@
 .template-variable-reference .reference-actions button { flex:1 1 140px; }
 .template-variable-reference .template-reference-preview { max-width:240px; margin:0 auto 16px; }
 
-#templatesGallery .template-create-card { grid-column:1/-1; display:flex; flex-wrap:wrap; align-items:center; padding:0; border:0; box-shadow:none; background:transparent; }
 .template-fixed-reference .template-media { max-width:160px; }
 #templateSelection .template-use > :is(h2,p) { margin:0; }
 
 .template-reference-library .reference-status { overflow-wrap:anywhere; }
 
-#templatesGallery .template-create-card { gap:12px; }
-#templatesGallery .template-create-card > .primary.compact { width:auto; min-width:0; flex:0 0 auto; }
 
 @media(max-width:950px) {
  .template-editor .settings-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
@@ -117,3 +113,8 @@
 .template-cover { display:grid; gap:16px; min-width:0; }
 .template-cover > h3 { margin:0; font-size:var(--type-group); }
 .template-cover > .field-hint { margin:0; }
+
+#templateHeadingActions { flex-wrap:wrap; justify-content:flex-end; max-width:100%; gap:12px; }
+#templateHeadingActions > .field-hint { flex-basis:100%; margin:0; }
+#templateHeadingActions > button { min-width:0!important; max-width:100%; }
+@media(max-width:600px) { #templateHeadingActions { width:100%; } }

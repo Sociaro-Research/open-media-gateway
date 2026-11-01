@@ -1,6 +1,6 @@
 (() => {
  'use strict';
- const content=document.querySelector('#templatesContent'),status=document.querySelector('#templatesStatus'),browser=document.querySelector('#templatesBrowser'),galleryHost=document.querySelector('#templatesGallery'),selection=document.querySelector('#templateSelection');
+ const content=document.querySelector('#templatesContent'),status=document.querySelector('#templatesStatus'),browser=document.querySelector('#templatesBrowser'),galleryHost=document.querySelector('#templatesGallery'),selection=document.querySelector('#templateSelection'),headingActions=document.querySelector('#templateHeadingActions');
  let requestedEdit=new URLSearchParams(location.search).get('edit');
  let canEdit=false,authorRecords=[],hovered=null;
  const stopHover=()=>{const previous=hovered;hovered=null;previous?.player.pause();};
@@ -64,7 +64,7 @@
   if(editing&&systemAdministrator&&localDrafts.has(editing.id)){renderEditor(localDrafts.get(editing.id));return;}
   return gallery();
  }
- function showBrowser(){browser.hidden=false;content.hidden=true;stopMedia(content);content.replaceChildren();}
+ function showBrowser(){headingActions.hidden=!canEdit;browser.hidden=false;content.hidden=true;stopMedia(content);content.replaceChildren();}
  function emptySelection(){stopMedia(selection);selection.replaceChildren(el('p',GenerationKey.value()?'Select a template from the gallery.':'Enter a Gateway API key to select and use a template.'));useUpdate=null;}
  async function gallery(){
   const id=browseID;next();view=id?'use':'gallery';editing=null;showBrowser();emptySelection();document.querySelector('#priceCard').hidden=true;
@@ -73,7 +73,9 @@
  function selectedCard(){for(const card of galleryHost.querySelectorAll('[data-template-id]')){const selected=card.dataset.templateId===browseID;card.classList.toggle('selected',selected);card.querySelector('[data-use-template]')?.setAttribute('aria-pressed',String(selected));}}
  function renderGallery(result){
   const nextGrid=el('div');
-  if(canEdit){const card=el('article','','card template-create-card');card.dataset.updateKey='create';const action=button('Create template',create,'primary compact');action.disabled=!adminCatalog.length;card.append(action,button('Template references',()=>chooseLibrary('',true,null)));if(!adminCatalog.length)card.append(el('p','No models with a References workflow are available for templates.'));nextGrid.append(card);}
+  const actions=el('div');headingActions.hidden=!canEdit;
+  if(canEdit){const action=button('Create template',create,'primary compact');action.disabled=!adminCatalog.length;actions.append(action,button('Template references',()=>chooseLibrary('',true,null)));if(!adminCatalog.length){const hint=el('p','No models with a References workflow are available for templates.','field-hint');hint.id='templateAvailability';action.setAttribute('aria-describedby',hint.id);actions.append(hint);}}
+  GatewayAutoUpdate.reconcile(headingActions,actions);
   const seen=new Set();
   for(const item of result.data||[]){seen.add(item.id);const card=el('article','','card template-card');card.dataset.updateKey=item.id;card.dataset.templateId=item.id;card.append(media(item.cover_url,item.cover_type,item.title,{hover:true}));const select=button(item.title,()=>use(item.id),'template-card-title');select.dataset.useTemplate='';select.setAttribute('aria-pressed',String(browseID===item.id));card.append(select);if(item.description)card.append(el('p',item.description));if(canEdit){const record=authorRecords.find(r=>r.id===item.id);if(record){const edit=button('Edit',()=>renderEditor(localDrafts.get(record.id)||record));edit.setAttribute('aria-label','Edit '+(record.draft.title||item.title));card.append(edit);}}nextGrid.append(card);}
   if(canEdit)for(const record of authorRecords){if(seen.has(record.id))continue;const card=el('article','','card template-card template-draft-card');card.dataset.updateKey=record.id;card.append(el('h2',record.draft.title||'Untitled template'),el('p',record.published?'Published template unavailable to this key':'Not published'));const edit=button('Edit',()=>renderEditor(localDrafts.get(record.id)||record));edit.setAttribute('aria-label','Edit '+(record.draft.title||'Untitled template'));card.append(edit);nextGrid.append(card);}
@@ -214,7 +216,7 @@
  }
  function draftStamp(d){const normalized={...d,description:d.description||'',reference_counts:d.reference_counts||{}};const stable=value=>Array.isArray(value)?value.map(stable):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(key=>[key,stable(value[key])])):value;return JSON.stringify(stable(normalized));}
  function renderEditor(record){
-  if(!canEdit||!systemAdministrator)return;record=currentRecord(record);stopMedia(selection);stopMedia(galleryHost);browser.hidden=true;content.hidden=false;
+  if(!canEdit||!systemAdministrator)return;record=currentRecord(record);stopMedia(selection);stopMedia(galleryHost);headingActions.hidden=true;browser.hidden=true;content.hidden=false;
   const token=next(),signal=controller.signal;view='edit';editing=record;const draft=structuredClone(record.draft),form=el('form','','card template-editor');let savedDraft=record.savedDraft||structuredClone(record.draft),baseline='',modelOptions=structuredClone(draft.options||{}),mediaChecking=false,mediaIssue='',mediaSequence=0,mediaStamp='';content.replaceChildren(form);say('');
   form.append(button('Back to templates',()=>{localDrafts.set(record.id,snapshotRecord());editing=null;gallery();}));const titleHeading=FormUI.sectionHeading(form,'Edit template'),heading=titleHeading.parentElement;
   const title=field(form,'Title','text',draft.title);title.maxLength=120;
