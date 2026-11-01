@@ -43,6 +43,16 @@ const server=http.createServer((req,res)=>{if(req.url.includes('/reports/')&&(re
  const base='http://127.0.0.1:'+server.address().port;
  const dialog=()=>page.getByRole('dialog',{name:'Generation details',exact:true});
  const ready=()=>dialog().getByRole('heading',{name:'Generation',exact:true}).waitFor();
+ // A lazy image's individual decode promise can abort during source activation.
+ // Assert the current rendered image, including exact source and dimensions.
+ async function readyImage(title,source){
+  const image=dialog().getByRole('img',{name:title,exact:true});await image.scrollIntoViewIfNeeded();
+  await page.waitForFunction(({title,source})=>{
+   const image=[...document.querySelectorAll('dialog[aria-label="Generation details"] img')].find(image=>image.alt===title);
+   return image?.isConnected&&image.src===source&&image.currentSrc===source&&image.complete&&image.naturalWidth===480&&image.naturalHeight===300;
+  },{title,source});
+  return image;
+ }
  const open=async()=>{await page.locator('#reportsContent tbody tr').first().click();await ready();};
  const close=async()=>{await page.keyboard.press('Escape');await dialog().waitFor({state:'detached'});assert.equal(await page.locator('#reportsContent tbody tr').first().evaluate(el=>el===document.activeElement),true);};
  try{
@@ -51,9 +61,9 @@ const server=http.createServer((req,res)=>{if(req.url.includes('/reports/')&&(re
   await page.waitForFunction(()=>document.querySelector('#reportsContent [role=status]')?.textContent===''&&!!document.querySelector('#reportsContent tbody tr'));
   await open();assert.equal(requested.at(-1),'/v1/system/reports/'+id);assert.equal(await dialog().locator('.detail-text').first().textContent(),prompt);assert.equal(await page.evaluate(()=>!!window.injected),false);
   assert.match(await dialog().innerText(),/Future custom setting 1/);assert.match(await dialog().innerText(),/Exact instruction\nSecond line/);
-  const referenceImage=dialog().getByRole('img',{name:'Image reference 1',exact:true});await referenceImage.scrollIntoViewIfNeeded();await referenceImage.evaluate(el=>el.decode());assert.equal(await referenceImage.getAttribute('src'),reference);assert.equal(await dialog().locator('a[href^="javascript:"]').count(),0);assert.equal(await dialog().getByRole('link',{name:reference,exact:true}).count(),0);
+  const referenceImage=await readyImage('Image reference 1',reference);assert.equal(await referenceImage.getAttribute('src'),reference);assert.equal(await dialog().locator('a[href^="javascript:"]').count(),0);assert.equal(await dialog().getByRole('link',{name:reference,exact:true}).count(),0);
   await dialog().getByRole('button',{name:'Copy image reference 1 link',exact:true}).click();if(process.env.UI_BROWSER_ENGINE!=='webkit')assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),reference);
-  const resultImage=dialog().getByRole('img',{name:'Result',exact:true});await resultImage.scrollIntoViewIfNeeded();await resultImage.evaluate(el=>el.decode());await dialog().getByRole('button',{name:'Copy result link',exact:true}).click();if(process.env.UI_BROWSER_ENGINE!=='webkit')assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),base+'/v1/system/reports/'+id+'/content');
+  await readyImage('Result',base+'/v1/system/reports/'+id+'/content');await dialog().getByRole('button',{name:'Copy result link',exact:true}).click();if(process.env.UI_BROWSER_ENGINE!=='webkit')assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),base+'/v1/system/reports/'+id+'/content');
   const download=page.waitForEvent('download');await dialog().getByRole('link',{name:'Download result',exact:true}).click();assert.equal((await download).suggestedFilename(),'result.png');
   await dialog().locator('.detail-record').evaluate(el=>el.open=true);await dialog().getByRole('button',{name:'Close generation details',exact:true}).focus();const bodyNode=await dialog().locator('.detail-text').first().elementHandle();version=2;await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await page.waitForFunction(()=>document.querySelector('.detail-record pre')?.textContent.includes('Future custom setting 2'));assert.equal(await dialog().locator('.detail-record').evaluate(el=>el.open),true);assert.equal(await dialog().getByRole('button',{name:'Close generation details',exact:true}).evaluate(el=>el===document.activeElement),true);assert.equal(await bodyNode.evaluate(el=>el.isConnected),true);assert.equal(await dialog().getByRole('button',{name:/Refresh|Reload/}).count(),0);
   fs.mkdirSync(evidencePath('/tmp/gateway-report-details-ui'),{recursive:true});
