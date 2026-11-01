@@ -324,6 +324,6 @@ the disposable-service wrapper described in [testing](testing.md).
 
 ## Shared field and panel presentation
 
-Duration puts the selected model's actual bounds or discrete step in its label, without a detached duplicate caption.
+Duration puts the selected model's actual bounds or discrete step in its label, without a detached duplicate caption. Prompt labels show the declared model limit and dynamic Unicode code-point count, formatted with thousands separators; unknown limits are not presented as known provider bounds. Validation remains authoritative.
 
 Selection blocks show only internal Remove while selected; empty blocks show Upload and Choose from library where that scope supports it. Removing a fixed binding leaves its slot for the user and never deletes the library file.

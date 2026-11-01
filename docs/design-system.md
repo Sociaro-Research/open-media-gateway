@@ -580,6 +580,7 @@ Fields, buttons, switches and selectable Template/reference cards use one visibl
 
 Primary buttons center their content vertically through the shared flex alignment, including text, icons, pending and disabled states. Do not fix individual labels with transforms or per-screen offsets.
 
+Prompt labels use the common FormUI code-point counter and declared model maximum: **Prompt (10,000 characters max)** when empty and **Prompt (5,550 / 10,000 characters)** when filled. Remove detached duplicate counts, preserve validation and update on typing, paste, clear and model changes. Unknown model bounds remain unknown.
 
 
 Templates have one current content and a Published visibility switch. Save applies current edits immediately, including to published templates. Do not expose internal revisions, a separate published draft or version history in the interface. Compare every UI change with this design system and complete the spacing and visual review gate above.

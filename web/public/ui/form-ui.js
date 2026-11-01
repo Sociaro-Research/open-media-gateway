@@ -229,7 +229,19 @@
   for(const event of ['input','change','focusin','focusout'])document.addEventListener(event,e=>{if(e.target.matches('input,select,textarea')){sync(e.target);sizeMultiline(e.target);if(e.target.form)update(e.target.form);}},true);
   document.addEventListener('reset',event=>{event.target.querySelectorAll('.password-field input').forEach(hidePassword);setTimeout(refresh,0);},true);
   window.addEventListener('resize',schedule);document.fonts?.ready.then(schedule);
+  function promptState(value,model){
+    const count=Array.from(String(value||'')).length,known=Number.isInteger(model?.max_prompt_characters)&&model.max_prompt_characters>0?Math.min(10000,model.max_prompt_characters):null;
+    const number=n=>n.toLocaleString('en-US'),label=model?.no_prompt?'Prompt':known?count?'Prompt ('+number(count)+' / '+number(known)+' characters)':'Prompt ('+number(known)+' characters max)':count?'Prompt ('+number(count)+' characters)':'Prompt';
+    const maximum=known||10000,error=!model?.no_prompt&&Array.from(String(value||'').trim()).length>maximum?'Prompt must not exceed '+number(maximum)+' characters.':'';
+    return {count,limit:known,label,error};
+  }
+  function updatePrompt(control,model){
+    control.removeAttribute('maxlength');const previous=control.dataset.promptLimitError||'',state=promptState(control.value,model);
+    control.dataset.promptLimitError=state.error;setLabel(control,state.label);control.setAttribute('aria-description',(model?.prompt_optional?'Optional. ':'')+state.label);
+    if(state.error||previous&&control.validationMessage===previous)control.setCustomValidity(state.error);
+    return state;
+  }
   function setLabel(control,text){enhance(control);const label=control.closest('.floating-field')?.querySelector('.floating-label');if(label&&label.textContent!==text)label.textContent=text;}
-  window.FormUI={sectionHeading,dialogHeading,message,valid,watch,commit,snapshot,saved,update,refresh,setLabel,copyButton,placeAction,credentials:{setup:setupCredential,render:renderCredential,replacement:credentialReplacement,updateValue:credentialUpdate},passwords:{hide:hidePassword}};
+  window.FormUI={sectionHeading,dialogHeading,message,valid,watch,commit,snapshot,saved,update,refresh,setLabel,promptState,updatePrompt,copyButton,placeAction,credentials:{setup:setupCredential,render:renderCredential,replacement:credentialReplacement,updateValue:credentialUpdate},passwords:{hide:hidePassword}};
   new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['disabled']});refresh();
 })();

@@ -29,7 +29,6 @@ const expandedTaskParameters = new Set();
 const elements = {
   form: document.querySelector('#taskForm'),
   prompt: document.querySelector('#prompt'),
-  promptCount: document.querySelector('#promptCount'),
   model: document.querySelector('#model'),
   resolution: document.querySelector('#resolution'),
   ratio: document.querySelector('#ratio'),
@@ -848,9 +847,8 @@ function updateModelUI() {
   const isVideo = model.media_type === 'video';
   const isImage = model.media_type === 'image';
   const isSpeech = model.media_type === 'speech';
-  FormUI.setLabel(elements.prompt,model.prompt_optional ? 'Prompt (optional)' : 'Prompt');
+  FormUI.updatePrompt(elements.prompt,model);window.PromptReferences?.refresh();
   elements.prompt.closest('.floating-field').hidden = !!model.no_prompt;
-  elements.promptCount.parentElement.hidden = !!model.no_prompt;
   elements.prompt.disabled = !!model.no_prompt;
   elements.resolutionField.hidden = (!isVideo && !isImage) || !model.resolutions?.length;
   elements.ratioField.hidden = (!isVideo && !isImage) || !model.ratios?.length;
@@ -1099,7 +1097,7 @@ function requestOptions(model) {
 }
 
 elements.prompt.addEventListener('input', () => {
-  elements.promptCount.textContent = `${elements.prompt.value.length.toLocaleString('en-US')} / 10,000`;
+  FormUI.updatePrompt(elements.prompt,selectedModel());
 });
 window.addEventListener('gateway-project-change', event => {
   taskListRequest?.controller.abort();

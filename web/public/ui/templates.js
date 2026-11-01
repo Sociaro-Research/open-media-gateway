@@ -232,7 +232,7 @@
   }
   function generationOptions(){const result={...modelOptions};for(const [key,input] of Object.entries(generationFields))result[key]=key==='generate_audio'?input.checked:key==='duration'?Number(input.value):input.value;return result;}
 
-  const prompt=field(form,'Prompt','textarea',draft.prompt);prompt.maxLength=10000;prompt.rows=5;
+  const prompt=field(form,'Prompt','textarea',draft.prompt);prompt.rows=5;
   const countFields=el('div');form.append(countFields);const counts={};
   for(const kind of ['image','video','audio']){const input=field(countFields,kind[0].toUpperCase()+kind.slice(1)+' input count','number',draft.reference_counts?.[kind]??(Math.max(0,...(draft.slots||[]).filter(s=>s.type===kind).map(s=>s.index))||''));input.min=0;input.max=64;input.step=1;counts[kind]=input;}
   countFields.append(el('p','For workflows without prompt markers, declare the ordered inputs. Leave blank to use the workflow minimum. The prompt is submitted unchanged.','field-hint'));
@@ -250,7 +250,7 @@
   function read(){const [p,m]=model.value?JSON.parse(model.value):[draft.provider,draft.model],reference_counts={};if(!countFields.hidden)for(const kind of ['image','video','audio'])if(selected()?.['supports_'+kind+'_input']&&counts[kind].value!=='')reference_counts[kind]=Number(counts[kind].value);return {...draft,title:title.value,description:description.value,prompt:prompt.value,provider:p,model:m,media_type:selected()?.media_type||draft.media_type,syntax,reference_counts,slots:bindings,options:{...generationOptions(),reference_mode:mode.value||modelOptions.reference_mode||draft.options?.reference_mode||''},cover_id:coverID,override_sound_id:overrideSoundID};}
   function snapshotRecord(){const content=read();return {...record,content,draft:content,savedDraft};}
   function workflowReady(){return !!model.value&&mode.value==='references'&&Object.values(generationFields).every(input=>input.validity.valid);}
-  function cache(){sound.root.hidden=selected()?.media_type!=='video'&&!overrideSoundID;sound.sync();countVisibility();infer.disabled=writing||!!uploading||!workflowReady();syncPublication();localDrafts.set(record.id,snapshotRecord());promptEditor?.refresh();for(const widget of widgets)widget.sync();FormUI.update(form);}
+  function cache(){FormUI.updatePrompt(prompt,selected());sound.root.hidden=selected()?.media_type!=='video'&&!overrideSoundID;sound.sync();countVisibility();infer.disabled=writing||!!uploading||!workflowReady();syncPublication();localDrafts.set(record.id,snapshotRecord());promptEditor?.refresh();for(const widget of widgets)widget.sync();FormUI.update(form);}
   const validation=()=>{const d=read();return ReferenceValidation.target(d.provider,d.model,d.options);};
   async function checkDraftMedia(d,operationSignal=signal){if(!d.provider||!d.model)return;await api(`/v1/system/templates/${record.id}/validate-media`,{method:'POST',body:JSON.stringify({draft:d}),signal:operationSignal});}
   function checkMedia(){

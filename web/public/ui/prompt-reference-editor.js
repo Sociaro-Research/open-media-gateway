@@ -28,10 +28,10 @@
  }
  function markers(){return ReferencePrompts.inspect(input.value,model(),options());}
  function check(){
-  const message=enabled()?(config.message?.()??ReferencePrompts.error(input.value,model(),options())):'';
-  if(config.validate!==false)input.setCustomValidity(message);if(warning.textContent!==message)warning.textContent=message;warning.hidden=!message;return !message;
+  const length=FormUI.updatePrompt(input,model()),reference=enabled()?(config.message?.()??ReferencePrompts.error(input.value,model(),options())):'',message=length.error||reference;
+  input.setCustomValidity(config.validate===false?length.error:message);if(warning.textContent!==message)warning.textContent=message;warning.hidden=!message;return !message;
  }
- function requestError(request,model){return ReferencePrompts.error(request.prompt,model,request.options||{});}
+ function requestError(request,model){return FormUI.promptState(request.prompt,model).error||ReferencePrompts.error(request.prompt,model,request.options||{});}
  function validate(){const valid=check();if(!valid){input.focus();input.reportValidity();}return valid;}
  function requestRefresh(){if(life.signal.aborted)return;check();if(!scheduled){scheduled=true;requestAnimationFrame(refresh);}}
  function reference(kind,index){
