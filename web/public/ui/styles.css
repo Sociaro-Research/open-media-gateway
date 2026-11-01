@@ -1691,10 +1691,11 @@ input[type=color]:focus-visible { outline:none; box-shadow:none; border:2px soli
 .journal-project-edit { position:absolute; z-index:2; top:50%; right:32px; transform:translateY(-50%); width:44px; min-width:44px; height:44px; min-height:44px; padding:6px; font-size:12px; line-height:20px; }
 .has-project-edit > .select-trigger { padding-right:92px; }
 /* This field action is text-only; retain its 44px target and reserved border. */
-.journal-project-edit { background:transparent; box-shadow:none; }
-.journal-project-edit::after { display:none; }
-.journal-project-edit:focus-visible { color:var(--text); text-decoration:underline; text-decoration-thickness:2px; text-underline-offset:.2em; }
-@media(forced-colors:active) { .journal-project-edit:focus-visible { color:CanvasText; } }
+/* Embedded field actions reuse the field perimeter instead of adding an inner frame. */
+:is(.member-limit-form,.role-editor) > button,.floating-field > button:not(.select-trigger) { background:transparent; box-shadow:none; }
+:is(.member-limit-form,.role-editor) > button::after,.floating-field > button:not(.select-trigger)::after { display:none; }
+:is(.member-limit-form,.role-editor) > button:focus-visible,.journal-project-edit:focus-visible { outline:none!important; color:var(--text); text-decoration:underline; text-decoration-thickness:2px; text-underline-offset:.2em; }
+@media(forced-colors:active) { :is(.member-limit-form,.role-editor) > button:focus-visible,.journal-project-edit:focus-visible { color:CanvasText; } }
 
 /* Scrollable owners retain their native perimeter; compensate its extra pixel
    with reserved padding so focus never shifts content or adds an outline. */
