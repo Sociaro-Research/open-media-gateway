@@ -743,6 +743,18 @@ rejects filter-triggered writes and external calls. Evidence uses
 `UI_EVIDENCE_DIR`; `UI_SOURCE_DIR` can select an archived UI. PostgreSQL regressions
 separately verify full-set filtering before pagination and workspace/role isolation.
 
+Run `node scripts/ui/journal-pagination.cjs` in Chromium and WebKit for ten-record
+initial/next pages, page scrolling, visible loading, duplicate-load prevention,
+failure preservation and keyboard retry, natural polling with new arrivals,
+stable completion, exact filter counts, empty states and delayed filter/key
+changes. It also covers an empty append retaining its cursor, scrolling during
+a pending poll, 150 new arrivals without gaps, and zero full-card downloads
+during unchanged polling of 178 loaded records. Both themes at 1440/390/320px
+cover the growing list and wrapping footer.
+Use `UI_SOURCE_DIR` with `UI_BASELINE=1` for before captures and
+`UI_EVIDENCE_DIR` for ignored evidence. All APIs are synthetic loopback fixtures;
+PostgreSQL/API tests verify the actual ordering, snapshot counts and isolation.
+
 Run the real provider-logo regression with disposable services:
 
 ```sh

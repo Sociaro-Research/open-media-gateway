@@ -1,3 +1,4 @@
+const {generationPage}=require('./generation-page-fixture.cjs');
 const {useFixtureKey}=require('./fixture-key.cjs');
 // Projects + repeat-generation integration, entirely synthetic localhost APIs.
 const {chromium,webkit}=require('playwright');
@@ -18,7 +19,7 @@ const deferred=()=>{let resolve;const promise=new Promise(r=>resolve=r);return {
  page.on('pageerror',e=>{if(engine==='webkit'&&e.message==='ResizeObserver loop completed with undelivered notifications.')notices.push(e.message);else errors.push(e.message);});
  await page.route('**/*',async route=>{
   const req=route.request(),url=new URL(req.url());if(url.hostname!=='127.0.0.1'){external.push(req.url());return route.abort();}if(!url.pathname.startsWith('/v1/'))return route.continue();
-  const json=body=>route.fulfill({json:body}),auth=req.headers().authorization;
+  const json=body=>route.fulfill({json:url.pathname==='/v1/generations'&&req.method()==='GET'&&body.data?generationPage(url,body.data):body}),auth=req.headers().authorization;
   if(url.pathname==='/v1/playground-key/restore')return route.fulfill({status:404,json:{error:{message:'No saved fixture key'}}});
   if(url.pathname==='/v1/info')return json({provider:'mock',auth_mode:'google'});
   if(url.pathname==='/v1/me')return json({id:'preview',session_id:'preview',name:'Preview',email:'preview@example.test',is_system_admin:true});

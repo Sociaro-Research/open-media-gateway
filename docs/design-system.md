@@ -164,6 +164,16 @@ Unavailable previews keep these actions; content visibility still follows the
 report's permissions and retention policy. Shared `ControlPickers.enhance` accepts
 an existing icon button as its trigger without creating a second dropdown field.
 
+The Playground Journal grows with loaded cards and uses page scrolling. Load ten
+records initially and append ten near the bottom, with a keyboard-accessible
+Load more fallback. Its bottom feedback uses the shared secondary action,
+muted text, spacing and error tokens: show the server-filtered Shown N of M
+count, pending loading text, retryable failures and a clear empty/end state.
+Background reconciliation checks lightweight ID/revision pages and retrieves only
+changed/new cards, retaining attached cards, playback, focus and the page scroll
+anchor. A failed page retains existing records; changing viewer/project
+clears that context and ignores its late responses.
+
 ## 7. Review before completion
 
 Audit Log reuses shared filters, calendars, tables and the read-only detail

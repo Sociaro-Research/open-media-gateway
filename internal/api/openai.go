@@ -209,8 +209,8 @@ func (s *Server) listGenerations(w http.ResponseWriter, r *http.Request) {
 		offset = value
 	}
 	for key := range r.URL.Query() {
-		if key != "limit" && key != "offset" && key != "project_id" {
-			invalidParameter(w, key, "only limit, offset and project_id are supported; cursor pagination is not available")
+		if key != "limit" && key != "offset" && key != "project_id" && key != "cursor" && key != "through" && key != "view" && key != "ids" && key != "include_total" {
+			invalidParameter(w, key, "unsupported generation list parameter")
 			return
 		}
 	}
@@ -221,6 +221,20 @@ func (s *Server) listGenerations(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		limit = value
+	}
+	if r.URL.Query().Has("cursor") {
+		if r.URL.Query().Has("offset") {
+			invalidParameter(w, "offset", "offset cannot be combined with cursor pagination")
+			return
+		}
+		s.listGenerationsCursor(w, r, limit)
+		return
+	}
+	for _, name := range []string{"through", "view", "ids", "include_total"} {
+		if r.URL.Query().Has(name) {
+			invalidParameter(w, name, name+" requires cursor pagination")
+			return
+		}
 	}
 	var tasks []core.Task
 	var err error

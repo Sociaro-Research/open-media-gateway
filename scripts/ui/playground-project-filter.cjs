@@ -1,3 +1,4 @@
+const {generationPage}=require('./generation-page-fixture.cjs');
 // Exact filter membership and rendered width, using disposable loopback fixtures.
 const {chromium,webkit}=require('playwright');
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
@@ -32,9 +33,9 @@ const server=http.createServer((req,res)=>{const p=new URL(req.url,'http://fixtu
   if(p==='/v1/generations'){
    if(req.method()==='POST'){const body=req.postDataJSON();assert.notEqual(body.project_id,'none');const created={...task('submitted',body.project_id),...body,status:'queued'};tasks.unshift(created);return json(created);}
    assert.equal(req.method(),'GET');const filter=u.searchParams.get('project_id')||'',offset=Number(u.searchParams.get('offset')||0),limit=Number(u.searchParams.get('limit')||50);
-   reads.push({filter,offset,limit});const all=key==='fixture-project-key'?tasks.filter(t=>!filter||(filter==='none'?!t.project_id:t.project_id===filter)):[],data=structuredClone(all.slice(offset,offset+limit));
+   reads.push({filter,offset,limit});const all=key==='fixture-project-key'?tasks.filter(t=>!filter||(filter==='none'?!t.project_id:t.project_id===filter)):[],data=structuredClone(all);
    const pending=gate;if(pending&&pending.filter===filter){pending.started.resolve();await pending.promise;}
-   return json({data,has_more:all.length>offset+limit,next_offset:offset+data.length});
+   return json(generationPage(u,data));
   }
   assert.equal(req.method(),'GET','Unexpected fixture write: '+p);return json({data:[]});
  });
@@ -47,21 +48,21 @@ const server=http.createServer((req,res)=>{const p=new URL(req.url,'http://fixtu
  try{
   await page.goto(base);await page.locator('#managedGenerationHelp').waitFor({state:'visible'});
   const defaultWidth=(await page.getByRole('combobox',{name:'Project',exact:true}).boundingBox()).width;
-  await useFixtureKey(page,key);await page.waitForFunction(()=>selectedModel()?.id==='video');await waitIDs(tasks.slice(0,50).map(t=>t.id));
+  await useFixtureKey(page,key);await page.waitForFunction(()=>selectedModel()?.id==='video');await waitIDs(tasks.slice(0,10).map(t=>t.id));
   const mutations=()=>writes.filter(w=>!['/v1/generations/estimate','/v1/playground-key/restore'].includes(w.path)).length;const writesBefore=mutations();await page.locator('#prompt').fill('Retained draft');
   const draft=await page.locator('#taskForm').evaluate(f=>[...f.querySelectorAll('input:not([type=file]),textarea,select')].map(n=>[n.id,n.value]));
   await choose('No Projects');await waitIDs(['older-unassigned','oldest-unassigned']);assert.equal(await page.locator('#manageProject').isVisible(),false);assert.equal(await page.locator('#journalProject option[value="new-project-action"]').evaluate(n=>n.disabled),false);
   assert.equal(await page.evaluate(()=>GatewayProjects.selected()),'');assert.equal(await page.evaluate(()=>GatewayProjects.filter()),'none');
-  await choose(projects[0].name);await waitIDs(tasks.filter(t=>t.project_id===projects[0].id).map(t=>t.id));await choose(projects[1].name);await waitIDs(tasks.filter(t=>t.project_id===projects[1].id).map(t=>t.id));await choose('All Projects');await waitIDs(tasks.slice(0,50).map(t=>t.id));
+  await choose(projects[0].name);await waitIDs(tasks.filter(t=>t.project_id===projects[0].id).slice(0,10).map(t=>t.id));await choose(projects[1].name);await waitIDs(tasks.filter(t=>t.project_id===projects[1].id).slice(0,10).map(t=>t.id));await choose('All Projects');await waitIDs(tasks.slice(0,10).map(t=>t.id));
   assert.deepEqual(tasks,initial);assert.equal(mutations(),writesBefore);assert.deepEqual(await page.locator('#taskForm').evaluate(f=>[...f.querySelectorAll('input:not([type=file]),textarea,select')].map(n=>[n.id,n.value])),draft);
   record('Exact All/two-project/No Projects membership; older unassigned outside loaded All page; selecting filters writes nothing and preserves form');
   await choose('No Projects');await waitIDs(['older-unassigned','oldest-unassigned']);await page.reload();await waitIDs(['older-unassigned','oldest-unassigned']);assert.equal(await filter(),'none');await page.goto(base+'/away');await page.goBack();await waitIDs(['older-unassigned','oldest-unassigned']);assert.equal(await filter(),'none');
   record('No Projects is distinct from All and concrete project IDs after reload and browser Back');
-  const beforePoll=reads.length;tasks.push(task('poll-arrival'));await waitIDs(['older-unassigned','oldest-unassigned','poll-arrival']);assert.ok(reads.length>beforePoll);assert.ok(reads.slice(beforePoll).every(r=>r.filter==='none'&&r.offset===0));
+  const beforePoll=reads.length;tasks.unshift(task('poll-arrival'));await waitIDs(['poll-arrival','older-unassigned','oldest-unassigned']);assert.ok(reads.length>beforePoll);assert.ok(reads.slice(beforePoll).every(r=>r.filter==='none'&&r.offset===0));
   tasks=tasks.filter(t=>t.project_id);await page.locator('#taskList .empty-state').waitFor();assert.match(await page.locator('#taskList').innerText(),/without a project/);await poll();assert.equal(await filter(),'none');assert.equal(await current().then(ids=>ids.length),0);tasks=structuredClone(initial);await waitIDs(['older-unassigned','oldest-unassigned']);
   record('Unmodified natural 2000ms polling retains active filter and handles arrivals and empty No Projects results');
-  gate={...deferred(),started:deferred(),filter:'none'};await gate.started.promise;await choose(projects[0].name);await waitIDs(tasks.filter(t=>t.project_id===projects[0].id).map(t=>t.id));gate.resolve();gate=null;await poll();assert.ok((await current()).every(id=>id.startsWith('assigned-')));
-  await choose('No Projects');await waitIDs(['older-unassigned','oldest-unassigned']);gate={...deferred(),started:deferred(),filter:'none'};await gate.started.promise;await choose('All Projects');await waitIDs(tasks.slice(0,50).map(t=>t.id));await choose('No Projects');gate.resolve();gate=null;await waitIDs(['older-unassigned','oldest-unassigned']);
+  gate={...deferred(),started:deferred(),filter:'none'};await gate.started.promise;await choose(projects[0].name);await waitIDs(tasks.filter(t=>t.project_id===projects[0].id).slice(0,10).map(t=>t.id));gate.resolve();gate=null;await poll();assert.ok((await current()).every(id=>id.startsWith('assigned-')));
+  await choose('No Projects');await waitIDs(['older-unassigned','oldest-unassigned']);gate={...deferred(),started:deferred(),filter:'none'};await gate.started.promise;await choose('All Projects');await waitIDs(tasks.slice(0,10).map(t=>t.id));await choose('No Projects');gate.resolve();gate=null;await waitIDs(['older-unassigned','oldest-unassigned']);
   record('Late No Projects responses cannot mix into concrete filters or an All→No Projects return');
   await page.locator('#prompt').fill('No Projects submission');await page.locator('#submitButton').click();await page.waitForFunction(()=>document.querySelector('#confirmDialog').open&&!document.querySelector('#confirmSubmit').disabled);await page.locator('#confirmSubmit').click();await page.locator('#confirmDialog').waitFor({state:'hidden'});assert.equal(writes.filter(w=>w.path==='/v1/generations').at(-1).body.project_id,undefined);await waitIDs(['submitted','older-unassigned','oldest-unassigned']);
   record('No Projects keeps ordinary unassigned submission semantics; sentinel never enters assignment payload');

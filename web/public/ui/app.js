@@ -128,6 +128,8 @@ let providerAdminCatalog = [];
 let selectedAdminProviderID = '';
 let renderedTasksFingerprint = '';
 let taskListRequest = null;
+let journalEpoch = 0;
+let journalPage = {ready:false, cursor:null, scope:null, total:null, hasMore:false, error:'', pageError:false};
 let generationKeyVersion = 0;
 let authMode = 'pending';
 const authAbsent = Symbol('absent session');
@@ -363,10 +365,9 @@ function renderTasks(tasks) {
       document.querySelector('#journalProject')?.closest('.floating-field')?.querySelector('.select-trigger')?.focus({preventScroll:true});
   };
   // Preserve the first surviving visible card when membership changes above it.
-  const listTop = elements.taskList.getBoundingClientRect().top;
-  const anchors = (elements.taskList.scrollTop > 0 ? [...elements.taskList.querySelectorAll('.task')] : [])
-    .map(card => ({id:card.dataset.taskId, top:card.getBoundingClientRect().top-listTop, bottom:card.getBoundingClientRect().bottom-listTop}))
-    .filter(anchor => anchor.bottom > 0);
+  const anchors = (window.scrollY > 0 ? [...elements.taskList.querySelectorAll('.task')] : [])
+    .map(card => ({id:card.dataset.taskId, top:card.getBoundingClientRect().top, bottom:card.getBoundingClientRect().bottom}))
+    .filter(anchor => anchor.bottom > 0 && anchor.top < window.innerHeight);
   const previous = new Map(latestTasks.map(task => [task.id, task.status]));
   const existing = new Map([...elements.taskList.querySelectorAll('.task')].map(article => [article.dataset.taskId, article]));
   const fingerprints = new Map(tasks.map(task => [task.id, JSON.stringify(task)]));
@@ -391,7 +392,7 @@ function renderTasks(tasks) {
 	if (saved?.taskFingerprint === fingerprints.get(task.id)) return saved;
 	// Only project membership/version may bypass rendering. Content, result and
 	// permission changes must still dispose the old card and its media access.
-	const {project_id, project_version, ...content} = task;
+	const {project_id, project_version, journal_revision, ...content} = task;
 	const contentFingerprint = JSON.stringify(content);
 	if (saved?.contentFingerprint === contentFingerprint) {
 	  saved.taskFingerprint = fingerprints.get(task.id);
@@ -497,7 +498,7 @@ function renderTasks(tasks) {
   const anchor = anchors.find(anchor => visibleIDs.has(anchor.id));
   if (changedCards && anchor) {
     const card = articles.find(article => article.dataset.taskId === anchor.id);
-    elements.taskList.scrollTop += card.getBoundingClientRect().top-listTop-anchor.top;
+    window.scrollBy(0, card.getBoundingClientRect().top-anchor.top);
   }
   restoreProjectAssignment?.(tasks);
   restoreRemovedFocus();
@@ -537,6 +538,7 @@ async function api(path, options = {}) {
     const error = new Error(body.error?.message || `HTTP ${response.status}`);
     error.status = response.status;
     error.code = body.error?.code;
+    error.param = body.error?.param;
     error.templates = body.error?.templates;
     throw error;
   }
@@ -766,28 +768,134 @@ function showConsoleSection(name) {
   else history.replaceState(null,'','/');
 }
 
-async function loadTasks(showErrors = false) {
+function updateJournalPagination() {
+  const footer = document.querySelector('#journalPagination'), count = document.querySelector('#journalCount');
+  const status = document.querySelector('#journalLoadStatus'), button = document.querySelector('#journalLoadMore');
+  const loading = taskListRequest && !taskListRequest.controller.signal.aborted;
+  footer.hidden = !window.GenerationKey.value();
+  count.textContent = journalPage.total === null ? '' : `Shown ${latestTasks.length} of ${journalPage.total}`;
+  FormUI.message(status, loading && (!journalPage.ready || taskListRequest.more) ? 'Loading generations…' : journalPage.error, journalPage.error && !loading ? 'error' : '');
+  const showButton = journalPage.hasMore || !!journalPage.error || !journalPage.ready;
+  if (!showButton && document.activeElement === button) count.focus({preventScroll:true});
+  button.hidden = !showButton;
+  button.disabled = !!loading;
+  button.textContent = journalPage.error ? 'Retry loading' : 'Load more';
+  elements.taskList.setAttribute('aria-busy', loading ? 'true' : 'false');
+}
+function resetJournal() {
+  journalEpoch++;
+  taskListRequest?.controller.abort();
+  journalPage = {ready:false, cursor:null, scope:null, total:null, hasMore:false, error:'', pageError:false};
+  updateJournalPagination();
+}
+function journalNearBottom() {
+  const footer = document.querySelector('#journalPagination');
+  return !footer.hidden && footer.getBoundingClientRect().top <= window.innerHeight + 600;
+}
+function maybeLoadJournalPage() {
+  if (!document.hidden && currentConsoleSection === 'generation' && journalPage.ready && journalPage.hasMore && !journalPage.error && journalNearBottom()) void loadTasks(false, true);
+}
+document.querySelector('#journalLoadMore').addEventListener('click', () => loadTasks(true, journalPage.ready && (journalPage.pageError || !journalPage.error)));
+if ('IntersectionObserver' in window) new IntersectionObserver(entries => {
+  if (entries.some(entry => entry.isIntersecting)) maybeLoadJournalPage();
+}, {rootMargin:'600px 0px'}).observe(document.querySelector('#journalPagination'));
+
+async function loadTasks(showErrors = false, more = false) {
   if (submitting || !window.GenerationKey.value()) return;
   if (taskListRequest && !taskListRequest.controller.signal.aborted) return taskListRequest.promise;
-  const request = {controller: new AbortController(), promise: null};
+  if (more && (!journalPage.ready || !journalPage.hasMore)) return;
+  const request = {controller: new AbortController(), promise: null, more, epoch:journalEpoch};
   taskListRequest = request;
+  updateJournalPagination();
   request.promise = (async () => { try {
     const project = window.GatewayProjects?.filter() || '';
+    const workspace = window.Workspace?.id(), key = window.GenerationKey.value();
     window.GatewayProjects?.load();
-    const response = await api('/v1/generations?limit=50' + (project ? '&project_id='+encodeURIComponent(project) : ''), {signal: request.controller.signal});
-    if (request.controller.signal.aborted) return;
-    if (submitting) return;
-    const tasks = response.data || [];
+    let scope=journalPage.scope;
+    const read = async params => {
+      const response = await api('/v1/generations?' + params, {signal:request.controller.signal, expectedKey:key});
+      if (request.controller.signal.aborted || request.epoch !== journalEpoch || project !== (window.GatewayProjects?.filter() || '') || workspace !== window.Workspace?.id() || submitting) throw new DOMException('Journal context changed', 'AbortError');
+      if (response.journal_scope !== undefined) {
+        if (scope && scope !== response.journal_scope) {
+          const error=new Error('Journal permissions changed.');error.status=400;error.param='cursor';throw error;
+        }
+        scope=response.journal_scope;
+      }
+      return response;
+    };
+    const params = (limit, cursor='') => {
+      const value = new URLSearchParams({limit:String(limit), cursor:cursor || ''});
+      if (project) value.set('project_id', project);
+      return value;
+    };
+    let tasks, total, tail=journalPage.cursor, hasMore=journalPage.hasMore;
+    let candidates = latestTasks;
+    if (more || !journalPage.ready || !tail) {
+      const response = await read(params(10, more ? tail : ''));
+      candidates = more ? [...latestTasks, ...(response.data || [])] : response.data || [];
+      // An empty final page does not erase the position of loaded history.
+      tail = response.next_cursor || (more ? tail : null);
+      tasks = candidates; total = response.total;
+      if (!more) hasMore = !!response.has_more;
+    }
+    if (journalPage.ready && tail) {
+      // Poll a narrow ID/revision inventory, never full loaded card payloads.
+      // Walking the complete loaded range also finds older tasks newly assigned
+      // to the filter, plus every new arrival across a ten-record boundary.
+      const inventory=[];
+      let cursor='', response;
+      do {
+        const query=params(100,cursor);query.set('view','versions');query.set('through',tail);
+        if (cursor) query.set('include_total','false');
+        response=await read(query);
+        if (response.total !== undefined) total=response.total;
+        inventory.push(...(response.data || []));
+        if (!response.has_more) break;
+        if (!response.next_cursor || response.next_cursor===cursor) throw new Error('Journal pagination did not advance.');
+        cursor=response.next_cursor;
+      } while (true);
+      const records=new Map(candidates.map(task=>[task.id,task]));
+      const changed=inventory.filter(item=>records.get(item.id)?.journal_revision!==item.journal_revision);
+      for (let i=0;i<changed.length;i+=50) {
+        const query=params(50);query.set('ids',changed.slice(i,i+50).map(item=>item.id).join(','));
+        const update=await read(query);total=update.total;
+        // An authorization/membership change between inventory and data reads
+        // removes the unavailable record instead of keeping its former view.
+        for (const item of changed.slice(i,i+50)) records.delete(item.id);
+        for (const task of update.data || []) records.set(task.id,task);
+      }
+      tasks=[...new Map(inventory.map(item=>[item.id,records.get(item.id)]).filter(([,task])=>task)).values()];
+      hasMore=tasks.length<total;
+    }
+    if (!Number.isSafeInteger(total) || total<tasks.length) throw new Error('Journal changed while loading. Retrying automatically.');
+    journalPage.ready = true;
+    journalPage.total = total;
+    journalPage.hasMore = hasMore;
+    journalPage.cursor = tail;
+    journalPage.scope = scope;
+    if (more || !journalPage.pageError || !journalPage.hasMore) { journalPage.error = ''; journalPage.pageError = false; }
     const fingerprint = JSON.stringify(tasks);
     if (fingerprint !== renderedTasksFingerprint) {
       renderedTasksFingerprint = fingerprint;
       renderTasks(tasks);
     }
   } catch (error) {
-    if (error.name === 'AbortError') return;
+    if (error.name === 'AbortError' || request.epoch !== journalEpoch) return;
+    if (error.status===400 && ['cursor','through'].includes(error.param) && (journalPage.cursor || journalPage.scope)) {
+      // Roles can change while a key stays valid. Dispose former views and
+      // restart with current authorization rather than retrying an old scope.
+      resetJournal();renderedTasksFingerprint='';renderTasks([]);
+      return loadTasks();
+    }
+    journalPage.error = `Could not load ${more ? 'more generations' : 'the journal'}: ${error.message}`;
+    journalPage.pageError = more;
     if (showErrors || error.status === 401) setMessage(error.status === 401 ? 'Check your API key.' : `Could not load the journal: ${error.message}`, 'error');
   } finally {
-    if (taskListRequest === request) taskListRequest = null;
+    if (taskListRequest === request) {
+      taskListRequest = null;
+      updateJournalPagination();
+      if (!journalPage.error && !request.controller.signal.aborted) requestAnimationFrame(maybeLoadJournalPage);
+    }
   } })();
   return request.promise;
 }
@@ -1157,7 +1265,7 @@ elements.prompt.addEventListener('input', () => {
 window.addEventListener('gateway-project-change', event => {
   taskListRequest?.controller.abort();
   renderedTasksFingerprint='';
-  if (!event.detail?.metadata) renderTasks([]);
+  if (!event.detail?.metadata) { resetJournal(); renderTasks([]); }
   loadTasks(true);
 });
 window.addEventListener('gateway-key-change', () => {
@@ -1165,6 +1273,7 @@ window.addEventListener('gateway-key-change', () => {
   playgroundCatalogSequence++;renderedPlaygroundModel=null;renderedPlaygroundProvider='';
   ProviderLogos.prune();
   taskListRequest?.controller.abort();
+  resetJournal();
   elements.taskList.querySelectorAll('.task').forEach(disposeTaskCard);
   playgroundSound?.clear();playgroundResources?.dispose();playgroundResources=null;
   providerCatalog = []; latestTasks = []; taskCompletionUntil.clear(); renderedTasksFingerprint = ''; pendingSubmission = null;
@@ -1465,7 +1574,9 @@ async function moveRequestToJournal(task) {
     return;
   }
   renderedTasksFingerprint = '';
+  if (!latestTasks.some(item => item.id === task.id) && journalPage.total !== null) journalPage.total++;
   renderTasks([task, ...latestTasks.filter(item => item.id !== task.id)]);
+  updateJournalPagination();
   const article = elements.taskList.firstElementChild;
   article.classList.add('task-arriving');
   article.scrollIntoView({block: 'nearest', behavior: 'instant'});
@@ -1609,7 +1720,7 @@ document.querySelector('#authRetry').addEventListener('click', initialize);
 showConsoleSection(currentConsoleSection);
 void initialize();
 setInterval(() => {
-  if (!document.hidden && currentConsoleSection === 'generation' && window.GenerationKey.value()) loadTasks();
+  if (!document.hidden && currentConsoleSection === 'generation' && window.GenerationKey.value()) loadTasks(false, journalPage.pageError && journalNearBottom());
 }, 2000);
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) taskListRequest?.controller.abort();

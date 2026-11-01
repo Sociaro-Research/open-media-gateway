@@ -1375,7 +1375,7 @@ paths:
         '503': {$ref: '#/components/responses/ServiceUnavailable'}
   /v1/generations:
     get:
-      description: Gateway extension. Role-filtered jobs ordered by creation time and ID. Supports limit, offset and optional project_id; ownership, author and project filtering happen before pagination. Omitting project_id includes older ungrouped generations; project_id=none selects only unassigned generations, including older entries, before pagination. Unknown or foreign projects return the same validation error.
+      description: Gateway extension. Role-filtered jobs ordered by creation time and ID descending. Ownership, author and project filtering happen before pagination and counting. Omitting project_id includes older ungrouped generations; project_id=none selects only unassigned generations. Unknown or foreign projects return the same validation error. Existing limit/offset pagination remains supported. Send cursor with an empty value for the first stable cursor page, then use next_cursor for older records. New arrivals do not shift cursor pages. Cursor responses include the exact full filtered total from the same database snapshot as the page; this total is independent of cursor/through bounds. Cursors are bound to the viewer and project filter and retain the full creation timestamp precision. They are positions, so a removed or reassigned boundary record does not invalidate continuation.
       operationId: list_generations
       parameters:
       - in: query
@@ -1386,6 +1386,26 @@ paths:
           - {type: string, enum: [none]}
         description: Optional workspace project UUID or none for unassigned generations only. Omit for all generations. The none sentinel is a read-only filter and cannot be assigned or managed as a project.
       - {in: query, name: offset, schema: {type: integer, minimum: 0, maximum: 1000000, default: 0}}
+      - in: query
+        name: cursor
+        schema: {type: string, maxLength: 1024}
+        description: Opt in to cursor pagination, using an empty value for the first page. Use the returned next_cursor for the next older page. Cannot be combined with offset. next_cursor is also returned on a final nonempty page so its position can bound a later refresh.
+      - in: query
+        name: through
+        schema: {type: string, maxLength: 1024}
+        description: Optional inclusive oldest position for refreshing an already loaded range. Requires cursor pagination. Walk from cursor= through that saved tail, following has_more/next_cursor within the bounded range. The total still counts the full filtered set. Reuse the saved tail to load older history afterward.
+      - in: query
+        name: view
+        schema: {type: string, enum: [versions]}
+        description: Cursor mode only. Return only id and an opaque journal_revision for each matching record. Reconcile the loaded range with these lightweight pages, then request full data only for changed/new IDs. The revision includes the viewer/role/filter context and changes after task or stored-result availability updates, including same-timestamp writes.
+      - in: query
+        name: ids
+        schema: {type: string}
+        description: Cursor mode only. Comma-separated set of 1 to 50 unique canonical generation UUIDs for changed-card reads. All workspace, author and project restrictions still apply before pagination. The total counts the full viewer/project filter, independently of these IDs.
+      - in: query
+        name: include_total
+        schema: {type: boolean, default: true}
+        description: Cursor mode only. Set false on continuation inventory pages to omit total and avoid repeating the same count query. Reconciliation can count once per inventory walk.
       - in: query
         name: limit
         schema:
@@ -1401,13 +1421,30 @@ paths:
                 properties:
                   data:
                     items:
-                      $ref: '#/components/schemas/Generation'
+                      oneOf:
+                      - $ref: '#/components/schemas/Generation'
+                      - type: object
+                        required: [id, journal_revision]
+                        additionalProperties: false
+                        properties:
+                          id: {type: string, format: uuid}
+                          journal_revision: {type: string}
                     type: array
                   has_more:
                     type: boolean
                   next_offset:
                     type: integer
                     minimum: 0
+                  next_cursor:
+                    type: [string, 'null']
+                    description: Cursor mode only. Last returned position, or null for an empty page.
+                  journal_scope:
+                    type: string
+                    description: Cursor mode only. Opaque viewer/role/filter context for reconciling multiple requests. Discard former views and restart with an empty cursor if this changes or a saved cursor becomes invalid after a permission change.
+                  total:
+                    type: integer
+                    minimum: 0
+                    description: Cursor mode only, unless include_total=false. Exact count for the viewer and project filter, including records outside this page or refresh range.
                   object:
                     const: list
                 type: object
@@ -9038,6 +9075,7 @@ components:
         requires the same Gateway API key. No progress percentage is invented. Managers receive
         operational metadata only, with content_access false and without prompt, input, output links or provider errors.
       properties:
+        journal_revision: {type: string, description: Opaque synchronization revision included only in cursor list responses. Compare it as a string; it is not an authorization token or a creation-order cursor.}
         resources:
           type: array
           description: Owner-bound local resource bindings returned only after successful terminal capture.

@@ -1,3 +1,4 @@
+const {generationPage}=require('./generation-page-fixture.cjs');
 const {useFixtureKey}=require('./fixture-key.cjs');
 // Natural journal polling, synthetic APIs only; never pause application timers.
 const {chromium,webkit}=require('playwright');
@@ -18,7 +19,7 @@ const server=http.createServer((req,res)=>{const file=path.join(root,req.url==='
  page.on('pageerror',e=>{if(e.message!=='ResizeObserver loop completed with undelivered notifications.')errors.push(e.message);});
  await page.route('**/*',async route=>{
   const req=route.request(),url=new URL(req.url());if(url.hostname!=='127.0.0.1'){external.push(req.url());return route.abort();}if(!url.pathname.startsWith('/v1/'))return route.continue();
-  const json=(body,status=200)=>route.fulfill({status,json:body});
+  const json=(body,status=200)=>route.fulfill({status,json:url.pathname==='/v1/generations'&&req.method()==='GET'&&body.data?generationPage(url,body.data):body});
   if(url.pathname==='/v1/info')return json({provider:'mock',auth_mode:'google'});
   if(url.pathname==='/v1/me')return json({id:'preview',session_id:'preview',name:'Preview',email:'preview@example.test',is_system_admin:true});
   if(url.pathname==='/v1/playground-key/restore')return json({error:{message:'No saved fixture key'}},404);
@@ -58,7 +59,7 @@ const server=http.createServer((req,res)=>{const file=path.join(root,req.url==='
   projectFailure=true;projectGate={...deferred(),started:deferred()};await open(false);await projectGate.started.promise;await nextPoll();projectGate.resolve();projectGate=null;await menu().getByText(/Could not load projects/).waitFor();const count=patches.length;await page.waitForFunction(()=>!document.querySelector('#projectMessage').hidden&&document.querySelector('#projectMessage').textContent.includes('Project list interrupted'));assert.equal(await menu().isVisible(),true);assert.equal(patches.length,count);await snapshot('background-503');await close();projectFailure=false;await open();await menu().getByRole('menuitemcheckbox').first().waitFor();record('Independent background 503 remains visible without dismissing local failure/recovery or mutating a project');
   target.can_change_project=false;target.updated_at++;await fingerprint('can_change_project',false);await menu().waitFor({state:'hidden'});assert.equal(await card().locator('.change-project').isEnabled(),false);record('Permission loss closes assignment instead of preserving unauthorized interaction');
   target.can_change_project=true;target.updated_at++;await fingerprint('can_change_project',true);await open();tasks=[other];await card().waitFor({state:'detached'});await menu().waitFor({state:'hidden'});tasks=[target,other];await card().waitFor();assert.equal(await menu().count(),0);record('Task removal closes the submenu; reappearing task does not resurrect it');
-  await open();key='different-fixture-key';await page.evaluate(()=>{window.GenerationKey.value=()=> 'different-fixture-key';window.dispatchEvent(new Event('gateway-key-change'));});await menu().waitFor({state:'hidden'});await page.waitForFunction(()=>document.querySelector('#journalProject').options.length===2);record('Key/context change closes rebound interaction and clears previous names');
+  await open();key='different-fixture-key';await page.evaluate(()=>{window.GenerationKey.value=()=> 'different-fixture-key';window.dispatchEvent(new Event('gateway-key-change'));});await menu().waitFor({state:'hidden'});await page.waitForFunction(()=>document.querySelector('#journalProject').options.length===3);record('Key/context change closes rebound interaction and clears previous names');
   assert.deepEqual(errors,[]);assert.deepEqual(external,[]);assert.equal(patches.length,2);assert.ok(reads>=8);fs.writeFileSync(path.join(output,'results.json'),JSON.stringify({engine,polling:'Unmodified application 2000ms timer; no explicit loadTasks calls or interval replacement',cases,snapshots,patches,reads,errors,external},null,2));
  }catch(error){await page.screenshot({path:path.join(output,'failure.png')});fs.writeFileSync(path.join(output,'failure.json'),JSON.stringify({error:String(error),cases,snapshots,patches,reads},null,2));throw error;}finally{await browser.close();await new Promise(r=>server.close(r));}
 })().catch(error=>{console.error(error);process.exitCode=1;});
