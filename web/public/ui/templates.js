@@ -87,20 +87,35 @@
   if(writing||uploading)return;
   const token=epoch,screen=view,id=browseID;const valid=()=>current()&&fresh(token)&&view===screen;
   if(!quiet)say('Loading templates…');
-  try{
+  let result=null,failure=null;
+  const renderList=()=>{if(!valid()||!result||screen==='edit')return;const signature=JSON.stringify([canEdit,result,authorRecords,adminCatalog]);if(signature!==listFingerprint){listFingerprint=signature;renderGallery(result);}};
+  const read=operation=>operation().catch(error=>{if(valid()&&error.name!=='AbortError'){failure=error;say(error.message,'error');}});
+  // These reads have separate authorization and rendering responsibilities.
+  // A slow authoring catalogue must not hold the gallery or selected detail.
+  async function authoring(){
    let admin=null,allowed=false;
    if(systemAdministrator){try{admin=await api('/v1/system/templates',{signal});if(!valid())return;allowed=true;}catch(e){if(e.status!==403)throw e;}}
    if(!valid())return;
    canEdit=allowed;authorRecords=canEdit?(admin.data||[]).map(currentRecord):[];adminCatalog=canEdit?(admin.catalog||[]).map(p=>({...p,models:p.models.filter(eligible)})).filter(p=>p.models.length):[];
    if(requestedEdit&&screen!=='edit'){const id=requestedEdit;requestedEdit=null;const record=canEdit&&authorRecords.find(item=>item.id===id);if(record){renderEditor(localDrafts.get(record.id)||record);return;}say('This template is unavailable for editing.','error');}
    if(screen==='edit'){if(!canEdit){editing=null;await gallery();say('Template editing permission is no longer available.','error');}else await editorUpdate?.();return;}
-   const result=GenerationKey.value()?await api('/v1/templates',{signal}):{data:[]};if(!valid())return;
-   const signature=JSON.stringify([canEdit,result,authorRecords,adminCatalog]);if(signature!==listFingerprint){listFingerprint=signature;renderGallery(result);}
-   if(!GenerationKey.value()){emptySelection();say('Enter the same Gateway API key used in Playground to browse and generate.');return;}
-   if(screen==='use'&&id){try{const detail=await api('/v1/templates/'+encodeURIComponent(id),{signal});if(valid()){if(useUpdate)useUpdate(detail);else{renderUse(detail,token,id);}}}catch(e){if(valid()&&e.name!=='AbortError'){if([403,404,410].includes(e.status))useUpdate?.(null);say(e.message,'error');}}}
-   else say('');
-  }catch(error){if(valid()&&error.name!=='AbortError')say(error.message,'error');}
+   renderList();
+  }
+  async function listing(){
+   if(screen==='edit')return;
+   const incoming=GenerationKey.value()?await api('/v1/templates',{signal}):{data:[]};if(!valid())return;
+   result=incoming;renderList();
+   if(!GenerationKey.value()){emptySelection();if(!failure)say('Enter the same Gateway API key used in Playground to browse and generate.');}
+   else if(screen!=='use'&&!failure)say('');
+  }
+  async function detail(){
+   if(screen!=='use'||!id||!GenerationKey.value())return;
+   try{const incoming=await api('/v1/templates/'+encodeURIComponent(id),{signal});if(valid()){if(!failure)say('');if(useUpdate)useUpdate(incoming);else renderUse(incoming,token,id);}}
+   catch(error){if(valid()&&error.name!=='AbortError'&&[403,404,410].includes(error.status))useUpdate?.(null);throw error;}
+  }
+  await Promise.all([read(authoring),read(listing),read(detail)]);
  }
+
  async function chooseLibrary(kind,administrator,onSelect,validationContext=null,selectedID=()=>null,onClear=null,returnTarget=null){
   const token=epoch,parentSignal=controller.signal,operation=new AbortController(),signal=operation.signal,previousFocus=returnTarget||document.activeElement;
   let busy=false,uploadPending=false,offset=0,hasMore=false,items=[],sequence=0;
