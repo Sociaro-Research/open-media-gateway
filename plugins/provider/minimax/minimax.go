@@ -22,6 +22,7 @@ import (
 	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
 	"github.com/Sociaro-Research/open-media-gateway/internal/money"
 	"github.com/Sociaro-Research/open-media-gateway/internal/providerkit"
+	"github.com/Sociaro-Research/open-media-gateway/internal/webhookurl"
 )
 
 const maxResponseBytes = 4 << 20
@@ -129,12 +130,17 @@ func (a *Adapter) do(ctx context.Context, method, path string, body io.Reader, c
 	code := 0
 	if envelope.Base != nil {
 		if envelope.Base.Code == nil {
-			return nil, errors.New("MiniMax response status code is missing")
+			// Preserve the body for an exact-ID, read-only completion query.
+			// Other callers still receive the envelope error.
+			return data, errors.New("MiniMax response status code is missing")
 		}
 		code = *envelope.Base.Code
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 || code != 0 || envelope.Type == "error" || len(envelope.Error) > 0 && string(envelope.Error) != "null" {
-		return nil, &APIError{Status: resp.StatusCode, Code: code}
+		// A read-only task query may contain a completed output alongside a
+		// contradictory response envelope. Its caller can inspect the body,
+		// while every other caller still receives the API error.
+		return data, &APIError{Status: resp.StatusCode, Code: code}
 	}
 	if strings.HasPrefix(path, "/v1/") && !strings.HasPrefix(path, "/v1/models") && envelope.Base == nil {
 		return nil, errors.New("MiniMax response status envelope is missing")
@@ -248,7 +254,7 @@ func (a *Adapter) CredentialStatus() providerkit.CredentialCheck {
 }
 func publicURL(s string) bool {
 	u, e := url.Parse(s)
-	return e == nil && u.Scheme == "https" && u.Host != "" && u.User == nil && u.Fragment == ""
+	return e == nil && u.Scheme == "https" && webhookurl.Validate(s) == nil
 }
 
 // The shared host supplies concrete ID/owner/revision in context after resolving

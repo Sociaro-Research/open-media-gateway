@@ -14,10 +14,16 @@ import (
 
 func nativeResponse(id, model, state, kind string) map[string]any {
 	modality := "video"
-	content := map[string]string{"url": "https://media.example/result.mp4"}
+	content := map[string]string{}
+	if state == "succeeded" {
+		content["url"] = "https://media.example/result.mp4"
+	}
 	if kind == "h3_context_ir" {
 		modality = "text"
-		content = map[string]string{"prompt": "Structured enhanced prompt"}
+		content = map[string]string{}
+		if state == "succeeded" {
+			content["prompt"] = "Structured enhanced prompt"
+		}
 	}
 	resolution := "768P"
 	if kind == "regeneration" {
@@ -188,7 +194,11 @@ func TestNativeTextResultAndCancellation(t *testing.T) {
 	}
 }
 func TestMalformedTaskResponsesAreRejected(t *testing.T) {
-	for _, mutate := range []func(map[string]any){func(p map[string]any) { p["id"] = "999" }, func(p map[string]any) { p["model"] = "other" }, func(p map[string]any) { p["status"] = "mystery" }, func(p map[string]any) { p["task_type"] = "h3_context_ir" }, func(p map[string]any) { p["content"] = map[string]string{"url": "http://insecure.example/file"} }, func(p map[string]any) { p["usage"] = map[string]int{"output_seconds": -1} }} {
+	for _, mutate := range []func(map[string]any){func(p map[string]any) { p["id"] = "999" }, func(p map[string]any) { p["content"] = map[string]string{"url": "http://insecure.example/file"} }, func(p map[string]any) { p["content"] = map[string]string{"url": "https://127.0.0.1/file"} }, func(p map[string]any) {
+		p["content"] = map[string]string{"url": "https://user:pass@media.example/file"}
+	}, func(p map[string]any) { p["content"] = map[string]string{"url": "https://media.example/file#fragment"} }, func(p map[string]any) {
+		p["content"] = map[string]string{"preview_url": "https://media.example/preview.mp4"}
+	}} {
 		a := fixture(t, func(*http.Request) (*http.Response, error) {
 			out := nativeResponse("123", "MiniMax-H3", "succeeded", "generation")
 			mutate(out["task"].(map[string]any))
@@ -198,6 +208,154 @@ func TestMalformedTaskResponsesAreRejected(t *testing.T) {
 		if _, e := a.GetTask(owned("alice"), token); e == nil {
 			t.Fatal("malformed task accepted")
 		}
+	}
+}
+
+func TestReadyH3VideoOutputIgnoresOptionalMetadata(t *testing.T) {
+	for _, model := range []string{"MiniMax-H3", "MiniMax-H3-Highspeed", "MiniMax-H3-Lite", "MiniMax-H3-Max"} {
+		for _, kind := range []string{"h3", "regeneration"} {
+			if kind == "regeneration" && model != "MiniMax-H3" {
+				continue
+			}
+			t.Run(model+"/"+kind, func(t *testing.T) {
+				a := fixture(t, func(*http.Request) (*http.Response, error) {
+					taskType := "generation"
+					if kind == "regeneration" {
+						taskType = "regeneration"
+					}
+					out := nativeResponse("123", model, "succeeded", taskType)
+					task := out["task"].(map[string]any)
+					delete(task, "modality")
+					delete(task, "resolution")
+					task["duration"] = "not an integer"
+					task["status"] = "failed"
+					task["task_type"] = "other"
+					task["model"] = true
+					task["usage"] = map[string]any{"output_seconds": "bad"}
+					return response(200, out), nil
+				})
+				token := a.seal(owned("alice"), handle{ID: "123", Model: model, Kind: kind, Duration: 5})
+				result, err := a.GetTask(owned("alice"), token)
+				if err != nil || result.Status != core.ProviderSucceeded || result.ResultURL != "https://media.example/result.mp4" || len(result.Artifacts) != 1 || result.Artifacts[0].Duration != 5 || result.Usage != nil {
+					t.Fatalf("ready video was lost: status=%s artifacts=%d err=%v", result.Status, len(result.Artifacts), err)
+				}
+			})
+		}
+	}
+}
+
+func TestReadyVideoWithContradictoryModalityRemainsAvailableToNativeConsumers(t *testing.T) {
+	ctx := owned("alice")
+	a := fixture(t, func(r *http.Request) (*http.Response, error) {
+		task := nativeResponse("123", "MiniMax-H3", "succeeded", "generation")["task"].(map[string]any)
+		task["modality"] = "text"
+		task["status"] = "failed"
+		if r.URL.Path == "/v2/query/video_generation/123" {
+			return response(200, map[string]any{"task": task}), nil
+		}
+		return response(200, map[string]any{"total": 1, "items": []any{task}}), nil
+	})
+	token := a.seal(ctx, handle{ID: "123", Model: "MiniMax-H3", Kind: "h3"})
+	queried, err := a.QueryNativeTask(ctx, token)
+	if err != nil || queried.Status != "succeeded" || queried.Content.URL != "https://media.example/result.mp4" {
+		t.Fatalf("ready native video lost: status=%s err=%v", queried.Status, err)
+	}
+	listed, _, err := a.ListTasks(ctx, []string{token}, 1, 20)
+	if err != nil || len(listed) != 1 || listed[0].Status != "succeeded" || listed[0].Content.URL != queried.Content.URL {
+		t.Fatalf("ready listed video lost: count=%d err=%v", len(listed), err)
+	}
+}
+
+func TestReadyVideoListFiltersUseOwnedHandleOverOptionalMetadata(t *testing.T) {
+	for _, missing := range []bool{false, true} {
+		a := fixture(t, func(*http.Request) (*http.Response, error) {
+			task := nativeResponse("123", "MiniMax-H3", "succeeded", "generation")["task"].(map[string]any)
+			if missing {
+				delete(task, "status")
+				delete(task, "model")
+				delete(task, "task_type")
+			} else {
+				task["status"] = "failed"
+				task["model"] = "MiniMax-H3-Lite"
+				task["task_type"] = "regeneration"
+			}
+			return response(200, map[string]any{"total": 1, "items": []any{task}}), nil
+		})
+		ctx := owned("alice")
+		token := a.seal(ctx, handle{ID: "123", Model: "MiniMax-H3", Kind: "h3"})
+		filter := NativeTaskFilter{Status: "failed", Model: "MiniMax-H3", TaskType: "generation"}
+		items, total, err := a.ListTasksFiltered(ctx, []string{token}, 1, 20, filter)
+		if err != nil || total != 1 || len(items) != 1 || items[0].Status != "succeeded" || items[0].Content.URL != "https://media.example/result.mp4" {
+			t.Fatalf("ready listed video lost with missing=%t: total=%d count=%d err=%v", missing, total, len(items), err)
+		}
+		for _, wrong := range []NativeTaskFilter{{Model: "MiniMax-H3-Lite"}, {TaskType: "regeneration"}} {
+			if _, _, err := a.ListTasksFiltered(ctx, []string{token}, 1, 20, wrong); err == nil {
+				t.Fatal("list accepted filter inconsistent with authenticated handle", wrong)
+			}
+		}
+	}
+}
+
+func TestReadyVideoSurvivesContradictoryQueryEnvelope(t *testing.T) {
+	for _, status := range []int{200, 500} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			a := fixture(t, func(*http.Request) (*http.Response, error) {
+				out := nativeResponse("123", "MiniMax-H3", "failed", "generation")
+				task := out["task"].(map[string]any)
+				task["content"] = map[string]string{"url": "https://media.example/result.mp4"}
+				delete(task, "modality")
+				out["base_resp"] = map[string]int{"status_code": 500}
+				out["error"] = map[string]string{"message": "stale status"}
+				return response(status, out), nil
+			})
+			result, err := a.GetTask(owned("alice"), a.seal(owned("alice"), handle{ID: "123", Model: "MiniMax-H3", Kind: "h3"}))
+			if err != nil || result.Status != core.ProviderSucceeded || result.ResultURL != "https://media.example/result.mp4" {
+				t.Fatalf("ready output lost with envelope status %d: result=%+v err=%v", status, result, err)
+			}
+		})
+	}
+}
+
+func TestReadyVideoSurvivesIncompleteQueryEnvelope(t *testing.T) {
+	for _, ready := range []bool{false, true} {
+		a := fixture(t, func(*http.Request) (*http.Response, error) {
+			out := nativeResponse("123", "MiniMax-H3", "failed", "generation")
+			if ready {
+				out["task"].(map[string]any)["content"] = map[string]string{"url": "https://media.example/result.mp4"}
+			}
+			out["base_resp"] = map[string]any{}
+			return response(200, out), nil
+		})
+		result, err := a.GetTask(owned("alice"), a.seal(owned("alice"), handle{ID: "123", Model: "MiniMax-H3", Kind: "h3"}))
+		if ready {
+			if err != nil || result.Status != core.ProviderSucceeded || result.ResultURL != "https://media.example/result.mp4" {
+				t.Fatalf("ready output lost behind incomplete envelope: result=%+v err=%v", result, err)
+			}
+		} else if err == nil || !strings.Contains(err.Error(), "status code is missing") {
+			t.Fatalf("incomplete envelope without final output accepted: result=%+v err=%v", result, err)
+		}
+	}
+}
+
+func TestH3VideoWithoutFinalOutputPreservesProviderFailure(t *testing.T) {
+	for _, state := range []string{"queued", "running", "failed", "cancelled", "succeeded", "unknown"} {
+		t.Run(state, func(t *testing.T) {
+			a := fixture(t, func(*http.Request) (*http.Response, error) {
+				out := nativeResponse("123", "MiniMax-H3", state, "generation")
+				out["task"].(map[string]any)["content"] = map[string]string{"preview_url": "https://media.example/preview.mp4"}
+				return response(200, out), nil
+			})
+			result, err := a.GetTask(owned("alice"), a.seal(owned("alice"), handle{ID: "123", Model: "MiniMax-H3", Kind: "h3"}))
+			if state == "succeeded" || state == "unknown" {
+				if err == nil {
+					t.Fatal("non-final content accepted")
+				}
+				return
+			}
+			if err != nil || result.Status != map[string]core.ProviderStatus{"queued": core.ProviderQueued, "running": core.ProviderRunning, "failed": core.ProviderFailed, "cancelled": core.ProviderFailed}[state] {
+				t.Fatalf("status=%s err=%v", result.Status, err)
+			}
+		})
 	}
 }
 func TestTaskListNeverLeaksUnrequestedIDs(t *testing.T) {
@@ -246,7 +404,7 @@ func TestUnknownUsageNeverMetersAsZero(t *testing.T) {
 	}
 }
 func TestListedTaskContractMatchesOwnedHandle(t *testing.T) {
-	for _, change := range []func(map[string]any){func(m map[string]any) { m["model"] = "other" }, func(m map[string]any) { m["task_type"] = "regeneration" }, func(m map[string]any) { m["status"] = "unknown" }, func(m map[string]any) { m["modality"] = "text" }} {
+	for _, change := range []func(map[string]any){func(m map[string]any) { m["id"] = "999" }, func(m map[string]any) { m["content"] = map[string]string{"url": "http://insecure.example/file"} }} {
 		a := fixture(t, func(*http.Request) (*http.Response, error) {
 			task := nativeResponse("123", "MiniMax-H3", "succeeded", "generation")["task"].(map[string]any)
 			change(task)
@@ -390,7 +548,7 @@ func TestEveryNativeOperationState(t *testing.T) {
 		}
 	}
 }
-func TestOutputConstraintsCannotMislabelSucceededTasks(t *testing.T) {
+func TestReadyOutputOverridesOptionalOutputMetadata(t *testing.T) {
 	for _, tc := range []struct {
 		kind, res string
 		duration  int
@@ -405,8 +563,9 @@ func TestOutputConstraintsCannotMislabelSucceededTasks(t *testing.T) {
 			p["task"].(map[string]any)["duration"] = tc.duration
 			return response(200, p), nil
 		})
-		if _, e := a.GetTask(owned("alice"), a.seal(owned("alice"), handle{ID: "123", Model: "MiniMax-H3", Kind: tc.kind})); e == nil {
-			t.Fatal("invalid final output metadata accepted", tc)
+		result, err := a.GetTask(owned("alice"), a.seal(owned("alice"), handle{ID: "123", Model: "MiniMax-H3", Kind: tc.kind}))
+		if err != nil || result.Status != core.ProviderSucceeded || result.ResultURL != "https://media.example/result.mp4" {
+			t.Fatalf("ready output lost for optional metadata %+v: status=%s err=%v", tc, result.Status, err)
 		}
 	}
 }

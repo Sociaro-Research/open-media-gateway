@@ -34,15 +34,59 @@ type NativeTask struct {
 	} `json:"error"`
 }
 
+// The H3 query has returned completed videos without some of its descriptive
+// fields. Decode those fields independently: a malformed optional value must
+// not hide an otherwise valid final output URL.
+func (t *NativeTask) UnmarshalJSON(data []byte) error {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return err
+	}
+	*t = NativeTask{}
+	readString := func(raw json.RawMessage) string {
+		var value string
+		_ = json.Unmarshal(raw, &value)
+		return value
+	}
+	t.ID = readString(fields["id"])
+	t.Model = readString(fields["model"])
+	t.Status = readString(fields["status"])
+	t.TaskType = readString(fields["task_type"])
+	t.Modality = readString(fields["modality"])
+	t.Resolution = readString(fields["resolution"])
+	_ = json.Unmarshal(fields["duration"], &t.Duration)
+	var content map[string]json.RawMessage
+	_ = json.Unmarshal(fields["content"], &content)
+	t.Content.URL = readString(content["url"])
+	t.Content.Prompt = readString(content["prompt"])
+	t.Usage = fields["usage"]
+	_ = json.Unmarshal(fields["error"], &t.Error)
+	return nil
+}
+
 func (a *Adapter) queryNative(ctx context.Context, h handle) (NativeTask, error) {
 	var out struct {
 		Task NativeTask `json:"task"`
 	}
-	if e := a.json(ctx, "GET", "/v2/query/video_generation/"+h.ID, nil, &out); e != nil {
-		return NativeTask{}, e
+	data, requestErr := a.do(ctx, "GET", "/v2/query/video_generation/"+h.ID, nil, "")
+	if requestErr != nil && len(data) == 0 {
+		return NativeTask{}, requestErr
+	}
+	if e := json.Unmarshal(data, &out); e != nil {
+		if requestErr != nil {
+			return NativeTask{}, requestErr
+		}
+		return NativeTask{}, errors.New("MiniMax returned an invalid response schema")
 	}
 	if e := validateNativeTask(out.Task, h); e != nil {
 		return NativeTask{}, e
+	}
+	if requestErr != nil && !((h.Kind == "h3" || h.Kind == "regeneration") && out.Task.Content.URL != "") {
+		return NativeTask{}, requestErr
+	}
+	if (h.Kind == "h3" || h.Kind == "regeneration") && out.Task.Content.URL != "" {
+		out.Task.Status = "succeeded"
+		out.Task.Error = nil
 	}
 	return out.Task, nil
 }
@@ -54,25 +98,36 @@ func validateNativeTask(t NativeTask, h handle) error {
 	if h.Kind == "regeneration" {
 		kind = "regeneration"
 	}
-	if t.ID != h.ID || t.Model != h.Model || t.TaskType != kind || !slices.Contains([]string{"queued", "running", "succeeded", "failed", "cancelled"}, t.Status) {
+	if t.ID != h.ID {
+		return errors.New("MiniMax task identity does not match its handle")
+	}
+	// For a video handle, content.url is the designated final output. MiniMax
+	// can omit or disagree in ancillary status/type/model fields; those fields
+	// must not override a ready video. Archival checks downloaded content type,
+	// but does not decode video frames.
+	if h.Kind == "h3" || h.Kind == "regeneration" {
+		if t.Content.URL != "" {
+			if !publicURL(t.Content.URL) {
+				return errors.New("MiniMax video task has an invalid output URL")
+			}
+			return nil
+		}
+		if t.Status == "succeeded" {
+			return errors.New("MiniMax video task has no output URL")
+		}
+		if !slices.Contains([]string{"queued", "running", "failed", "cancelled"}, t.Status) {
+			return errors.New("MiniMax video task has no final output or recognized state")
+		}
+		return nil
+	}
+	if t.Model != h.Model || t.TaskType != kind || !slices.Contains([]string{"queued", "running", "succeeded", "failed", "cancelled"}, t.Status) {
 		return errors.New("MiniMax task identity, type or state does not match its handle")
 	}
 	if t.Status == "succeeded" {
-		if kind == "generation" {
-			m, ok := modelFor(h.Model)
-			if !ok || !slices.Contains(m.Resolutions, strings.ToLower(t.Resolution)) || t.Duration < m.MinDuration || t.Duration > m.MaxDuration {
-				return errors.New("MiniMax task output resolution or duration violates its model contract")
-			}
-		}
-		if kind == "regeneration" && (t.Resolution != "2K" || t.Duration < 4 || t.Duration > 15) {
-			return errors.New("MiniMax regeneration output must be 2K and 4–15 seconds")
-		}
 		if kind == "h3_context_ir" {
 			if t.Modality != "text" || strings.TrimSpace(t.Content.Prompt) == "" {
 				return errors.New("MiniMax context task has no enhanced prompt")
 			}
-		} else if t.Modality != "video" || !publicURL(t.Content.URL) {
-			return errors.New("MiniMax video task has no valid output URL")
 		}
 	}
 	return nil
@@ -114,6 +169,9 @@ func (a *Adapter) GetTask(ctx context.Context, token string) (core.ProviderResul
 			return core.ProviderResult{}, e
 		}
 		status := map[string]core.ProviderStatus{"queued": core.ProviderQueued, "running": core.ProviderRunning, "succeeded": core.ProviderSucceeded, "failed": core.ProviderFailed, "cancelled": core.ProviderFailed}[t.Status]
+		if h.Kind != "context" && t.Content.URL != "" {
+			status = core.ProviderSucceeded
+		}
 		out := core.ProviderResult{Status: status}
 		if status == core.ProviderFailed {
 			out.Error = "MiniMax task " + t.Status
@@ -123,11 +181,18 @@ func (a *Adapter) GetTask(ctx context.Context, token string) (core.ProviderResul
 				out.Artifacts = []core.ProviderArtifact{{ID: "prepared-prompt", MediaType: "text", Format: "txt", Text: t.Content.Prompt}}
 			} else {
 				out.ResultURL = t.Content.URL
-				out.Artifacts = []core.ProviderArtifact{{ID: t.ID, MediaType: "video", Format: "mp4", URL: t.Content.URL, Duration: float64(t.Duration)}}
+				duration := t.Duration
+				if duration <= 0 {
+					duration = h.Duration
+				}
+				out.Artifacts = []core.ProviderArtifact{{ID: h.ID, MediaType: "video", Format: "mp4", URL: t.Content.URL, Duration: float64(duration)}}
 			}
 			out.Usage, e = normalizeH3Usage(t.Usage, h.Model)
-			if e != nil {
+			if e != nil && h.Kind == "context" {
 				return core.ProviderResult{}, e
+			}
+			if e != nil {
+				out.Usage = nil
 			}
 		}
 		return out, nil
@@ -344,6 +409,8 @@ func (a *Adapter) ListTasks(ctx context.Context, tokens []string, page, size int
 
 // ListTasksFiltered supports every documented list filter while always requiring
 // the caller's locally authorized handles. Filters never expand that owner scope.
+// A ready video is returned as succeeded even if upstream optional metadata
+// contradicts a requested status filter; the final output takes precedence.
 func (a *Adapter) ListTasksFiltered(ctx context.Context, tokens []string, page, size int, filter NativeTaskFilter) ([]NativeTask, int, error) {
 	if len(tokens) == 0 || len(tokens) > 100 || page < 1 || size < 1 || size > 100 {
 		return nil, 0, invalid("list requires 1–100 owned handles and valid pagination")
@@ -396,7 +463,18 @@ func (a *Adapter) ListTasksFiltered(ctx context.Context, tokens []string, page, 
 		if e := validateNativeTask(out.Items[i], h); e != nil {
 			return nil, 0, e
 		}
-		if filter.Status != "" && out.Items[i].Status != filter.Status || filter.Model != "" && out.Items[i].Model != filter.Model || filter.TaskType != "" && out.Items[i].TaskType != filter.TaskType {
+		readyVideo := (h.Kind == "h3" || h.Kind == "regeneration") && out.Items[i].Content.URL != ""
+		if readyVideo {
+			out.Items[i].Status = "succeeded"
+			out.Items[i].Error = nil
+		}
+		expectedType := "generation"
+		if h.Kind == "context" {
+			expectedType = "h3_context_ir"
+		} else if h.Kind == "regeneration" {
+			expectedType = "regeneration"
+		}
+		if filter.Status != "" && out.Items[i].Status != filter.Status && !readyVideo || filter.Model != "" && h.Model != filter.Model || filter.TaskType != "" && expectedType != filter.TaskType {
 			return nil, 0, errors.New("MiniMax task list ignored the requested filter")
 		}
 		out.Items[i].ID = token

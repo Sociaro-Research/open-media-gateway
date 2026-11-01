@@ -323,7 +323,13 @@ func TestMiniMaxWorkerArchiveAndPublicContent(t *testing.T) {
 						resolution = ""
 						usage = map[string]int{"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150}
 					}
-					return workerJSON(map[string]any{"task": map[string]any{"id": id, "model": "MiniMax-H3", "status": "succeeded", "task_type": kind, "modality": modality, "content": content, "resolution": resolution, "duration": 5, "usage": usage}}), nil
+					task := map[string]any{"id": id, "model": "MiniMax-H3", "status": "succeeded", "task_type": kind, "modality": modality, "content": content, "resolution": resolution, "duration": 5, "usage": usage}
+					if scenario == "video_url" || scenario == "regeneration" {
+						// The real H3 completion omitted this descriptive field. Both
+						// ordinary and regenerated videos must still reach archival.
+						delete(task, "modality")
+					}
+					return workerJSON(map[string]any{"task": task}), nil
 				case "/v1/video_template_generation":
 					return workerJSON(map[string]any{"task_id": "123", "base_resp": map[string]int{"status_code": 0}}), nil
 				case "/v1/query/video_template_generation":
