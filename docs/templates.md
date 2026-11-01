@@ -8,7 +8,7 @@ Forgetting, switching or revoking a key invalidates pending reads and inputs.
 
 Select a template title in the gallery. Its details, missing typed references and
 generation action appear in the left panel beneath the Playground key control.
-Fixed references appear as a compact preview strip below the description. Only
+Fixed image/video references fill one equal-width row below the description. Each keeps its natural aspect ratio; videos play muted, inline and continuously without opening a separate preview. Only
 the model and free reference slots are editable. Review the existing generation
 estimate after supplying the missing references. **Advanced editing** explicitly
 replaces the Playground draft with the published prompt, settings, selected model

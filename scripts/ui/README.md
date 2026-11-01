@@ -747,6 +747,8 @@ Run each fixture with Node/Playwright, then repeat with `UI_BROWSER_ENGINE=webki
 - `duration-labels.cjs`: selected-model bounds/steps in Duration labels and native validation in both editors, themes and relevant responsive breakpoints.
 - `prompt-labels.cjs`: `max_prompt_characters`, formatted dynamic Unicode code-point labels, typing/paste/clear/model switches, trimmed validation, unknown capabilities and both editors.
 - `template-file-selection.cjs`: canonical-only administrator content/visibility responses, explicit image/video shared covers, internal Remove, no copies/deletes, persistence and publication gating.
+- `template-current.cjs`: already-open runner refresh, invalidated references/estimates, rejected stale estimate/media-validation/Advanced editing and preserved real refresh errors.
+- `template-editing.cjs`: natural-aspect equal-width fixed image/video rows, actual muted autoplay/loop, cleanup, summary/slot presentation and Advanced editing handoff. Prepare the synthetic MP4 using the existing video-workflow fixture instructions above.
 - `disclosures.cjs`: native keyboard disclosure semantics, repeated collapse/expand retaining values, trailing shared chevrons, matching heading typography, expanded spacing and separate Override Sound panels.
 - `button-alignment.cjs`: primary/secondary glyph geometry in normal, compact, icon, disabled, pending and dialog contexts.
 - `interaction-borders.cjs`: one actual border perimeter, custom accent, selected/keyboard/invalid/disabled states, stable outer/content geometry and forced colors.

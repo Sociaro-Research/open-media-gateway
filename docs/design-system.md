@@ -534,8 +534,7 @@ change the cover.
 Cover media preserves its complete natural aspect ratio, including portrait
 video, and has a textual failure state. Mouse hover previews pause on leave;
 keyboard users focus the video and press Space/Enter; touch users tap the video. Cards have no separate Play/Pause preview button. Reduced-motion preferences
-disable hover playback. Devices without hover ignore compatibility mouse-enter events after touch. Changing or leaving media disposes the previous player. Fixed references use a single horizontally scrolling row of 56px preview buttons
-below the description, with accessible labels and full media in the shared modal.
+disable hover playback. Devices without hover ignore compatibility mouse-enter events after touch. Changing or leaving media disposes the previous player. Fixed image/video references use one full-width row of equal-width cells below the description. Preserve each natural aspect ratio with automatic height, without square cropping or stretching. Videos play muted, inline and loop automatically; they have no click action, controls or preview modal. Stop and dispose media when switching templates or leaving the runner.
 The runner omits the prompt; Advanced editing opens the existing Playground after
 explicit draft replacement confirmation.
 The runner summary lists ratio, resolution and duration, then **Overridden Audio**

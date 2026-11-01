@@ -107,12 +107,13 @@
 /* Audio controls have no intrinsic aspect ratio; auto height collapses in Chromium. */
 .template-reference-preview audio,.template-library-preview audio { height:54px; }
 
-/* Fixed inputs are a compact strip; full controls live in the shared modal. */
-.template-fixed-references { display:flex; gap:8px; overflow-x:auto; min-width:0; max-width:100%; padding:3px; }
-#templatesView .template-fixed-preview { flex:0 0 56px; width:56px; height:56px; min-height:56px; padding:0; overflow:hidden; border:1px solid var(--line); border-radius:12px; background:var(--field); color:var(--text); font-size:24px; }
-.template-fixed-preview :is(img,video) { width:100%; height:100%; object-fit:cover; pointer-events:none; }
-.template-preview-dialog { width:min(640px,calc(100vw - 32px)); }
-.template-preview-dialog :is(img,video,audio) { display:block; max-width:100%; max-height:70vh; margin:auto; }
+/* Fixed runner media shares one row, preserving each natural aspect ratio. */
+.template-fixed-references { display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0,1fr); align-items:start; gap:8px; min-width:0; width:100%; }
+.template-fixed-media { min-width:0; overflow:hidden; border-radius:12px; }
+.template-fixed-media > :is(img,video) { display:block; width:100%; height:auto; aspect-ratio:auto; object-fit:contain; }
+.template-fixed-media > video { pointer-events:none; }
+.template-fixed-media > .field-hint { margin:0; }
+
 .template-cover { display:grid; gap:16px; min-width:0; }
 .template-cover > h3 { margin:0; font-size:var(--type-group); }
 .template-cover > .field-hint { margin:0; }
