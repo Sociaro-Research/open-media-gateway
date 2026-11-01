@@ -789,6 +789,9 @@ func (p *managedProvider) Generate(ctx context.Context, request core.MediaReques
 		return core.ProviderTask{}, err
 	}
 	ctx = p.connectionScope(ctx, adapter, expected)
+	if opener, ok := p.manager.referenceImages.(core.ResourceSourceOpener); ok {
+		ctx = core.WithResourceSourceOpener(ctx, opener)
+	}
 	allowed, err := p.manager.referencePolicy(ctx, request.Options)
 	if err != nil {
 		return core.ProviderTask{}, err

@@ -11,6 +11,7 @@ import (
 
 // Generation is the single public representation shared by HTTP and webhooks.
 type Generation struct {
+	Resources []ResourceReference  `json:"resources,omitempty"`
 	Artifacts []GenerationArtifact `json:"artifacts,omitempty"`
 	Task
 	Prompt      string `json:"prompt"`
@@ -34,6 +35,9 @@ func GenerationView(task Task) Generation {
 		object = "video"
 	}
 	v := Generation{Task: task, Prompt: task.Prompt, Object: object, Status: string(task.Status), CreatedAt: task.CreatedAt.Unix(), UpdatedAt: task.UpdatedAt.Unix(), StatusURL: base, ContentURL: base + "/content"}
+	if task.MediaType == "resource" {
+		v.ContentURL = ""
+	}
 	// Stored jobs may predate these routes; always derive public URLs from the ID.
 	v.ProviderTaskID = nil
 	v.ProviderResultURL = nil
@@ -41,6 +45,7 @@ func GenerationView(task Task) Generation {
 	v.LastFrameURL = nil
 	if task.ResultDeletedAt == nil {
 		if task.Status == TaskSucceeded {
+			v.Resources = append([]ResourceReference(nil), task.StoredResourceReferences...)
 			for _, a := range task.StoredArtifacts {
 				v.Artifacts = append(v.Artifacts, GenerationArtifact{ID: a.ID, MediaType: a.MediaType, Format: a.Format, Duration: a.Duration, GroupID: a.GroupID, ContentURL: "/v1/generations/" + task.ID + "/artifacts/" + a.ID + "/content", ContentType: a.ContentType, SizeBytes: a.SizeBytes, SHA256: a.SHA256})
 			}
@@ -133,6 +138,8 @@ func (v Generation) MarshalJSON() ([]byte, error) {
 	}
 	delete(options, "_override_sound")
 	delete(options, "_reference_media")
+	delete(options, "_reference_resources")
+	delete(options, "_resource_creation")
 	if v.MediaType == "speech" {
 		delete(fields, "prompt")
 		fields["input"] = v.Prompt

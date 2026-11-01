@@ -68,8 +68,16 @@ func customerPrices(value any, profits ...bool) {
 			}
 		}
 		// TaskCost's customer amounts are computed from its immutable accepted rate.
-		if expected, ok := v["customer_expected_usd"]; ok {
-			safe := map[string]any{"expected_usd": expected}
+		expected, hasExpected := v["customer_expected_usd"]
+		unknownQuantity, _ := v["quantity_unknown"].(bool)
+		if hasExpected || unknownQuantity && v["pricing"] != nil && v["quoted_at"] != nil {
+			safe := map[string]any{}
+			if hasExpected {
+				safe["expected_usd"] = expected
+			}
+			if unknownQuantity {
+				safe["quantity_unknown"] = true
+			}
 			for _, key := range []string{"quoted_at"} {
 				if x, ok := v[key]; ok {
 					safe[key] = x
@@ -88,15 +96,18 @@ func customerPrices(value any, profits ...bool) {
 				v[key] = x
 			}
 		}
-		if _, ok := v["reference_price_usd"]; ok {
+		_, hasReferencePrice := v["reference_price_usd"]
+		if hasReferencePrice || unknownQuantity && v["known"] != nil && v["reference_quote"] != nil {
 			for key := range v {
 				switch key {
-				case "known", "reference_price_usd", "reference_description", "reference_quote":
+				case "known", "quantity_unknown", "reference_price_usd", "reference_description", "reference_quote":
 				default:
 					delete(v, key)
 				}
 			}
-			if description, ok := v["reference_description"].(string); ok {
+			if unknownQuantity {
+				v["reference_description"] = "A gateway tariff is verified. The total is unavailable until actual usage quantities are known."
+			} else if description, ok := v["reference_description"].(string); ok {
 				description = strings.Split(description, " Provider standard list-rate estimate;")[0]
 				if strings.Contains(description, "Published rates") {
 					description = "A verified estimate is unavailable for this configuration."

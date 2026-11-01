@@ -295,34 +295,14 @@ func TestDedicatedMigrationPreservesLegacyCompanyAndGrant(t *testing.T) {
 	exec(`INSERT INTO customer_workspace_owners(user_id,organization_id) VALUES($1,$2)`, user, company)
 	exec(`INSERT INTO remote_workspaces(owner_id,version,active,origin,organization_id,organization_name,remote_user_id,remote_key_id,token_hash,token_ciphertext) VALUES($1::uuid,1,TRUE,'https://central.fixture.test',$2,'Existing company',$1::text,$3,$4,$5)`, user, company, key, apikey.Hash("synthetic-legacy-token"), encrypted)
 	exec(`INSERT INTO tasks(id,owner_id,actor_id,api_key_id,status,provider,model,prompt,provider_owner_id,storage_owner_id,storage_key,cost) VALUES($1,$2,$3,$4,'succeeded','mock','mock-image-v1','Unmoved legacy task',$5,$5,'legacy/result.png','{"expected_usd":0.1,"actual_usd":0.1}')`, task, company, user, key, identity.SharedOwnerID)
-	snapshot := func() string {
-		t.Helper()
-		var result string
-		for _, table := range []string{"users", "organizations", "organization_members", "organization_credits", "user_api_keys", "workspace_authorizations", "customer_workspace_owners", "remote_workspaces", "tasks"} {
-			var rows string
-			row := "to_jsonb(t)"
-			if table == "workspace_authorizations" {
-				row = "(to_jsonb(t)-'installation_hash')"
-			}
-			if table == "remote_workspaces" {
-				row = "(to_jsonb(t)-'provisioning')"
-			}
-			if table == "tasks" {
-				row = "(to_jsonb(t)-'result_artifacts')"
-			}
-			if err := db.QueryRow(`SELECT COALESCE(jsonb_agg(` + row + ` ORDER BY ` + row + `::text),'[]')::text FROM ` + table + ` t`).Scan(&rows); err != nil {
-				t.Fatal(err)
-			}
-			result += rows
-		}
-		return result
-	}
-	before := snapshot()
+	preserved := newResourceLegacyProjection(t, db, "users", "organizations", "organization_members", "organization_credits", "user_api_keys", "workspace_authorizations", "customer_workspace_owners", "remote_workspaces", "tasks")
+	before := preserved.snapshot(t, db, "dedicated81-before-upgrade")
 	if err := Migrate(db); err != nil {
 		t.Fatal(err)
 	}
-	if snapshot() != before {
-		t.Fatal("migration changed existing data or ledger")
+	assertResourceBindingsEmptyDefault(t, db)
+	if preserved.snapshot(t, db, "dedicated84-after-upgrade") != before {
+		t.Fatal("migration changed an old field, data count or ledger")
 	}
 	repo := NewSystemRepository(db)
 	record, err := repo.RemoteWorkspace(ctx, user)
@@ -347,7 +327,7 @@ func TestDedicatedMigrationPreservesLegacyCompanyAndGrant(t *testing.T) {
 	if err = db.QueryRow(`SELECT count(*) FROM workspace_installations`).Scan(&count); err != nil || count != 0 {
 		t.Fatal("migration created a dedicated company", err)
 	}
-	// Exercise the populated combined 081→083→081→083 window. Additive Down
+	// Exercise the populated combined 081→084→081→084 window. Additive Down
 	// paths retain both Kling artifacts and installation proofs/billing snapshots.
 	exec(`UPDATE system_settings SET customer_workspaces=TRUE,shared_resources=TRUE`)
 	proof, _ := wa.DeviceCode()
@@ -359,10 +339,11 @@ func TestDedicatedMigrationPreservesLegacyCompanyAndGrant(t *testing.T) {
 		t.Fatal(err)
 	}
 	exec(`UPDATE tasks SET result_artifacts='[{"index":0,"url":"https://fixture.invalid/result.png"}]',template_snapshot='{"prompt":"Unmoved legacy task","company":"original"}' WHERE id=$1`, task)
+	resourceSeed := seedResourcePreservationMetadata(t, db, company, identity.SharedOwnerID)
 	protected := func() string {
 		t.Helper()
 		var value string
-		for _, table := range []string{"users", "organizations", "organization_members", "organization_credits", "user_api_keys", "workspace_authorizations", "customer_workspace_owners", "remote_workspaces", "workspace_installations", "remote_installation_identities", "tasks"} {
+		for _, table := range []string{"users", "organizations", "organization_members", "organization_credits", "user_api_keys", "workspace_authorizations", "customer_workspace_owners", "remote_workspaces", "workspace_installations", "remote_installation_identities", "tasks", "provider_resources", "provider_resource_jobs"} {
 			var rows string
 			if err := db.QueryRow(`SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY to_jsonb(t)::text),'[]')::text FROM ` + table + ` t`).Scan(&rows); err != nil {
 				t.Fatal(err)
@@ -379,12 +360,13 @@ func TestDedicatedMigrationPreservesLegacyCompanyAndGrant(t *testing.T) {
 		if protected() != prior {
 			t.Fatal("combined rollback lost accepted artifacts, proof bindings, legacy data or billing snapshots")
 		}
-		// A schema-81 writer uses its old column set; new metadata must survive it.
-		exec(`UPDATE tasks SET updated_at=updated_at WHERE id=$1`, task)
-		if err = goose.UpTo(db, "migrations", 83); err != nil {
+		// Real old-column updates/inserts preserve populated resource metadata.
+		assertResourceMetadataSurvivesOldWriter(t, db, resourceSeed)
+		afterOldWrite := protected()
+		if err = goose.UpTo(db, "migrations", 84); err != nil {
 			t.Fatal(err)
 		}
-		if protected() != prior {
+		if protected() != afterOldWrite {
 			t.Fatal("reupgrade recreated or changed retained installation/accepted task data")
 		}
 	}

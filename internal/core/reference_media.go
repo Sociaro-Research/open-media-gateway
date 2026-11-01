@@ -16,6 +16,9 @@ type ReferenceMediaLimits struct {
 	ReferenceVoice            *MediaFileLimits `json:"reference_voice,omitempty"`
 }
 type MediaFileLimits struct {
+	MinFrames        int64    `json:"min_frames,omitempty"`
+	MaxFrames        int64    `json:"max_frames,omitempty"`
+	RequireAudio     *bool    `json:"require_audio,omitempty"`
 	NoAlpha          bool     `json:"no_alpha,omitempty"`
 	ContentTypes     []string `json:"content_types,omitempty"`
 	Codecs           []string `json:"codecs,omitempty"`
@@ -52,4 +55,10 @@ func (limits *ReferenceMediaLimits) Clone() *ReferenceMediaLimits {
 		rule.Codecs = slices.Clone(rule.Codecs)
 	}
 	return &result
+}
+
+type MediaRoleLimits struct {
+	Kind   string          `json:"kind"`
+	Role   string          `json:"role"`
+	Limits MediaFileLimits `json:"limits"`
 }

@@ -33,7 +33,8 @@ type PricingSnapshot struct {
 	Region              string             `json:"region,omitempty"`
 	// Nil preserves legacy metering. New duration-based contracts explicitly
 	// distinguish charged input video from output-only continuation/editing.
-	BillInputVideo *bool `json:"bill_input_video,omitempty"`
+	BillInputVideo      *bool  `json:"bill_input_video,omitempty"`
+	DurationBillingRule string `json:"duration_billing_rule,omitempty"`
 }
 
 // PricingComponent prices one normalized usage metric. All components must be
@@ -46,6 +47,7 @@ type PricingComponent struct {
 }
 
 type TaskCost struct {
+	QuantityUnknown   bool            `json:"quantity_unknown,omitempty"`
 	BillingRequired   bool            `json:"billing_required,omitempty"`
 	MarkupPercent     money.Percent   `json:"markup_percent,omitempty"`
 	TariffUSD         *money.USD      `json:"tariff_usd,omitempty"`
@@ -146,7 +148,21 @@ func (c *TaskCost) MeterUsage(usage ProviderUsage) bool {
 	if !found {
 		return false
 	}
-	if c.Pricing.Unit == "second" && (c.Pricing.BillInputVideo == nil || *c.Pricing.BillInputVideo) {
+	if c.Pricing.DurationBillingRule != "" {
+		if c.Pricing.Unit != "second" || c.Pricing.DurationBillingRule != "output_plus_max_input_output" {
+			return false
+		}
+		input, ok := 0.0, false
+		for _, metric := range usage.Metrics {
+			if metric.Name == "input_video_duration" {
+				input, ok = metric.Quantity, true
+			}
+		}
+		if !ok || input <= 0 {
+			return false
+		}
+		quantity += max(input, quantity)
+	} else if c.Pricing.Unit == "second" && (c.Pricing.BillInputVideo == nil || *c.Pricing.BillInputVideo) {
 		inputFound := false
 		for _, metric := range usage.Metrics {
 			if metric.Name == "input_video_duration" {
@@ -189,10 +205,15 @@ func (c *TaskCost) ConsumptionView() *TaskCost {
 
 // CustomerExpected and the serialized customer prices include only the accepted
 // markup. All original provider prices remain available for reconciliation.
-func (c TaskCost) CustomerExpected() (money.USD, error) { return c.MarkupPercent.Apply(c.ExpectedUSD) }
+func (c TaskCost) CustomerExpected() (money.USD, error) {
+	if c.QuantityUnknown {
+		return 0, ErrPricingUnavailable
+	}
+	return c.MarkupPercent.Apply(c.ExpectedUSD)
+}
 func (c TaskCost) MarshalJSON() ([]byte, error) {
 	type plain TaskCost
-	expected, err := c.CustomerExpected()
+	expected, err := c.MarkupPercent.Apply(c.ExpectedUSD)
 	if err != nil {
 		return nil, err
 	}
@@ -215,10 +236,19 @@ func (c TaskCost) MarshalJSON() ([]byte, error) {
 		zero := money.USD(0)
 		metered, tariff = &zero, &zero
 	}
+	var providerExpected, customerExpected *money.USD
+	var units *float64
+	if !c.QuantityUnknown {
+		providerExpected = &c.ExpectedUSD
+		customerExpected = &expected
+		units = &c.EstimatedUnits
+	}
 	return json.Marshal(struct {
 		plain
-		CustomerExpected money.USD  `json:"customer_expected_usd"`
+		ExpectedUSD      *money.USD `json:"expected_usd,omitempty"`
+		CustomerExpected *money.USD `json:"customer_expected_usd,omitempty"`
+		EstimatedUnits   *float64   `json:"estimated_units,omitempty"`
 		CustomerMetered  *money.USD `json:"customer_metered_usd,omitempty"`
 		CustomerTariff   *money.USD `json:"customer_tariff_usd,omitempty"`
-	}{plain(c), expected, metered, tariff})
+	}{plain(c), providerExpected, customerExpected, units, metered, tariff})
 }

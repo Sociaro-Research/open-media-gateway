@@ -134,7 +134,7 @@ func (s *Server) prepareGenerationReferences(r *http.Request, input *core.Create
 	// ReferenceEvidence is server-only (json:"-") and may contain inspected
 	// fixed template assets. Preserve a copy, but always refresh local capability
 	// evidence below. Metadata in public options never becomes trusted evidence.
-	input.ReferenceEvidence = maps.Clone(input.ReferenceEvidence)
+	input.ReferenceEvidence = core.CloneInputMediaEvidence(input.ReferenceEvidence)
 	input.Options.ReferenceMediaEvidence = nil
 	if s.references == nil || s.mediaSigner == nil {
 		return nil
@@ -205,14 +205,17 @@ func (s *Server) prepareGenerationReferences(r *http.Request, input *core.Create
 		}
 	}
 	input.Options = options
-	type binding struct{ raw, kind string }
+	type binding struct {
+		raw, kind string
+		index     int
+	}
 	values := []binding{}
 	for _, group := range []struct {
 		kind string
 		urls []string
 	}{{"image", input.Options.ImageURLs}, {"video", input.Options.Videos()}, {"audio", input.Options.Audios()}} {
-		for _, raw := range group.urls {
-			values = append(values, binding{raw, group.kind})
+		for index, raw := range group.urls {
+			values = append(values, binding{raw, group.kind, index + 1})
 		}
 	}
 	files := []referencevalidation.File{}
@@ -236,8 +239,9 @@ func (s *Server) prepareGenerationReferences(r *http.Request, input *core.Create
 		if file.Type != binding.kind {
 			return referencevalidation.Invalid(file.Name, "Detected "+file.Type+" media cannot be used in a "+binding.kind+" input. Select the matching file type.")
 		}
+		file.ReferenceIndex = binding.index
 		files = append(files, file)
-		input.ReferenceEvidence[binding.raw] = core.InputMediaEvidence{Type: file.Type, Duration: file.Info.Duration}
+		input.ReferenceEvidence[binding.raw] = core.InputMediaEvidence{Type: file.Type, Duration: file.Info.Duration, SHA256: file.SHA256, ReferenceID: id, ContentType: file.Info.ContentType, SizeBytes: file.Info.Size, Width: file.Info.Width, Height: file.Info.Height, FPS: file.Info.FPS, FrameCount: file.Info.FrameCount, AudioStreams: file.Info.AudioStreams, VideoStreams: file.Info.VideoStreams}
 	}
 	for _, raw := range input.Options.ReferenceVoices {
 		owner, id, ok := references.ParseSignedReference(raw, s.mediaSigner.secret)

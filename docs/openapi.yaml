@@ -6430,6 +6430,127 @@ paths:
           "$ref": "#/components/responses/NotFound"
         '503':
           "$ref": "#/components/responses/ServiceUnavailable"
+  "/v1/provider-resources":
+    get:
+      tags: [References]
+      operationId: listProviderResources
+      summary: List owner-bound provider resources
+      x-required-scope: generation
+      parameters:
+      - {name: provider, in: query, required: true, schema: {type: string}}
+      - {name: kind, in: query, schema: {type: string}}
+      - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 50}}
+      - {name: offset, in: query, schema: {type: integer, minimum: 0, maximum: 1000000, default: 0}}
+      responses:
+        '200':
+          description: Local bindings only; never account-wide provider inventory.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  object: {type: string, const: list}
+                  data: {type: array, items: {$ref: '#/components/schemas/ProviderResource'}}
+                  limit: {type: integer}
+                  offset: {type: integer}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+    post:
+      tags: [References]
+      operationId: createProviderResource
+      summary: Admit a priced resource-creation generation
+      description: Uses the normal model authorization, request limits, pricing, idempotency and cost-cap gates. Inputs are inspected owner-authorized local references or an eligible archived generation; remote IDs and client metadata are rejected. Unknown tariffs return 422. A successful generation contains local resources binding IDs.
+      x-required-scope: generation
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ProviderResourceCreate'}
+      responses:
+        '202':
+          description: Resource creation admitted; poll the returned generation status URL.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Generation'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {description: Idempotency conflict or estimate increased; no new work admitted.}
+        '422': {description: A verified tariff or capped total is unavailable; no provider submission.}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  "/v1/provider-resources/estimate":
+    post:
+      tags: [References]
+      operationId: estimateProviderResource
+      summary: Inspect resource sources and quote without submitting
+      x-required-scope: generation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ProviderResourceCreate'}
+      responses:
+        '200': {description: Normal cost estimate; a known tariff with unknown quantity omits the total.}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {description: Verified pricing unavailable.}
+  "/v1/provider-resources/{id}":
+    parameters:
+    - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+    get:
+      tags: [References]
+      operationId: getProviderResource
+      summary: Read local resource state and usability
+      x-required-scope: generation
+      responses:
+        '200':
+          description: Resource metadata with local IDs only.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ProviderResource'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    delete:
+      tags: [References]
+      operationId: deleteProviderResource
+      summary: Start owner-authorized asynchronous deletion
+      description: Presets and resources retained by active work cannot be deleted. Pending or uncertain deletion is never treated as completed and is never automatically resubmitted. A provider without a documented deletion poll contract remains pending with a warning.
+      x-required-scope: generation
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '202':
+          description: Current deletion job, including idempotent replay.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ProviderResourceJob'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {description: Resource in use or lifecycle conflict.}
+  "/v1/provider-resource-jobs/{id}":
+    get:
+      tags: [References]
+      operationId: getProviderResourceJob
+      summary: Poll an owner-bound management job
+      x-required-scope: generation
+      parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: Sanitized lifecycle status; no provider task handle.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ProviderResourceJob'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
   "/v1/generations/{id}/media-access":
     parameters:
     - "$ref": "#/components/parameters/TaskID"
@@ -8817,6 +8938,15 @@ components:
         requires the same Gateway API key. No progress percentage is invented. Managers receive
         operational metadata only, with content_access false and without prompt, input, output links or provider errors.
       properties:
+        resources:
+          type: array
+          description: Owner-bound local resource bindings returned only after successful terminal capture.
+          items:
+            type: object
+            required: [binding_id, reference_id]
+            properties:
+              binding_id: {type: string, format: uuid}
+              reference_id: {type: string}
         artifacts:
           type: array
           maxItems: 64
@@ -9989,6 +10119,91 @@ components:
         authentication check does not prove model access or funded generation; inspect
         status_message for its scope. Cached checks can expire or reset on restart.
         Separate billing credentials are used to retrieve actual generation charges.
+    ProviderResourceCreate:
+      type: object
+      additionalProperties: false
+      required: [provider, kind, name]
+      properties:
+        provider: {type: string, description: Authorized concrete provider connection ID.}
+        model: {type: string, description: Optional reviewed resource-operation model from the authorized catalogue.}
+        kind: {type: string}
+        subtype: {type: string}
+        name: {type: string}
+        description: {type: string}
+        reference_ids: {type: array, maxItems: 64, items: {type: string, format: uuid}}
+        generated_task_id: {type: string, format: uuid, description: An eligible completed owned generation; never a provider video ID.}
+        bound_voice_binding_id: {type: string, format: uuid}
+        tags: {type: array, maxItems: 32, items: {type: string}}
+        max_expected_usd: {type: number, minimum: 0, description: Unknown totals cannot satisfy an explicit cap.}
+    ProviderResource:
+      type: object
+      required: [id, provider, kind, status, usable]
+      properties:
+        id: {type: string, format: uuid}
+        provider: {type: string}
+        kind: {type: string}
+        subtype: {type: string}
+        name: {type: string}
+        description: {type: string}
+        status: {type: string, enum: [queued, running, succeeded, failed, deleting, deleted]}
+        usable: {type: boolean, description: Checks owner, actual connection revision and session expiry.}
+        unavailable_reason: {type: string}
+        is_preset: {type: boolean}
+        bound_voice_binding_id: {type: string, format: uuid}
+        generation_id: {type: string, format: uuid, description: Owned origin generation for archived face-preview artifact IDs.}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+        deleted_at: {type: string, format: date-time}
+        session:
+          type: object
+          properties:
+            expires_at: {type: string, format: date-time}
+            source_video_duration: {type: number}
+            frame_count: {type: integer}
+            fps: {type: number}
+            selection_revision: {type: integer}
+            has_selection: {type: boolean}
+            faces:
+              type: array
+              items:
+                type: object
+                properties:
+                  index: {type: integer, minimum: 1}
+                  start_ms: {type: integer}
+                  end_ms: {type: integer}
+                  preview_artifact_id: {type: string}
+            selections:
+              type: array
+              maxItems: 10
+              items:
+                type: object
+                properties:
+                  frame_index: {type: integer}
+                  points:
+                    type: array
+                    maxItems: 10
+                    items:
+                      type: object
+                      properties:
+                        'x': {type: number, minimum: 0, maximum: 1}
+                        'y': {type: number, minimum: 0, maximum: 1}
+      description: Contains no provider resource IDs, task/file handles, credentials, source URLs, storage keys or input hashes. Native face IDs stay private; callers use local indices.
+    ProviderResourceJob:
+      type: object
+      required: [id, binding_id, provider, operation, status]
+      properties:
+        id: {type: string, format: uuid}
+        binding_id: {type: string, format: uuid}
+        provider: {type: string}
+        kind: {type: string}
+        operation: {type: string, enum: [create, delete]}
+        status: {type: string, enum: [queued, running, succeeded, failed, deleting, deleted]}
+        error: {type: string}
+        warning: {type: string}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+        started_at: {type: string, format: date-time}
+        completed_at: {type: string, format: date-time}
     GenerationArtifact:
       type: object
       additionalProperties: false
@@ -10207,8 +10422,9 @@ components:
     TaskCost:
       description: Customer responses expose gateway expected/metered/tariff amounts only (including accepted markup), plus quoted_at. Provider pricing, settlement and markup fields are returned only to administrators.
       type: object
-      required: [expected_usd, customer_expected_usd, quoted_at]
+      required: [quoted_at]
       properties:
+        quantity_unknown: {type: boolean, description: A verified tariff exists but quantity and total are unavailable. expected_usd, customer_expected_usd and estimated_units are omitted; unknown is not free. An explicit max_expected_usd request cannot be admitted without a provable total.}
         billing_required: {type: boolean, description: Administrator-only accepted-quote snapshot; profit waits for provider bill verification when true.}
         markup_percent:
           allOf: [{"$ref": "#/components/schemas/MarkupPercent"}]
@@ -10250,7 +10466,7 @@ components:
           description: Confirmed paid USD charge, or confirmed free mock/failed generation. Omitted while unknown, never substituted with an estimate.
         status:
           type: string
-          enum: [estimated, pending_billing, confirmed]
+          enum: [estimated, quantity_unknown, pending_billing, confirmed]
         actual_source:
           type: string
         invoice_ids:

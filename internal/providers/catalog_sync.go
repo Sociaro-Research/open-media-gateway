@@ -3,6 +3,7 @@ package providers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -123,32 +124,56 @@ func (m *Manager) InterpretCatalogSource(_ context.Context, id string, source ca
 	return entries, nil
 }
 func (m *Manager) CheckCatalogRate(ctx context.Context, id string, model core.MediaModel, rate catalogsync.Rate) error {
+	if err := rate.ValidateConditions(); err != nil {
+		return err
+	}
 	ctx = catalogContext(ctx)
 	adapter, err := m.resolve(ctx, id, true)
 	if err != nil {
 		return err
 	}
 	r, _ := referenceRequest(model)
-	if rate.Resolution != "" {
-		r.Options.Resolution = rate.Resolution
-	}
-	if rate.Quality != "" {
-		r.Options.Quality = rate.Quality
-	}
-	if rate.Audio != nil {
-		if *rate.Audio && !model.SupportsAudio || !*rate.Audio && model.AudioAlwaysOn {
-			return fmt.Errorf("unsupported generated audio selector")
+	typedRequest := false
+	if hook, ok := adapter.(catalogRateRequestProvider); ok {
+		exact, e := hook.CatalogRateRequest(model, rate)
+		if e == nil {
+			if exact.Model != model.ID {
+				return fmt.Errorf("typed catalogue request targets a different model")
+			}
+			r = exact
+			typedRequest = true
+		} else if !errors.Is(e, errCatalogRateRequestUnavailable) {
+			return fmt.Errorf("typed catalogue request rejected: %w", e)
 		}
-		r.Options.GenerateAudio = rate.Audio
 	}
-	if rate.VideoInput != nil && *rate.VideoInput {
-		if !model.SupportsVideoInput {
-			return fmt.Errorf("unsupported video-reference selector")
+	if !typedRequest {
+		if rate.Resolution != "" {
+			r.Options.Resolution = rate.Resolution
 		}
-		r.Options.VideoURL = "https://example.invalid/catalogue-reference.mp4"
+		if rate.Quality != "" {
+			r.Options.Quality = rate.Quality
+		}
+		if rate.Audio != nil {
+			if *rate.Audio && !model.SupportsAudio || !*rate.Audio && model.AudioAlwaysOn {
+				return fmt.Errorf("unsupported generated audio selector")
+			}
+			r.Options.GenerateAudio = rate.Audio
+		}
+		if rate.VideoInput != nil && *rate.VideoInput {
+			if !model.SupportsVideoInput {
+				return fmt.Errorf("unsupported video-reference selector")
+			}
+			r.Options.VideoURL = "https://example.invalid/catalogue-reference.mp4"
+			if model.ReferenceMediaLimits != nil && model.ReferenceMediaLimits.Video.MinDuration > 0 {
+				r.Options.ReferenceMediaEvidence = map[string]core.InputMediaEvidence{r.Options.VideoURL: {Type: "video", Duration: model.ReferenceMediaLimits.Video.MinDuration}}
+			}
+		}
 	}
 	if model.Pricing.USDPerMillionAudioTokens > 0 && rate.Audio == nil {
 		return fmt.Errorf("generated audio requires an explicit tariff selector")
+	}
+	if !rate.MatchesConditions(model, r) {
+		return fmt.Errorf("typed quote request does not match tariff selectors")
 	}
 	definition, _ := m.findSpec(id)
 	if rate.InputImages != nil {
@@ -165,7 +190,7 @@ func (m *Manager) CheckCatalogRate(ctx context.Context, id string, model core.Me
 		return fmt.Errorf("unsupported quality")
 	}
 	p := &managedProvider{id: id, manager: m}
-	base, err := p.referenceQuoter(ctx, adapter)(model, r)
+	base, err := p.referenceQuoter(p.connectionScope(ctx, adapter, ""), adapter)(model, r)
 	// A reviewed model may exist only in another documented region. Its
 	// regional tariff must not depend on a quote being available in this account.
 	if err != nil && definition.Quote != nil && definition.CatalogRegions[rate.Region] != "" {
@@ -242,16 +267,28 @@ func applyCatalogQuote(base core.TaskCost, err error, model core.MediaModel, req
 	case "dreamina-seedance-2-0-260128", "dreamina-seedance-2-0-fast-260128", "dreamina-seedance-2-0-mini-260615", "dreamina-seedance-2-5-260628":
 		reviewedAudioRefs = true
 	}
-	if len(request.Options.Audios()) > 0 && !reviewedAudioRefs {
-		return base, nil
-	}
 	entry, ok := state.Models[model.ID]
+	if len(request.Options.Audios()) > 0 && !reviewedAudioRefs {
+		explicit := false
+		for _, rate := range entry.Rates {
+			if rate.AudioInput != nil && *rate.AudioInput && rate.MatchesConditions(model, request) {
+				explicit = true
+				break
+			}
+		}
+		if !explicit {
+			return base, nil
+		}
+	}
 	if !ok {
 		return base, nil
 	}
 	var selected *catalogsync.Rate
 	for i := range entry.Rates {
 		r := &entry.Rates[i]
+		if !r.MatchesConditions(model, request) {
+			continue
+		}
 		if r.Region != base.Pricing.Region || r.Unit != base.Pricing.Unit || r.Per != base.Pricing.Per {
 			continue
 		}
@@ -266,6 +303,14 @@ func applyCatalogQuote(base core.TaskCost, err error, model core.MediaModel, req
 			continue
 		}
 		hasVideo := len(request.Options.Videos()) > 0
+		if r.VideoInputIncludesResources {
+			for _, resource := range request.Options.ResourceSnapshots {
+				if resource.Kind == "element" && resource.Subtype == "video_character" {
+					hasVideo = true
+					break
+				}
+			}
+		}
 		if r.VideoInput == nil && hasVideo || r.VideoInput != nil && *r.VideoInput != hasVideo {
 			continue
 		}
@@ -281,7 +326,7 @@ func applyCatalogQuote(base core.TaskCost, err error, model core.MediaModel, req
 			continue
 		}
 		specificity := func(r *catalogsync.Rate) int {
-			n := len(r.Resolution) + len(r.Quality)
+			n := len(r.Resolution) + len(r.Quality) + r.ConditionSpecificity()
 			if r.Audio != nil {
 				n++
 			}

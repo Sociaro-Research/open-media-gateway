@@ -57,17 +57,14 @@ func TestCompanyProjectsMigrationSharingAndIsolation(t *testing.T) {
 	if _, err := db.Exec(`INSERT INTO tasks(id,owner_id,actor_id,provider_owner_id,storage_owner_id,status,provider,model,media_type,prompt,project_id,project_version) VALUES($1,$2,$3,$2,$2,'succeeded','mock','mock-video-v1','video','Retained payload',$4,7)`, oldTask, company, alice, second); err != nil {
 		t.Fatal(err)
 	}
-	// Migration 082 adds an empty artifact list; existing payload columns must remain exact.
-	var beforeProjects, beforeTasks string
-	if err := db.QueryRow(`SELECT json_agg(x ORDER BY id)::text FROM generation_projects x`).Scan(&beforeProjects); err != nil {
-		t.Fatal(err)
-	}
-	if err := db.QueryRow(`SELECT (to_jsonb(t)-'result_artifacts')::text FROM tasks t WHERE id=$1`, oldTask).Scan(&beforeTasks); err != nil {
-		t.Fatal(err)
-	}
+	// Explicitly compare every field that existed before the upgrade; future
+	// additive columns are asserted separately rather than masking old values.
+	preserved := newResourceLegacyProjection(t, db, "generation_projects", "tasks")
+	before := preserved.snapshot(t, db, "company76-before-upgrade")
 	if err := Migrate(db); err != nil {
 		t.Fatal(err)
 	}
+	assertResourceBindingsEmptyDefault(t, db)
 	// Index-retaining rollback and re-upgrade remain idempotent without data rewrites.
 	if err := goose.DownTo(db, "migrations", 76); err != nil {
 		t.Fatal(err)
@@ -75,11 +72,8 @@ func TestCompanyProjectsMigrationSharingAndIsolation(t *testing.T) {
 	if err := Migrate(db); err != nil {
 		t.Fatal("re-upgrade after rollback", err)
 	}
-	var afterProjects, afterTasks string
-	db.QueryRow(`SELECT json_agg(x ORDER BY id)::text FROM generation_projects x`).Scan(&afterProjects)
-	db.QueryRow(`SELECT (to_jsonb(t)-'result_artifacts')::text FROM tasks t WHERE id=$1`, oldTask).Scan(&afterTasks)
-	if beforeProjects != afterProjects || beforeTasks != afterTasks {
-		t.Fatal("76→77 rewrote existing project or task")
+	if preserved.snapshot(t, db, "company84-after-reupgrade") != before {
+		t.Fatal("upgrade rewrote an existing project/task field or count")
 	}
 	for _, c := range []context.Context{a, b} {
 		list, err := r.ListProjects(c)

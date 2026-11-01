@@ -19,6 +19,7 @@ type ParameterField struct {
 	Min       *float64 `json:"min,omitempty"`
 	Max       *float64 `json:"max,omitempty"`
 	MaxLength int      `json:"max_length,omitempty"`
+	MaxItems  int      `json:"max_items,omitempty"`
 }
 
 var parameterKey = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
@@ -47,6 +48,30 @@ func NormalizeParameters(fields []ParameterField, values map[string]any) (map[st
 		case "text", "select":
 			s, ok := v.(string)
 			valid = ok && (f.MaxLength <= 0 || len([]rune(s)) <= f.MaxLength) && (!f.Required || s != "") && (f.Type != "select" || slices.Contains(f.Choices, s))
+		case "text_list":
+			items := []string{}
+			switch list := v.(type) {
+			case []string:
+				items = append(items, list...)
+				valid = true
+			case []any:
+				valid = true
+				for _, item := range list {
+					s, ok := item.(string)
+					if !ok {
+						valid = false
+						break
+					}
+					items = append(items, s)
+				}
+			}
+			valid = valid && f.MaxItems > 0 && f.MaxItems <= 64 && len(items) <= f.MaxItems && (!f.Required || len(items) > 0)
+			for _, item := range items {
+				if f.MaxLength > 0 && len([]rune(item)) > f.MaxLength {
+					valid = false
+				}
+			}
+			v = items
 		case "boolean":
 			_, valid = v.(bool)
 		case "number", "integer":

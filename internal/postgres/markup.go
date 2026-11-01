@@ -27,6 +27,9 @@ func applyTaskMarkup(ctx context.Context, db rowQuerier, task *core.Task, lock b
 		return nil
 	}
 	task.Cost.MarkupPercent = policy.Resolve(task.Provider, task.Model).Percent
+	if task.Cost.QuantityUnknown {
+		return nil
+	}
 	_, err = task.Cost.CustomerExpected()
 	return err
 }

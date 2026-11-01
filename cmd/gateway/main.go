@@ -174,6 +174,7 @@ func run() error {
 		return err
 	}
 	handler := api.NewGateway(api.Dependencies{
+		ResourceRepository: postgres.NewProviderResourceRepository(db), ResourceScopes: providerManager.ResolveResourceConnection, ResourceDirectory: providerManager,
 		PlaygroundKeys:         playgroundKeys,
 		CatalogSync:            catalogRepository,
 		WorkspaceAuthorization: wa.New(postgres.NewSystemRepository(db), credentialsCipher),

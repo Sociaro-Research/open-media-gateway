@@ -32,7 +32,7 @@ func InspectFile(name string, data []byte, declared string) (referencevalidation
 		if limit := commonLimit(kind); limit > 0 && int64(len(data)) > limit {
 			return bad(fmt.Sprintf("size %d bytes; detected %s permits at most %d bytes. Reduce the file size.", len(data), kind, limit))
 		}
-		return bad("Detected format " + kind + " is unsupported. Use PNG/JPEG/WebP/GIF, MP4/MOV/WebM or MP3/WAV/OGG/FLAC.")
+		return bad("Detected format " + kind + " is unsupported. Use PNG/JPEG/WebP/GIF, MP4/MOV/WebM or MP3/WAV/AAC/M4A/OGG/FLAC.")
 	}
 	if declared != "" && mediafile.CanonicalType(declared) != mediafile.CanonicalType(kind) {
 		return bad(fmt.Sprintf("declared format %s does not match detected %s. Export a supported file and select it again.", declared, kind))
@@ -73,7 +73,12 @@ func (l *Library) inspectItem(ctx context.Context, item Image) (referencevalidat
 	if item.SHA256 != "" && hex.EncodeToString(sum[:]) != item.SHA256 {
 		return referencevalidation.File{}, referencevalidation.Invalid(item.Name, "Stored file checksum changed. Select a valid file again.")
 	}
-	return InspectFile(item.Name, data, item.ContentType)
+	file, err := InspectFile(item.Name, data, item.ContentType)
+	if err != nil {
+		return referencevalidation.File{}, err
+	}
+	file.SHA256 = hex.EncodeToString(sum[:])
+	return file, nil
 }
 
 // Inspect uses the repository's existing owner and content-author restrictions.

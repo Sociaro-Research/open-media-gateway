@@ -123,10 +123,13 @@ func (w *Worker) process(ctx context.Context, id string) error {
 			return err
 		}
 		if len(providerTask.Artifacts) > 0 {
-			return w.archiveArtifacts(ctx, ctx, provider, task, providerTask.ResultURL, providerTask.LastFrameURL, providerTask.Artifacts)
+			return w.archiveArtifacts(ctx, ctx, provider, task, providerTask.ResultURL, providerTask.LastFrameURL, providerTask.Artifacts, providerTask.Resources)
 		}
 		if providerTask.ResultURL != "" {
-			return w.archiveResult(ctx, ctx, task, providerTask.ResultURL, providerTask.LastFrameURL)
+			return w.archiveResult(ctx, ctx, task, providerTask.ResultURL, providerTask.LastFrameURL, providerTask.Resources)
+		}
+		if len(providerTask.Resources) > 0 {
+			return w.repo.MarkSucceeded(ctx, task.ID, core.StoredMedia{Resources: providerTask.Resources}, "")
 		}
 		return &pollLater{}
 	} else if providerTaskID == "" {
@@ -165,12 +168,15 @@ func (w *Worker) process(ctx context.Context, id string) error {
 	switch result.Status {
 	case core.ProviderSucceeded:
 		if len(result.Artifacts) > 0 {
-			return w.archiveArtifacts(ctx, taskCtx, provider, task, result.ResultURL, result.LastFrameURL, result.Artifacts)
+			return w.archiveArtifacts(ctx, taskCtx, provider, task, result.ResultURL, result.LastFrameURL, result.Artifacts, result.Resources)
+		}
+		if len(result.Resources) > 0 && result.ResultURL == "" {
+			return w.repo.MarkSucceeded(ctx, task.ID, core.StoredMedia{Resources: result.Resources}, "")
 		}
 		if strings.TrimSpace(result.ResultURL) == "" {
 			return w.repo.MarkFailed(ctx, id, "provider completed without a media URL")
 		}
-		return w.archiveResult(ctx, taskCtx, task, result.ResultURL, result.LastFrameURL)
+		return w.archiveResult(ctx, taskCtx, task, result.ResultURL, result.LastFrameURL, result.Resources)
 	case core.ProviderFailed:
 		if accounting, ok := w.repo.(interface {
 			ConfirmNoCharge(context.Context, string) error
@@ -252,11 +258,11 @@ func usageMetric(metrics []core.UsageMetric, name string) float64 {
 	return 0
 }
 
-func (w *Worker) archiveResult(ctx, archiveCtx context.Context, task core.Task, resultURL, lastFrameURL string) error {
-	return w.archiveResults(ctx, archiveCtx, task, resultURL, lastFrameURL, nil, nil)
+func (w *Worker) archiveResult(ctx, archiveCtx context.Context, task core.Task, resultURL, lastFrameURL string, resources ...[]core.ProviderResource) error {
+	return w.archiveResults(ctx, archiveCtx, task, resultURL, lastFrameURL, nil, nil, firstResources(resources))
 }
 
-func (w *Worker) archiveArtifacts(ctx, archiveCtx context.Context, provider core.MediaProvider, task core.Task, resultURL, lastFrameURL string, artifacts []core.ProviderArtifact) error {
+func (w *Worker) archiveArtifacts(ctx, archiveCtx context.Context, provider core.MediaProvider, task core.Task, resultURL, lastFrameURL string, artifacts []core.ProviderArtifact, resources ...[]core.ProviderResource) error {
 	if len(artifacts) == 0 || len(artifacts) > 64 {
 		return w.repo.MarkFailed(ctx, task.ID, "provider returned an invalid artifact count")
 	}
@@ -277,7 +283,7 @@ func (w *Worker) archiveArtifacts(ctx, archiveCtx context.Context, provider core
 	if resultURL != "" && resultURL != artifacts[0].URL {
 		return w.repo.MarkFailed(ctx, task.ID, "provider primary artifact does not match its scalar result")
 	}
-	return w.archiveResults(ctx, archiveCtx, task, artifacts[0].URL, lastFrameURL, append([]core.ProviderArtifact(nil), artifacts...), provider)
+	return w.archiveResults(ctx, archiveCtx, task, artifacts[0].URL, lastFrameURL, append([]core.ProviderArtifact(nil), artifacts...), provider, firstResources(resources))
 }
 
 func artifactMatchesMedia(a core.ProviderArtifact, m core.StoredMedia) bool {
@@ -298,7 +304,7 @@ func storedArtifact(a core.ProviderArtifact, m core.StoredMedia, index int) core
 	return core.StoredArtifact{ID: strconv.Itoa(index + 1), ProviderID: a.ID, MediaType: a.MediaType, Format: a.Format, Duration: a.Duration, GroupID: a.GroupID, StorageKey: m.StorageKey, ContentType: m.ContentType, SizeBytes: m.SizeBytes, SHA256: m.SHA256}
 }
 
-func (w *Worker) archiveResults(ctx, archiveCtx context.Context, task core.Task, resultURL, lastFrameURL string, artifacts []core.ProviderArtifact, provider core.MediaProvider) error {
+func (w *Worker) archiveResults(ctx, archiveCtx context.Context, task core.Task, resultURL, lastFrameURL string, artifacts []core.ProviderArtifact, provider core.MediaProvider, resources []core.ProviderResource) error {
 	if w.archiveSlots != nil {
 		select {
 		case w.archiveSlots <- struct{}{}:
@@ -407,6 +413,7 @@ func (w *Worker) archiveResults(ctx, archiveCtx context.Context, task core.Task,
 		media.LastFrameStorageKey = frame.StorageKey
 		lastFrameURL = "/v1/generations/" + task.ID + "/last-frame"
 	}
+	media.Resources = resources
 	return w.repo.MarkSucceeded(ctx, task.ID, media, lastFrameURL)
 }
 
@@ -456,4 +463,11 @@ func archiveProviderArtifact(ctx context.Context, destination ResultStorage, pro
 		source = core.ArtifactSource{Reader: io.NopCloser(strings.NewReader(a.Text)), ContentType: kind, SizeBytes: int64(len(a.Text))}
 	}
 	return archiver.ArchiveSource(ctx, id, source)
+}
+
+func firstResources(values [][]core.ProviderResource) []core.ProviderResource {
+	if len(values) == 0 {
+		return nil
+	}
+	return values[0]
 }

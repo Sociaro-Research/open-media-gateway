@@ -22,7 +22,7 @@ import (
 
 var (
 	ErrPromptRequired      = errors.New("prompt is required")
-	ErrPromptTooLong       = fmt.Errorf("prompt must not exceed %d characters", MaxPromptCharacters)
+	ErrPromptTooLong       = errors.New("prompt exceeds the selected model limits")
 	ErrModelRequired       = errors.New("model is required")
 	ErrModelUnavailable    = errors.New("selected model is not available for this provider")
 	ErrOptionsInvalid      = errors.New("media options are not supported by the selected model")
@@ -34,6 +34,7 @@ var (
 )
 
 type TaskService struct {
+	resourceResolver ReferenceResourceResolver
 	directory        ProviderDirectory
 	repo             TaskRepository
 	queue            TaskQueue
@@ -69,7 +70,10 @@ func (s *TaskService) EnableAccounting() { s.accounting = true }
 func (s *TaskService) ValidateMediaRequest(ctx context.Context, input CreateMediaInput) error {
 	validation := *s
 	validation.accounting = false
-	_, err := validation.prepare(ctx, input, "")
+	task, err := validation.prepare(ctx, input, "")
+	if err == nil {
+		return task.AdmissionError
+	}
 	return err
 }
 
@@ -81,6 +85,8 @@ func (s *TaskService) CreateMediaRequest(ctx context.Context, input CreateMediaI
 	hashOptions := task.Options
 	hashOptions.OverrideSound = nil // Resolved storage is not client request identity.
 	hashOptions.ReferenceMediaEvidence = nil
+	hashOptions.ResourceSnapshots = nil
+	hashOptions.ResourceCreation = nil
 	encodedOptions, _ := json.Marshal(hashOptions)
 	webhookURL := ""
 	if task.WebhookURL != nil {
@@ -120,7 +126,7 @@ func (s *TaskService) prepare(ctx context.Context, input CreateMediaInput, idemp
 		return Task{}, ErrCostLimitInvalid
 	}
 	prompt := strings.TrimSpace(input.Prompt)
-	if len([]rune(prompt)) > MaxPromptCharacters {
+	if len([]rune(prompt)) > MaxReviewedPromptCharacters {
 		return Task{}, ErrPromptTooLong
 	}
 	provider := strings.ToLower(strings.TrimSpace(input.Provider))
@@ -148,6 +154,9 @@ func (s *TaskService) prepare(ctx context.Context, input CreateMediaInput, idemp
 	if !found {
 		return Task{}, ErrModelUnavailable
 	}
+	if err := ValidatePromptPolicy(descriptor, prompt); err != nil {
+		return Task{}, err
+	}
 	mediaType := strings.ToLower(strings.TrimSpace(input.MediaType))
 	if mediaType == "" {
 		mediaType = descriptor.MediaType
@@ -167,12 +176,31 @@ func (s *TaskService) prepare(ctx context.Context, input CreateMediaInput, idemp
 	if input.Options.OverrideSoundID != "" && mediaType != "video" {
 		return Task{}, fmt.Errorf("%w: Override Sound requires video output", ErrOptionsInvalid)
 	}
-	input.Options.ReferenceMediaEvidence = maps.Clone(input.ReferenceEvidence)
-	options, err := s.normalizeOptions(descriptor, input.Options)
+	if err := ValidateResourceReferenceIntent(descriptor, input.Options); err != nil {
+		return Task{}, err
+	}
+	input.Options.ResourceSnapshots = nil
+	var resourceError error
+	if len(input.Options.ResourceReferences) > 0 {
+		if s.resourceResolver == nil {
+			resourceError = fmt.Errorf("%w: resource resolver unavailable", ErrOptionsInvalid)
+		} else {
+			input.Options.ResourceSnapshots, resourceError = s.resourceResolver.ResolveResourceReferences(ctx, provider, append([]ResourceReference(nil), input.Options.ResourceReferences...))
+		}
+		if resourceError != nil && input.AdmissionError == nil {
+			input.AdmissionError = resourceError
+		}
+	}
+	input.Options.ResourceCreation = CloneResourceCreation(input.ResourceCreation)
+	input.Options.ReferenceMediaEvidence = nil
+	if input.ReferenceEvidence != nil {
+		input.Options.ReferenceMediaEvidence = CloneInputMediaEvidence(input.ReferenceEvidence)
+	}
+	options, err := normalizeModelOptions(descriptor, input.Options, resourceError != nil || input.AdmissionError != nil)
 	if err != nil {
 		return Task{}, err
 	}
-	if validator, ok := providerAdapter.(RequestValidator); ok {
+	if validator, ok := providerAdapter.(RequestValidator); ok && input.AdmissionError == nil {
 		if err := validator.ValidateRequest(ctx, MediaRequest{Prompt: prompt, Model: model, Options: options.ProviderOptions()}); err != nil {
 			return Task{}, err
 		}
@@ -215,6 +243,9 @@ func (s *TaskService) prepare(ctx context.Context, input CreateMediaInput, idemp
 	if s.accounting && input.AdmissionError == nil {
 		if quoter, ok := providerAdapter.(CostQuoter); ok {
 			cost, fingerprint, err := quoter.Quote(ctx, descriptor, MediaRequest{TaskID: task.ID, Prompt: prompt, Model: model, Options: options.ProviderOptions()})
+			if err == nil && !HasVerifiedQuantityUnknownTariff(cost) {
+				err = ErrPricingUnavailable
+			}
 			// A missing quote is rejected transactionally only for a NEW task, so an
 			// idempotent retry can still return its original acceptance after a tariff change.
 			if err != nil && !errors.Is(err, ErrPricingUnavailable) {
@@ -238,6 +269,9 @@ func (s *TaskService) Estimate(ctx context.Context, input CreateMediaInput) (Cos
 	if err != nil {
 		return CostEstimate{}, err
 	}
+	if task.AdmissionError != nil {
+		return CostEstimate{}, task.AdmissionError
+	}
 	if task.Cost == nil {
 		return CostEstimate{}, ErrPricingUnavailable
 	}
@@ -250,7 +284,7 @@ func (s *TaskService) Estimate(ctx context.Context, input CreateMediaInput) (Cos
 	if task.APIKeyID != nil {
 		if budgets, ok := s.repo.(BudgetReader); ok {
 			estimate.WeeklyLimitUSD, estimate.RemainingUSD, err = budgets.Budget(ctx, *task.APIKeyID, task.CreatedAt)
-			if err != nil && !(errors.Is(err, ErrPricingUnavailable) && task.Cost.ExpectedUSD == 0) {
+			if err != nil && !(errors.Is(err, ErrPricingUnavailable) && task.Cost.ExpectedUSD == 0 && !task.Cost.QuantityUnknown) {
 				return CostEstimate{}, err
 			}
 			estimate.CanGenerate = estimate.RemainingUSD == nil || *estimate.RemainingUSD > 0
@@ -285,13 +319,34 @@ func NormalizeReferenceOptions(descriptor MediaModel, options MediaOptions) (Med
 }
 
 func NormalizeModelOptions(descriptor MediaModel, options MediaOptions) (MediaOptions, error) {
+	return normalizeModelOptions(descriptor, options, false)
+}
+func normalizeModelOptions(descriptor MediaModel, options MediaOptions, deferResourceLookup bool) (MediaOptions, error) {
 	if options.OutputCount != 0 && (descriptor.MediaType != "image" || options.OutputCount < 1 || options.OutputCount > max(1, descriptor.MaxOutputs)) {
 		return MediaOptions{}, fmt.Errorf("%w: unsupported output count", ErrOptionsInvalid)
 	}
 	if options.OutputCount == 1 {
 		options.OutputCount = 0
 	}
-	options.ReferenceMediaEvidence = maps.Clone(options.ReferenceMediaEvidence)
+	options.ResourceIntent = CloneResourceIntent(options.ResourceIntent)
+	options.ResourceCreation = CloneResourceCreation(options.ResourceCreation)
+	if err := ValidateResourceCreationIntent(descriptor, options, deferResourceLookup); err != nil {
+		return MediaOptions{}, err
+	}
+	options.ResourceReferences = slices.Clone(options.ResourceReferences)
+	options.ResourceSnapshots = slices.Clone(options.ResourceSnapshots)
+	for i := range options.ResourceSnapshots {
+		options.ResourceSnapshots[i].Session = CloneMediaSession(options.ResourceSnapshots[i].Session)
+		options.ResourceSnapshots[i].Sources = slices.Clone(options.ResourceSnapshots[i].Sources)
+		for j := range options.ResourceSnapshots[i].Sources {
+			if d := options.ResourceSnapshots[i].Sources[j].Duration; d != nil {
+				value := *d
+				options.ResourceSnapshots[i].Sources[j].Duration = &value
+			}
+		}
+	}
+	options.ReferenceRoles = maps.Clone(options.ReferenceRoles)
+	options.ReferenceMediaEvidence = CloneInputMediaEvidence(options.ReferenceMediaEvidence)
 	options.ReferenceVoices = maps.Clone(options.ReferenceVoices)
 	options.ImageURLs = slices.Clone(options.ImageURLs)
 	options.VideoURLs = slices.Clone(options.VideoURLs)
@@ -333,6 +388,15 @@ func NormalizeModelOptions(descriptor MediaModel, options MediaOptions) (MediaOp
 		}
 	}
 	if err := ValidateReferenceURLs(descriptor, options); err != nil {
+		return MediaOptions{}, err
+	}
+	if err := ValidateResourceReferenceIntent(descriptor, options); err != nil {
+		return MediaOptions{}, err
+	}
+	if err := ValidateResourceReferences(descriptor, options); !deferResourceLookup && err != nil {
+		return MediaOptions{}, err
+	}
+	if err := ValidateReferenceRoles(descriptor, options); err != nil {
 		return MediaOptions{}, err
 	}
 	if err := ValidateReferenceMode(descriptor, options); err != nil {
@@ -393,15 +457,19 @@ func NormalizeModelOptions(descriptor MediaModel, options MediaOptions) (MediaOp
 			return MediaOptions{}, ErrOptionsInvalid
 		}
 	case "speech":
-		if descriptor.SupportsVoice && strings.TrimSpace(options.Voice) == "" {
+		resourceVoice := hasVoiceResourceIntent(descriptor, options)
+		if resourceVoice && options.Voice != "" {
+			return MediaOptions{}, ErrOptionsInvalid
+		}
+		if !resourceVoice && descriptor.SupportsVoice && strings.TrimSpace(options.Voice) == "" {
 			if len(descriptor.Voices) > 0 {
 				options.Voice = descriptor.Voices[0]
 			}
 		}
-		if descriptor.RequiresVoice && strings.TrimSpace(options.Voice) == "" {
+		if !resourceVoice && descriptor.RequiresVoice && strings.TrimSpace(options.Voice) == "" {
 			return MediaOptions{}, ErrOptionsInvalid
 		}
-		if len(descriptor.Voices) > 0 && !slices.Contains(descriptor.Voices, options.Voice) {
+		if !resourceVoice && len(descriptor.Voices) > 0 && !slices.Contains(descriptor.Voices, options.Voice) {
 			return MediaOptions{}, ErrOptionsInvalid
 		}
 	case "music":
@@ -424,7 +492,7 @@ func NormalizeModelOptions(descriptor MediaModel, options MediaOptions) (MediaOp
 				options.Duration = descriptor.DefaultDuration
 			}
 			if options.Duration < descriptor.MinDuration || options.Duration > descriptor.MaxDuration ||
-				(descriptor.DurationStep > 0 && (options.Duration-descriptor.MinDuration)%descriptor.DurationStep != 0) {
+				(descriptor.DurationStep > 0 && options.Duration != 0 && (options.Duration-descriptor.MinDuration)%descriptor.DurationStep != 0) {
 				return MediaOptions{}, ErrOptionsInvalid
 			}
 		}
@@ -458,7 +526,7 @@ func normalizeVideoOptions(descriptor MediaModel, options MediaOptions) (MediaOp
 			options.Resolution = descriptor.Resolutions[0]
 		}
 	}
-	if options.Ratio == "" {
+	if options.Ratio == "" && !descriptor.RatioMayBeInferred {
 		if slices.Contains(descriptor.Ratios, "16:9") {
 			options.Ratio = "16:9"
 		} else if len(descriptor.Ratios) > 0 {
@@ -469,14 +537,14 @@ func normalizeVideoOptions(descriptor MediaModel, options MediaOptions) (MediaOp
 		if options.Duration != 0 {
 			return MediaOptions{}, fmt.Errorf("%w: duration follows the input video", ErrOptionsInvalid)
 		}
-	} else if options.Duration == 0 {
+	} else if options.Duration == 0 && !descriptor.DurationMayBeInferred {
 		options.Duration = descriptor.DefaultDuration
 	}
 	if (len(descriptor.Resolutions) > 0 && !slices.Contains(descriptor.Resolutions, options.Resolution)) ||
-		(len(descriptor.Ratios) > 0 && !slices.Contains(descriptor.Ratios, options.Ratio)) ||
+		(len(descriptor.Ratios) > 0 && !(descriptor.RatioMayBeInferred && options.Ratio == "") && !slices.Contains(descriptor.Ratios, options.Ratio)) ||
 		(len(descriptor.Ratios) == 0 && options.Ratio != "") ||
-		(!descriptor.DurationFromInput && (options.Duration < descriptor.MinDuration || options.Duration > descriptor.MaxDuration)) ||
-		(descriptor.DurationStep > 0 && (options.Duration-descriptor.MinDuration)%descriptor.DurationStep != 0) ||
+		(!descriptor.DurationFromInput && !(descriptor.DurationMayBeInferred && options.Duration == 0) && (options.Duration < descriptor.MinDuration || options.Duration > descriptor.MaxDuration)) ||
+		(descriptor.DurationStep > 0 && options.Duration != 0 && (options.Duration-descriptor.MinDuration)%descriptor.DurationStep != 0) ||
 		(options.GenerateAudio != nil && *options.GenerateAudio && !descriptor.SupportsAudio) ||
 		(options.Draft != nil && *options.Draft && (!descriptor.SupportsDraft ||
 			(len(descriptor.DraftResolutions) > 0 && !slices.Contains(descriptor.DraftResolutions, options.Resolution)))) ||
@@ -588,6 +656,10 @@ func (s *TaskService) ListProviders(ctx context.Context) []ProviderDescriptor {
 				} else {
 					priceMarkupErr = ErrPricingUnavailable
 				}
+			}
+			if cost.QuantityUnknown && priceMarkupErr == nil {
+				models[i].Pricing.ReferenceQuote = &cost
+				continue
 			}
 			amount, priceErr := cost.CustomerExpected()
 			if priceMarkupErr != nil || priceErr != nil {

@@ -11,6 +11,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
@@ -207,33 +208,81 @@ type s3Reader struct {
 	key          string
 	size, offset int64
 	etag         *string
-	body         io.ReadCloser
-	closed       bool
+	// Serialize body reads, but never make Close/Seek wait for a blocked Read.
+	readMu     sync.Mutex
+	mu         sync.Mutex
+	body       io.ReadCloser
+	cancel     context.CancelFunc
+	generation uint64
+	closed     bool
 }
 
 func (r *s3Reader) Read(p []byte) (int, error) {
+	r.readMu.Lock()
+	defer r.readMu.Unlock()
+	r.mu.Lock()
 	if r.closed {
+		r.mu.Unlock()
 		return 0, os.ErrClosed
 	}
 	if len(p) == 0 {
+		r.mu.Unlock()
 		return 0, nil
 	}
 	if r.offset >= r.size {
+		r.mu.Unlock()
 		return 0, io.EOF
 	}
-	if r.body == nil {
-		out, err := r.store.client.GetObject(r.ctx, &s3.GetObjectInput{Bucket: aws.String(r.store.config.Bucket), Key: &r.key, Range: aws.String(fmt.Sprintf("bytes=%d-", r.offset)), IfMatch: r.etag})
-		if err != nil {
+	generation, offset, body := r.generation, r.offset, r.body
+	if body == nil {
+		requestCtx, cancel := context.WithCancel(r.ctx)
+		r.cancel = cancel
+		r.mu.Unlock()
+		out, err := r.store.client.GetObject(requestCtx, &s3.GetObjectInput{Bucket: aws.String(r.store.config.Bucket), Key: &r.key, Range: aws.String(fmt.Sprintf("bytes=%d-", offset)), IfMatch: r.etag})
+		r.mu.Lock()
+		closed, stale := r.closed, r.generation != generation
+		if err != nil || closed || stale {
+			if !stale && !closed {
+				r.cancel = nil
+			}
+			r.mu.Unlock()
+			cancel()
+			if out != nil && out.Body != nil {
+				_ = out.Body.Close()
+			}
+			if closed {
+				return 0, os.ErrClosed
+			}
+			if stale {
+				return 0, errors.New("S3 read interrupted by seek")
+			}
+			if r.ctx.Err() != nil {
+				return 0, r.ctx.Err()
+			}
 			return 0, safeS3Error("read", err)
 		}
-		r.body = out.Body
+		body = out.Body
+		r.body = body
+		r.mu.Unlock()
+	} else {
+		r.mu.Unlock()
 	}
-	n, err := r.body.Read(p)
+	n, err := body.Read(p)
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.closed {
+		return 0, os.ErrClosed
+	}
+	if r.generation != generation {
+		return 0, errors.New("S3 read interrupted by seek")
+	}
 	r.offset += int64(n)
 	return n, err
 }
 func (r *s3Reader) Seek(offset int64, whence int) (int64, error) {
+	r.mu.Lock()
 	if r.closed {
+		r.mu.Unlock()
 		return 0, os.ErrClosed
 	}
 	switch whence {
@@ -243,22 +292,46 @@ func (r *s3Reader) Seek(offset int64, whence int) (int64, error) {
 	case io.SeekEnd:
 		offset += r.size
 	default:
+		r.mu.Unlock()
 		return 0, errors.New("invalid seek origin")
 	}
 	if offset < 0 {
+		r.mu.Unlock()
 		return 0, errors.New("negative seek offset")
 	}
-	if offset != r.offset && r.body != nil {
-		_ = r.body.Close()
-		r.body = nil
+	if offset == r.offset {
+		r.mu.Unlock()
+		return offset, nil
 	}
+	body, cancel := r.body, r.cancel
+	r.body, r.cancel = nil, nil
 	r.offset = offset
+	r.generation++
+	r.mu.Unlock()
+	if cancel != nil {
+		cancel()
+	}
+	if body != nil {
+		_ = body.Close()
+	}
 	return offset, nil
 }
 func (r *s3Reader) Close() error {
+	r.mu.Lock()
+	if r.closed {
+		r.mu.Unlock()
+		return nil
+	}
 	r.closed = true
-	if r.body != nil {
-		return r.body.Close()
+	r.generation++
+	body, cancel := r.body, r.cancel
+	r.body, r.cancel = nil, nil
+	r.mu.Unlock()
+	if cancel != nil {
+		cancel()
+	}
+	if body != nil {
+		return body.Close()
 	}
 	return nil
 }

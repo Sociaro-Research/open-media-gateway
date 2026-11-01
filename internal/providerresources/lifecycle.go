@@ -1,0 +1,256 @@
+package providerresources
+
+import (
+	"context"
+	"errors"
+	"strings"
+	"time"
+
+	"github.com/Sociaro-Research/open-media-gateway/internal/core"
+	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
+	"github.com/google/uuid"
+)
+
+const pendingDeletionWarning = "Provider deletion remains pending. A provider without a documented deletion-task polling route cannot confirm completion from submission alone."
+const uncertainDeletionWarning = "The provider outcome is uncertain. Check this job before submitting another deletion; this job will not be resubmitted."
+
+// Lifecycle orchestrates already-authorized deletion jobs. Paid resource
+// creation remains a generation operation admitted and metered by TaskService.
+type Lifecycle struct {
+	repo      Repository
+	current   ScopeResolver
+	directory core.ProviderDirectory
+}
+
+func NewLifecycle(repo Repository, current ScopeResolver, directory core.ProviderDirectory) *Lifecycle {
+	return &Lifecycle{repo: repo, current: current, directory: directory}
+}
+func (l *Lifecycle) bindingScope(ctx context.Context, b Binding) (core.ProviderConnectionScope, error) {
+	if l == nil || l.repo == nil || l.current == nil || l.directory == nil {
+		return core.ProviderConnectionScope{}, ErrInvalid
+	}
+	if b.OwnerID != identity.OwnerID(ctx) || b.ProviderOwnerID != identity.ProviderOwnerID(ctx) || b.ProviderID == "" || b.ConnectionID == "" || b.Revision == "" || !ValidRemoteID(b.RemoteID) {
+		return core.ProviderConnectionScope{}, ErrNotFound
+	}
+	if filter := identity.ContentAuthorFilter(ctx); filter != "" && b.ActorID != filter {
+		return core.ProviderConnectionScope{}, ErrNotFound
+	}
+	scope, err := l.current(ctx, b.ProviderID)
+	if err != nil {
+		return scope, err
+	}
+	if scope.ID != b.ConnectionID || scope.OwnerID != b.ProviderOwnerID || scope.Revision != b.Revision {
+		return core.ProviderConnectionScope{}, ErrNotFound
+	}
+	return scope, nil
+}
+func lifecycleJobMatches(ctx context.Context, j Job, b Binding) bool {
+	return j.Operation == Delete && j.BindingID == b.ID && j.OwnerID == identity.OwnerID(ctx) && j.OwnerID == b.OwnerID && j.ProviderOwnerID == identity.ProviderOwnerID(ctx) && j.ProviderOwnerID == b.ProviderOwnerID && j.ProviderID == b.ProviderID && j.ConnectionID == b.ConnectionID && j.Revision == b.Revision && j.Kind == b.Kind && j.Intent.Kind == b.Kind && (identity.ContentAuthorFilter(ctx) == "" || j.ActorID == identity.ContentAuthorFilter(ctx))
+}
+func lifecyclePublicJob(j Job) Job {
+	uncertain := strings.HasPrefix(j.Warning, "The provider outcome is uncertain.")
+	j.Intent = CloneIntent(j.Intent)
+	j.SafeError = SafeFailure(j.SafeError)
+	if j.Operation == Delete && j.Status == Queued && j.Handle == "" {
+		j.Warning = "Deletion has not been submitted. Repeat the original request to resume this queued job."
+		return j
+	}
+	if j.Warning != "" {
+		j.Warning = SafeWarning(j.Warning)
+		if j.Operation == Delete && j.Status == Running {
+			j.Warning = pendingDeletionWarning
+			if j.Handle == "" || uncertain {
+				j.Warning = uncertainDeletionWarning
+			}
+		}
+	}
+	return j
+}
+func (l *Lifecycle) refresh(ctx context.Context, id string) (Job, error) {
+	j, err := l.repo.GetJob(ctx, id)
+	return lifecyclePublicJob(j), err
+}
+func lifecycleProviderContext(ctx context.Context, j Job, scope core.ProviderConnectionScope) context.Context {
+	return core.WithProviderConnectionScope(core.WithProviderRevision(ctx, j.Revision), scope)
+}
+func (l *Lifecycle) provider(ctx context.Context, j Job, b Binding) (context.Context, core.ResourceProvider, error) {
+	scope, err := l.bindingScope(ctx, b)
+	if err != nil {
+		return ctx, nil, err
+	}
+	if !lifecycleJobMatches(ctx, j, b) {
+		return ctx, nil, ErrNotFound
+	}
+	pinned := lifecycleProviderContext(ctx, j, scope)
+	provider, err := l.directory.Provider(pinned, j.ProviderID)
+	if err != nil {
+		return pinned, nil, err
+	}
+	resource, ok := provider.(core.ResourceProvider)
+	if !ok {
+		return pinned, nil, core.ErrProviderUnavailable
+	}
+	return pinned, resource, nil
+}
+func (l *Lifecycle) uncertain(ctx context.Context, j Job) (Job, error) {
+	persist, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	if err := l.repo.RecordUncertain(persist, j.ID, uncertainDeletionWarning); err != nil {
+		return lifecyclePublicJob(j), err
+	}
+	return l.refresh(persist, j.ID)
+}
+func (l *Lifecycle) failed(ctx context.Context, j Job) (Job, error) {
+	persist, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	if err := l.repo.FailJob(persist, j.ID, "Provider resource deletion failed.", ""); err != nil {
+		return lifecyclePublicJob(j), err
+	}
+	return l.refresh(persist, j.ID)
+}
+func (l *Lifecycle) apply(ctx context.Context, j Job, result core.ResourceJob) (Job, error) {
+	persist, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	if result.Handle != "" {
+		if err := l.repo.SaveHandle(persist, j.ID, result.Handle, result.Warning); err != nil {
+			pending, saveErr := l.uncertain(persist, j)
+			if saveErr != nil {
+				return pending, errors.Join(err, saveErr)
+			}
+			return pending, err
+		}
+		j.Handle = result.Handle
+	}
+	switch result.Status {
+	case core.ProviderSucceeded:
+		if err := l.repo.CompleteDelete(persist, j.ID); err != nil {
+			return lifecyclePublicJob(j), err
+		}
+	case core.ProviderFailed:
+		return l.failed(persist, j)
+	case core.ProviderQueued, core.ProviderRunning:
+		if result.Handle == "" && j.Handle == "" {
+			return l.uncertain(persist, j)
+		}
+	default:
+		return l.uncertain(persist, j)
+	}
+	return l.refresh(persist, j.ID)
+}
+func (l *Lifecycle) Delete(ctx context.Context, bindingID, idem string) (Job, error) {
+	if l == nil || l.repo == nil || l.current == nil || l.directory == nil {
+		return Job{}, ErrInvalid
+	}
+	if _, err := uuid.Parse(bindingID); err != nil {
+		return Job{}, ErrInvalid
+	}
+	b, err := l.repo.GetBinding(ctx, bindingID)
+	if err != nil {
+		return Job{}, err
+	}
+	if _, err = l.bindingScope(ctx, b); err != nil {
+		return Job{}, err
+	}
+	if b.IsPreset {
+		return Job{}, ErrConflict
+	}
+	if b.Kind != "element" && b.Kind != "voice" {
+		return Job{}, ErrInvalid
+	}
+	switch b.Status {
+	case Succeeded, Failed, Deleting, Deleted:
+	default:
+		return Job{}, ErrConflict
+	}
+	if idem == "" {
+		idem = b.ID
+	}
+	if len(idem) > 200 {
+		return Job{}, ErrInvalid
+	}
+	// BeginDelete owns in-use checks and replay-before-state-check ordering under
+	// a row lock. An outstanding job cannot be replaced with another key.
+	job, _, err := l.repo.BeginDelete(ctx, b.ID, idem)
+	if err != nil {
+		return lifecyclePublicJob(job), err
+	}
+	if !lifecycleJobMatches(ctx, job, b) {
+		return Job{}, ErrNotFound
+	}
+	if job.Status != Queued {
+		return lifecyclePublicJob(job), nil
+	}
+	job, started, err := l.repo.StartJob(ctx, job.ID)
+	if err != nil {
+		return lifecyclePublicJob(job), err
+	}
+	if !lifecycleJobMatches(ctx, job, b) {
+		return Job{}, ErrNotFound
+	}
+	if !started {
+		return lifecyclePublicJob(job), nil
+	}
+	pinned, provider, err := l.provider(ctx, job, b)
+	if err != nil {
+		return l.failed(ctx, job)
+	}
+	snapshot := core.ResourceSnapshot{Session: CloneSession(b.Session), BindingID: b.ID, ReferenceID: "resource", Kind: b.Kind, RemoteID: b.RemoteID, IsPreset: b.IsPreset, Subtype: b.Subtype, ConnectionIdentity: b.Revision, Sources: CloneSources(b.Sources)}
+	result, err := provider.DeleteResource(pinned, snapshot)
+	if err != nil {
+		// Only adapter-declared pre-I/O rejections prove that no remote deletion was
+		// attempted. A transport error after invocation always remains uncertain.
+		if errors.Is(err, core.ErrOptionsInvalid) || errors.Is(err, core.ErrProviderChanged) || errors.Is(err, core.ErrProviderUnavailable) {
+			return l.failed(ctx, job)
+		}
+		return l.uncertain(ctx, job)
+	}
+	return l.apply(ctx, job, result)
+}
+func (l *Lifecycle) Poll(ctx context.Context, jobID string) (Job, error) {
+	if l == nil || l.repo == nil || l.current == nil || l.directory == nil {
+		return Job{}, ErrInvalid
+	}
+	if _, err := uuid.Parse(jobID); err != nil {
+		return Job{}, ErrInvalid
+	}
+	job, err := l.repo.GetJob(ctx, jobID)
+	if err != nil {
+		return Job{}, err
+	}
+	b, err := l.repo.GetBinding(ctx, job.BindingID)
+	if err != nil {
+		return Job{}, err
+	}
+	if !lifecycleJobMatches(ctx, job, b) {
+		return Job{}, ErrNotFound
+	}
+	if _, err = l.bindingScope(ctx, b); err != nil {
+		return Job{}, err
+	}
+	if job.Status == Succeeded || job.Status == Failed {
+		return lifecyclePublicJob(job), nil
+	}
+	if b.Status != Deleting {
+		return Job{}, ErrConflict
+	}
+	if job.Status == Queued {
+		return lifecyclePublicJob(job), nil
+	}
+	if job.Status != Running {
+		return Job{}, ErrConflict
+	}
+	if job.Handle == "" {
+		return l.uncertain(ctx, job)
+	}
+	pinned, provider, err := l.provider(ctx, job, b)
+	if err != nil {
+		return lifecyclePublicJob(job), err
+	}
+	result, err := provider.GetResourceJob(pinned, job.Kind, job.Handle)
+	if err != nil {
+		return l.uncertain(ctx, job)
+	}
+	// Poll is read-only at the provider boundary. It never calls DeleteResource,
+	// even when the submission handle or a previous transport outcome is unknown.
+	return l.apply(ctx, job, result)
+}

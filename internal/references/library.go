@@ -22,7 +22,7 @@ import (
 
 const MaxBytes int64 = 200 << 20
 
-var ErrInvalidImage = errors.New("use PNG, JPEG, WebP or GIF (30 MB), MP4, MOV or WebM (200 MB), or MP3, WAV, OGG or FLAC (50 MB)")
+var ErrInvalidImage = errors.New("use PNG, JPEG, WebP or GIF (30 MB), MP4, MOV or WebM (200 MB), or MP3, WAV, AAC, M4A, OGG or FLAC (50 MB)")
 var ErrDuplicate = errors.New("reference content already exists")
 var ErrInUse = errors.New("reference is retained by a template or is being prepared by a provider; remove retained usage before deleting the original")
 var ErrUploadBusy = errors.New("another reference upload is in progress; retry shortly")
@@ -256,13 +256,24 @@ func InspectMedia(data []byte) (string, error) {
 	if len(data) >= 3 && data[0] == 0xff && data[1]&0xe0 == 0xe0 && data[1]&0x06 != 0 && data[2]&0xf0 != 0xf0 {
 		kind = "audio/mpeg"
 	}
+	// Classify audio MP4 by its inspected sound track and sample extents, not
+	// by an M4A extension or ftyp brand. Video keeps its existing strict path.
+	if _, err := mediafile.Inspect(data, "audio/mp4"); err == nil {
+		kind = "audio/mp4"
+	}
+	if len(data) >= 2 && data[0] == 0xff && data[1]&0xf6 == 0xf0 {
+		if _, err := mediafile.Inspect(data, "audio/aac"); err != nil {
+			return "audio/aac", ErrInvalidImage
+		}
+		kind = "audio/aac"
+	}
 	switch kind {
 	case "image/png", "image/jpeg", "image/webp", "image/gif":
 		if len(data) > 30<<20 {
 			return kind, ErrInvalidImage
 		}
 	case "video/mp4", "video/quicktime", "video/webm":
-	case "audio/mpeg", "audio/wave", "audio/wav", "audio/x-wav", "audio/ogg", "audio/flac":
+	case "audio/mpeg", "audio/wave", "audio/wav", "audio/x-wav", "audio/ogg", "audio/flac", "audio/aac", "audio/mp4":
 		if len(data) > 50<<20 {
 			return kind, ErrInvalidImage
 		}

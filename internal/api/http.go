@@ -21,6 +21,7 @@ import (
 	"github.com/Sociaro-Research/open-media-gateway/internal/payments"
 	"github.com/Sociaro-Research/open-media-gateway/internal/playgroundkey"
 	"github.com/Sociaro-Research/open-media-gateway/internal/providerassets"
+	"github.com/Sociaro-Research/open-media-gateway/internal/providerresources"
 	"github.com/Sociaro-Research/open-media-gateway/internal/providers"
 	"github.com/Sociaro-Research/open-media-gateway/internal/references"
 	"github.com/Sociaro-Research/open-media-gateway/internal/remoteworkspace"
@@ -60,6 +61,9 @@ type BrowserAuth interface {
 }
 
 type Server struct {
+	resourceRepository     providerresources.Repository
+	resourceScopes         providerresources.ScopeResolver
+	resourceLifecycle      *providerresources.Lifecycle
 	playgroundKeys         *playgroundkey.Manager
 	templates              templates.Repository
 	workspaceAuthorization *wa.Manager
@@ -118,6 +122,9 @@ func NewWithPayments(service Service, health HealthChecker, apiKey string, media
 
 // Dependencies keeps management services independent of browser authentication.
 type Dependencies struct {
+	ResourceRepository     providerresources.Repository
+	ResourceScopes         providerresources.ScopeResolver
+	ResourceDirectory      core.ProviderDirectory
 	PlaygroundKeys         *playgroundkey.Manager
 	Templates              templates.Repository
 	WorkspaceAuthorization *wa.Manager
@@ -149,6 +156,16 @@ func NewGateway(d Dependencies) http.Handler {
 	s.remoteWorkspaceManager = d.RemoteWorkspace
 	s.workspaceAuthorization = d.WorkspaceAuthorization
 	s.references = library
+	s.resourceRepository = d.ResourceRepository
+	s.resourceScopes = d.ResourceScopes
+	if d.ResourceRepository != nil && d.ResourceScopes != nil {
+		s.resourceLifecycle = providerresources.NewLifecycle(d.ResourceRepository, d.ResourceScopes, d.ResourceDirectory)
+		if service, ok := d.Service.(interface {
+			SetReferenceResourceResolver(core.ReferenceResourceResolver)
+		}); ok {
+			service.SetReferenceResourceResolver(providerresources.New(d.ResourceRepository, d.ResourceScopes))
+		}
+	}
 	s.templates = d.Templates
 	s.playgroundKeys = d.PlaygroundKeys
 	s.providerAssets = d.ProviderAssets
@@ -300,6 +317,7 @@ func (s *Server) handler() http.Handler {
 	mux.Handle("PATCH /v1/me", s.authenticate(http.HandlerFunc(s.updateProfile)))
 	s.registerReferenceRoutes(mux)
 	s.registerProviderAssetRoutes(mux)
+	s.registerProviderResourceRoutes(mux)
 	if s.keys != nil {
 		mux.Handle("GET /v1/key", s.authenticate(http.HandlerFunc(s.currentAPIKey)))
 		mux.Handle("GET /v1/admin/reports/{id}", s.authenticate(http.HandlerFunc(s.reportDetail)))

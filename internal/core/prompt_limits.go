@@ -13,6 +13,9 @@ func (m MediaModel) EffectivePromptCharacterLimit() int {
 	if m.NoPrompt {
 		return 0
 	}
+	if !m.Manual && m.PromptPolicy != nil && m.PromptPolicy.MaxCharacters > 0 && m.PromptPolicy.MaxCharacters <= MaxReviewedPromptCharacters {
+		return m.PromptPolicy.MaxCharacters
+	}
 	if !m.Manual && m.MaxPromptCharacters > 0 && m.MaxPromptCharacters < MaxPromptCharacters {
 		return m.MaxPromptCharacters
 	}

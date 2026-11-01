@@ -1,10 +1,14 @@
 package mediafile
 
-// CanonicalContentType identifies equivalent WAV labels without admitting new
-// formats. Use it on both detected/stored types and model allowlist entries;
+// CanonicalContentType identifies equivalent WAV, AAC and M4A MIME labels.
+// Use it on both detected/stored types and model allowlist entries;
 // callers must still inspect the bytes and enforce the selected model's limits.
 func CanonicalContentType(kind string) string {
 	switch kind {
+	case "audio/x-m4a", "audio/m4a":
+		return "audio/mp4"
+	case "audio/x-aac":
+		return "audio/aac"
 	case "audio/wav", "audio/x-wav":
 		return "audio/wave"
 	default:

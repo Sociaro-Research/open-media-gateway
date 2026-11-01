@@ -38,6 +38,9 @@ func rateKey(r Rate) string {
 	if r.VideoInput != nil && *r.VideoInput {
 		key += "/video_input=true"
 	}
+	if r.AudioInput != nil || r.VoiceInput != nil || r.ImageInput != nil || len(r.Parameters) > 0 || len(r.ResourceInputs) > 0 || len(r.ReferenceRoles) > 0 || r.VideoInputIncludesResources {
+		key += "/conditions=" + r.ConditionKey()
+	}
 	return key
 }
 func ValidDate(d string) bool {

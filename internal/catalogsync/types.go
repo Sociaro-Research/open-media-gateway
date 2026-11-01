@@ -62,7 +62,7 @@ func (s Schedule) Validate() error {
 	if _, err := time.Parse("15:04", s.Time); err != nil || len(s.Time) != 5 {
 		return ErrSettings
 	}
-	if s.Sources == nil || len(s.Sources) > 30 {
+	if s.Sources == nil || len(s.Sources) > 100 {
 		return ErrSettings
 	}
 	ids := map[string]bool{}
@@ -108,17 +108,25 @@ func NextDaily(now time.Time, clock, zone string) time.Time {
 }
 
 type Rate struct {
-	Source      string                  `json:"source,omitempty"`
-	Region      string                  `json:"region"`
-	Resolution  string                  `json:"resolution,omitempty"`
-	Quality     string                  `json:"quality,omitempty"`
-	Audio       *bool                   `json:"audio,omitempty"`
-	VideoInput  *bool                   `json:"video_input,omitempty"`
-	InputImages *ImageInputTariff       `json:"input_images,omitempty"`
-	Unit        string                  `json:"unit"`
-	Per         int64                   `json:"per"`
-	Price       money.USD               `json:"price"`
-	Components  []core.PricingComponent `json:"components,omitempty"`
+	AudioInput                  *bool                   `json:"audio_input,omitempty"`
+	VoiceInput                  *bool                   `json:"voice_input,omitempty"`
+	ImageInput                  *bool                   `json:"image_input,omitempty"`
+	Parameters                  map[string]string       `json:"parameters,omitempty"`
+	ResourceInputs              []ResourceCountSelector `json:"resource_inputs,omitempty"`
+	ReferenceRoles              []RoleCountSelector     `json:"reference_roles,omitempty"`
+	VideoInputIncludesResources bool                    `json:"video_input_includes_resources,omitempty"`
+	DurationBillingRule         string                  `json:"duration_billing_rule,omitempty"`
+	Source                      string                  `json:"source,omitempty"`
+	Region                      string                  `json:"region"`
+	Resolution                  string                  `json:"resolution,omitempty"`
+	Quality                     string                  `json:"quality,omitempty"`
+	Audio                       *bool                   `json:"audio,omitempty"`
+	VideoInput                  *bool                   `json:"video_input,omitempty"`
+	InputImages                 *ImageInputTariff       `json:"input_images,omitempty"`
+	Unit                        string                  `json:"unit"`
+	Per                         int64                   `json:"per"`
+	Price                       money.USD               `json:"price"`
+	Components                  []core.PricingComponent `json:"components,omitempty"`
 }
 
 // ImageInputTariff is a reviewed fixed charge for submitted reference images.

@@ -112,6 +112,10 @@ func webm(data []byte, info *Info) error {
 	defaultNS := uint64(0)
 	videoTrack := uint64(0)
 	samples := uint64(0)
+	audioStreams, videoStreams, tracks := 0, 0, 0
+	streamsKnown := true
+	framesKnown := true
+	seenTracks := map[uint64]bool{}
 	var walk func([]byte, int) error
 	walk = func(data []byte, depth int) error {
 		if depth > 8 {
@@ -161,11 +165,31 @@ func webm(data []byte, info *Info) error {
 					v := b[p : p+int(es)]
 					p += int(es)
 					if eid == 0xd7 {
+						if track != 0 || len(v) == 0 || len(v) > 8 {
+							streamsKnown = false
+						}
 						track = ebmlUint(v)
 					}
 					if eid == 0x83 {
+						if kind != 0 || len(v) == 0 || len(v) > 8 {
+							streamsKnown = false
+						}
 						kind = ebmlUint(v)
 					}
+				}
+				tracks++
+				if seenTracks[track] && track == videoTrack {
+					framesKnown = false
+				}
+				if track == 0 || kind == 0 || seenTracks[track] {
+					streamsKnown = false
+				}
+				seenTracks[track] = true
+				if kind == 1 {
+					videoStreams++
+				}
+				if kind == 2 {
+					audioStreams++
 				}
 				if kind == 1 && videoTrack == 0 {
 					videoTrack = track
@@ -197,12 +221,18 @@ func webm(data []byte, info *Info) error {
 					return ErrInvalid
 				}
 				if track == videoTrack {
+					if !webmBlockFramesKnown(b, n) {
+						framesKnown = false
+					}
 					count := uint64(1)
 					if b[n+2]&6 != 0 {
 						if len(b) < n+4 {
 							return ErrInvalid
 						}
 						count += uint64(b[n+3])
+					}
+					if ^uint64(0)-samples < count {
+						return ErrInvalid
 					}
 					samples += count
 				}
@@ -212,6 +242,16 @@ func webm(data []byte, info *Info) error {
 	}
 	if err := walk(data, 0); err != nil {
 		return err
+	}
+	if samples > math.MaxInt64 {
+		return ErrInvalid
+	}
+	if samples > 0 && framesKnown {
+		info.FrameCount = int64(samples)
+	}
+	if streamsKnown && tracks > 0 {
+		info.AudioStreams = &audioStreams
+		info.VideoStreams = &videoStreams
 	}
 	info.Duration = duration * float64(scale) / 1e9
 	if info.Duration > 0 && samples > 0 {
@@ -223,4 +263,75 @@ func webm(data []byte, info *Info) error {
 		return ErrInvalid
 	}
 	return nil
+}
+
+// Check the block's frame boundaries before publishing a sample count. Keep
+// legacy average-FPS behavior independent when an unusual/invalid lacing table
+// cannot establish frame-count evidence without changing accepted formats.
+func webmBlockFramesKnown(block []byte, trackBytes int) bool {
+	header := trackBytes + 3
+	if len(block) <= header {
+		return false
+	}
+	lacing := (block[trackBytes+2] >> 1) & 3
+	if lacing == 0 {
+		return true
+	}
+	count := int(block[header]) + 1
+	pos := header + 1
+	if count == 1 {
+		return pos < len(block)
+	}
+	if lacing == 2 {
+		return len(block)-pos >= count && (len(block)-pos)%count == 0
+	}
+	sizes := make([]int64, 0, count-1)
+	if lacing == 1 {
+		for i := 0; i < count-1; i++ {
+			size := int64(0)
+			for {
+				if pos >= len(block) {
+					return false
+				}
+				value := block[pos]
+				pos++
+				size += int64(value)
+				if value != 255 {
+					break
+				}
+			}
+			if size <= 0 {
+				return false
+			}
+			sizes = append(sizes, size)
+		}
+	} else {
+		first, n, ok := vint(block[pos:], false)
+		if !ok || first == 0 || first > uint64(len(block)) {
+			return false
+		}
+		pos += n
+		sizes = append(sizes, int64(first))
+		for i := 1; i < count-1; i++ {
+			delta, n, ok := vint(block[pos:], false)
+			if !ok {
+				return false
+			}
+			pos += n
+			bias := (int64(1) << uint(7*n-1)) - 1
+			size := sizes[i-1] + int64(delta) - bias
+			if size <= 0 || size > int64(len(block)) {
+				return false
+			}
+			sizes = append(sizes, size)
+		}
+	}
+	remaining := int64(len(block) - pos)
+	for _, size := range sizes {
+		if size >= remaining {
+			return false
+		}
+		remaining -= size
+	}
+	return remaining > 0
 }

@@ -85,7 +85,7 @@ func (s *Local) archiveReader(ctx context.Context, taskID string, reader io.Read
 }
 
 func (s *Local) archiveReaderChecked(ctx context.Context, taskID string, reader io.Reader, contentType string, size int64, sourceURL string, trustedStream bool) (core.StoredMedia, error) {
-	if err := ctx.Err(); err != nil {
+	if err := ctx.Err(); trustedStream && err != nil {
 		return core.StoredMedia{}, err
 	}
 	if size > s.maxBytes {
@@ -148,7 +148,7 @@ func (s *Local) archiveReaderChecked(ctx context.Context, taskID string, reader 
 			return core.StoredMedia{}, err
 		}
 	}
-	if err := ctx.Err(); err != nil {
+	if err := ctx.Err(); trustedStream && err != nil {
 		return core.StoredMedia{}, err
 	}
 	if err := temporary.Sync(); err != nil {
@@ -162,7 +162,7 @@ func (s *Local) archiveReaderChecked(ctx context.Context, taskID string, reader 
 			return core.StoredMedia{}, fmt.Errorf("close media file: %w", err)
 		}
 	}
-	if err := ctx.Err(); err != nil {
+	if err := ctx.Err(); trustedStream && err != nil {
 		return core.StoredMedia{}, err
 	}
 	if err := os.Rename(temporaryName, path); err != nil {
@@ -193,6 +193,10 @@ func mediaFileName(contentType string) (string, string) {
 		return "image", ".jpg"
 	case "image/webp":
 		return "image", ".webp"
+	case "audio/aac":
+		return "audio", ".aac"
+	case "audio/mp4":
+		return "audio", ".m4a"
 	case "audio/mpeg":
 		return "audio", ".mp3"
 	case "audio/wav", "audio/x-wav":
@@ -235,7 +239,14 @@ func (s *Local) Open(_ context.Context, key string) (Object, error) {
 		_ = file.Close()
 		return Object{}, fmt.Errorf("stat stored media: %w", err)
 	}
-	return Object{Key: key, ContentType: mime.TypeByExtension(filepath.Ext(path)), SizeBytes: info.Size(), ModTime: info.ModTime(), Reader: file}, nil
+	contentType := mime.TypeByExtension(filepath.Ext(path))
+	switch filepath.Ext(path) {
+	case ".aac":
+		contentType = "audio/aac"
+	case ".m4a":
+		contentType = "audio/mp4"
+	}
+	return Object{Key: key, ContentType: contentType, SizeBytes: info.Size(), ModTime: info.ModTime(), Reader: file}, nil
 }
 
 func (s *Local) openSource(ctx context.Context, rawURL string) (io.ReadCloser, string, int64, error) {

@@ -14,9 +14,15 @@ import (
 	"strings"
 )
 
-var ErrInvalid = errors.New("media cannot be inspected: use a valid PNG, JPEG, GIF, WebP, MP4/MOV/WebM, MP3, WAV, OGG or FLAC reference file")
+var ErrInvalid = errors.New("media cannot be inspected: use a valid PNG, JPEG, GIF, WebP, MP4/MOV/WebM, MP3, WAV, AAC, M4A, OGG or FLAC reference file")
 
 type Info struct {
+	// FrameCount is the primary video sample count; zero means unavailable.
+	FrameCount int64
+	// Track counts are nil when container metadata cannot establish them.
+	// A non-nil zero means that no stream of that kind was declared.
+	AudioStreams  *int
+	VideoStreams  *int
 	AlphaChannel  bool
 	Codec         string
 	ContentType   string
@@ -89,6 +95,24 @@ func Inspect(data []byte, kind string) (Info, error) {
 	case kind == "video/webm":
 		if err := webm(data, &result); err != nil {
 			return result, err
+		}
+	case kind == "audio/aac":
+		if err := adtsAAC(data, &result); err != nil {
+			return result, err
+		}
+	case kind == "audio/mp4":
+		if err := audioMP4(data, &result); err != nil {
+			return result, err
+		}
+		if top, err := boxes(data); err == nil {
+			for _, b := range top {
+				if b.kind == "moov" {
+					if children, err := boxes(b.data); err == nil {
+						mp4StreamCounts(children, &result)
+					}
+					break
+				}
+			}
 		}
 	case kind == "audio/ogg":
 		if err := ogg(data, &result); err != nil {
@@ -283,6 +307,9 @@ func mp4(data []byte, info *Info) error {
 									if samples == 0 || delta == 0 || ^uint64(0)-sampleTicks < samples*delta {
 										return ErrInvalid
 									}
+									if ^uint64(0)-frames < samples {
+										return ErrInvalid
+									}
 									frames += samples
 									sampleTicks += samples * delta
 								}
@@ -303,11 +330,68 @@ func mp4(data []byte, info *Info) error {
 			// understated header cannot hide an overlong sample timeline.
 			duration = math.Max(duration, float64(sampleTicks)/float64(timescale))
 			info.Width, info.Height, info.Duration, info.FPS = width, height, duration, float64(frames)*float64(timescale)/float64(sampleTicks)
+			if frames > math.MaxInt64 {
+				return ErrInvalid
+			}
+			info.FrameCount = int64(frames)
+			mp4StreamCounts(children, info)
 			info.Codec = codec
 			return nil
 		}
 	}
 	return ErrInvalid
+}
+
+// Count declared stream handlers only when every track has unambiguous
+// metadata. An unreadable later track must not be mistaken for proven silence.
+// This does not change the existing primary-video acceptance contract.
+func mp4StreamCounts(children []box, info *Info) {
+	audio, video, tracks := 0, 0, 0
+	for _, track := range children {
+		if track.kind != "trak" {
+			continue
+		}
+		tracks++
+		parts, err := boxes(track.data)
+		if err != nil {
+			return
+		}
+		handler := ""
+		handlers := 0
+		for _, part := range parts {
+			if part.kind != "mdia" {
+				continue
+			}
+			media, err := boxes(part.data)
+			if err != nil {
+				return
+			}
+			for _, entry := range media {
+				if entry.kind != "hdlr" {
+					continue
+				}
+				if len(entry.data) < 12 {
+					return
+				}
+				handlers++
+				handler = string(entry.data[8:12])
+			}
+		}
+		if handlers != 1 {
+			return
+		}
+		switch handler {
+		case "soun":
+			audio++
+		case "vide":
+			video++
+		}
+	}
+	if tracks == 0 {
+		return
+	}
+	info.AudioStreams = &audio
+	info.VideoStreams = &video
 }
 func mp3(data []byte) (float64, error) {
 	pos := 0

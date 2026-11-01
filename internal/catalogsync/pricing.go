@@ -13,6 +13,9 @@ import (
 // metrics, currency conversion, minimums or billing units.
 func Reprice(base core.TaskCost, rate Rate) (core.TaskCost, error) {
 	p := base.Pricing
+	if p.DurationBillingRule != rate.DurationBillingRule {
+		return base, fmt.Errorf("duration billing formula differs from the reviewed estimator")
+	}
 	if p.Currency != "USD" || rate.Region != p.Region || rate.Unit != p.Unit || rate.Per != p.Per || rate.Per <= 0 || rate.Price < 0 || p.FixedUSD < 0 || p.FixedUSD != 0 && rate.InputImages == nil {
 		return base, fmt.Errorf("tariff does not match the reviewed billing contract")
 	}
@@ -68,6 +71,17 @@ func Reprice(base core.TaskCost, rate Rate) (core.TaskCost, error) {
 		return base, core.ErrPricingUnavailable
 	}
 	base.ExpectedUSD += p.FixedUSD
+	if base.QuantityUnknown {
+		rates := []string{}
+		for _, component := range base.Pricing.Components {
+			rates = append(rates, fmt.Sprintf("$%s per %d %s", component.Price.String(), component.Per, component.Metric))
+		}
+		if len(rates) == 0 {
+			rates = append(rates, fmt.Sprintf("$%s per %d %s", base.Pricing.Price.String(), base.Pricing.Per, base.Pricing.Unit))
+		}
+		base.Pricing.EstimateDescription = "Verified tariff: " + strings.Join(rates, "; ") + ". Total cost is unavailable until provider usage quantities are known; unknown quantity is not a zero or free estimate."
+		return base, nil
+	}
 	unchanged := p.Price == base.Pricing.Price
 	for i, c := range p.Components {
 		if c.Price != base.Pricing.Components[i].Price {

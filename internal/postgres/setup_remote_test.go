@@ -187,30 +187,12 @@ func TestSetupUpgradeAndSwitchPreserveResources(t *testing.T) {
 	exec(`INSERT INTO tasks(id,status,provider,model,prompt,owner_id,actor_id,provider_owner_id,storage_owner_id,storage_key) VALUES($1,'succeeded','mock','mock-image-v1','Kept prompt',$2,$3,$4,$4,'fixture/result.png')`, taskID, companyID, owner, identity.SharedOwnerID)
 	exec(`INSERT INTO reference_images(owner_id,id,name,content_type,size_bytes,storage_key,actor_id) VALUES($1,$2,'Kept file','image/png',123,'fixture/reference.png',$3)`, companyID, uuid.NewString(), owner)
 	exec(`UPDATE system_settings SET shared_resources=TRUE,personal_providers=TRUE,generation_ui=FALSE,allow_inline_references=FALSE,markup_basis_points=1200`)
-	snapshot := func() string {
-		t.Helper()
-		var result string
-		for _, table := range []string{"organizations", "organization_members", "organization_credits", "provider_settings", "storage_connections", "storage_settings", "tasks", "reference_images"} {
-			var rows string
-			row := "to_jsonb(t)"
-			if table == "reference_images" {
-				row = "(to_jsonb(t)-'deleting'-'template_published'-'storage_owner_id')"
-			}
-			if table == "tasks" {
-				// Later migrations add optional template metadata and an empty artifact list.
-				row = "(to_jsonb(t)-'template_snapshot'-'result_artifacts')"
-			}
-			if err := db.QueryRow(`SELECT COALESCE(jsonb_agg(` + row + ` ORDER BY ` + row + `::text),'[]')::text FROM ` + table + ` t`).Scan(&rows); err != nil {
-				t.Fatal(err)
-			}
-			result += table + rows
-		}
-		return result
-	}
-	before := snapshot()
+	preserved := newResourceLegacyProjection(t, db, "organizations", "organization_members", "organization_credits", "provider_settings", "storage_connections", "storage_settings", "tasks", "reference_images")
+	before := preserved.snapshot(t, db, "setup72-before-upgrade")
 	if err := Migrate(db); err != nil {
 		t.Fatal(err)
 	}
+	assertResourceBindingsEmptyDefault(t, db)
 	var snapshots int
 	if err := db.QueryRow(`SELECT count(*) FROM tasks WHERE template_snapshot IS NOT NULL`).Scan(&snapshots); err != nil || snapshots != 0 {
 		t.Fatal("upgrade populated existing task template metadata", snapshots, err)
@@ -227,7 +209,7 @@ func TestSetupUpgradeAndSwitchPreserveResources(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if snapshot() != before {
+		if preserved.snapshot(t, db, "setup84-after-profile-switch") != before {
 			t.Fatal("profile switch changed credentials, companies, funding, limits, history or file metadata")
 		}
 	}

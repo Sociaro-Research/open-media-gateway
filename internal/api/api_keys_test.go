@@ -381,7 +381,7 @@ func TestPublicReferenceAndRouteCoverage(t *testing.T) {
 		t.Fatal(err)
 	}
 	source = append(source, organizationSource...)
-	for _, name := range []string{"openai.go", "payments.go", "audit.go", "provider_assets.go", "templates.go"} {
+	for _, name := range []string{"openai.go", "payments.go", "audit.go", "provider_assets.go", "provider_resources.go", "templates.go"} {
 		adapterSource, err := os.ReadFile(name)
 		if err != nil {
 			t.Fatal(err)

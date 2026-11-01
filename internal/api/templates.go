@@ -731,7 +731,7 @@ func (s *Server) resolveTemplate(r *http.Request, item templates.Record, in temp
 		if !strings.HasPrefix(value, "https://") && !strings.HasPrefix(value, "http://") {
 			return input, fmt.Errorf("%w: public media origin is not configured", templates.ErrInvalid)
 		}
-		input.ReferenceEvidence[value] = core.InputMediaEvidence{Type: slot.Type, Duration: files[len(files)-1].Info.Duration}
+		input.ReferenceEvidence[value] = core.InputMediaEvidence{Type: slot.Type, Duration: files[len(files)-1].Info.Duration, ContentType: files[len(files)-1].Info.ContentType, SizeBytes: files[len(files)-1].Info.Size, Width: files[len(files)-1].Info.Width, Height: files[len(files)-1].Info.Height, FPS: files[len(files)-1].Info.FPS}
 		switch slot.Type {
 		case "image":
 			input.Options.ImageURLs = append(input.Options.ImageURLs, value)

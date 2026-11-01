@@ -28,7 +28,7 @@ func isGenerationPath(path string) bool {
 		return true
 	}
 	switch path {
-	case "/v1/videos", "/v1/images/generations", "/v1/images/edits", "/v1/audio/speech", "/v1/audio/generations", "/v1/generations", "/v1/generations/estimate":
+	case "/v1/provider-resources/estimate", "/v1/provider-resources", "/v1/videos", "/v1/images/generations", "/v1/images/edits", "/v1/audio/speech", "/v1/audio/generations", "/v1/generations", "/v1/generations/estimate":
 		return true
 	}
 	return false
@@ -376,7 +376,7 @@ func (s *Server) openAIInput(r *http.Request, fields map[string]json.RawMessage)
 		}
 	}
 	allowedOptions := map[string]bool{}
-	for _, name := range []string{"override_sound_id", "parameters", "ratio", "generate_audio", "watermark", "camera_fixed", "draft", "seed", "return_last_frame", "negative_prompt", "reference_mode", "reference_voices", "video_urls", "audio_urls", "language", "lyrics", "gender"} {
+	for _, name := range []string{"override_sound_id", "parameters", "ratio", "generate_audio", "watermark", "camera_fixed", "draft", "seed", "return_last_frame", "negative_prompt", "reference_mode", "reference_voices", "reference_roles", "resource_references", "video_urls", "audio_urls", "language", "lyrics", "gender"} {
 		allowedOptions[name] = true
 	}
 	if input.MediaType == "music" || input.MediaType == "audio" || input.MediaType == "video" {

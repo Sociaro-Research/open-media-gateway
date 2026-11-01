@@ -49,9 +49,11 @@ func ValidateVoiceFiles(model core.MediaModel, options core.MediaOptions, files 
 }
 
 type File struct {
-	Type string
-	Name string
-	Info mediafile.Info
+	ReferenceIndex int
+	SHA256         string
+	Type           string
+	Name           string
+	Info           mediafile.Info
 }
 type Validator func(context.Context, *Target, []File, bool) error
 
@@ -181,6 +183,9 @@ func ValidateFiles(model core.MediaModel, files []File, complete bool) error {
 }
 
 func ValidateRequestFiles(model core.MediaModel, options core.MediaOptions, files []File, complete bool) error {
+	if err := ValidateRoleFiles(model, options, files); err != nil {
+		return err
+	}
 	if err := ValidateFiles(model, files, complete); err != nil {
 		return err
 	}

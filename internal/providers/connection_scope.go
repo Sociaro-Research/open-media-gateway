@@ -37,3 +37,17 @@ func (a *connectionAdapter) OpenArtifact(ctx context.Context, reference string) 
 	source, err := opener.OpenArtifact(ctx, reference)
 	return source, a.redact(err)
 }
+
+// ResolveResourceConnection obtains current host-authorized connection identity
+// for resource admission. The caller cannot supply its revision or owner.
+func (m *Manager) ResolveResourceConnection(ctx context.Context, id string) (core.ProviderConnectionScope, error) {
+	adapter, err := m.resolve(ctx, id, true)
+	if err != nil {
+		return core.ProviderConnectionScope{}, err
+	}
+	connection, ok := adapter.(*connectionAdapter)
+	if !ok {
+		return core.ProviderConnectionScope{}, core.ErrProviderUnavailable
+	}
+	return core.ProviderConnectionScope{ID: id, OwnerID: identity.ProviderOwnerID(ctx), Revision: connectionIdentity(id, connection.definition, connection.credentials)}, nil
+}

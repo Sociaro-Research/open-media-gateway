@@ -24,7 +24,8 @@ var (
 )
 
 type Task struct {
-	StoredArtifacts []StoredArtifact `json:"-"`
+	StoredResourceReferences []ResourceReference `json:"-"`
+	StoredArtifacts          []StoredArtifact    `json:"-"`
 	// Checked only for NEW admissions after idempotency resolution. Never stored.
 	AdmissionError         error           `json:"-"`
 	TemplateSnapshot       json.RawMessage `json:"template_snapshot,omitempty"`
@@ -76,6 +77,7 @@ type Task struct {
 // storage owned by the gateway. SourceURL is retained for diagnostics but is
 // never returned from the public task API.
 type StoredMedia struct {
+	Resources           []ProviderResource
 	Artifacts           []StoredArtifact
 	LastFrameStorageKey string
 	SourceURL           string
@@ -100,7 +102,12 @@ type SoundOverride struct {
 }
 
 type MediaOptions struct {
+	ResourceIntent         *ResourceIntent               `json:"resource_intent,omitempty"`
+	ResourceCreation       *ResourceCreateRequest        `json:"_resource_creation,omitempty"`
+	ResourceReferences     []ResourceReference           `json:"resource_references,omitempty"`
+	ResourceSnapshots      []ResourceSnapshot            `json:"_reference_resources,omitempty"`
 	OutputCount            int                           `json:"output_count,omitempty"`
+	ReferenceRoles         map[string]string             `json:"reference_roles,omitempty"`
 	ReferenceMediaEvidence map[string]InputMediaEvidence `json:"_reference_media,omitempty"`
 	OverrideSoundID        string                        `json:"override_sound_id,omitempty"`
 	OverrideSound          *SoundOverride                `json:"_override_sound,omitempty"`
@@ -134,6 +141,7 @@ type MediaOptions struct {
 }
 
 type CreateMediaInput struct {
+	ResourceCreation  *ResourceCreateRequest        `json:"-"`
 	ReferenceEvidence map[string]InputMediaEvidence `json:"-"`
 	AdmissionError    error                         `json:"-"`
 	TemplateSnapshot  json.RawMessage               `json:"-"`
@@ -199,7 +207,16 @@ func (r *ReferencePromptRecommendation) Clone() *ReferencePromptRecommendation {
 }
 
 type MediaModel struct {
-	MaxOutputs int `json:"max_outputs,omitempty"`
+	ResourceOutputs       []ResourceOutputSchema   `json:"resource_outputs,omitempty"`
+	ReferenceRoleLimits   []MediaRoleLimits        `json:"reference_role_limits,omitempty"`
+	ResourceOperation     *ResourceOperationSchema `json:"resource_operation,omitempty"`
+	ResourceInputSchemas  []ResourceInputSchema    `json:"resource_input_schemas,omitempty"`
+	MaxReferenceInputs    int                      `json:"max_reference_inputs,omitempty"`
+	MaxOutputs            int                      `json:"max_outputs,omitempty"`
+	PromptPolicy          *PromptPolicy            `json:"prompt_policy,omitempty"`
+	ReferenceRoleSchemas  []ReferenceRoleSchema    `json:"reference_role_schemas,omitempty"`
+	DurationMayBeInferred bool                     `json:"duration_may_be_inferred,omitempty"`
+	RatioMayBeInferred    bool                     `json:"ratio_may_be_inferred,omitempty"`
 	// MaxPromptCharacters is an enforced character ceiling, not an upstream limit claim.
 	// Runtime API catalogues combine it with the gateway cap; zero is unspecified.
 	MaxPromptCharacters           int                            `json:"max_prompt_characters,omitempty"`
@@ -338,6 +355,7 @@ type MediaRequest struct {
 }
 
 type ProviderTask struct {
+	Resources    []ProviderResource
 	Artifacts    []ProviderArtifact
 	ID           string
 	ResultURL    string
@@ -355,6 +373,7 @@ const (
 )
 
 type ProviderResult struct {
+	Resources    []ProviderResource
 	Artifacts    []ProviderArtifact
 	Status       ProviderStatus
 	ResultURL    string

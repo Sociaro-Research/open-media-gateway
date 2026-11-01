@@ -76,7 +76,7 @@ func commonLimit(kind string) int64 {
 		return 30 << 20
 	case "video/mp4", "video/quicktime", "video/webm":
 		return 200 << 20
-	case "audio/mpeg", "audio/wave", "audio/wav", "audio/x-wav", "audio/ogg", "audio/flac":
+	case "audio/mpeg", "audio/wave", "audio/wav", "audio/x-wav", "audio/ogg", "audio/flac", "audio/aac", "audio/mp4":
 		return 50 << 20
 	}
 	return 0
@@ -84,7 +84,7 @@ func commonLimit(kind string) int64 {
 func checkUpload(input UploadInput) error {
 	limit := commonLimit(input.ContentType)
 	if limit == 0 {
-		return referencevalidation.Invalid(cleanName(input.Name), "Declared format "+input.ContentType+" is unsupported. Use PNG/JPEG/WebP/GIF, MP4/MOV/WebM or MP3/WAV/OGG/FLAC.")
+		return referencevalidation.Invalid(cleanName(input.Name), "Declared format "+input.ContentType+" is unsupported. Use PNG/JPEG/WebP/GIF, MP4/MOV/WebM or MP3/WAV/AAC/M4A/OGG/FLAC.")
 	}
 	if input.SizeBytes <= 0 || input.SizeBytes > limit {
 		return referencevalidation.Invalid(cleanName(input.Name), fmt.Sprintf("size %d bytes; %s requires a nonempty file at most %d bytes. Reduce the file size.", input.SizeBytes, input.ContentType, limit))
