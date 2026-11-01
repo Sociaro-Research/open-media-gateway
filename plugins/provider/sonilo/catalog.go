@@ -102,6 +102,9 @@ func catalog() []core.MediaModel {
 				m.Formats = []string{"aac", "wav", "mp3", "flac"}
 			}
 		}
+		if !m.NoPrompt {
+			m.MaxPromptCharacters = promptMaxCharacters
+		}
 		models = append(models, m)
 	}
 	return models

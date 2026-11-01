@@ -21,7 +21,7 @@ import (
 
 var (
 	ErrPromptRequired      = errors.New("prompt is required")
-	ErrPromptTooLong       = errors.New("prompt must not exceed 10000 characters")
+	ErrPromptTooLong       = fmt.Errorf("prompt must not exceed %d characters", MaxPromptCharacters)
 	ErrModelRequired       = errors.New("model is required")
 	ErrModelUnavailable    = errors.New("selected model is not available for this provider")
 	ErrOptionsInvalid      = errors.New("media options are not supported by the selected model")
@@ -118,7 +118,7 @@ func (s *TaskService) prepare(ctx context.Context, input CreateMediaInput, idemp
 		return Task{}, ErrCostLimitInvalid
 	}
 	prompt := strings.TrimSpace(input.Prompt)
-	if len([]rune(prompt)) > 10000 {
+	if len([]rune(prompt)) > MaxPromptCharacters {
 		return Task{}, ErrPromptTooLong
 	}
 	provider := strings.ToLower(strings.TrimSpace(input.Provider))

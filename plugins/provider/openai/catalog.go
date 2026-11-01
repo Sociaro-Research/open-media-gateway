@@ -55,6 +55,9 @@ func (a *Adapter) ReviewedCatalogModels() []core.MediaModel {
 	return models
 }
 
+const imagePromptMaxCharacters = 32000
+const speechPromptMaxCharacters = 4096
+
 func describeModel(id string) core.MediaModel {
 	m := core.MediaModel{ID: id, DisplayName: id, NoSeed: true, NoWatermark: true}
 	id = canonicalModel(id)
@@ -97,6 +100,11 @@ func describeModel(id string) core.MediaModel {
 			m.Voices = append(m.Voices, "ballad", "verse", "marin", "cedar")
 		}
 		m.Formats = []string{"mp3", "wav", "flac", "opus", "aac"}
+	}
+	if m.MediaType == "image" {
+		m.MaxPromptCharacters = min(core.MaxPromptCharacters, imagePromptMaxCharacters)
+	} else {
+		m.MaxPromptCharacters = min(core.MaxPromptCharacters, speechPromptMaxCharacters)
 	}
 	// Reference prices are indicative and exclude input tokens; quotes include
 	// explicit local input estimates. No price is presented as an invoice.
@@ -210,8 +218,8 @@ func (a *Adapter) ValidateRequest(ctx context.Context, r core.MediaRequest) erro
 		return invalid("unsupported output format")
 	}
 	if m.MediaType == "image" {
-		if len([]rune(r.Prompt)) > 32000 {
-			return invalid("image prompt exceeds 32000 characters")
+		if len([]rune(r.Prompt)) > imagePromptMaxCharacters {
+			return invalid(fmt.Sprintf("image prompt exceeds %d characters", imagePromptMaxCharacters))
 		}
 		if o.Resolution != "" && !slices.Contains(m.Resolutions, o.Resolution) {
 			return invalid("unsupported image size")
@@ -240,8 +248,8 @@ func (a *Adapter) ValidateRequest(ctx context.Context, r core.MediaRequest) erro
 			}
 		}
 	} else {
-		if len([]rune(r.Prompt)) > 4096 {
-			return invalid("speech prompt exceeds 4096 characters")
+		if len([]rune(r.Prompt)) > speechPromptMaxCharacters {
+			return invalid(fmt.Sprintf("speech prompt exceeds %d characters", speechPromptMaxCharacters))
 		}
 		if o.Resolution != "" || o.Quality != "" || o.Background != "" || len(o.ImageURLs) > 0 || o.ReferenceMode != "" {
 			return invalid("image options cannot be used for speech")

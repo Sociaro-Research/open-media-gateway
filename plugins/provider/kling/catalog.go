@@ -14,11 +14,21 @@ import (
 	"github.com/Sociaro-Research/open-media-gateway/internal/providerkit"
 )
 
+const kling3PromptMaxCharacters = 3072
+
+func promptCharacterLimit(id string) int {
+	if isKling4(id) {
+		return core.MaxPromptCharacters
+	}
+	return kling3PromptMaxCharacters
+}
+
 func catalog() []core.MediaModel {
 	models := []core.MediaModel{}
 	for _, id := range []string{TextToVideo, ImageToVideo} {
 		m := core.MediaModel{
-			ID: id, DisplayName: "Kling 3.0 · Text to video", MediaType: "video",
+			MaxPromptCharacters: promptCharacterLimit(id),
+			ID:                  id, DisplayName: "Kling 3.0 · Text to video", MediaType: "video",
 			NoSeed: true, NoLanguage: true, NoInstructions: true, NoWatermark: true,
 			Resolutions: []string{"720p", "1080p", "4k"},
 			MinDuration: 3, MaxDuration: 15, DefaultDuration: 5, DurationStep: 1, SupportsAudio: true,
@@ -41,7 +51,8 @@ func catalog() []core.MediaModel {
 	}
 	for _, id := range []string{TextToVideo4, ImageToVideo4} {
 		m := core.MediaModel{
-			ID: id, DisplayName: "Kling 4.0 · Text to video", MediaType: "video",
+			MaxPromptCharacters: promptCharacterLimit(id),
+			ID:                  id, DisplayName: "Kling 4.0 · Text to video", MediaType: "video",
 			NoSeed: true, NoLanguage: true, NoInstructions: true, NoWatermark: true,
 			Resolutions: []string{"1080p", "720p"}, MinDuration: 3, MaxDuration: 30, DefaultDuration: 10, DurationStep: 1,
 			Pricing: core.MediaModelPricing{Known: true, ReferencePriceUSD: 2.35, ReferenceDescription: "10-second 1080p output at published USD balance list price; actual account charges and model access remain unverified."},
@@ -96,10 +107,7 @@ func (a *Adapter) ValidateRequest(_ context.Context, r core.MediaRequest) error 
 	if !ok {
 		return invalid("unsupported Kling operation")
 	}
-	limit := 3072
-	if isKling4(r.Model) {
-		limit = 10000
-	} // Gateway cap; below Kling's minimum language-dependent limit.
+	limit := promptCharacterLimit(r.Model)
 	if strings.TrimSpace(r.Prompt) == "" || utf8.RuneCountInString(r.Prompt) > limit {
 		return invalid(fmt.Sprintf("Kling prompt must contain 1–%d characters", limit))
 	}

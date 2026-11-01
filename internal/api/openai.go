@@ -86,7 +86,24 @@ func (s *Server) visibleCatalog(r *http.Request) []core.ProviderDescriptor {
 	if !ok {
 		catalog = s.service.ListProviders(r.Context())
 	}
-	return catalog
+	// Copy descriptors before adding local effective limits; providers may cache
+	// these slices, and catalogue synchronization must keep its own evidence.
+	if catalog == nil {
+		return nil
+	}
+	result := make([]core.ProviderDescriptor, len(catalog))
+	copy(result, catalog)
+	for i, provider := range catalog {
+		if provider.Models == nil {
+			continue
+		}
+		result[i].Models = make([]core.MediaModel, len(provider.Models))
+		copy(result[i].Models, provider.Models)
+		for j := range result[i].Models {
+			result[i].Models[j].MaxPromptCharacters = result[i].Models[j].EffectivePromptCharacterLimit()
+		}
+	}
+	return result
 }
 
 type modelResponse struct {

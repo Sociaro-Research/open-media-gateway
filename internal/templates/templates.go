@@ -99,7 +99,7 @@ var kinds = []string{"image", "video", "audio"}
 // free-form Playground requests: ambiguous, malformed or gapped bindings cannot
 // be published. Repeated valid mentions refer to the same slot.
 func Infer(prompt, syntax string, types []string, mode core.ReferenceMode) ([]Slot, error) {
-	if len(prompt) > 40000 {
+	if len(prompt) > 4*core.MaxPromptCharacters {
 		return nil, fmt.Errorf("%w: prompt is too long", ErrInvalid)
 	}
 	pattern := ""
@@ -271,8 +271,8 @@ func (d Definition) InferSlots(model core.MediaModel) ([]Slot, error) {
 	return slots, nil
 }
 func (d Definition) Validate(model core.MediaModel) error {
-	if strings.TrimSpace(d.Title) == "" || len([]rune(d.Title)) > 120 || len([]rune(d.Description)) > 500 || len([]rune(d.Prompt)) > 10000 || strings.TrimSpace(d.Prompt) == "" {
-		return fmt.Errorf("%w: title and prompt are required (120/10000 characters); description is limited to 500", ErrInvalid)
+	if strings.TrimSpace(d.Title) == "" || len([]rune(d.Title)) > 120 || len([]rune(d.Description)) > 500 || len([]rune(d.Prompt)) > core.MaxPromptCharacters || strings.TrimSpace(d.Prompt) == "" {
+		return fmt.Errorf("%w: title and prompt are required (120/%d characters); description is limited to 500", ErrInvalid, core.MaxPromptCharacters)
 	}
 	if d.Prompt != strings.TrimSpace(d.Prompt) {
 		return fmt.Errorf("%w: remove leading/trailing prompt whitespace", ErrInvalid)

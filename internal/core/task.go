@@ -194,6 +194,9 @@ func (r *ReferencePromptRecommendation) Clone() *ReferencePromptRecommendation {
 }
 
 type MediaModel struct {
+	// MaxPromptCharacters is an enforced character ceiling, not an upstream limit claim.
+	// Runtime API catalogues combine it with the gateway cap; zero is unspecified.
+	MaxPromptCharacters           int                            `json:"max_prompt_characters,omitempty"`
 	ReferencePromptRecommendation *ReferencePromptRecommendation `json:"reference_prompt_recommendation,omitempty"`
 	ReferenceMediaLimits          *ReferenceMediaLimits          `json:"reference_media_limits,omitempty"`
 	ReferencePromptTypes          []string                       `json:"reference_prompt_types,omitempty"`

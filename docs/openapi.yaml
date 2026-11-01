@@ -9592,6 +9592,12 @@ components:
         backgrounds: {type: array, items: {type: string}}
         no_language: {type: boolean}
         no_instructions: {type: boolean}
+        max_prompt_characters:
+          type: integer
+          minimum: 1
+          maximum: 10000
+          readOnly: true
+          description: Effective known gateway/adapter prompt input ceiling in Unicode code points, not bytes, UTF-16 units, grapheme clusters or a documented vendor maximum. Runtime model catalogues combine the gateway 10000-code-point cap with a lower existing native adapter rule when applicable. Unknown upstream bounds do not imply unlimited input; the known gateway ceiling still applies. Manual models bypass native adapter rules and use the gateway ceiling. Omitted for no_prompt models; absence on older servers is unknown metadata. Admission trims surrounding whitespace before counting; template publication also validates stored raw prompt length. See prompt-limits.md.
         prompt_optional:
           type: boolean
           description: The model accepts an empty prompt, for example when direction comes from reference media.

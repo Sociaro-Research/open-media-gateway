@@ -20,6 +20,8 @@ func sameJSON(a, b json.RawMessage) bool {
 	return reflect.DeepEqual(x, y)
 }
 func contract(m core.MediaModel) core.MediaModel {
+	// Derived local UI capability is not new external catalogue evidence.
+	m.MaxPromptCharacters = 0
 	m.Metadata = nil
 	m.ReferencePromptRecommendation = nil
 	m.Pricing = core.MediaModelPricing{}

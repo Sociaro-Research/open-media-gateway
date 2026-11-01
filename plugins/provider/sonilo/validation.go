@@ -11,6 +11,8 @@ import (
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
 )
 
+const promptMaxCharacters = 2000
+
 func (a *Adapter) ValidateRequest(_ context.Context, r core.MediaRequest) error {
 	op, ok := findOperation(r.Model)
 	if !ok {
@@ -19,8 +21,8 @@ func (a *Adapter) ValidateRequest(_ context.Context, r core.MediaRequest) error 
 	m := modelFor(r.Model)
 	o := r.Options
 	invalid := func(message string) error { return fmt.Errorf("%w: %s", core.ErrOptionsInvalid, message) }
-	if len([]rune(r.Prompt)) > 2000 || !m.PromptOptional && strings.TrimSpace(r.Prompt) == "" {
-		return invalid("Sonilo text prompts require 1-2000 characters")
+	if len([]rune(r.Prompt)) > promptMaxCharacters || !m.PromptOptional && strings.TrimSpace(r.Prompt) == "" {
+		return invalid(fmt.Sprintf("Sonilo text prompts require 1-%d characters", promptMaxCharacters))
 	}
 	if op.endpoint == "audio-ducking" && r.Prompt != "" {
 		return invalid("audio ducking uses foreground and background media, without a prompt")
