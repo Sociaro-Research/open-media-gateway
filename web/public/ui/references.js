@@ -176,7 +176,7 @@ function hashReferenceFile(file,signal){
     const values = urls();
     libraryView.render(items.filter(item=>(item.content_type||'image/png').startsWith(kind+'/')).map(item=>({...item,url:absolute(item.url)})),{
       selected:item=>values.includes(item.url),onSelect:select,busy,
-      onDelete:sharedLibrary?null:deleteItem,decorate:sharedLibrary?null:(card,item)=>remote?.decorate(card,item)
+      onDelete:sharedLibrary?null:deleteItem
     });
     more.hidden = !hasMore; more.disabled = busy || loading;
   }

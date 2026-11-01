@@ -413,6 +413,9 @@ locking and desktop/mobile layouts. The Go CI job installs the browser and enabl
 this workflow explicitly. `UI_BROWSER_PATH` can select local Chromium and
 `UI_SCREENSHOT_DIR` retains screenshots outside the public source tree.
 
+Generate disposable clips with `python3 scripts/ui/template-video-fixtures.py
+--output .local/video-workflow/clips` first (`ffmpeg` and `ffprobe` required);
+`GATEWAY_TEMPLATE_CLIP_DIR` can select another clip directory.
 Run `node scripts/ui/provider-reference-state.cjs` for repeated/overlapping
 BytePlus imports, key reset during import refresh, interrupted group creation
 followed by key/connection changes, Refresh recovery and keyboard navigation away

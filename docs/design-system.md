@@ -488,7 +488,7 @@ model/slot validation. Never reconstruct media paths from the current owner;
 render the URL returned by the authorized library response.
 
 Playground keeps its multiple-reference selection and provider-specific library
-adapter. Template user slots select one compatible organization reference. Remove clears the current binding before another file is chosen. Template editing uses the instance template library and administrator
+adapter. Local reference cards have no Add to BytePlus action; provider-source registration remains a separate explicit workflow. Template user slots select one compatible organization reference. Remove clears the current binding before another file is chosen. Template editing uses the instance template library and administrator
 mutation endpoints. Uploading to that library does not assign a slot. Delete
 cancellation or rejection retains the selection; confirmed organization-file
 deletion clears matching retained selections in both screens. Native audio/video
