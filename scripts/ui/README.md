@@ -16,6 +16,15 @@ ignored `.local/` or `dist/`; record limits explicitly.
 
 ## Available fixtures
 
+The CI container job prepares its synthetic video inputs before running browser
+checks. For the same setup in a clean checkout, install FFmpeg (`ffmpeg` and
+`ffprobe`), then run `python3 scripts/ui/template-video-fixtures.py
+.local/video-workflow/clips`. The generator creates five local color clips and
+records their hashes and timing metadata; no user media or provider call is used.
+`provider-reference-state.cjs` reads `cfr24.mp4` from that default directory.
+`GATEWAY_TEMPLATE_CLIP_DIR` may select another generated directory for fixtures
+that support it. CI evidence directories are outputs, not pre-existing inputs.
+
 `model-settings-preservation.cjs` checks compatible Playground settings across
 model/provider switches, false/zero/Auto values, workflow limits, typed parameters,
 voice/language pairs, explicit Copy and out-of-order catalogue reads. Run Chromium
@@ -77,7 +86,7 @@ role-picker legibility in both themes at 1440/390/320px.
 authorized media-access links, including scalar last-frame compatibility,
 expiry renewal, missing-link popup cleanup, retry, deletion and context disposal.
 Generate its disposable video with `python3 scripts/ui/template-video-fixtures.py
---output .local/video-workflow/clips` first. Run both suites with
+.local/video-workflow/clips` first. Run both suites with
 `UI_BROWSER_ENGINE=chromium` and `UI_BROWSER_ENGINE=webkit`; select evidence with
 `UI_EVIDENCE_DIR`. They use local synthetic services, never paid generation or
 provider resource registration/deletion. Inspect their screenshots against the
@@ -481,7 +490,7 @@ this workflow explicitly. `UI_BROWSER_PATH` can select local Chromium and
 `UI_SCREENSHOT_DIR` retains screenshots outside the public source tree.
 
 Generate disposable clips with `python3 scripts/ui/template-video-fixtures.py
---output .local/video-workflow/clips` first (`ffmpeg` and `ffprobe` required);
+.local/video-workflow/clips` first (`ffmpeg` and `ffprobe` required);
 `GATEWAY_TEMPLATE_CLIP_DIR` can select another clip directory.
 Run `node scripts/ui/provider-reference-state.cjs` for repeated/overlapping
 BytePlus imports, key reset during import refresh, interrupted group creation
