@@ -9,6 +9,7 @@
     const heading=sectionHeading(parent,title),close=document.createElement('button');
     heading.parentElement.classList.add('dialog-heading');close.className='model-info-close dialog-close';close.type='button';close.textContent='×';close.setAttribute('aria-label','Close '+title.toLowerCase());close.onclick=onClose;heading.parentElement.append(close);return {heading,close};
   }
+  function disclosure(summary,text){if(!summary||summary.dataset.disclosureLabel===text)return;summary.dataset.disclosureLabel=text;const label=document.createElement('span'),chevron=document.createElement('span');label.textContent=text;chevron.className='select-chevron';chevron.setAttribute('aria-hidden','true');summary.replaceChildren(label,chevron);}
   function message(target,text='',type=''){target.dataset.messageType=type;target.textContent=text;target.setAttribute('role','status');}
 
   // API credentials are not login passwords. All credential editors share the
@@ -242,6 +243,6 @@
     return state;
   }
   function setLabel(control,text){enhance(control);const label=control.closest('.floating-field')?.querySelector('.floating-label');if(label&&label.textContent!==text)label.textContent=text;}
-  window.FormUI={sectionHeading,dialogHeading,message,valid,watch,commit,snapshot,saved,update,refresh,setLabel,promptState,updatePrompt,copyButton,placeAction,credentials:{setup:setupCredential,render:renderCredential,replacement:credentialReplacement,updateValue:credentialUpdate},passwords:{hide:hidePassword}};
+  window.FormUI={sectionHeading,dialogHeading,disclosure,message,valid,watch,commit,snapshot,saved,update,refresh,setLabel,promptState,updatePrompt,copyButton,placeAction,credentials:{setup:setupCredential,render:renderCredential,replacement:credentialReplacement,updateValue:credentialUpdate},passwords:{hide:hidePassword}};
   new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['disabled']});refresh();
 })();

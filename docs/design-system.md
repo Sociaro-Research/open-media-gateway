@@ -582,5 +582,6 @@ Primary buttons center their content vertically through the shared flex alignmen
 
 Prompt labels use the common FormUI code-point counter and declared model maximum: **Prompt (10,000 characters max)** when empty and **Prompt (5,550 / 10,000 characters)** when filled. Remove detached duplicate counts, preserve validation and update on typing, paste, clear and model changes. Unknown model bounds remain unknown.
 
+Use Image URLs and Advanced Settings disclosures match Image References heading typography, with the shared dropdown chevron after the text and 16px before expanded content. Keep native keyboard and expanded semantics, retain values through collapse and omit the separator before Advanced Settings.
 
 Templates have one current content and a Published visibility switch. Save applies current edits immediately, including to published templates. Do not expose internal revisions, a separate published draft or version history in the interface. Compare every UI change with this design system and complete the spacing and visual review gate above.

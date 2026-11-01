@@ -31,7 +31,7 @@ function hashReferenceFile(file,signal){
    for(const kind of ['image','video','audio']) {
      const target=document.querySelector(kind==='image'?'#imageURLsField':`#${kind}URLField`);
      const manual=target.querySelector('.reference-manual');
-     manual.querySelector('summary').textContent=`Use ${kind} URLs${model.supports_asset_references?' or registered assets':''}`;
+     FormUI.disclosure(manual.querySelector('summary'),`Use ${kind} URLs${model.supports_asset_references?' or registered assets':''}`);
      let hint=manual.querySelector('[data-asset-hint]');
      if(!hint){hint=document.createElement('p');hint.className='field-hint';hint.dataset.assetHint='';manual.append(hint);}
      hint.hidden=!model.supports_asset_references;

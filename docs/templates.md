@@ -326,4 +326,5 @@ the disposable-service wrapper described in [testing](testing.md).
 
 Duration puts the selected model's actual bounds or discrete step in its label, without a detached duplicate caption. Prompt labels show the declared model limit and dynamic Unicode code-point count, formatted with thousands separators; unknown limits are not presented as known provider bounds. Validation remains authoritative.
 
+Image URL and Advanced settings disclosures use the reference heading typography, a trailing dropdown chevron and the shared 16px expanded-content gap.
 Selection blocks show only internal Remove while selected; empty blocks show Upload and Choose from library where that scope supports it. Removing a fixed binding leaves its slot for the user and never deletes the library file.

@@ -837,6 +837,7 @@ function syncOverrideSound(model){
  }
  playgroundSound.root.hidden=model?.media_type!=='video';
 }
+FormUI.disclosure(document.querySelector('.advanced-settings > summary'),'Advanced settings');
 function updateModelUI() {
   const provider = selectedProvider();
   const model = selectedModel();
