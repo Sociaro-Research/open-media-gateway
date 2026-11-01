@@ -1349,6 +1349,9 @@ main > section:not(.system-layout):not(.docs-view):not(#configurationView) { max
 .subsection-parent[aria-expanded=true]::after { transform:rotate(90deg); }
 .configuration-nav .subsection-nav { display:grid; gap:0; margin:0 0 12px 20px; padding:0; border:0; border-left:1px solid var(--line); }
 .configuration-nav .subsection-nav button { position:relative; font-size:12px; padding:10px 12px; border:0; border-radius:0; background:transparent; box-shadow:none; overflow-wrap:anywhere; }
+/* Sidebar tabs use their established rail marker, not button perimeter paint. */
+.configuration-nav .subsection-nav button::after { content:none; inset:auto; border:0; }
+.configuration-nav .subsection-nav button:focus-visible { outline:none; text-decoration:underline; text-decoration-thickness:2px; text-underline-offset:.2em; }
 .configuration-nav .subsection-nav [aria-selected=true] { color:var(--accent-text,var(--accent)); }
 .configuration-nav .subsection-nav [aria-selected=true]::after { content:''; position:absolute; top:0; bottom:0; left:-1px; width:2px; background:var(--accent-text,var(--accent)); }
 @media (min-width:761px) {
