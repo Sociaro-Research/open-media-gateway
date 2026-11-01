@@ -10,6 +10,7 @@ import (
 	"math"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -259,7 +260,8 @@ func ValidateSession(kind string, in *core.MediaSessionEvidence) error {
 			return ErrInvalid
 		}
 		if face.PreviewArtifactID != "" {
-			if _, err := uuid.Parse(face.PreviewArtifactID); err != nil {
+			index, err := strconv.Atoi(face.PreviewArtifactID)
+			if err != nil || index < 1 || index > 64 || strconv.Itoa(index) != face.PreviewArtifactID {
 				return ErrInvalid
 			}
 		}

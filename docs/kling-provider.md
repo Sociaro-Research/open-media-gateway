@@ -1,189 +1,193 @@
-# Direct Kling video generation
+# Direct Kling integration
 
-Contract reviewed on **2026-10-29** using Kling's official
-[authentication reference](https://kling.ai/document-api/api/get-started/authentication),
-[Kling 4.0 text-to-video](https://kling.ai/document-api/api/video/4-0/text-to-video),
-[Kling 4.0 image-to-video](https://kling.ai/document-api/api/video/4-0/image-to-video),
-[text-to-video API](https://kling.ai/document-api/api/video/3-0-omni/text-to-video),
-[image-to-video API](https://kling.ai/document-api/api/video/3-0-omni/image-to-video)
-and [video pricing](https://kling.ai/document-api/pricing/base/video), including
-the **Balance** USD prices. Official `.md` exports expose the same contracts without JavaScript; discover
-them through the [documentation index](https://kling.ai/document-api/llms.txt).
-A successful document fetch alone does not verify account access or actual charges.
+This native protocol stage registers **37** generation, analysis, solution and
+resource-creation descriptors. Public editing initialization/selection actions,
+their UI and native account-query rows remain separate integration work.
 
-This adapter calls Kling directly at `https://api-singapore.klingai.com`, the
-documented endpoint for servers outside China. It uses the current **API key**
-with `Authorization: Bearer …`. Legacy Access Key / Secret Key JWT credentials,
-consumer subscriptions, reseller APIs and Alibaba models are separate contracts.
+Contracts were reviewed on **2026-10-31** against the official
+[API index](https://kling.ai/document-api/llms.txt), including its endpoint-specific
+Markdown exports. The adapter uses `https://api-singapore.klingai.com` and a
+current API key in the Bearer authorization header. Authentication, account
+funding and model entitlement are separate: a successful connection check does
+not prove that a generation is funded or permitted.
 
-## Kling 4.0 access and pricing
+Add a Kling connection, select its reviewed catalogue, save the operator's API
+key and enable availability. Environment bootstrap uses `KLING_API_KEY`,
+`KLING_BASE_URL` and `KLING_MODEL`. Loading models or estimates does not submit a
+generation. The explicit connection check uses the documented free account query;
+it discards balances, caches successful authentication for five minutes and
+limits fresh checks to one per second per process.
 
-Kling 4.0 is fully available in the current official reference. Its account
-funding prerequisite is a Flagship Resource Pack or account-manager balance
-top-up; a catalogue entry does not establish entitlement for a particular key.
+## Operation families
 
-Published USD Balance prices supply estimates automatically for both text and
-image-keyframe operations. No manual tariff is required. Optional account-specific
-USD/second overrides remain available in `kling4_720p_price` and
-`kling4_1080p_price` (environment: `KLING4_720P_PRICE`, `KLING4_1080P_PRICE`).
-An override takes precedence over synchronized public prices. Remove an override
-to return that resolution to published list pricing. Accepted tasks retain their
-original credential and tariff revisions.
+Gateway IDs identify reviewed serializers and exact upstream versions. They are
+not arbitrary upstream `model_name` overrides. Public model IDs include the
+concrete connection prefix, for example `kling/kling-4.0-omni-video`.
 
-## Connection and catalogue
-
-Add a **Kling AI** connection in Providers or Shared providers, select its
-reviewed catalogue (turn off **Manual catalog**), and save an API key supplied by
-the operator. Enable **Available for generation** when ready. Keys use the
-existing encrypted, owner-scoped connection store and revision pinning.
-Environment bootstrap is optional: `KLING_API_KEY`, `KLING_BASE_URL` and
-`KLING_MODEL` (default `kling-4.0-text-to-video`). No database migration or
-Compose change is required.
-
-Saving credentials, reading the connection and loading its four-model local
-catalogue do not contact Kling. **Check connection** explicitly calls the
-[free account query](https://kling.ai/document-api/api/assets/account-usage.md):
-`GET /account/costs?start_time=…&end_time=…`, with a 24-hour UTC window in Unix
-milliseconds and the saved API key. Following the official
-[service-code semantics](https://kling.ai/document-api/api/get-started/error-codes.md)
-(rechecked 2026-10-30), successful HTTP/JSON and explicit zero outer/nested service
-codes establish **Authentication verified**. Resource-package details are
-separate: a missing, null or unrecognized list retains a visible warning without
-inferring a balance or subscription. An empty list is valid. Missing/invalid
-service codes, malformed envelopes, transport failures and nonzero service codes
-remain unverified. A disabled connection can be checked without enabling
-generation.
-
-This check does not establish model entitlement, available funding or generation
-output. Package/balance values can lag 12 hours and are discarded. The adapter
-keeps only a timestamp, latency, safe error and optional-details warning in
-memory. Success is cached for five minutes; credential or connection changes invalidate it. Restarts and other
-replicas require their own check. Generation does not persist a verification
-badge. Fresh account queries are serialized at one per second per gateway
-process; other clients or replicas can still hit Kling's QPS limit. No generation
-is submitted by a connection check. Permission restrictions are reported
-separately from authentication failure.
-
-The following IDs are Gateway operation IDs for upstream **`kling-4.0`** and
-**`kling-3.0`**.
-Their separate descriptors keep image-derived aspect ratios out of text controls.
-Public IDs default to `kling/<operation-id>` for the built-in connection; a
-separately named connection uses its own connection ID prefix.
-
-| Gateway operation ID | Official POST route | Inputs |
+| Family | Gateway operations | Official contract |
 | --- | --- | --- |
-| `kling-4.0-text-to-video` | `/text-to-video/kling-4.0` | Prompt; aspect ratio `21:9`, `16:9`, `9:16` or `1:1` |
-| `kling-4.0-image-to-video` | `/image-to-video/kling-4.0` | Prompt and 1–10 ordered keyframes |
-| `kling-3.0-text-to-video` | `/text-to-video/kling-3.0` | Prompt; aspect ratio `16:9`, `9:16` or `1:1` |
-| `kling-3.0-image-to-video` | `/image-to-video/kling-3.0` | Prompt and first frame; optional last frame |
+| Native video | Text/image operations for4.0,3.0,3.0Turbo,2.6,2.5Turbo | [Video capability map](https://kling.ai/document-api/guides/capability-map/video.md); each specific endpoint supplies its limits |
+| Omni video | `kling-4.0-omni-video`, `kling-3.0-omni-video`, `kling-o1-omni-video` | [4Omni](https://kling.ai/document-api/api/video/4-0/video-omni.md), [3Omni](https://kling.ai/document-api/api/video/3-0-omni/video-omni.md), [O1](https://kling.ai/document-api/api/video/o1/video-omni.md) |
+| Motion control | `kling-3.0-motion-control`, `kling-2.6-motion-control` | [Motion control](https://kling.ai/document-api/api/video/motion-control.md) |
+| Images | Standard3/2.1, Omni3/O1, multi-image, outpainting, AI Multi-Shot | [Image capability map](https://kling.ai/document-api/guides/capability-map/image.md) |
+| Audio and Avatar | Text-to-audio, video-to-audio, TTS, Avatar image-to-video | [TTS](https://kling.ai/document-api/api/video/avatar/text-to-speech.md), [Avatar](https://kling.ai/document-api/api/video/avatar.md) |
+| Solutions | Effects, Apparel, Goods Studio, Video Commerce, Virtual Try-On | [Apparel](https://kling.ai/document-api/api/ecommerce-replication/apparel.md), [Goods Studio](https://kling.ai/document-api/api/ecommerce-replication/goods-studio.md), [Video Commerce](https://kling.ai/document-api/api/ecommerce-replication/video-commerce.md), [Virtual Try-On](https://kling.ai/document-api/api/ecommerce-replication/virtual-try-on.md) |
+| Analysis and editing | Image recognition, face detection, lip-sync, multi-element editing | [Recognition](https://kling.ai/document-api/api/video/image-recognition.md), [Face detection](https://kling.ai/document-api/api/video/lip-sync/face-detection.md), [Lip-sync](https://kling.ai/document-api/api/video/lip-sync.md), [Editing](https://kling.ai/document-api/api/video/multi-elements.md) |
+| Managed resources | Element/voice creation and owner/connection-bound local bindings | [Elements](https://kling.ai/document-api/api/video/4-0/elements.md), [Voices](https://kling.ai/document-api/api/video/4-0/voice-customization.md) |
 
-Kling **4.0** supports 3–30 whole seconds (default 10), `1080p` (default) or
-`720p`. The specific API reference does not expose an audio switch,
-`multi_shot`, or 4K, even though the broader release note describes additional
-capabilities. Direct audio requirements through the prompt. Gateway's existing
-10,000-character prompt cap is conservatively below Kling 4.0's published
-language-dependent limits; the adapter does not expand that core cap.
+Use the authorized `/v1/models` response for exact operation IDs, controls,
+reference modes, resource schemas and price availability. Capability maps do not
+override specific endpoint contracts:4.0's direct API currently exposes720p and
+1080p. No undocumented Flash route or4K parameter is synthesized.
 
-For 4.0 images, `first_frame` takes one image, `first_last_frame` takes two,
-and `keyframes` takes 3–10. Order is first frame, middle frames, last frame.
-Each is assigned a stable `image_1`, `image_2`, … ID for optional `@image_1`
-prompt references. Frame roles are inferred from count if the mode is omitted.
+## Kling4 keyframes and Omni references
 
-Kling **3.0** supports 3–15 whole seconds (default 5), `720p` (default), `1080p` or `4k`,
-optional native audio (default off), and `options.parameters.multi_shot`
-(boolean, default true). Prompts contain 1–3072 characters. Multi-shot prompt
-syntax is described in the official reference; Kling checks shot timing and
-content. Image generation, Omni references, Elements, voice references, motion
-control, editing, Flash and legacy versions are outside this initial adapter.
-Generic manual-model profiles are unavailable because the
-upstream version lives in the route rather than a replaceable JSON model field.
+The ordinary `kling-4.0-image-to-video` operation accepts ordered image keyframes.
+The separate Omni operation accepts image and video references. Kling's ability
+to use video references must not be inferred from the ordinary keyframe route.
+Templates apply their selected slots, fixed media and settings to each operation's
+actual capabilities and validation; provider availability alone is insufficient.
 
-Image inputs use public HTTPS URLs in first/last order, with
-`options.reference_mode` set to `first_frame` or `first_last_frame` (or inferred
-from count); 4.0 also accepts the `keyframes` mode above. Last-frame-only input
-is excluded. Kling requires JPEG/PNG, at most 30 MB for 4.0 and 50 MB for 3.0,
-both dimensions at least 300 px and image ratio from 1:2.5 to 2.5:1.
-The provider validates the remote image bytes and fetchability. This adapter
-does not fetch reference URLs or accept Base64 inputs. Image-to-video takes its
-aspect ratio from the frame; do not send `options.ratio` for that operation.
-
-## API and Playground
-
-Use the existing `POST /v1/videos` or `POST /v1/generations`, then poll the
-returned Gateway status URL. The Playground uses the same catalogue and shared
-controls. For the built-in `kling` connection:
+4Omni supports image roles `first_frame`, `middle_frame`, `last_frame` and
+`refer_image`, and video roles `feature_video` and `base_video`. Use the catalogue's
+`reference_role_schemas` and `options.reference_roles`, keyed by `image_1`,
+`video_1`, etc. Omitting inferred duration/aspect controls preserves native
+prompt/base-video inference instead of eagerly sending unrelated defaults.
 
 ```json
 {
-  "model": "kling/kling-4.0-text-to-video",
-  "prompt": "A paper boat floating across a still pond",
+  "model": "kling/kling-4.0-omni-video",
+  "prompt": "Follow @video_1 and preserve @image_1",
   "seconds": "10",
-  "size": "1080p",
+  "size": "720p",
+  "input_reference": ["https://media.example/subject.png"],
   "options": {
-    "ratio": "16:9"
+    "reference_mode": "references",
+    "video_urls": ["https://media.example/reference.mp4"],
+    "reference_roles": {"image_1": "refer_image", "video_1": "feature_video"}
   }
 }
 ```
 
-For image-to-video select `kling/kling-4.0-image-to-video`, omit ratio and pass
-`input_reference` with ordered HTTPS image URLs on either route. The same pattern
-applies to the 3.0 IDs, whose audio and multi-shot controls are separate.
-Requests for unsupported controls fail before submission. Native requests use `settings` and `contents`,
-not the legacy `model_name` payload.
+The endpoint permits10images,7Elements (at most3video-character Elements),
+5videos including video-character Elements,3voices and15combined inputs. At
+most one video is a base video. Video duration is3–30seconds per input and in
+aggregate, including Element videos. Reusable video Elements need trusted stored
+type/duration evidence; an arbitrary remote ID or client duration cannot satisfy
+quotas or pricing. Direct voice references select managed voice IDs; arbitrary
+background audio is not a documented voice reference.
 
-The provider's task ID persists without in-memory state. `GET /tasks?task_ids=…`
-maps `submitted`, `processing`, `succeeded` and `failed` to Gateway states.
-Polling verifies that exactly one returned task matches the saved ID and that
-success contains one HTTPS video output and a finite positive duration. Gateway
-archives the finished video through its existing storage flow; Kling documents
-a 30-day retention period for provider results. Submission errors are never
-automatically retried. After a timeout or ambiguous response, inspect provider
-history before resubmitting. No upstream cancellation API is exposed.
+The reviewed4Omni prompt policy uses ASCII/non-ASCII budgets26,000/11,000 and
+the weighted sum≤1. This is Gateway's explicit classification; the upstream
+contract does not define punctuation/emoji/combining-character classifications.
+Ordinary4.0 text/keyframe prompts retain Gateway's conservative10,000-character
+ceiling.3Omni and O1 have different prompt, video, keyframe, Element, audio and
+multi-shot combinations; they do not inherit4Omni's schema.
 
-## Estimates and billing
+Managed uploads retain Gateway's shared limits as well as model limits. In
+particular, the current200MiB shared video-upload ceiling is below4Omni's
+300MB endpoint allowance. Uninspected external video duration remains unknown;
+Gateway does not fetch arbitrary remote references as a side effect of quoting.
+A required input-duration estimate cannot treat unknown metadata as zero.
 
-Published USD **Balance list prices per output second**:
+## Managed resources and face detection
 
-| Model / audio | 720p | 1080p | 4k |
-| --- | --- | --- | --- |
-| Kling 4.0 (text or image keyframes) | $0.157 | $0.235 | Unsupported |
-| Kling 3.0 / off | $0.084 | $0.112 | $0.420 |
-| Kling 3.0 / native | $0.126 | $0.168 | $0.420 |
+`POST /v1/provider-resources/estimate` and `POST /v1/provider-resources` accept
+local reference UUIDs or an eligible owned generation for element/voice creation.
+The host inspects source bytes and constructs private native inputs for the
+selected connection. Public bodies do not accept native resource IDs, source
+URLs, hashes or duration assertions. Accepted jobs retain their connection and
+tariff revisions; reusing a binding requires its owner and connection revision.
+Completed creation jobs return local `resources[{binding_id,reference_id}]`.
 
-A default 10-second 1080p Kling 4.0 output has a **$2.35** provider list estimate,
-before Gateway markup or account discounts. Image keyframes do not count as input
-video. The cheaper video-input rows have different duration rules and are not
-used by these adapters. Turbo, Omni and Flash prices are separate contracts.
+```json
+{
+  "provider": "kling",
+  "model": "kling-create-voice",
+  "kind": "voice",
+  "subtype": "custom",
+  "name": "Voice sample",
+  "reference_ids": ["00000000-0000-4000-8000-000000000001"]
+}
+```
 
-The catalogue synchronizer imports explicit USD prices from the official
-[Markdown pricing table](https://kling.ai/document-api/pricing/base/video.md).
-It matches only reviewed model, resolution, audio and output-duration rules;
-it never converts Units to dollars. Existing schedules using exact old default
-Kling page URLs resolve to their official `.md` exports at fetch time, retaining
-the actual fetched URL as evidence. Custom source URLs and saved schedule
-settings are preserved. Missing/changed headers, rows, currency, preview markers
-or billing rules fail interpretation, retain last confirmed prices and produce a
-warning. Unknown document hashes are not acknowledged automatically. Model
-discovery remains a reviewed local catalogue; new model announcements do not
-automatically enable new routes or controls.
+Read bindings with `GET /v1/provider-resources?provider=CONNECTION` and
+`GET /v1/provider-resources/{id}`. This inventory contains the owner's local
+bindings. Element creation distinguishes a frontal image plus 1–3 distinct
+reference images from a 3–8 second 1080p character video. Voice creation requires
+one eligible 5–30 second source. Use the catalogue's resource variants for exact
+source types, dimensions and limits. Unverified creation tariffs remain
+unavailable until a positive account-specific tariff is explicitly configured.
 
-A silent five-second 720p video is estimated at **$0.42**. Quotes use integer
-microdollars and retain the reviewed source/date. Output duration meters the
-accepted tariff after completion; it remains an estimate pending billing.
-Provider task billing counters retain only validated amounts and recognized
-denominations: cash in USD/CNY, test balances, or prepaid video units. They are
-not promoted to confirmed USD charges. Package purchase economics, account
-discounts, free test balances and currency conversion are not inferred.
+`kling-lip-sync-face-detection` accepts its own inspected video contract and
+returns typed JSON plus archived face previews. When source hash and duration
+are known, the host can retain an owner/connection-bound `face_session` for one
+hour; upstream expiry is undocumented. Uninspected external video can return
+artifacts without creating a reusable binding. Public results use local 1-based
+face indices. Preview selectors identify images archived by that same generation;
+native face/session IDs and provider preview URLs stay private.
 
-Automated bill import/reconciliation is not implemented. The documented
-`POST /account/billing/balance` supplies historical deductions, not a prospective
-tariff catalogue. It needs separate account-scoped pagination, task matching and
-settlement handling; the adapter does not silently treat task counters as bills.
-Confirm actual charges in the Kling account. HTTP and JSON error messages use status/machine codes;
-arbitrary provider text, prompts, reference URLs and credentials are excluded
-from errors and usage records. Result URLs remain in the existing private
-result-storage lifecycle, separate from usage metadata.
+Lip-sync selects the local binding through `options.resource_references` and one
+`options.parameters.face_index`. Crop/insertion controls are milliseconds; crops
+must fit inspected source duration and overlap the face interval by at least
+2 seconds. Both volume controls permit zero. Generated-TTS audio selection still
+requires its separate owner-bound provenance workflow; native IDs are not a
+shortcut.
 
-Local regression tests use synthetic HTTP fixtures only. No key creation,
-credential entry, paid generation or live account validation is part of those
-tests.
+Multi-element editing has a native generation serializer for addition
+(1–2 cropped JPEG/PNG images), swap (exactly one) and removal (no image). Prompt
+aliases use `<<<video_1>>>`/`<<<image_1>>>`. It requires a trusted editing-session
+binding. Public editing initialization and selection add/delete/clear/preview
+actions are **not included in this stage**. Their serializer helpers are retained
+for the later host workflow; no public selection action endpoint or UI is
+promised here.
+
+`DELETE /v1/provider-resources/{id}` uses the documented element/voice deletion
+operation. Active admitted uses and dependent elements protect retained bindings.
+An asynchronous handle without a documented matching poll endpoint remains
+pending/uncertain; submission alone is not proof of deletion. Public local
+face/editing-session revocation actions belong to the later workflow.
+
+## Pricing and outputs
+
+Published USD Balance prices are synchronized from the separate official
+[video](https://kling.ai/document-api/pricing/base/video.md),
+[image](https://kling.ai/document-api/pricing/base/image.md),
+[effects](https://kling.ai/document-api/pricing/solutions/effects.md) and
+[ecommerce](https://kling.ai/document-api/pricing/solutions/ecommerce.md) sources.
+Units, USD/CNY cash, list prices, discounts and actual invoices remain separate.
+Never apply one universal Unit-to-USD conversion.
+
+4Omni without video input costs output seconds×USD0.157at720p or0.235at1080p.
+With reference/base/video-Element input, billed seconds are
+`output + max(total_input, output)`, atUSD0.094/0.141 respectively. Missing Element
+duration cannot be guessed.3Omni's resource tariff rules remain separate.
+Images charge per output image; fixed series count overrides `n`, while automatic
+series count is unknown in advance. AI Multi-Shot instead charges per call.
+
+A verified tariff with unknown quantity is retained as `quantity_unknown` and
+omits the total; it is not free. Such a request cannot satisfy an explicit cost
+cap. Unknown tariffs stay unavailable. Unpublished Element costs,
+lip-sync partial-block rounding and Avatar/multi-edit mode-to-resolution mapping
+are not invented. Optional positive operator-confirmed USD/request fields can
+supply explicit account tariffs for these named operations; they are labeled
+account-specific and never replaced by a public-source refresh. Effects uses the
+optional `effect_prices` (`KLING_EFFECT_PRICES`) JSON object mapping exact
+catalogue `effect_scene` keys to positive decimal USD/request strings. Unknown
+scene keys, duplicates and malformed prices are rejected. Leaving a scene
+unpriced keeps it unavailable; no template-dependent fee is guessed. Existing
+`kling4_720p_price`/`kling4_1080p_price` USD/second overrides remain supported.
+
+All normalized outputs are archived before success: multiple images/audio,
+recognition JSON, face/segmentation previews and watermarked variants. Read
+`artifacts[{id,media_type,content_url,content_type,size_bytes,sha256}]` from the
+normal generation response. `/v1/generations/{id}/media-access` issues signed
+per-artifact preview/download links. Owner checks, expiry and deletion apply to
+every artifact. Scalar primary-result routes remain compatible.
+
+Credentials, provider task/resource IDs, inspected source proof and connection
+revisions remain private in generation/report views and download errors.
+
+See [the OpenAI-style API](openai-api.md), [Templates API](template-api.md) and
+[testing guide](testing.md). Provider fixtures use synthetic inputs and mocked
+HTTP. Local tests do not establish live model entitlement or paid output quality.

@@ -97,7 +97,14 @@ func (s *Server) reportDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	if content {
 		if !task.MinimizeRequestLogging {
-			data["request"] = map[string]any{"prompt": task.Prompt, "options": task.Options, "webhook_url": task.WebhookURL}
+			// Retained user intent is readable; resolved provider/source evidence
+			// remains private even for a content viewer with full request logging.
+			options := task.Options
+			options.OverrideSound = nil
+			options.ReferenceMediaEvidence = nil
+			options.ResourceSnapshots = nil
+			options.ResourceCreation = nil
+			data["request"] = map[string]any{"prompt": task.Prompt, "options": options, "webhook_url": task.WebhookURL}
 		} else {
 			// Match the persisted minimal-log allowlist, including for in-flight tasks.
 			data["request"] = map[string]any{"options": map[string]any{"resolution": task.Options.Resolution, "ratio": task.Options.Ratio, "duration": task.Options.Duration, "generate_audio": task.Options.GenerateAudio}}

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"slices"
 	"strings"
 	"testing"
 
@@ -46,9 +47,10 @@ func TestKlingConnectionEncryptionCatalogEstimatesAndPinnedPolling(t *testing.T)
 	}
 	key := "kling-fixture-secret"
 	p, err := m.Update(ctx, connection.ID, ProviderUpdate{APIKey: &key, Enabled: pointer(true), Connection: &providerkit.Connection{ManualCatalog: false}, Extra: map[string]string{"kling4_1080p_price": "0.200001"}})
-	if err != nil || !p.Configured || p.Status != "unverified" || len(p.Models) != 4 || submissions+polls != 0 {
+	if err != nil || !p.Configured || p.Status != "unverified" || submissions+polls != 0 {
 		t.Fatal(p, err)
 	}
+	assertKlingContracts(t, p.Models)
 	record, err := repo.Get(ctx, connection.ID)
 	if err != nil || strings.Contains(string(record.CredentialsCiphertext), key) {
 		t.Fatal("unencrypted secret", err)
@@ -95,17 +97,32 @@ func TestKlingConnectionEncryptionCatalogEstimatesAndPinnedPolling(t *testing.T)
 	service := core.NewTaskServiceWithProviders(nil, nil, map[string]core.MediaProvider{connection.ID: provider}, map[string]string{connection.ID: kling.TextToVideo}, connection.ID)
 	service.EnableAccounting()
 	catalog := service.ListProviders(ctx)
-	if len(catalog) != 1 || len(catalog[0].Models) != 4 {
+	if len(catalog) != 1 {
 		t.Fatal(catalog)
 	}
+	assertKlingContracts(t, catalog[0].Models)
 	for _, model := range catalog[0].Models {
+		if !slices.Contains([]string{kling.TextToVideo, kling.ImageToVideo, kling.TextToVideo4, kling.ImageToVideo4, kling.TextToVideo3Turbo, kling.ImageToVideo3Turbo, kling.TextToVideo25Turbo, kling.ImageToVideo25Turbo, kling.OmniVideo4}, model.ID) {
+			continue
+		}
 		input := core.CreateMediaInput{Provider: connection.ID, Model: model.ID, Prompt: "Synthetic fixture"}
-		if model.ID == kling.ImageToVideo || model.ID == kling.ImageToVideo4 {
+		if model.RequiresImageInput {
 			input.Options.ImageURLs = []string{"https://cdn.example/first.png"}
 		}
 		estimate, err := service.Estimate(ctx, input)
 		want := int64(420000)
 		if model.ID == kling.TextToVideo4 || model.ID == kling.ImageToVideo4 {
+			want = 2000010
+		}
+		if model.ID == kling.TextToVideo3Turbo || model.ID == kling.ImageToVideo3Turbo {
+			want = 560000
+		}
+		if model.ID == kling.TextToVideo25Turbo || model.ID == kling.ImageToVideo25Turbo {
+			want = 210000
+		}
+		if model.ID == kling.OmniVideo4 {
+			input.Options.Duration = 10
+			estimate, err = service.Estimate(ctx, input)
 			want = 2000010
 		}
 		if err != nil || int64(estimate.Cost.ExpectedUSD) != want || estimate.Cost.ActualUSD != nil {

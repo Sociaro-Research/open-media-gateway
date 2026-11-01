@@ -131,7 +131,7 @@ func TestDefaultsAndNonbillableCatalogCheck(t *testing.T) {
 		return response(200, `{"code":0,"data":{"id":"task_123","status":"processing"}}`), nil
 	})
 	models, err := a.ListModels(context.Background())
-	if err != nil || len(models) != 4 || calls != 0 {
+	if err != nil || !exactReviewedOperationIDs(models) || calls != 0 {
 		t.Fatal(models, err, calls)
 	}
 	models[0].Resolutions[0] = "altered"
@@ -318,4 +318,15 @@ func TestFixedOriginAndRedirectPolicy(t *testing.T) {
 	if err != nil || a.client.CheckRedirect(nil, nil) != http.ErrUseLastResponse || client.CheckRedirect != nil {
 		t.Fatal("redirect policy is unsafe or changed caller client", err)
 	}
+}
+
+func exactReviewedOperationIDs(models []core.MediaModel) bool {
+	expected := map[string]bool{OmniVideo3: true, OmniVideoO1: true, ResourceCreateElement: true, ResourceCreateVoice: true, ImageRecognition: true, FaceDetection: true, LipSync: true, MultiElementsEditing: true, TextToVideo: true, ImageToVideo: true, TextToVideo4: true, ImageToVideo4: true, TextToVideo3Turbo: true, ImageToVideo3Turbo: true, TextToVideo25Turbo: true, ImageToVideo25Turbo: true, OmniVideo4: true, ImageGeneration3: true, ImageGeneration21: true, ImageOmni3: true, ImageO1: true, MultiImage21: true, ImageOutpainting: true, ImageMultiShot: true, TextToAudio: true, VideoToAudio: true, TextToSpeech: true, AvatarImageToVideo: true, TextToVideo26: true, ImageToVideo26: true, MotionControl3: true, MotionControl26: true, KlingEffects: true, ApparelReplicator: true, GoodsStudio: true, VideoCommerce: true, VirtualTryOn: true}
+	for _, m := range models {
+		if !expected[m.ID] {
+			return false
+		}
+		delete(expected, m.ID)
+	}
+	return len(expected) == 0
 }

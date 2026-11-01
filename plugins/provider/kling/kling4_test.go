@@ -148,7 +148,11 @@ func TestKling4ValidationPublishedPricesAndAccountOverrides(t *testing.T) {
 
 func TestReferencePromptMetadataMatchesReviewedKlingRoutes(t *testing.T) {
 	for _, model := range catalog() {
-		if model.ID == ImageToVideo4 {
+		if model.ID == OmniVideo4 || model.ID == OmniVideo3 || model.ID == OmniVideoO1 {
+			if model.ReferencePromptSyntax != "kling-id" || strings.Join(model.ReferencePromptTypes, ",") != "image,video" {
+				t.Fatal(model)
+			}
+		} else if model.ID == ImageToVideo4 {
 			if model.ReferencePromptSyntax != "kling-id" || len(model.ReferencePromptTypes) != 1 || model.ReferencePromptTypes[0] != "image" {
 				t.Fatalf("Kling 4 frame IDs missing from descriptor: %+v", model)
 			}

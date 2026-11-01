@@ -249,10 +249,20 @@ func (s *Local) Open(_ context.Context, key string) (Object, error) {
 	return Object{Key: key, ContentType: contentType, SizeBytes: info.Size(), ModTime: info.ModTime(), Reader: file}, nil
 }
 
+// sourceOpenError keeps private signed URLs and transport diagnostics out of
+// public task errors while retaining cancellation and destination classification.
+type sourceOpenError struct {
+	message string
+	cause   error
+}
+
+func (e sourceOpenError) Error() string { return e.message }
+func (e sourceOpenError) Unwrap() error { return e.cause }
+
 func (s *Local) openSource(ctx context.Context, rawURL string) (io.ReadCloser, string, int64, error) {
 	parsed, err := url.Parse(rawURL)
 	if err != nil {
-		return nil, "", 0, fmt.Errorf("parse provider result URL: %w", err)
+		return nil, "", 0, sourceOpenError{message: "provider result URL is invalid", cause: err}
 	}
 	if parsed.Scheme == "data" {
 		return openDataURL(rawURL)
@@ -262,15 +272,18 @@ func (s *Local) openSource(ctx context.Context, rawURL string) (io.ReadCloser, s
 	}
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
-		return nil, "", 0, fmt.Errorf("create provider result request: %w", err)
+		return nil, "", 0, sourceOpenError{message: "provider result request could not be created", cause: err}
 	}
 	response, err := s.client.Do(request)
 	if err != nil {
-		return nil, "", 0, fmt.Errorf("download provider result: %w", err)
+		if response != nil && response.Body != nil {
+			_ = response.Body.Close()
+		}
+		return nil, "", 0, sourceOpenError{message: "download provider result failed", cause: err}
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		response.Body.Close()
-		return nil, "", 0, fmt.Errorf("download provider result: unexpected HTTP status %s", response.Status)
+		return nil, "", 0, errors.New("download provider result returned an unsuccessful HTTP status")
 	}
 	contentType := strings.TrimSpace(strings.Split(response.Header.Get("Content-Type"), ";")[0])
 	return response.Body, contentType, response.ContentLength, nil

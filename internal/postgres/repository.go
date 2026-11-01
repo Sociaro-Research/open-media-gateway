@@ -275,6 +275,9 @@ func (r *TaskRepository) SetProviderResultURL(ctx context.Context, id, resultURL
 }
 
 func (r *TaskRepository) MarkSucceeded(ctx context.Context, id string, media core.StoredMedia, lastFrameURL string) error {
+	if err := validateSessionPreviewArtifacts(media.Resources, media.Artifacts); err != nil {
+		return err
+	}
 	artifacts := media.Artifacts
 	if artifacts == nil {
 		artifacts = []core.StoredArtifact{}

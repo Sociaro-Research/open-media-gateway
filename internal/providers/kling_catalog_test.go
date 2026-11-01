@@ -1,6 +1,7 @@
 package providers
 
 import (
+	"errors"
 	"io"
 	"net/http"
 	"os"
@@ -15,7 +16,7 @@ import (
 	"github.com/Sociaro-Research/open-media-gateway/plugins/provider/kling"
 )
 
-func TestKlingSynchronizedPricesMatchAllFourOperationContractsAndPreserveOverrides(t *testing.T) {
+func TestKlingSynchronizedPricesMatchReviewedOperationContractsAndPreserveOverrides(t *testing.T) {
 	m, _, ctx := fixtureConnection(t)
 	ctx = identity.WithResourceOwners(identity.WithOwnerID(ctx, identity.SharedOwnerID), identity.SharedOwnerID, identity.SharedOwnerID)
 	m.client.Transport = roundTripFunc(func(*http.Request) (*http.Response, error) {
@@ -26,9 +27,10 @@ func TestKlingSynchronizedPricesMatchAllFourOperationContractsAndPreserveOverrid
 		t.Fatal(err)
 	}
 	capture, err := m.CaptureCatalog(ctx, "kling")
-	if err != nil || len(capture.Models) != 4 {
+	if err != nil {
 		t.Fatal(capture, err)
 	}
+	assertKlingContracts(t, capture.Models)
 	raw, err := os.ReadFile("../../plugins/provider/kling/testdata/pricing.md")
 	if err != nil {
 		t.Fatal(err)
@@ -42,7 +44,11 @@ func TestKlingSynchronizedPricesMatchAllFourOperationContractsAndPreserveOverrid
 	state, run := catalogsync.Reconcile(catalogsync.State{}, capture, []catalogsync.Observation{obs}, time.Now(), func(model core.MediaModel, rate catalogsync.Rate) error {
 		return m.CheckCatalogRate(ctx, "kling", model, rate)
 	})
+	documentedGaps := map[string]string{kling.OmniVideo3: "Video-character element tariff classification", kling.AvatarImageToVideo: "native std/pro modes", kling.MultiElementsEditing: "native std/pro modes", kling.LipSync: "partial-block rounding", kling.ResourceCreateElement: "numeric element-creation tariff"}
 	for _, warning := range run.OpenWarnings {
+		if required, ok := documentedGaps[warning.Model]; ok && warning.Reason == "Published tariff needs a structured pricing rule" && strings.Contains(string(warning.Evidence), required) {
+			continue
+		}
 		if strings.Contains(warning.Reason, "tariff") || strings.Contains(warning.Reason, "price") {
 			t.Fatal(warning)
 		}
@@ -53,20 +59,32 @@ func TestKlingSynchronizedPricesMatchAllFourOperationContractsAndPreserveOverrid
 	if err != nil {
 		t.Fatal(err)
 	}
+	adapter, err := m.resolve(ctx, "kling", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hook := adapter.(catalogRateRequestProvider)
 	for _, model := range models {
-		request, _ := referenceRequest(model)
-		if strings.Contains(model.ID, "4.0") && request.Options.GenerateAudio != nil {
-			t.Fatal("unreviewed audio switch in reference quote")
+		entry, ok := state.Models[model.ID]
+		if !ok {
+			continue
 		}
-		cost, _, err := provider.Quote(ctx, model, request)
-		if err != nil || !strings.HasPrefix(cost.Pricing.Version, "catalog-") || cost.Pricing.Source != source.URL || !model.Pricing.Known || model.Pricing.ReferenceQuote == nil || model.Pricing.ReferenceQuote.ExpectedUSD != cost.ExpectedUSD {
-			t.Fatal(model.ID, cost, err)
+		for _, rate := range entry.Rates {
+			request, err := hook.CatalogRateRequest(model, rate)
+			if err != nil {
+				t.Fatal(model.ID, rate, err)
+			}
+			cost, _, err := provider.Quote(ctx, model, request)
+			if err != nil || !strings.HasPrefix(cost.Pricing.Version, "catalog-") || cost.Pricing.Source != source.URL || cost.Pricing.Price != rate.Price || cost.Pricing.DurationBillingRule != rate.DurationBillingRule {
+				t.Fatal(model.ID, rate, cost, err)
+			}
 		}
-		// Empty resolution must also match the native model's first/default resolution.
-		request.Options.Resolution = ""
-		defaultCost, _, err := provider.Quote(ctx, model, request)
-		if err != nil || defaultCost.ExpectedUSD != cost.ExpectedUSD || defaultCost.Pricing.Source != source.URL {
-			t.Fatal(defaultCost, err)
+	}
+	// A resolution price must never be projected onto undocumented Avatar modes.
+	for _, mode := range []string{"std", "pro"} {
+		_, _, err := provider.Quote(ctx, core.MediaModel{ID: kling.AvatarImageToVideo}, core.MediaRequest{Model: kling.AvatarImageToVideo, Options: core.MediaOptions{ImageURLs: []string{"https://cdn.example/avatar.png"}, AudioURLs: []string{"https://cdn.example/speech.wav"}, Parameters: map[string]any{"mode": mode}}})
+		if !errors.Is(err, core.ErrPricingUnavailable) {
+			t.Fatal("invented Avatar mode tariff", mode, err)
 		}
 	}
 	changed := strings.Replace(string(raw), "($0.235)", "($0.240)", 1)

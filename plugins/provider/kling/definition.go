@@ -3,8 +3,8 @@ package kling
 
 import (
 	"net/http"
+	"strings"
 
-	"github.com/Sociaro-Research/open-media-gateway/internal/catalogsync"
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
 	"github.com/Sociaro-Research/open-media-gateway/internal/providerkit"
 )
@@ -22,12 +22,12 @@ const priceMarkdownSource = priceSource + ".md"
 
 func Definition() providerkit.Definition {
 	aliases := map[string]string{}
-	for _, path := range []string{"api/get-started/authentication", "api/video/3-0-omni/text-to-video", "api/video/3-0-omni/image-to-video", "api/video/4-0/text-to-video", "api/video/4-0/image-to-video", "pricing/base/video"} {
-		aliases[docsBase+path] = docsBase + path + ".md"
+	for _, source := range reviewedSources() {
+		aliases[strings.TrimSuffix(source.URL, ".md")] = source.URL
 	}
 	return providerkit.Definition{
 		ID: "kling", Name: "Kling AI", DefaultModel: TextToVideo4, ModelEnv: "KLING_MODEL",
-		Description:        "Direct Kling 4.0 and 3.0 text-to-video and image-to-video, with published price estimates and a free authentication check.",
+		Description:        "Direct Kling video, Omni references, images, audio, editing and managed resources, with typed capabilities, reviewed pricing and a free authentication check.",
 		PublicCatalog:      true,
 		AuthenticatedCheck: true,
 		Fields: []providerkit.Field{
@@ -35,17 +35,20 @@ func Definition() providerkit.Definition {
 			{Key: "base_url", Label: "API endpoint", Default: DefaultBaseURL, Env: "KLING_BASE_URL"},
 			{Key: "kling4_720p_price", Label: "4.0 720p override (USD/s, optional)", Env: "KLING4_720P_PRICE"},
 			{Key: "kling4_1080p_price", Label: "4.0 1080p override (USD/s, optional)", Env: "KLING4_1080P_PRICE"},
+			{Key: "selection_init_price", Label: "Confirmed selection initialization tariff (USD/request, optional)", Env: "KLING_SELECTION_INIT_PRICE"},
+			{Key: "selection_add_price", Label: "Confirmed add-selection tariff (USD/request, optional)", Env: "KLING_SELECTION_ADD_PRICE"},
+			{Key: "selection_delete_price", Label: "Confirmed delete-selection tariff (USD/request, optional)", Env: "KLING_SELECTION_DELETE_PRICE"},
+			{Key: "selection_clear_price", Label: "Confirmed clear-selection tariff (USD/request, optional)", Env: "KLING_SELECTION_CLEAR_PRICE"},
+			{Key: "selection_preview_price", Label: "Confirmed selection preview tariff (USD/request, optional)", Env: "KLING_SELECTION_PREVIEW_PRICE"},
+			{Key: "element_multi_image_price", Label: "Confirmed image-element creation tariff (USD/request, optional)", Env: "KLING_ELEMENT_MULTI_IMAGE_PRICE"},
+			{Key: "element_video_character_price", Label: "Confirmed video-element creation tariff (USD/request, optional)", Env: "KLING_ELEMENT_VIDEO_CHARACTER_PRICE"},
+			{Key: "avatar_std_price", Label: "Confirmed Avatar std tariff (USD/request, optional)", Env: "KLING_AVATAR_STD_PRICE"},
+			{Key: "avatar_pro_price", Label: "Confirmed Avatar pro tariff (USD/request, optional)", Env: "KLING_AVATAR_PRO_PRICE"},
+			{Key: "lip_sync_price", Label: "Confirmed lip-sync tariff (USD/request, optional)", Env: "KLING_LIP_SYNC_PRICE"},
+			{Key: "multi_edit_std_price", Label: "Confirmed multi-edit std tariff (USD/request, optional)", Env: "KLING_MULTI_EDIT_STD_PRICE"},
+			{Key: "multi_edit_pro_price", Label: "Confirmed multi-edit pro tariff (USD/request, optional)", Env: "KLING_MULTI_EDIT_PRO_PRICE"},
 		},
-		CatalogSources: []catalogsync.Source{
-			{ID: "authentication", URL: docsBase + "api/get-started/authentication.md", Parser: "document"},
-			{ID: "account-check", URL: docsBase + "api/assets/account-usage.md", Parser: "document"},
-			{ID: "error-codes", URL: docsBase + "api/get-started/error-codes.md", Parser: "document"},
-			{ID: "text-to-video", URL: docsBase + "api/video/3-0-omni/text-to-video.md", Parser: "document"},
-			{ID: "image-to-video", URL: docsBase + "api/video/3-0-omni/image-to-video.md", Parser: "document"},
-			{ID: "kling4-text-to-video", URL: docsBase + "api/video/4-0/text-to-video.md", Parser: "document"},
-			{ID: "kling4-image-to-video", URL: docsBase + "api/video/4-0/image-to-video.md", Parser: "document"},
-			{ID: "pricing", URL: priceMarkdownSource, Parser: "document"},
-		},
+		CatalogSources:       reviewedSources(),
 		CatalogInterpret:     interpretPrices,
 		CatalogSourceAliases: aliases,
 		// Model versions live in routes, not a JSON model field. The generic
@@ -57,6 +60,9 @@ func Definition() providerkit.Definition {
 				return nil, err
 			}
 			if err = a.setPrices(c); err != nil {
+				return nil, err
+			}
+			if err = a.setOperationPrices(c); err != nil {
 				return nil, err
 			}
 			return a, nil

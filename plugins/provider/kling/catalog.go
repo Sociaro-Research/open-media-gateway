@@ -17,8 +17,14 @@ import (
 const kling3PromptMaxCharacters = 3072
 
 func promptCharacterLimit(id string) int {
+	if id == OmniVideo4 {
+		return 26000
+	}
 	if isKling4(id) {
 		return core.MaxPromptCharacters
+	}
+	if f, ok := additionalNativeFamily(id); ok {
+		return f.promptLimit
 	}
 	return kling3PromptMaxCharacters
 }
@@ -74,6 +80,15 @@ func catalog() []core.MediaModel {
 		}
 		models = append(models, m)
 	}
+	models = append(models, additionalNativeCatalog()...)
+	models = append(models, omni4Model())
+	models = append(models, imageModels()...)
+	models = append(models, audioModels()...)
+	models = append(models, motionModels()...)
+	models = append(models, solutionModels()...)
+	models = append(models, legacyOmniModels()...)
+	models = append(models, resourceGenerationModels()...)
+	models = append(models, auxiliaryModels()...)
 	return models
 }
 
@@ -101,11 +116,38 @@ func (a *Adapter) models() []core.MediaModel {
 func (a *Adapter) ListModels(context.Context) ([]core.MediaModel, error) { return a.models(), nil }
 func (a *Adapter) ReviewedCatalogModels() []core.MediaModel              { return a.models() }
 
-func (a *Adapter) ValidateRequest(_ context.Context, r core.MediaRequest) error {
+func (a *Adapter) ValidateRequest(ctx context.Context, r core.MediaRequest) error {
+	if isLegacyOmniOperation(r.Model) {
+		return a.validateLegacyOmniRequest(r)
+	}
+	if isResourceGenerationOperation(r.Model) {
+		return a.validateResourceGenerationRequest(ctx, r)
+	}
+	if isAuxiliaryOperation(r.Model) {
+		return a.validateAuxiliaryRequest(r)
+	}
+	if isImageOperation(r.Model) {
+		return a.validateImageRequest(r)
+	}
+	if isAudioOperation(r.Model) {
+		return a.validateAudioRequest(r)
+	}
+	if isMotionOperation(r.Model) {
+		return a.validateMotionRequest(r)
+	}
+	if isSolutionOperation(r.Model) {
+		return validateSolutionRequest(r)
+	}
 	invalid := func(s string) error { return errors.Join(core.ErrOptionsInvalid, errors.New(s)) }
 	m, ok := modelFor(r.Model)
 	if !ok {
 		return invalid("unsupported Kling operation")
+	}
+	if r.Model == OmniVideo4 {
+		return validateOmni4(m, r)
+	}
+	if f, ok := additionalNativeFamily(r.Model); ok {
+		return validateAdditionalNative(f, m, r)
 	}
 	limit := promptCharacterLimit(r.Model)
 	if strings.TrimSpace(r.Prompt) == "" || utf8.RuneCountInString(r.Prompt) > limit {
@@ -144,6 +186,33 @@ func (a *Adapter) Quote(ctx context.Context, _ core.MediaModel, r core.MediaRequ
 		return core.TaskCost{}, "", err
 	}
 	m, _ := modelFor(r.Model)
+	if isLegacyOmniOperation(r.Model) {
+		return a.quoteLegacyOmni(r)
+	}
+	if isResourceGenerationOperation(r.Model) {
+		return a.quoteResourceGeneration(ctx, r)
+	}
+	if isAuxiliaryOperation(r.Model) {
+		return a.quoteAuxiliary(r)
+	}
+	if isImageOperation(r.Model) {
+		return a.quoteImage(r)
+	}
+	if isAudioOperation(r.Model) {
+		return a.quoteAudio(r)
+	}
+	if isMotionOperation(r.Model) {
+		return a.quoteMotion(r)
+	}
+	if isSolutionOperation(r.Model) {
+		return quoteSolution(r)
+	}
+	if r.Model == OmniVideo4 {
+		return a.quoteOmni4(m, r)
+	}
+	if f, ok := additionalNativeFamily(r.Model); ok {
+		return quoteAdditionalNative(f, m, r)
+	}
 	res := resolutionFor(m, r.Options)
 	source := priceSource
 	description := "Published USD balance list price for requested output duration. Prepaid units, discounts, trials and CNY charges are not converted; this is not a confirmed bill."
