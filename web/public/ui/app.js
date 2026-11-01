@@ -34,7 +34,6 @@ const elements = {
   resolution: document.querySelector('#resolution'),
   ratio: document.querySelector('#ratio'),
   duration: document.querySelector('#duration'),
-  durationHint: document.querySelector('#durationHint'),
   generateAudio: document.querySelector('#generateAudio'),
   watermark: document.querySelector('#watermark'),
   cameraFixed: document.querySelector('#cameraFixed'),
@@ -859,6 +858,9 @@ function updateModelUI() {
   elements.resolution.disabled = elements.resolutionField.hidden;
   elements.ratio.disabled = elements.ratioField.hidden;
   elements.duration.disabled = elements.durationField.hidden;
+  const durationLabel=ModelInfo.durationLabel(model);
+  FormUI.setLabel(elements.duration,durationLabel);
+  elements.duration.setAttribute('aria-label',durationLabel);
   if (model.resolutions?.length) fillSelect(elements.resolution, model.resolutions, model.resolutions[0]);
   if (model.ratios?.length) fillSelect(elements.ratio, model.ratios, isVideo && model.ratios.includes('16:9') ? '16:9' : model.ratios[0]);
   if (!elements.durationField.hidden) {
@@ -866,7 +868,6 @@ function updateModelUI() {
     elements.duration.step = model.duration_step || 1;
     elements.duration.max = model.max_duration;
     elements.duration.value = model.default_duration;
-    elements.durationHint.textContent = model.duration_step ? `${model.min_duration}–${model.max_duration} seconds, in steps of ${model.duration_step}` : `${model.min_duration}–${model.max_duration} seconds`;
   }
   elements.imageURLsField.hidden = !model.supports_image_input;
   elements.videoURLField.hidden = !model.supports_video_input;

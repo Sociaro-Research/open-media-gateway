@@ -16,7 +16,11 @@ ignored `.local/` or `dist/`; record limits explicitly.
 
 ## Available fixtures
 
-
+Run `node scripts/ui/duration-labels.cjs` (also with `UI_BROWSER_ENGINE=webkit`)
+for actual Templates/Playground model changes, bounded/stepped/fixed/one-sided
+Duration labels, unknown/input-derived/unsupported capabilities, native validation
+and readable labels in both themes at 1440/390/320px. It blocks external requests
+and submits no generations. `UI_EVIDENCE_DIR` selects its internal screenshots.
 
 
 
@@ -728,6 +732,7 @@ submission state. Evidence stays under `.local/editing/`.
 
 Run each fixture with Node/Playwright, then repeat with `UI_BROWSER_ENGINE=webkit`. Set `UI_BROWSER_PATH` when using an installed browser outside Playwright's default cache, and `UI_EVIDENCE_DIR` to a new ignored run directory. All APIs and media are synthetic and local; these checks never authorize live writes or paid providers.
 
+- `duration-labels.cjs`: selected-model bounds/steps in Duration labels and native validation in both editors, themes and relevant responsive breakpoints.
 - `button-alignment.cjs`: primary/secondary glyph geometry in normal, compact, icon, disabled, pending and dialog contexts.
 - `interaction-borders.cjs`: one actual border perimeter, custom accent, selected/keyboard/invalid/disabled states, stable outer/content geometry and forced colors.
 

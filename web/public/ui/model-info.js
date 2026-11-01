@@ -4,6 +4,17 @@
  const node=(tag,cls,text)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(text!=null)n.textContent=text;return n;};
  const usd=v=>new Intl.NumberFormat(undefined,{style:'currency',currency:'USD',maximumFractionDigits:6}).format(Number(v));
  const date=v=>v?new Date(v+(v.length===7?'-01':'')+'T12:00:00').toLocaleDateString(undefined,{year:'numeric',month:'short',...(v.length===7?{}:{day:'numeric'})}):'Not published';
+ // Format capability bounds once for both generation and template fields.
+ function durationLabel(model={}){
+  if(model.duration_from_input)return 'Duration (from input)';
+  if(model.max_duration===0)return 'Duration (unavailable)';
+  const min=Number.isFinite(model.min_duration)&&model.min_duration>0?model.min_duration:null;
+  const max=Number.isFinite(model.max_duration)&&model.max_duration>0?model.max_duration:null;
+  if(min!==null&&max!==null&&min>max)return 'Duration (s)';
+  const range=min!==null&&max!==null?(min===max?min+' s':min+'–'+max+' s'):max!==null?'up to '+max+' s':min!==null?'from '+min+' s':'s';
+  const step=Number.isFinite(model.duration_step)&&model.duration_step>1&&min!==max?'; step '+model.duration_step+' s':'';
+  return 'Duration ('+range+step+')';
+ }
  function close(restore=false){clearTimeout(timer);if(!active)return;const {panel,button}=active;active=null;panel.remove();button.setAttribute('aria-expanded','false');button.removeAttribute('aria-describedby');if(restore&&button.isConnected)button.focus();}
  function position(){if(!active)return;const {panel,button}=active,r=button.getBoundingClientRect();panel.style.maxHeight=Math.max(120,Math.min(560,innerHeight-24))+'px';const b=panel.getBoundingClientRect();const right=r.right+10;panel.style.left=Math.max(12,Math.min(right+b.width<innerWidth-12?right:r.left-b.width-10,innerWidth-b.width-12))+'px';panel.style.top=Math.max(12,Math.min(r.top,innerHeight-b.height-12))+'px';}
  function contains(target){return !!active&&(active.panel.contains(target)||active.button.contains(target));}
@@ -66,5 +77,5 @@
  document.addEventListener('keydown',e=>{if(active&&e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();close(true);}},true);
  document.addEventListener('pointerdown',e=>{if(active&&!contains(e.target))close();},true);
  window.addEventListener('resize',position);document.addEventListener('scroll',e=>{if(active&&!active.panel.contains(e.target))position();},true);
- window.ModelInfo={button,informationButton,close,contains,compare:(a,b)=>{const d=m=>[m.metadata?.release_date||'',m.metadata?.version_date||''].sort().at(-1);return d(b).localeCompare(d(a))||a.display_name.localeCompare(b.display_name);}};
+ window.ModelInfo={button,informationButton,close,contains,durationLabel,compare:(a,b)=>{const d=m=>[m.metadata?.release_date||'',m.metadata?.version_date||''].sort().at(-1);return d(b).localeCompare(d(a))||a.display_name.localeCompare(b.display_name);}};
 })();

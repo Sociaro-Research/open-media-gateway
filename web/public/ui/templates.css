@@ -93,6 +93,11 @@
 #templatesGallery .template-create-card { gap:12px; }
 #templatesGallery .template-create-card > .primary.compact { width:auto; min-width:0; flex:0 0 auto; }
 
+@media(max-width:950px) {
+ .template-editor .settings-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+ .template-editor .settings-grid > div:has(input[type=number]) { grid-column:1/-1; }
+}
+
 /* A single audio option fills the template editor; narrow editors stack fields. */
 .template-editor .toggle-grid { grid-template-columns:minmax(0,1fr); }
 @media(max-width:600px) {

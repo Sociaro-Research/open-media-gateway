@@ -334,3 +334,7 @@ release image checks and dependency notices apply to this added runtime. Local
 fixture checks are `go test ./internal/soundoverride` and the Override Sound tests
 in `internal/api`, `internal/postgres` and `internal/worker`; database checks require
 the disposable-service wrapper described in [testing](testing.md).
+
+## Shared field and panel presentation
+
+Duration puts the selected model's actual bounds or discrete step in its label, without a detached duplicate caption.

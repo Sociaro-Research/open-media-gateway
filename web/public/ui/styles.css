@@ -802,6 +802,9 @@ table .floating-field > .select-trigger { min-height:44px; padding:9px 42px 9px 
 #generationFields { min-width:0; }
 #generationFields > .floating-field + .floating-field { margin-top:20px; }
 .settings-grid > div { min-width:0; }
+/* Capability labels remain readable in the narrow Playground settings panel. */
+#generationSettings > .settings-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+#durationField { grid-column:1/-1; }
 
 /* Navigation wraps as one group only when the actual header contents do not fit. */
 .section-nav { gap:20px; justify-self:end; align-items:stretch; flex-wrap:nowrap; }
