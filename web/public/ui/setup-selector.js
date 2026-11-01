@@ -49,7 +49,7 @@
  }
  window.SetupSelector={
   async initialize(user){opening++;if(actor!==user)dialog?.close();actor=user;window.RemoteWorkspace?.setActor(user);if(!user?.is_system_admin)return;try{const settings=await api('/v1/system/settings');if(actor===user&&settings.setup_pending&&!dismissed())await open({onboarding:true});}catch(error){console.warn('Setup guide is available from Settings.');}},
-  mount(parent,state,onSaved,current=()=>true){const block=node('section',undefined,'setup-section'),summary=node('p',profile(state),'field-explanation');block.append(node('h2','How you use this installation'),summary);sections.add({summary,onSaved,current});const button=node('button','Choose setup','secondary');button.type='button';button.onclick=()=>open({current}).catch(e=>{if(current())FormUI.message(message,e.message,'error');});const message=node('p');message.setAttribute('role','status');block.append(button,message);parent.append(block);return button;},
+  mount(parent,state,onSaved,current=()=>true){const block=node('section',undefined,'setup-section'),summary=node('p',profile(state),'field-explanation');block.append(node('h2','Installation Mode'),summary);sections.add({summary,onSaved,current});const button=node('button','Change Mode','secondary');button.type='button';button.onclick=()=>open({current}).catch(e=>{if(current())FormUI.message(message,e.message,'error');});const message=node('p');message.setAttribute('role','status');block.append(button,message);parent.append(block);return button;},
   open,reflect:published
  };
 })();

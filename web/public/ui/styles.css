@@ -1719,3 +1719,6 @@ input[type=color]:focus-visible { outline:none; box-shadow:none; border:2px soli
 .setup-option input[type=radio]:checked { appearance:none; -webkit-appearance:none; border:1px solid var(--accent); border-radius:50%; background:var(--accent); }
 @media(forced-colors:active) { .setup-option input[type=radio]:checked { forced-color-adjust:none; border-color:Highlight; background:Highlight; } }
 
+
+/* The group's grid gap owns spacing; inherited heading/paragraph margins must not stack. */
+:is(#systemView,#configurationView) .setup-section > :is(h2,p) { margin:0; }

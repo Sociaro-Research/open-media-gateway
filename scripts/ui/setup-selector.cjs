@@ -28,7 +28,7 @@ const server=http.createServer(async(req,res)=>{
  page.on('pageerror',e=>errors.push(e.message));await page.route('**/*',r=>new URL(r.request().url()).origin===origin?r.continue():r.abort());
  const dialog=page.locator('.setup-dialog'),apply=()=>dialog.getByRole('button',{name:'Apply',exact:true});
  const init=()=>page.evaluate(async()=>{await SetupSelector.initialize({id:'synthetic-owner',session_id:'fixture',is_system_admin:true});const state=await api('/v1/system/settings');SetupSelector.mount(document.querySelector('#fixture'),state);});
- const open=async()=>{await page.getByRole('button',{name:'Choose setup'}).click();await dialog.waitFor({state:'visible'});};
+ const open=async()=>{await page.getByRole('button',{name:'Change Mode'}).click();await dialog.waitFor({state:'visible'});};
  const chosen=()=>dialog.locator('input[name=scenario]:checked').getAttribute('value');
  async function matrix(label){
   fs.mkdirSync(out,{recursive:true});

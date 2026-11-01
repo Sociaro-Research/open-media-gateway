@@ -591,3 +591,5 @@ Nested sidebar tabs retain their established 20px hierarchy inset, 12px text ins
 The **Show Playground / Templates** setting controls both console sections together. Its help text states that disabling it hides both screens while API generation remains available. This is a visibility explanation, not a separate Template permission.
 
 Installation mode choices retain the native unselected radio and a thin configured-accent filled selected dot. Skip for now belongs only to initial onboarding. Settings Apply appears only for a valid changed choice, hides on revert or success, and remains available after failure.
+
+The Installation Mode summary uses Change Mode and the shared 16px heading-to-content grid gap without stacked heading/paragraph margins.
