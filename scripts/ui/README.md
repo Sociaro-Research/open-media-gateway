@@ -16,6 +16,13 @@ ignored `.local/` or `dist/`; record limits explicitly.
 
 ## Available fixtures
 
+`provider-voice-languages.cjs` checks the existing TTS fields against actual
+`voice_choices` from `UI_PROVIDER_DESCRIPTOR_FILE`: initial default, compatible
+language preservation, every declared pair, normal request serialization, managed
+voice binding, invalid saved/unknown metadata and legacy-provider behavior. It
+uses synthetic local quotes/submission and captures both themes/responsive widths.
+
+
 `provider-sessions.cjs` tests typed local session actions, exact saved point
 precision, zero-based frame bounds, explicit recovery, expiry/revision/key races,
 nonmutating preview artifacts and current face-session metadata.

@@ -665,3 +665,13 @@ and declared formats. Ordinary and manual model limits do not inherit a reviewed
 native extension. The existing validation context carries actual connection, native
 model and options; it never sends a numeric upload-limit override. Cover/library
 uploads without a model context retain the ordinary shared limit.
+
+### Existing voice and language controls
+
+Use declared `voice_choices` in the existing voice/language fields. Initialize the
+marked Gateway default, preserve a compatible language when the voice changes,
+and otherwise use that choice's declared default language. Selectable language
+values stay identical to the descriptor. Invalid saved pairs remain visibly blocked.
+Managed voices use declared model languages and suppress the preset field. Missing
+metadata preserves the established other-provider controls and their prior selection.
+Reuse the existing field/picker typography, spacing, focus and keyboard patterns.

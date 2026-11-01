@@ -834,7 +834,8 @@ function fillSelect(select, values, preferred) {
   select.replaceChildren(...values.map(value => new Option(value, value, false, value === preferred)));
 }
 
-let playgroundSound=null,modelParameterEditor=null,durationChoice=null,playgroundResources=null;
+const legacyLanguageChoices=[...elements.language.options].map(option=>({value:option.value,label:option.textContent}));
+let voiceLanguageControl=null,playgroundSound=null,modelParameterEditor=null,durationChoice=null,playgroundResources=null;
 window.addEventListener('gateway-reference-deleted',event=>{
  const {id,scope,keyVersion}=event.detail;
  if(['organization','template'].includes(scope)&&keyVersion===generationKeyVersion&&playgroundSound?.value===id)playgroundSound.clear();
@@ -907,6 +908,7 @@ function updateModelUI() {
   });
   [elements.generateAudio, elements.cameraFixed, elements.draft, elements.returnLastFrame]
     .forEach(element => { element.checked = false; });
+  voiceLanguageControl=ModelControls.voiceLanguage(model,{voice:elements.voice,language:elements.language,legacy:legacyLanguageChoices,managed:()=>!!playgroundResources?.hasKind('voice')});
   updateDynamicCapabilities();
   window.referencePicker?.render();
   updatePrice();
@@ -991,6 +993,7 @@ function generationRequest(request) {
 }
 function templateRequest(request){return {revision:request.template.revision,inputs:request.template.inputs,provider:request.provider,model:request.model,...(request.project_id?{project_id:request.project_id}:{}),...(request.max_expected_cost_usd!==undefined?{max_expected_cost_usd:request.max_expected_cost_usd}:{})};}
 async function fetchEstimate(request) {
+ const model=providerCatalog.find(p=>p.id===request.provider)?.models.find(m=>m.id===request.model),issue=ModelControls.voiceRequestError(model,request.options);if(issue)throw Error(issue);
  return api(request.template ? `/v1/templates/${encodeURIComponent(request.template.id)}/estimate` : request.resource_create?'/v1/provider-resources/estimate':request.session_action?sessionPath(request)+'/estimate':'/v1/generations/estimate',{method:'POST',body:JSON.stringify(request.template ? templateRequest(request) : generationRequest(request))});
 }
 
@@ -1010,6 +1013,7 @@ function updatePrice() {
  clearTimeout(quoteTimer);
  const sequence=++quoteSequence;
  const request=estimateRequest(); if(!request) return;
+ if(voiceLanguageControl&&!voiceLanguageControl.valid()){elements.priceValue.textContent='Choose voice and language';elements.priceCard.classList.add('unknown');FormUI.message(elements.priceDetails,'Choose an available voice and language to get a verified estimate.');return;}
  if(playgroundResources&&!playgroundResources.valid()){elements.priceValue.textContent='Complete resource inputs';elements.priceCard.classList.add('unknown');FormUI.message(elements.priceDetails,'Complete the resource fields to get a verified estimate.');return;}
  if(modelParameterEditor&&!modelParameterEditor.valid()){elements.priceValue.textContent='Complete model parameters';elements.priceCard.classList.add('unknown');FormUI.message(elements.priceDetails,'Complete the parameter fields to get a verified estimate.');return;}
  elements.priceValue.textContent='Calculating…';
@@ -1217,6 +1221,9 @@ elements.checkProvider.addEventListener('click', async () => {
   }
 });
 elements.model.addEventListener('change', updateModelUI);
+elements.voice.addEventListener('input',()=>{voiceLanguageControl?.voiceChanged();pendingSubmission=null;updatePrice();});
+elements.voice.addEventListener('change',()=>{voiceLanguageControl?.voiceChanged();pendingSubmission=null;updatePrice();});
+elements.language.addEventListener('change',()=>{voiceLanguageControl?.languageChanged();pendingSubmission=null;updatePrice();});
 [elements.quality, elements.background, elements.ratio, elements.duration, elements.generateAudio, elements.watermark, elements.cameraFixed, elements.draft, elements.returnLastFrame]
   .forEach(element => element.addEventListener('change', updatePrice));
 elements.resolution.addEventListener('change', () => { updateDynamicCapabilities(); updatePrice(); });
@@ -1240,8 +1247,9 @@ const optionLabels = {
   instructions: 'Voice instructions', lyrics: 'Lyrics', gender: 'Vocals', format: 'File format'
 };
 function optionDefaults(model) {
+  const voiceDefault=model.voice_choices?.find(c=>c.is_default===true);
   return {quality: model.qualities?.[0], background: model.backgrounds?.[0], resolution: model.resolutions?.[0], ratio: model.ratios?.includes('16:9') ? '16:9' : model.ratios?.[0],
-    duration: model.default_duration, voice: model.voices?.[0], language: 'Auto', gender: 'female', format: model.formats?.[0],
+    duration: model.default_duration, voice: voiceDefault?.id||model.voices?.[0], language: voiceDefault?.default_language||'Auto', gender: 'female', format: model.formats?.[0],
     generate_audio: false, watermark: false, camera_fixed: false, draft: false, return_last_frame: false};
 }
 function taskParameterRows(options, defaults = {}) {
@@ -1301,6 +1309,7 @@ function reuseTask(task, {sparse=false}={}) {
   window.referencePicker?.restoreMode(options);
   window.referencePicker?.restoreVoices(options.reference_voices);
   window.referencePicker?.restoreRoles(options.reference_roles);
+  voiceLanguageControl?.restore();
   durationChoice?.restore(options.duration);if(selectedModel()?.ratio_may_be_inferred&&!options.ratio)elements.ratio.value='';
   elements.prompt.value = task.prompt || promptHistory[task.id] || '';
   window.referencePicker?.render();
@@ -1342,6 +1351,7 @@ elements.form.addEventListener('change', updatePrice);
 elements.form.addEventListener('submit', async event => {
   event.preventDefault();
   if (submitting || dialog.open) return;
+  if(voiceLanguageControl&&!voiceLanguageControl.valid()){setMessage('Choose a current voice and language.','error');return;}
   if(playgroundResources&&!playgroundResources.valid()){setMessage('Complete the resource inputs or remove unavailable bindings.','error');return;}
   if(modelParameterEditor&&!modelParameterEditor.valid()){setMessage('Complete the model parameters.','error');return;}
   if (window.referencePicker && !window.referencePicker.validate()) return;
@@ -1627,6 +1637,6 @@ function syncModelResources(model,initial=[],initialIntent=null,initialSession=n
  playgroundResources?.dispose();playgroundResources=null;
  let host=document.querySelector('#modelResources');if(!host){host=document.createElement('section');host.id='modelResources';document.querySelector('#commonMediaFields').append(host);}
  if(!model?.resource_operation&&!model?.resource_input_schemas?.length){host.hidden=true;host.replaceChildren();elements.voice.disabled=!model?.supports_voice;return;}
- playgroundResources=ResourceControls.mount(host,{api,model,provider:selectedProvider(),initial,initialIntent,initialSession,locked:()=>submitting,reserved:()=>['image','video','audio'].flatMap(kind=>model['supports_'+kind+'_input']?(window.referencePicker?.values(kind)||[]).map((_,index)=>kind+'_'+(index+1)):[]),onChange:detail=>{ModelControls.resourceParameters(modelParameterEditor,playgroundResources?.bindings()||[]);elements.voiceField.hidden=!model.supports_voice||playgroundResources?.hasKind('voice');elements.voice.disabled=elements.voiceField.hidden;if(!submitting){const previous=pendingSubmission;pendingSubmission=null;if(detail?.metadata&&previous?.request.provider===selectedProvider()?.id&&previous.request.model===model.id&&dialog.open){dialog.close();setMessage('Resource availability changed. Review the updated inputs.','error');}}updatePrice();}});
- ModelControls.resourceParameters(modelParameterEditor,playgroundResources.bindings());elements.voiceField.hidden=!model.supports_voice||playgroundResources.hasKind('voice');elements.voice.disabled=elements.voiceField.hidden;
+ playgroundResources=ResourceControls.mount(host,{api,model,provider:selectedProvider(),initial,initialIntent,initialSession,locked:()=>submitting,reserved:()=>['image','video','audio'].flatMap(kind=>model['supports_'+kind+'_input']?(window.referencePicker?.values(kind)||[]).map((_,index)=>kind+'_'+(index+1)):[]),onChange:detail=>{ModelControls.resourceParameters(modelParameterEditor,playgroundResources?.bindings()||[]);elements.voiceField.hidden=!model.supports_voice||playgroundResources?.hasKind('voice');elements.voice.disabled=elements.voiceField.hidden;voiceLanguageControl?.resourcesChanged();if(!submitting){const previous=pendingSubmission;pendingSubmission=null;if(detail?.metadata&&previous?.request.provider===selectedProvider()?.id&&previous.request.model===model.id&&dialog.open){dialog.close();setMessage('Resource availability changed. Review the updated inputs.','error');}}updatePrice();}});
+ ModelControls.resourceParameters(modelParameterEditor,playgroundResources.bindings());elements.voiceField.hidden=!model.supports_voice||playgroundResources.hasKind('voice');elements.voice.disabled=elements.voiceField.hidden;voiceLanguageControl?.resourcesChanged();
 }
