@@ -59,10 +59,7 @@ func TestUnifiedTemplateLibraryBindingsAndDeletion(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		// Published uses remain protected after the draft no longer uses this file.
-		if e := refs.DeleteWithGuard(ctx, asset.ID, func() error { t.Fatal("published file deleted"); return nil }); !errors.Is(e, references.ErrInUse) {
-			t.Fatal(e)
-		}
+		// Save replaces the current binding immediately; other templates still protect theirs.
 		r, err = repo.Save(ctx, r, r.Version, "unpublish")
 		if err != nil {
 			t.Fatal(err)
@@ -121,7 +118,7 @@ func TestUnifiedTemplateDeletionCommittedBeforeStorageAndRetry(t *testing.T) {
 func TestUnifiedTemplateMigrationPreservesLegacyIdentity(t *testing.T) {
 	db := auditDatabase(t, true)
 	id, templateID := uuid.NewString(), uuid.NewString()
-	if _, err := db.Exec(`INSERT INTO generation_templates(id,draft) VALUES($1,'{"title":"Legacy","slots":null}')`, templateID); err != nil {
+	if _, err := db.Exec(`INSERT INTO generation_templates(id,content) VALUES($1,'{"title":"Legacy","slots":null}')`, templateID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.Exec(`INSERT INTO template_media(id,template_id,name,content_type,size_bytes,storage_key,sha256) VALUES($1,$2,'legacy.png','image/png',12,'unchanged-legacy-key','legacy-hash')`, id, templateID); err != nil {
@@ -173,7 +170,7 @@ func TestUnifiedLegacyBytesAndPrivateIsolation(t *testing.T) {
 		t.Fatal(err)
 	}
 	templateID := uuid.NewString()
-	if _, err = db.Exec(`INSERT INTO generation_templates(id,draft) VALUES($1,'{"title":"Legacy","slots":null}')`, templateID); err != nil {
+	if _, err = db.Exec(`INSERT INTO generation_templates(id,content) VALUES($1,'{"title":"Legacy","slots":null}')`, templateID); err != nil {
 		t.Fatal(err)
 	}
 	ids := []string{uuid.NewString(), uuid.NewString()}

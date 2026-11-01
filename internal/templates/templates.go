@@ -1,9 +1,10 @@
-// Package templates defines versioned instance-wide generation recipes. It never
+// Package templates defines current instance-wide generation recipes. It never
 // owns a customer's key, inputs or results.
 package templates
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"regexp"
@@ -47,13 +48,30 @@ type Definition struct {
 	CoverID         string            `json:"cover_id"`
 }
 type Record struct {
-	ID        string      `json:"id"`
-	Version   int64       `json:"version"`
-	Revision  int64       `json:"revision"`
-	Draft     Definition  `json:"draft"`
+	ID       string `json:"id"`
+	Version  int64  `json:"version"`
+	Revision int64  `json:"revision"`
+	// Draft is the legacy Go name of the ONE current content.
+	Draft Definition `json:"draft"`
+	// Published is a visibility view only, derived from the same current content.
 	Published *Definition `json:"published,omitempty"`
 	UpdatedAt time.Time   `json:"updated_at"`
 }
+
+// MarshalJSON keeps legacy clients working without exposing a second definition.
+func (r Record) MarshalJSON() ([]byte, error) {
+	type legacy Record
+	value := legacy(r)
+	if value.Published != nil {
+		value.Published = &value.Draft
+	}
+	return json.Marshal(struct {
+		legacy
+		Content     Definition `json:"content"`
+		IsPublished bool       `json:"is_published"`
+	}{value, r.Draft, r.Published != nil})
+}
+
 type Asset struct {
 	StorageOwnerID     string `json:"-"`
 	Name               string `json:"name,omitempty"`

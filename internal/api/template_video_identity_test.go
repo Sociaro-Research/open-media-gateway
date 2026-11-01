@@ -78,12 +78,12 @@ func TestTemplateThreeVideoIdentityAndPublication(t *testing.T) {
 	}
 	d.Slots[0].AssetID = c.ID
 	write(2, "")
-	if repo.items[id].Published.Slots[0].AssetID != a.ID || repo.items[id].Draft.Slots[0].AssetID != c.ID || repo.items[id].Revision != 2 {
-		t.Fatal("draft save changed published bytes")
+	if repo.items[id].Published.Slots[0].AssetID != c.ID || repo.items[id].Draft.Slots[0].AssetID != c.ID || repo.items[id].Revision != 3 {
+		t.Fatal("published Save did not update current bytes")
 	}
 	before := sendTest(h, "GET", "/v1/templates/"+id, "", "", "service-secret")
-	if strings.Contains(before.Body.String(), c.ID) {
-		t.Fatal("draft replacement exposed before publication", before.Body.String())
+	if !strings.Contains(before.Body.String(), c.ID) {
+		t.Fatal("saved replacement not exposed", before.Body.String())
 	}
 	write(3, "publish")
 	if repo.items[id].Published.Slots[0].AssetID != c.ID || repo.items[id].Published.CoverID != a.ID || repo.items[id].Revision != 4 {
@@ -132,5 +132,5 @@ func TestTemplateThreeVideoIdentityAndPublication(t *testing.T) {
 			t.Fatal(info)
 		}
 	}
-	t.Log("PASS rejected uploads did not persist; accepted third asset kept distinct hash/ID/bytes; draft retains old publication, explicit publish changes slot while cover remains first video")
+	t.Log("PASS rejected uploads did not persist; accepted third asset kept distinct hash/ID/bytes; published Save changes the current slot while cover remains first video")
 }

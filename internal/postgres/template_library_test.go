@@ -118,7 +118,7 @@ func TestTemplateReferenceSourceCopyDeleteSerialization(t *testing.T) {
 		t.Fatal("delete passed in-flight source lock", e)
 	case <-time.After(50 * time.Millisecond):
 	}
-	if _, e = tx.ExecContext(ctx, `UPDATE generation_templates SET draft=jsonb_set(draft,'{cover_id}',to_jsonb($1::text)) WHERE id=$2`, source.ID, id); e != nil {
+	if _, e = tx.ExecContext(ctx, `UPDATE generation_templates SET content=jsonb_set(content,'{cover_id}',to_jsonb($1::text)) WHERE id=$2`, source.ID, id); e != nil {
 		t.Fatal(e)
 	}
 	if e = tx.Commit(); e != nil {

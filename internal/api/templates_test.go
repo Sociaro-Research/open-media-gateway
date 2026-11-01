@@ -55,7 +55,7 @@ func (m *templateMemory) Save(_ context.Context, v templates.Record, version int
 	v.Version = version + 1
 	v.Revision = old.Revision
 	v.Published = old.Published
-	if action == "publish" {
+	if action == "publish" || action == "" && old.Published != nil {
 		d := v.Draft
 		v.Published = &d
 		v.Revision = v.Version
@@ -300,7 +300,7 @@ func TestTemplatesAuthorUsePermissionsAndExactInputs(t *testing.T) {
 		t.Fatal(w.Body.String())
 	}
 	svc.catalog[0].Models = []core.MediaModel{templateTestModel()}
-	// Concurrent edits retain the old published revision; stale writes fail.
+	// Stale concurrent writes fail without replacing current content.
 	edit := record
 	edit.Draft.Title = "New draft"
 	repo.items[id] = edit

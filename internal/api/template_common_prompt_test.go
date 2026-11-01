@@ -58,7 +58,7 @@ func TestCommonTemplatePromptTransmission(t *testing.T) {
 		})
 	}
 }
-func TestOldPublishedTemplateIsNotReinterpretedOnDraftUpgrade(t *testing.T) {
+func TestPublishedTemplateSaveAppliesValidatedPromptSyntax(t *testing.T) {
 	s, repo, _, _ := templateFixture(t)
 	id := uuid.NewString()
 	m := templateTestModel()
@@ -77,10 +77,10 @@ func TestOldPublishedTemplateIsNotReinterpretedOnDraftUpgrade(t *testing.T) {
 		t.Fatal(w.Code, w.Body.String())
 	}
 	record := repo.items[id]
-	if record.Published.Prompt != "Image 1 moves" || record.Published.Syntax != "numbered" || record.Draft.Syntax != templates.UIReferenceSyntax || !strings.Contains(record.Draft.Prompt, "@Picture_1") {
+	if record.Published.Prompt != next.Prompt || record.Published.Syntax != templates.UIReferenceSyntax || record.Draft.Syntax != templates.UIReferenceSyntax || !strings.Contains(record.Draft.Prompt, "@Picture_1") {
 		t.Fatal(record)
 	}
 	if err := record.Published.Compatible(m); err != nil {
-		t.Fatal("old published revision unavailable", err)
+		t.Fatal("saved current content unavailable", err)
 	}
 }

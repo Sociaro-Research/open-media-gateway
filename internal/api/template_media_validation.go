@@ -35,7 +35,7 @@ func (s *Server) templateValidateInputs(w http.ResponseWriter, r *http.Request) 
 		templateError(w, referencevalidation.Invalid("References", "Selected model is unavailable."))
 		return
 	}
-	d := *item.Published
+	d := item.Draft
 	if err = d.Compatible(model); err != nil {
 		templateError(w, err)
 		return

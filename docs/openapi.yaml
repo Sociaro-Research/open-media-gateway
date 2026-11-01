@@ -7420,14 +7420,14 @@ paths:
     get:
       tags: [Templates]
       operationId: listTemplateDrafts
-      summary: Administrator-only draft catalog and shared provider models
+      summary: Administrator-only current template catalog and shared provider models
       responses:
-        '200': {description: Versioned draft and separate published definitions}
+        '200': {description: Current template records and shared provider models; publication is a visibility flag}
         '403': {description: System Administrator role and system scope required}
     post:
       tags: [Templates]
       operationId: createTemplateDraft
-      summary: Create an incomplete template draft
+      summary: Create an unpublished template with one current content
       requestBody:
         required: true
         content:
@@ -7438,11 +7438,15 @@ paths:
               properties:
                 id: {type: string, format: uuid, description: Reuse the same ID to recover an uncertain create response.}
                 version: {type: integer, const: 0}
+                content: {$ref: '#/components/schemas/TemplateDefinition'}
                 draft: {$ref: '#/components/schemas/TemplateDefinition'}
+              anyOf:
+              - {required: [content]}
+              - {required: [draft]}
       responses:
-        '201': {description: Created versioned draft in an available model's References workflow}
+        '201': {description: Created unpublished TemplateRecord in an available model's References workflow}
         '400': {description: Missing or unsupported default model, output or reference workflow}
-        '200': {description: Existing draft recovered by the same create ID}
+        '200': {description: Existing current record recovered by the same create ID}
         '403': {description: Administrator required; company roles do not grant publishing}
   /v1/system/template-references:
     get:
@@ -7493,7 +7497,7 @@ paths:
       tags: [Templates]
       operationId: deleteSharedTemplateReference
       summary: Delete an unused shared source as a template creator
-      description: Active draft and published reference/cover bindings protect an asset under the same transaction lock as binding writes. A reference_in_use error includes every blocking template name, stable id and navigation URL. Unpublishing preserves draft uses; removed templates cannot be restored by the current lifecycle. Failed physical deletion remains retryable and cannot be selected or rebound.
+      description: Active current-content reference/cover bindings protect an asset under the same transaction lock as binding writes. A reference_in_use error includes every blocking template name, stable id and navigation URL. Unpublishing preserves current-content uses; removed templates cannot be restored by the current lifecycle. Failed physical deletion remains retryable and cannot be selected or rebound.
       responses:
         '204': {description: Shared asset deleted}
         '403': {description: Creator permission required}
@@ -7526,13 +7530,18 @@ paths:
     get:
       tags: [Templates]
       operationId: getTemplateDraft
-      summary: Read an Administrator's versioned draft and publication state
+      summary: Read an Administrator's current content and publication state
       responses:
-        '200': {description: Template record with draft, published, version and revision}
+        '200':
+          description: One current content and visibility; legacy aliases resolve to that same content
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/TemplateRecord'}
     put:
       tags: [Templates]
       operationId: saveTemplateDraft
       summary: Save, publish or unpublish a template with optimistic concurrency
+      description: Save replaces the single current content. If published, the validated replacement immediately applies to subsequent generations; otherwise it remains unpublished. The action field alone toggles visibility. Publish or unpublish may contain only version and action. Supply content or the legacy draft alias; conflicting aliases are rejected. See template-api.md for token and schema-transition semantics.
       requestBody:
         required: true
         content:
@@ -7540,16 +7549,26 @@ paths:
             schema:
               type: object
               additionalProperties: false
-              required: [version, draft]
+              required: [version]
+              anyOf:
+              - {required: [content]}
+              - {required: [draft]}
+              - {required: [action], properties: {action: {enum: [publish, unpublish]}}}
               properties:
-                version: {type: integer, minimum: 1}
+                version: {type: integer, minimum: 1, description: Opaque optimistic edit token from the current record.}
                 action: {type: string, enum: ['', publish, unpublish]}
+                content: {$ref: '#/components/schemas/TemplateDefinition'}
                 draft: {$ref: '#/components/schemas/TemplateDefinition'}
       responses:
-        '200': {description: Updated draft; only publish replaces the live revision}
-        '400': {description: Draft or publication violates the References-only workflow, or publication failed slot, model, media or cover validation}
+        '200':
+          description: Saved current content and visibility; no separate published definition
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/TemplateRecord'}
+        '400': {description: Conflicting aliases or invalid content; publish and published Save require valid slots, model, media and an explicit image/video cover. No content is changed on failure.}
+        '404': {description: Template or selected shared media unavailable; previous current content remains unchanged}
         '403': {description: Administrator required}
-        '409': {description: Concurrent edit; retain and review the draft}
+        '409': {description: Concurrent edit; reload the current record and review local changes}
     delete:
       tags: [Templates]
       operationId: removeTemplate
@@ -7871,7 +7890,7 @@ components:
     TemplateDefinition:
       type: object
       additionalProperties: false
-      description: Drafts may be incomplete but creation and saves require an available image/video model with the explicit references workflow. Known fixed-media incompatibilities are rejected on save and binding. Publication requires at least one reviewed reference slot and validates every binding and the native request contract before freezing admission defaults. Availability uses the same native validation without quoting or admitting a task. No generation reference URLs are allowed in options.
+      description: Unpublished current content may be incomplete but creation and saves require an available image/video model with the explicit references workflow. Known fixed-media incompatibilities are rejected on save and binding. Publish and every published Save require an explicit accessible shared image/video cover and at least one reviewed reference slot, and validate every binding and the native request contract before freezing admission defaults. Availability uses the same native validation without quoting or admitting a task. No generation reference URLs are allowed in options.
       properties:
         title: {type: string, maxLength: 120}
         description: {type: string, maxLength: 500}
@@ -7890,7 +7909,7 @@ components:
             audio: {type: integer, minimum: 0, maximum: 64}
         options: {$ref: '#/components/schemas/MediaOptions'}
         override_sound_id: {type: string, description: Optional shared audio asset ID. Video templates only; replaces all generated sound without video transcoding.}
-        cover_id: {type: string, description: Template-owned fixed image/video or separately uploaded cover ID}
+        cover_id: {type: string, description: Explicit accessible shared Template library image/video ID. Required to publish or save published content; no implicit reference fallback. May be empty while unpublished.}
         slots:
           type: array
           items:
@@ -7904,12 +7923,25 @@ components:
               role: {type: string}
               label: {type: string, maxLength: 120}
               asset_id: {type: string, description: Shared fixed asset; omitted for a user-supplied slot}
+    TemplateRecord:
+      type: object
+      required: [id, version, revision, content, is_published, draft, updated_at]
+      description: One current definition and visibility. Tokens provide concurrency and stale-input protection, not a user-facing version history.
+      properties:
+        id: {type: string, format: uuid}
+        version: {type: integer, minimum: 1, description: Opaque edit token; send it with every update or visibility toggle.}
+        revision: {type: integer, minimum: 0, description: Opaque generation token; a published Save or publish replaces it. Stale generation, estimate, input validation and Advanced editing requests fail with 409.}
+        content: {$ref: '#/components/schemas/TemplateDefinition'}
+        is_published: {type: boolean, description: Read-only visibility state; use action to change it.}
+        draft: {$ref: '#/components/schemas/TemplateDefinition', description: Legacy alias of content; never a second editable source.}
+        published: {$ref: '#/components/schemas/TemplateDefinition', description: Legacy alias of content when visible; omitted when unpublished.}
+        updated_at: {type: string, format: date-time}
     TemplateGenerationRequest:
       type: object
       additionalProperties: false
       required: [revision, provider, model, inputs]
       properties:
-        revision: {type: integer, minimum: 1}
+        revision: {type: integer, minimum: 1, description: Current opaque generation token; a changed template requires reloading and reviewing input choices.}
         provider: {type: string}
         model: {type: string}
         inputs:

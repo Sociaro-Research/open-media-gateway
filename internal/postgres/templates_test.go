@@ -15,7 +15,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func TestTemplatePublicationSnapshotsCASAndLifetime(t *testing.T) {
+func TestTemplateCurrentContentCASAndJobLifetime(t *testing.T) {
 	db := auditDatabase(t, true)
 	ctx := context.Background()
 	repo := NewTemplateRepository(db)
@@ -35,7 +35,7 @@ func TestTemplatePublicationSnapshotsCASAndLifetime(t *testing.T) {
 	if e != nil || item.Revision != 2 || item.Published == nil {
 		t.Fatal(item, e)
 	}
-	// A single winner, with no silent lost updates or unintended publication.
+	// A single winner; the accepted edit immediately becomes the visible content.
 	var wg sync.WaitGroup
 	results := make(chan error, 2)
 	for _, name := range []string{"Alice draft", "Bob draft"} {
@@ -64,8 +64,8 @@ func TestTemplatePublicationSnapshotsCASAndLifetime(t *testing.T) {
 		t.Fatal(wins, conflicts)
 	}
 	item, e = NewTemplateRepository(db).Get(ctx, id)
-	if e != nil || item.Published.Title != "Initial draft" || item.Revision != 2 {
-		t.Fatal("draft reinterpreted live revision", item, e)
+	if e != nil || item.Published.Title != item.Draft.Title || item.Revision != 3 {
+		t.Fatal("saved content and visibility view diverged", item, e)
 	}
 	user, e := NewAuthRepository(db).UpsertGoogleUser(ctx, uuid.NewString(), uuid.NewString()+"@example.test", "Author", "")
 	if e != nil {
@@ -86,7 +86,7 @@ func TestTemplatePublicationSnapshotsCASAndLifetime(t *testing.T) {
 	// An active admission holds publication stable, including against unpublish.
 	entered, release, done := make(chan struct{}), make(chan struct{}), make(chan error, 1)
 	go func() {
-		done <- repo.WithPublished(ctx, id, 2, func(current templates.Record) error {
+		done <- repo.WithPublished(ctx, id, item.Revision, func(current templates.Record) error {
 			close(entered)
 			<-release
 			if current.Published.Prompt != "Immutable scene" {
@@ -110,7 +110,7 @@ func TestTemplatePublicationSnapshotsCASAndLifetime(t *testing.T) {
 	if e = <-editDone; e != nil {
 		t.Fatal(e)
 	}
-	if e = repo.WithPublished(ctx, id, 2, func(templates.Record) error { t.Fatal("unpublished admitted"); return nil }); !errors.Is(e, templates.ErrNotFound) {
+	if e = repo.WithPublished(ctx, id, item.Revision, func(templates.Record) error { t.Fatal("unpublished admitted"); return nil }); !errors.Is(e, templates.ErrNotFound) {
 		t.Fatal(e)
 	}
 	retained, e := tasks.Get(owner, accepted.ID)

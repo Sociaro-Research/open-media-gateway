@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"reflect"
 	"strings"
 	"time"
 
@@ -141,13 +142,25 @@ func (s *Server) templateAdmin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		ID      string               `json:"id"`
-		Version int64                `json:"version"`
-		Action  string               `json:"action"`
-		Draft   templates.Definition `json:"draft"`
+		ID      string                `json:"id"`
+		Version int64                 `json:"version"`
+		Action  string                `json:"action"`
+		Draft   *templates.Definition `json:"draft"`
+		Content *templates.Definition `json:"content"`
 	}
 	if !decodeSystemLimit(w, r, &in, 65536) {
 		return
+	}
+	var definition templates.Definition
+	if in.Content != nil {
+		definition = *in.Content
+	}
+	if in.Draft != nil {
+		if in.Content != nil && !reflect.DeepEqual(*in.Content, *in.Draft) {
+			templateError(w, templates.ErrInvalid)
+			return
+		}
+		definition = *in.Draft
 	}
 	if r.Method == "POST" {
 		if in.ID == "" {
@@ -177,74 +190,87 @@ func (s *Server) templateAdmin(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "DELETE" {
 		in.Action = "remove"
 	}
-	if in.Action == "unpublish" || in.Action == "remove" {
+	var current *templates.Record
+	if r.Method != "POST" {
 		old, e := s.templates.Get(r.Context(), id)
 		if e != nil {
 			templateError(w, e)
 			return
 		}
-		in.Draft = old.Draft
-	}
-	if in.Action != "unpublish" && in.Action != "remove" {
-		model, ok := templateModel(s.visibleCatalog(r), in.Draft.Provider, in.Draft.Model)
-		if !ok {
-			templateError(w, fmt.Errorf("%w: default model is unavailable", templates.ErrInvalid))
+		if old.Version != in.Version {
+			templateError(w, templates.ErrConflict)
 			return
 		}
-		if _, err := templates.AuthoringMode(model, in.Draft.Options.ReferenceMode); err != nil {
-			templateError(w, err)
-			return
-		}
-		if err := in.Draft.ValidateGenerationOptions(model); err != nil {
-			templateError(w, err)
-			return
-		}
-		if in.Draft.MediaType != model.MediaType {
-			templateError(w, templates.ErrInvalid)
-			return
+		current = &old
+		if in.Action == "unpublish" || in.Action == "remove" || (in.Action == "publish" && in.Draft == nil && in.Content == nil) {
+			definition = old.Draft
 		}
 	}
-	if in.Draft.Options.OverrideSound != nil || in.Draft.Options.OverrideSoundID != "" {
+	if in.Draft == nil && in.Content == nil && in.Action == "" {
 		templateError(w, templates.ErrInvalid)
 		return
 	}
-	if in.Draft.OverrideSoundID != "" {
-		if in.Draft.MediaType != "video" {
-			templateError(w, templates.ErrInvalid)
-			return
-		}
-		if _, err := s.templateAsset(r.Context(), in.Draft.OverrideSoundID, id, "audio"); err != nil {
-			templateError(w, err)
-			return
-		}
-	}
-	item := templates.Record{ID: id, Draft: in.Draft}
-	if in.Action == "" && in.Draft.Provider != "" && in.Draft.Model != "" {
-		if e := s.validateDraftMedia(r, id, in.Draft); e != nil {
-			templateError(w, e)
-			return
-		}
-	}
-	if in.Action == "publish" {
-		model, ok := templateModel(s.visibleCatalog(r), in.Draft.Provider, in.Draft.Model)
+	liveSave := in.Action == "publish" || (in.Action == "" && current != nil && current.Published != nil)
+	if in.Action != "unpublish" && in.Action != "remove" {
+		model, ok := templateModel(s.visibleCatalog(r), definition.Provider, definition.Model)
 		if !ok {
 			templateError(w, fmt.Errorf("%w: default model is unavailable", templates.ErrInvalid))
 			return
 		}
-		if e := in.Draft.Validate(model); e != nil {
+		if _, err := templates.AuthoringMode(model, definition.Options.ReferenceMode); err != nil {
+			templateError(w, err)
+			return
+		}
+		if err := definition.ValidateGenerationOptions(model); err != nil {
+			templateError(w, err)
+			return
+		}
+		if definition.MediaType != model.MediaType {
+			templateError(w, templates.ErrInvalid)
+			return
+		}
+	}
+	if definition.Options.OverrideSound != nil || definition.Options.OverrideSoundID != "" {
+		templateError(w, templates.ErrInvalid)
+		return
+	}
+	if definition.OverrideSoundID != "" {
+		if definition.MediaType != "video" {
+			templateError(w, templates.ErrInvalid)
+			return
+		}
+		if _, err := s.templateAsset(r.Context(), definition.OverrideSoundID, id, "audio"); err != nil {
+			templateError(w, err)
+			return
+		}
+	}
+	item := templates.Record{ID: id, Draft: definition}
+	if in.Action == "" && definition.Provider != "" && definition.Model != "" {
+		if e := s.validateDraftMedia(r, id, definition); e != nil {
 			templateError(w, e)
 			return
 		}
-		if e := s.checkTemplateAssets(r.Context(), id, in.Draft); e != nil {
+	}
+	if liveSave {
+		model, ok := templateModel(s.visibleCatalog(r), definition.Provider, definition.Model)
+		if !ok {
+			templateError(w, fmt.Errorf("%w: default model is unavailable", templates.ErrInvalid))
+			return
+		}
+		if e := definition.Validate(model); e != nil {
 			templateError(w, e)
 			return
 		}
-		if e := s.checkTemplateModelMedia(r.Context(), id, in.Draft, model); e != nil {
+		if e := s.checkTemplateAssets(r.Context(), id, definition); e != nil {
+			templateError(w, e)
+			return
+		}
+		if e := s.checkTemplateModelMedia(r.Context(), id, definition, model); e != nil {
 			templateError(w, e)
 			return
 		}
 		// Freeze the same defaults admission will use; references are resolved later.
-		normalized, e := s.validateTemplateRequest(r.Context(), in.Draft, in.Draft.Provider, model)
+		normalized, e := s.validateTemplateRequest(r.Context(), definition, definition.Provider, model)
 		if e != nil {
 			templateError(w, e)
 			return
@@ -492,14 +518,14 @@ func (s *Server) templateGallery(w http.ResponseWriter, r *http.Request) {
 	}
 	data := []any{}
 	for _, item := range items {
-		if item.Published == nil || item.Published.WorkflowError() != nil {
+		if item.Published == nil || item.Draft.WorkflowError() != nil {
 			continue
 		}
-		a, e := s.templates.Asset(r.Context(), item.Published.CoverID)
+		a, e := s.templates.Asset(r.Context(), item.Draft.CoverID)
 		if e != nil {
 			continue
 		}
-		data = append(data, map[string]any{"id": item.ID, "revision": item.Revision, "title": item.Published.Title, "description": item.Published.Description, "cover_url": s.templateAssetURL(a.ID), "cover_type": a.ContentType})
+		data = append(data, map[string]any{"id": item.ID, "revision": item.Revision, "title": item.Draft.Title, "description": item.Draft.Description, "cover_url": s.templateAssetURL(a.ID), "cover_type": a.ContentType})
 	}
 	s.writeViewerJSON(w, r, 200, map[string]any{"data": data})
 }
@@ -509,18 +535,18 @@ func (s *Server) templateUse(w http.ResponseWriter, r *http.Request) {
 		templateError(w, templates.ErrNotFound)
 		return
 	}
-	fixedFiles, complete, fixedError := s.fixedTemplateMedia(r.Context(), item.ID, *item.Published)
+	fixedFiles, complete, fixedError := s.fixedTemplateMedia(r.Context(), item.ID, item.Draft)
 	catalog := []core.ProviderDescriptor{}
 	defaultAvailable := false
 	for _, p := range s.visibleCatalog(r) {
 		models := []core.MediaModel{}
 		for _, m := range p.Models {
-			if item.Published.Compatible(m) == nil && fixedError == nil && templates.ValidateRequestFiles(m, item.Published.Options, fixedFiles, complete) == nil {
-				if _, e := s.validateTemplateRequest(r.Context(), *item.Published, p.ID, m); e != nil {
+			if item.Draft.Compatible(m) == nil && fixedError == nil && templates.ValidateRequestFiles(m, item.Draft.Options, fixedFiles, complete) == nil {
+				if _, e := s.validateTemplateRequest(r.Context(), item.Draft, p.ID, m); e != nil {
 					continue
 				}
 				models = append(models, m)
-				if p.ID == item.Published.Provider && m.ID == item.Published.Model {
+				if p.ID == item.Draft.Provider && m.ID == item.Draft.Model {
 					defaultAvailable = true
 				}
 			}
@@ -531,13 +557,13 @@ func (s *Server) templateUse(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	assetError := ""
-	if e = s.checkTemplateAssets(r.Context(), item.ID, *item.Published); e != nil || fixedError != nil {
+	if e = s.checkTemplateAssets(r.Context(), item.ID, item.Draft); e != nil || fixedError != nil {
 		assetError = "A fixed reference or cover is unavailable. Ask an Administrator to repair this template."
 	}
 	// Expose only the fixed copies in this exact published recipe. Source-library
 	// records and draft-only replacements are never part of a consumer response.
 	fixed := []map[string]string{}
-	for _, slot := range item.Published.Slots {
+	for _, slot := range item.Draft.Slots {
 		if slot.AssetID == "" {
 			continue
 		}
@@ -547,7 +573,7 @@ func (s *Server) templateUse(w http.ResponseWriter, r *http.Request) {
 		}
 		fixed = append(fixed, map[string]string{"slot_id": slot.ID, "asset_id": a.ID, "name": a.Name, "content_type": a.ContentType, "url": s.templateAssetURL(a.ID)})
 	}
-	s.writeViewerJSON(w, r, 200, map[string]any{"id": item.ID, "revision": item.Revision, "template": item.Published, "fixed_references": fixed, "catalog": catalog, "default_available": defaultAvailable, "asset_error": assetError, "workflow_error": templateWorkflowError(*item.Published)})
+	s.writeViewerJSON(w, r, 200, map[string]any{"id": item.ID, "revision": item.Revision, "template": item.Draft, "fixed_references": fixed, "catalog": catalog, "default_available": defaultAvailable, "asset_error": assetError, "workflow_error": templateWorkflowError(item.Draft)})
 }
 
 // Use the same normalized request and native validator as admission, with one
@@ -594,7 +620,7 @@ func (s *Server) resolveTemplate(r *http.Request, item templates.Record, in temp
 	if item.Revision != in.Revision {
 		return input, templates.ErrConflict
 	}
-	d := *item.Published
+	d := item.Draft
 	model, ok := templateModel(s.visibleCatalog(r), in.Provider, in.Model)
 	if !ok {
 		return input, fmt.Errorf("%w: model is unavailable to this key", templates.ErrInvalid)

@@ -46,6 +46,10 @@ func TestOverrideSoundBindingsAndActiveJobPin(t *testing.T) {
 		t.Fatal(err)
 	}
 	recipe.Draft.OverrideSoundID = ""
+	recipe, err = recipes.Save(ctx, recipe, recipe.Version, "")
+	if err != nil {
+		t.Fatal(err)
+	}
 	recipe, err = recipes.Save(ctx, recipe, recipe.Version, "unpublish")
 	if err != nil {
 		t.Fatal(err)

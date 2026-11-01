@@ -22,7 +22,7 @@ func (s *Server) templateEditing(w http.ResponseWriter, r *http.Request) {
 	}
 	var snapshot map[string]any
 	err := s.templates.WithPublished(r.Context(), r.PathValue("template"), in.Revision, func(item templates.Record) error {
-		d := *item.Published
+		d := item.Draft
 		model, ok := templateModel(s.visibleCatalog(r), in.Provider, in.Model)
 		if !ok {
 			return fmt.Errorf("%w: selected model is unavailable", templates.ErrInvalid)

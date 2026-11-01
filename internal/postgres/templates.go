@@ -67,28 +67,29 @@ func (r *TemplateRepository) Close() error {
 	return nil
 }
 
-const templateColumns = `id,version,revision,draft,published,updated_at`
+const templateColumns = `id,version,revision,content,is_published,updated_at`
 
 func scanTemplate(row rowScanner) (templates.Record, error) {
 	var value templates.Record
-	var draft, published []byte
-	err := row.Scan(&value.ID, &value.Version, &value.Revision, &draft, &published, &value.UpdatedAt)
+	var content []byte
+	var published bool
+	err := row.Scan(&value.ID, &value.Version, &value.Revision, &content, &published, &value.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return value, templates.ErrNotFound
 	}
 	if err != nil {
 		return value, err
 	}
-	if err = json.Unmarshal(draft, &value.Draft); err != nil {
+	if err = json.Unmarshal(content, &value.Draft); err != nil {
 		return value, err
 	}
-	if len(published) > 0 {
-		err = json.Unmarshal(published, &value.Published)
+	if published {
+		value.Published = &value.Draft
 	}
 	return value, err
 }
 func (r *TemplateRepository) List(ctx context.Context, admin bool) ([]templates.Record, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT `+templateColumns+` FROM generation_templates WHERE removed_at IS NULL AND ($1 OR published IS NOT NULL) ORDER BY updated_at DESC,id`, admin)
+	rows, err := r.db.QueryContext(ctx, `SELECT `+templateColumns+` FROM generation_templates WHERE removed_at IS NULL AND ($1 OR is_published) ORDER BY updated_at DESC,id`, admin)
 	if err != nil {
 		return nil, err
 	}
@@ -110,6 +111,12 @@ func (r *TemplateRepository) Get(ctx context.Context, id string) (templates.Reco
 	return scanTemplate(r.db.QueryRowContext(ctx, `SELECT `+templateColumns+` FROM generation_templates WHERE id=$1 AND removed_at IS NULL`, id))
 }
 func (r *TemplateRepository) Save(ctx context.Context, input templates.Record, expected int64, action string) (templates.Record, error) {
+	if expected == 0 && action != "" {
+		return input, templates.ErrInvalid
+	}
+	if action != "" && action != "publish" && action != "unpublish" && action != "remove" {
+		return input, templates.ErrInvalid
+	}
 	locks, err := r.publicationDB(ctx)
 	if err != nil {
 		return input, err
@@ -125,10 +132,17 @@ func (r *TemplateRepository) Save(ctx context.Context, input templates.Record, e
 	}
 	// Wait for in-flight admissions before acquiring the asset lock. Holding
 	// the asset lock while waiting for this row could deadlock downstream reads.
+	var current templates.Record
 	if expected > 0 {
-		var locked string
-		if err = tx.QueryRowContext(ctx, `SELECT id FROM generation_templates WHERE id=$1 AND removed_at IS NULL FOR UPDATE`, input.ID).Scan(&locked); err != nil {
+		current, err = scanTemplate(tx.QueryRowContext(ctx, `SELECT `+templateColumns+` FROM generation_templates WHERE id=$1 AND removed_at IS NULL FOR UPDATE`, input.ID))
+		if err != nil {
 			return input, err
+		}
+		if current.Version != expected {
+			return input, templates.ErrConflict
+		}
+		if action == "unpublish" || action == "remove" {
+			input.Draft = current.Draft
 		}
 	}
 	if _, err = tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(199079)`); err != nil {
@@ -155,7 +169,7 @@ func (r *TemplateRepository) Save(ctx context.Context, input templates.Record, e
 		if e != nil {
 			return input, e
 		}
-		result, e := tx.ExecContext(ctx, `INSERT INTO generation_templates(id,draft) VALUES($1,$2) ON CONFLICT DO NOTHING`, input.ID, draft)
+		result, e := tx.ExecContext(ctx, `INSERT INTO generation_templates(id,content) VALUES($1,$2) ON CONFLICT DO NOTHING`, input.ID, draft)
 		if e != nil {
 			return input, e
 		}
@@ -164,24 +178,19 @@ func (r *TemplateRepository) Save(ctx context.Context, input templates.Record, e
 			return input, templates.ErrConflict
 		}
 	} else {
-		current, e := scanTemplate(tx.QueryRowContext(ctx, `SELECT `+templateColumns+` FROM generation_templates WHERE id=$1 AND removed_at IS NULL FOR UPDATE`, input.ID))
-		if e != nil {
-			return input, e
-		}
-		if current.Version != expected {
-			return input, templates.ErrConflict
-		}
 		draft, e := json.Marshal(input.Draft)
 		if e != nil {
 			return input, e
 		}
-		published := any(nil)
-		revision := current.Revision
-		if current.Published != nil {
-			data, _ := json.Marshal(current.Published)
-			published = data
-		}
+		published := current.Published != nil
 		if action == "publish" {
+			published = true
+		}
+		if action == "unpublish" || action == "remove" {
+			published = false
+		}
+		revision := current.Revision
+		if published {
 			for _, id := range ids {
 				if id != "" {
 					if _, e := tx.ExecContext(ctx, `UPDATE reference_images SET template_published=true WHERE owner_id=$1 AND id::text=$2`, templates.LibraryOwnerID, id); e != nil {
@@ -191,11 +200,8 @@ func (r *TemplateRepository) Save(ctx context.Context, input templates.Record, e
 			}
 
 			revision = expected + 1
-			published = draft
-		} else if action == "unpublish" || action == "remove" {
-			published = nil
 		}
-		_, err = tx.ExecContext(ctx, `UPDATE generation_templates SET version=version+1,revision=$3,draft=$4,published=$5,updated_at=now(),removed_at=CASE WHEN $6 THEN now() ELSE NULL END WHERE id=$1 AND version=$2`, input.ID, expected, revision, draft, published, action == "remove")
+		_, err = tx.ExecContext(ctx, `UPDATE generation_templates SET version=version+1,revision=$3,content=$4,is_published=$5,updated_at=now(),removed_at=CASE WHEN $6 THEN now() ELSE NULL END WHERE id=$1 AND version=$2`, input.ID, expected, revision, draft, published, action == "remove")
 		if err != nil {
 			return input, err
 		}
@@ -215,7 +221,7 @@ func (r *TemplateRepository) Asset(ctx context.Context, id string) (templates.As
 		return a, templates.ErrNotFound
 	}
 	e := r.db.QueryRowContext(ctx, `SELECT r.id,'',r.content_type,r.size_bytes,r.storage_key,COALESCE(r.content_sha256,''),
- r.template_published OR COALESCE((SELECT bool_or(published) FROM template_media WHERE id=r.id),false) OR EXISTS(SELECT 1 FROM generation_templates t WHERE t.published->>'cover_id'=r.id::text OR t.published->>'override_sound_id'=r.id::text OR EXISTS(SELECT 1 FROM jsonb_array_elements(COALESCE(NULLIF(t.published->'slots','null'::jsonb),'[]')) s WHERE s->>'asset_id'=r.id::text)),r.name,r.id,COALESCE(r.storage_owner_id::text,r.owner_id::text)
+ r.template_published OR COALESCE((SELECT bool_or(published) FROM template_media WHERE id=r.id),false) OR EXISTS(SELECT 1 FROM generation_templates t WHERE t.is_published AND (t.content->>'cover_id'=r.id::text OR t.content->>'override_sound_id'=r.id::text OR EXISTS(SELECT 1 FROM jsonb_array_elements(COALESCE(NULLIF(t.content->'slots','null'::jsonb),'[]')) s WHERE s->>'asset_id'=r.id::text))),r.name,r.id,COALESCE(r.storage_owner_id::text,r.owner_id::text)
  FROM reference_images r WHERE NOT r.deleting AND r.owner_id=$2 AND r.id=$1`, id, templates.LibraryOwnerID).Scan(&a.ID, &a.TemplateID, &a.ContentType, &a.SizeBytes, &a.StorageKey, &a.SHA256, &a.Published, &a.Name, &a.LibraryReferenceID, &a.StorageOwnerID)
 	if errors.Is(e, sql.ErrNoRows) {
 		e = templates.ErrNotFound

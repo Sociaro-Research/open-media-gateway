@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -202,6 +203,46 @@ func TestTemplateSharedValidationPersistedLifecycle(t *testing.T) {
 	}
 	if !strings.Contains(string(svc.input.TemplateSnapshot), id) || !strings.Contains(string(svc.input.TemplateSnapshot), `"revision":3`) || len(svc.input.Options.ImageURLs) != 1 || len(svc.input.Options.VideoURLs) != 1 {
 		t.Fatal("recipe assembly changed", svc.input)
+	}
+	// Published Save is validated before the real repository changes anything.
+	beforeRecord, _ := json.Marshal(persisted)
+	invalid := d
+	invalid.CoverID = ""
+	rejected = call("PUT", "/v1/system/templates/"+id, map[string]any{"version": persisted.Version, "content": invalid}, "alice", "")
+	if rejected.code < 400 {
+		t.Fatal("missing cover accepted on published Save", rejected)
+	}
+	unchanged, e := repo.Get(context.Background(), id)
+	if e != nil {
+		t.Fatal(e)
+	}
+	afterRecord, _ := json.Marshal(unchanged)
+	if !bytes.Equal(beforeRecord, afterRecord) {
+		t.Fatal("failed published Save mutated persisted content")
+	}
+	acceptedSnapshot := append([]byte(nil), svc.input.TemplateSnapshot...)
+	d.Prompt = "Image 1 now follows Video 1"
+	updated := call("PUT", "/v1/system/templates/"+id, map[string]any{"version": persisted.Version, "content": d}, "alice", "")
+	if updated.code != 200 {
+		t.Fatal(updated)
+	}
+	current, e := repo.Get(context.Background(), id)
+	if e != nil || current.Revision <= persisted.Revision || current.Draft.Prompt != d.Prompt || current.Published == nil || current.Published.Prompt != d.Prompt || current.Draft.CoverID != asset.ID || current.Draft.Slots[1].AssetID != asset.ID {
+		t.Fatal("published Save not current", current, e)
+	}
+	for _, endpoint := range []string{"generations", "estimate", "validate-media", "editing"} {
+		stale := call("POST", "/v1/templates/"+id+"/"+endpoint, request, "", consumerKey)
+		if stale.code != 409 {
+			t.Fatal("stale persisted content request accepted", endpoint, stale)
+		}
+	}
+	if !bytes.Equal(acceptedSnapshot, svc.input.TemplateSnapshot) || svc.calls != 1 {
+		t.Fatal("stale requests changed an admitted snapshot")
+	}
+	request["revision"] = current.Revision
+	accepted = call("POST", "/v1/templates/"+id+"/generations", request, "", consumerKey)
+	if accepted.code != 202 || svc.calls != 2 || svc.input.Prompt != d.Prompt {
+		t.Fatal("new admission used old published copy", accepted, svc.calls)
 	}
 	// Shared-source quota is enforced before bytes are received/persisted.
 	limit := int64(1)

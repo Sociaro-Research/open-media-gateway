@@ -125,7 +125,7 @@ func (r *ReferenceRepository) DeleteWithGuard(ctx context.Context, id string, re
 		if _, err = tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(199079)`); err != nil {
 			return err
 		}
-		rows, e := tx.QueryContext(ctx, `SELECT id,COALESCE(NULLIF(draft->>'title',''),NULLIF(published->>'title',''),'Untitled template') FROM generation_templates WHERE removed_at IS NULL AND (draft->>'cover_id'=$1 OR published->>'cover_id'=$1 OR draft->>'override_sound_id'=$1 OR published->>'override_sound_id'=$1 OR EXISTS(SELECT 1 FROM jsonb_array_elements(COALESCE(NULLIF(draft->'slots','null'::jsonb),'[]')) s WHERE s->>'asset_id'=$1) OR EXISTS(SELECT 1 FROM jsonb_array_elements(COALESCE(NULLIF(published->'slots','null'::jsonb),'[]')) s WHERE s->>'asset_id'=$1)) ORDER BY id`, id)
+		rows, e := tx.QueryContext(ctx, `SELECT id,COALESCE(NULLIF(content->>'title',''),'Untitled template') FROM generation_templates WHERE removed_at IS NULL AND (content->>'cover_id'=$1 OR content->>'override_sound_id'=$1 OR EXISTS(SELECT 1 FROM jsonb_array_elements(COALESCE(NULLIF(content->'slots','null'::jsonb),'[]')) s WHERE s->>'asset_id'=$1)) ORDER BY id`, id)
 		if e != nil {
 			return e
 		}
