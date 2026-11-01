@@ -227,6 +227,14 @@ jobs:
           npm install --prefix /tmp/gateway-ui-tests --no-save --package-lock=false playwright@1.62.1
           /tmp/gateway-ui-tests/node_modules/.bin/playwright install --with-deps chromium chrome webkit
 
+      - name: Prepare synthetic video fixtures
+        run: |
+          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install --no-install-recommends -y ffmpeg
+          fi
+          python3 scripts/ui/template-video-fixtures.py .local/video-workflow/clips
+
       - name: Verify independent UI and current workflows
         env:
           NODE_PATH: /tmp/gateway-ui-tests/node_modules
