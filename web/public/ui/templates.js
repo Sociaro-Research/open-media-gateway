@@ -154,7 +154,7 @@
     fixedRow.append(preview);
    }
    if(fixedRow.childElementCount)form.append(fixedRow);
-   const settings=[d.options?.ratio,d.options?.resolution,d.options?.duration?d.options.duration+' s':null,d.options?.generate_audio===undefined?null:d.options.generate_audio?'Audio on':'Audio off'].filter(Boolean);if(settings.length)form.append(el('p',settings.join(' · '),'field-hint'));
+   const settings=[d.options?.ratio,d.options?.resolution,d.options?.duration?d.options.duration+' s':null,d.override_sound_id?'Overridden Audio':d.options?.generate_audio?'Audio On':'Audio Off'].filter(Boolean);if(settings.length)form.append(el('p',settings.join(' · '),'field-hint'));
    const cached=runnerDrafts.get(id),draft=cached?.revision===view.revision?cached:{revision:view.revision,inputs:{},files:{},model:''};runnerDrafts.set(id,draft);
    const model=field(form,'Model','select');model.required=true;
    ModelPicker.populate(model,view.catalog,{value:draft.model||(view.default_available?ModelPicker.key(d.provider,d.model):''),placeholder:'Choose a compatible model'});
@@ -173,13 +173,13 @@
     controller.signal.addEventListener('abort',()=>{slotAbort?.abort();if(previewURL)URL.revokeObjectURL(previewURL);},{once:true});
     function clear(){begin();delete inputs[slot.id];delete draft.files[slot.id];if(previewURL)URL.revokeObjectURL(previewURL);previewURL='';widget.setPreview(null);widget.message('Choose a reference for '+slot.label+'.');validationIssue='';ready();}
     window.addEventListener('gateway-reference-deleted',event=>{if(event.detail.scope==='organization'&&event.detail.keyVersion===generationKeyVersion&&inputs[slot.id]===event.detail.id)clear();},{signal:controller.signal});
-    const row=el('div','','template-variable-reference');row.append(el('h3',slot.label+' · required '+slot.type));
-    const widget=ReferenceUpload.create({label:slot.label,title:'Drop a '+slot.type+' here',uploadLabel:'Upload '+slot.type,kinds:[slot.type],signal:controller.signal,locked:()=>unavailable||!model.value,
+    const row=el('div','','template-variable-reference');
+    const widget=ReferenceUpload.create({label:slot.label,title:slot.type==='image'?'Drop here an image of the '+slot.label:'Drop here '+(slot.type==='audio'?'an audio file':'a video')+' for '+slot.label,selectedTitle:slot.label,uploadLabel:'Upload '+slot.type,kinds:[slot.type],signal:controller.signal,locked:()=>unavailable||!model.value,
      limits:kind=>{const [p,m]=model.value?JSON.parse(model.value):[];return view.catalog.find(x=>x.id===p)?.models.find(x=>x.id===m)?.reference_media_limits?.[kind]||{};},
      onBusy:value=>{pending+=value?1:-1;ready();},
      onFile:async(file,signal)=>{const op=begin();op.signal=AbortSignal.any([op.signal,signal]);const ref=await uploadReference(file,op.signal,target(),text=>{if(current(op))widget.message(text);});await bind(ref,op,file);return 'Assigned '+file.name+' to '+slot.label+'.';},
      onRemove:clear,onLibrary:picker=>chooseLibrary(slot.type,false,async(item,signal)=>{const op=begin();op.signal=AbortSignal.any([op.signal,signal]);pending++;ready();try{await bind(item,op);}finally{pending--;if(fresh(token))ready();}},target,()=>inputs[slot.id],clear,picker.root)
-    });if(draft.files[slot.id]){const item=draft.files[slot.id];widget.setPreview({url:item.url,type:item.content_type,name:item.name||slot.label});widget.message('Assigned '+(item.name||slot.label)+'.');}row.append(widget.root);form.append(row);
+    });widget.root.setAttribute('aria-description','Required '+slot.type+' reference.');if(draft.files[slot.id]){const item=draft.files[slot.id];widget.setPreview({url:item.url,type:item.content_type,name:item.name||slot.label});widget.message('Assigned '+(item.name||slot.label)+'.');}row.append(widget.root);form.append(row);
 
    }
    const advanced=button('Advanced editing',async()=>{
@@ -191,7 +191,7 @@
      if(d.override_sound_id)source.options={...source.options,override_sound_id:d.override_sound_id};
      await openTemplateInPlayground(source,controller.signal);}
     catch(e){if(e.code==='template_conflict'&&fresh(token))await currentChanged(id,view.revision);else fail(e,token);}finally{pending--;if(fresh(token))ready();}
-   });form.append(advanced,button('Clear selection',()=>{browseID='';gallery();}));
+   });form.append(advanced);
    const generate=el('button','Review generation','primary');generate.type='submit';form.append(generate);model.onchange=async()=>{draft.model=model.value;const sequence=++validationSequence,selection=JSON.stringify(inputs);pending++;validationIssue='';ready();say('Checking reference compatibility…');try{await checkInputs();if(fresh(token)&&sequence===validationSequence&&selection===JSON.stringify(inputs))say('References checked.');}catch(e){if(fresh(token)&&sequence===validationSequence&&selection===JSON.stringify(inputs)){validationIssue=e.message;say(e.message,'error');}}finally{pending--;if(fresh(token))ready();}};
    const messages=[];if(view.workflow_error)messages.push(view.workflow_error);else{if(!view.default_available)messages.push('The configured default model is unavailable to this key. Choose an allowed alternative.');if(!view.catalog.some(p=>p.models.length))messages.push('No compatible models are available to this key.');}if(view.asset_error)messages.push(view.asset_error);say(messages.join(' '),messages.length?'error':'');
    form.onsubmit=e=>{e.preventDefault();if(generate.disabled||!form.reportValidity())return;const [provider,modelID]=JSON.parse(model.value);const source={prompt:d.prompt,provider,model:modelID,media_type:d.media_type,options:d.options,template_catalog:view.catalog,template:{id,revision:view.revision,inputs:{...inputs}}};const project=window.GatewayProjects?.selected();if(project)source.project_id=project;openGenerationConfirmation(source,generate);};

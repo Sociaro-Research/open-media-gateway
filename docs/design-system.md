@@ -538,6 +538,13 @@ disable hover playback. Devices without hover ignore compatibility mouse-enter e
 below the description, with accessible labels and full media in the shared modal.
 The runner omits the prompt; Advanced editing opens the existing Playground after
 explicit draft replacement confirmation.
+The runner summary lists ratio, resolution and duration, then **Overridden Audio**
+when an override asset is selected. Otherwise show the actual **Audio On** or
+**Audio Off** setting. Omit external slot headings. Empty image blocks say
+**Drop here an image of the {LABEL}**, substituting the configured label as safe
+text. A selected block retains its slot identity inside the block. Preserve type
+and required guidance in accessible descriptions and validation. There is no Clear
+selection action; choosing another gallery card changes the template.
 Missing slots use labeled file/library controls; fixed slots have no user editor.
 Authoring reuses the shared native-textarea reference mirror and declared prompt
 syntax contract. Reviewed variable slots count as bound references even without
