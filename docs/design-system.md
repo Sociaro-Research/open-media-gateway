@@ -498,7 +498,12 @@ mutation endpoints. Uploading to that library does not assign a slot. Delete
 cancellation or rejection retains the selection; confirmed organization-file
 deletion clears matching retained selections in both screens. Native audio/video
 preview controls sit outside the selection button so playback cannot assign a
-reference. Preview failures offer a retry without changing the binding.
+reference. Video and audio library cards expose a keyboard-accessible Play overlay
+on their thumbnail/placeholder, with a 44px target and visible focus; do not add a
+detached Preview action or Rename UI. Names and existing APIs remain unchanged.
+Selected and focused cards use the configured `--accent`, rather than a fixed blue or a copy of the current theme color. Selection and keyboard focus share one perimeter; the focused selected edge is thicker. Preview
+failures offer an overlay retry without changing the binding.
+
 Single-file selection controls reuse `ReferenceUpload` with `onRemove`. Empty
 blocks show Upload and Choose from library when that scope has a library. Selected
 blocks show only Remove as a selection action, inside the block; hide upload,

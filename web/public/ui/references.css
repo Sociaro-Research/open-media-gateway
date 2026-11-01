@@ -61,4 +61,11 @@ textarea.reference-hover { cursor:pointer; }
 .reference-library-grid .reference-card video { display:block; width:100%; height:120px; object-fit:contain; background:var(--bg); }
 .reference-library-grid .reference-card [data-player] { display:block; width:100%; max-width:100%; }
 .reference-library-grid .reference-size { display:block; color:var(--muted); }
+
+/* Separate overlay controls keep playback outside the selection button. The
+   shared 120px thumbnail and its 8px inset place the 44px target at its center. */
+.reference-library-grid .reference-choice > video { display:block; width:100%; height:120px; object-fit:contain; }
+.reference-library-grid .reference-choice > .reference-placeholder { height:120px; }
+.reference-library .reference-play { position:absolute; top:68px; left:50%; transform:translate(-50%,-50%); display:grid; place-items:center; width:44px; min-width:44px; height:44px; min-height:44px; padding:0; border-radius:50%; background:var(--panel); color:var(--text); border:1px solid var(--line); }
+
 .reference-card .reference-selection-remove { display:block; margin:12px auto 8px; min-height:44px; padding:8px 12px; }

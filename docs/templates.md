@@ -81,11 +81,11 @@ historical results. Physical cleanup requires a separate authorized operation.
 ## Shared template assets
 
 **Template references** is one reusable collection for the entire instance.
-Every Administrator can upload, rename, preview, select and delete unused files,
+Every Administrator can upload, preview, select and delete unused files,
 including files uploaded by another Administrator. Library, fixed-slot and cover
 uploads enter this same collection. Uploading alone does not assign a slot.
 Selecting a file preserves its asset ID; the same supported file can be a cover
-and a reference in several templates. Rename changes display metadata only.
+and a reference in several templates. The library has no Rename control. Video previews open from a Play overlay on the thumbnail, independently of selection. The compatible metadata API and existing names remain available.
 Replacing content requires uploading a new asset and explicitly rebinding uses.
 
 Authenticated ordinary users can browse, read and select shared files for

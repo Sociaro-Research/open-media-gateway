@@ -24,6 +24,14 @@ and submits no generations. `UI_EVIDENCE_DIR` selects its internal screenshots.
 
 
 
+`switches.cjs` measures shared switch/label spacing and alignment.
+`override-sound.cjs` covers selected-only internal Remove, remove-before-select,
+empty-upload failure/retry, native preview, persistence and interrupted uploads.
+`shared-reference-library.cjs` checks Play overlays, selection/playback isolation,
+configured accent/focus tokens, delete cancellation and repeated close/reopen.
+Run these in Chromium and WebKit, then inspect their screenshots against the
+design review gate above. Templates' `templates.cjs` additionally exercises fixed
+and variable binding removal, cover retention, publication and scoped libraries.
 
 Run `node scripts/ui/reference-validation.cjs` in Chromium and with
 `UI_BROWSER_ENGINE=webkit` for early reference errors, model changes, library
@@ -707,7 +715,7 @@ in the Go fixture suites. `UI_EVIDENCE_DIR` selects screenshot/result output.
 
 The reference and template fixtures also cover the shared `ReferenceLibrary`
 component. `references.cjs` checks the Playground multiple-selection adapter;
-`templates.cjs` checks administrator-library upload/rename/protected deletion,
+`templates.cjs` checks administrator-library upload/Play preview/protected deletion,
 organization-only slot selection/replacement/deselection and confirmed deletion
 versus cancellation/rejection. Run both engines with the existing local fixture
 settings. `reference-validation.cjs` verifies slot compatibility and late upload

@@ -108,7 +108,7 @@
   const {dialog,status:message,more}=view;dialog.classList.add('template-reference-library');
   function render(){view.render(items.filter(compatible),{
    selected:item=>item.id===selectedID(),busy:busy||uploadPending,onSelect:onSelect?select:null,
-   onDelete:remove,onRename:administrator?rename:null
+   onDelete:remove
   });more.hidden=!hasMore;more.disabled=busy||uploadPending;uploader.sync();}
   const uploader=ReferenceUpload.create({label:administrator?'Template reference library':'Reference library',title:'Drop a reference to add it to the library',uploadLabel:'Upload reference',kinds,signal,locked:()=>busy,onBusy:value=>{uploadPending=value;render();},onFile:async(file,uploadSignal)=>{
    let item;
@@ -130,7 +130,6 @@
    catch(error){if(!signal.aborted){message.textContent=error.message;for(const use of error.templates||[]){const link=el('a',use.name+' · '+use.id);link.href=use.url;link.onclick=async event=>{event.preventDefault();try{const record=await api('/v1/system/templates/'+encodeURIComponent(use.id),{signal});close();renderEditor(localDrafts.get(record.id)||record);}catch(e){if(!signal.aborted)message.textContent=e.message;}};message.append(document.createElement('br'),link);}}}
    finally{busy=false;if(!signal.aborted)render();}
   }
-  function rename(item){const rename=el('dialog'),form=el('form'),status=el('p');FormUI.dialogHeading(rename,'Rename shared file',()=>rename.close());const name=field(form,'Filename','text',item.name);name.required=true;name.maxLength=255;const save=button('Save',async()=>{if(!form.reportValidity())return;save.disabled=true;try{await api('/v1/system/template-references/'+encodeURIComponent(item.id),{method:'PATCH',body:JSON.stringify({name:name.value}),signal});rename.close();await load();}catch(error){status.textContent=error.message;}finally{save.disabled=false;}});form.onsubmit=event=>{event.preventDefault();if(!save.disabled)save.click();};const abortRename=()=>rename.close();signal.addEventListener('abort',abortRename,{once:true});rename.addEventListener('close',()=>signal.removeEventListener('abort',abortRename),{once:true});form.append(save,status);rename.append(form);document.body.append(rename);rename.addEventListener('close',()=>rename.remove(),{once:true});rename.showModal();name.focus();}
   more.onclick=()=>load(true);dialog.addEventListener('cancel',event=>{event.preventDefault();close();});parentSignal.addEventListener('abort',close,{once:true});signal.addEventListener('abort',()=>parentSignal.removeEventListener('abort',close),{once:true});document.body.append(dialog);dialog.showModal();await load();
  }
  async function uploadReference(file,signal,validation,onProgress){
