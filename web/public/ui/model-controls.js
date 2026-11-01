@@ -10,8 +10,8 @@
   const label=node('label',`${kind[0].toUpperCase()+kind.slice(1)} ${index} role`),input=document.createElement('select');
   for(const value of s.roles)input.append(new Option(value.replaceAll('_',' ').replace(/^./,s=>s.toUpperCase()),value));input.value=role(model,kind,value);input.onchange=()=>onChange(input.value);label.append(input);return label;
  }
- function parameters(host,model,values={},onChange=()=>{}){
-  host.replaceChildren();host.classList.add('model-parameters');const controls=[];host.hidden=!(model.parameters||[]).length;
+ function parameters(host,model,values={},onChange=()=>{},outputCount=1){
+  host.replaceChildren();host.classList.add('model-parameters');const controls=[];host.hidden=!(model.parameters||[]).length&&!(model.max_outputs>1);let count=null;if(Number.isSafeInteger(model.max_outputs)&&model.max_outputs>1){const label=node('label','Outputs (1–'+model.max_outputs+')');count=document.createElement('input');count.type='number';count.min=1;count.max=model.max_outputs;count.step=1;count.required=true;count.value=outputCount??1;label.append(count);host.append(label);count.oninput=count.onchange=()=>onChange();}
   for(const field of model.parameters||[]){
    const value=values[field.key]??field.default;
    if(field.type==='text_list'){
@@ -23,13 +23,13 @@
     if(Array.isArray(value)&&value.every(v=>typeof v==='string'))for(const text of value)append(text);
     add.onclick=()=>{if(declared&&inputs.length<field.max_items&&!add.disabled){append('',true);onChange();}};sync();controls.push({key:field.key,read:()=>inputs.map(input=>input.value),valid,sync});continue;
    }
-   const label=node('label',field.label),input=document.createElement(field.type==='select'?'select':'input');input.id=host.id==='modelParameters'?'model-param-'+field.key:host.id?host.id+'-'+field.key:'';
+   const label=node('label',field.label);let constrained=null,input=document.createElement(field.type==='select'?'select':'input');input.id=host.id==='modelParameters'?'model-param-'+field.key:host.id?host.id+'-'+field.key:'';
    if(field.type==='select'){for(const value of field.choices||[])input.append(new Option(value,value));}else input.type=field.type==='boolean'?'checkbox':['number','integer'].includes(field.type)?'number':'text';
    if(field.min!=null)input.min=field.min;if(field.max!=null)input.max=field.max;input.step=field.type==='integer'?'1':'any';if(input.type!=='checkbox')input.required=!!field.required;
    if(input.type==='checkbox')input.checked=value===true;else input.value=value??'';
-   const sync=()=>input.setCustomValidity(field.max_length>0&&Array.from(input.value).length>field.max_length?'Use at most '+field.max_length.toLocaleString('en-US')+' characters.':'');input.oninput=()=>{sync();onChange();};input.onchange=()=>{sync();onChange();};label.append(input);host.append(label);sync();controls.push({key:field.key,read:()=>input.type==='checkbox'?input.checked:input.value===''?undefined:['number','integer'].includes(field.type)?Number(input.value):input.value,valid:()=>input.validity.valid});
+   const sync=()=>input.setCustomValidity(constrained&&!constrained.has(input.value)?'Choose a currently available value.':field.max_length>0&&Array.from(input.value).length>field.max_length?'Use at most '+field.max_length.toLocaleString('en-US')+' characters.':'');input.oninput=()=>{sync();onChange();};input.onchange=()=>{sync();onChange();};label.append(input);host.append(label);sync();controls.push({key:field.key,read:()=>input.type==='checkbox'?input.checked:input.value===''?undefined:['number','integer'].includes(field.type)?Number(input.value):input.value,valid:()=>input.validity.valid,setChoices(items){const stamp=JSON.stringify(items);if(input.dataset.choiceStamp===stamp)return;const previous=input.value,next=input.tagName==='SELECT'?input:document.createElement('select');next.replaceChildren();next.id=input.id;next.required=!!field.required;next.disabled=input.disabled;next.dataset.choiceStamp=stamp;next.append(new Option('Choose '+field.label.toLowerCase(),''));constrained=new Set(items.map(item=>String(item.value)));for(const item of items)next.append(new Option(item.label,String(item.value)));if(previous&&!constrained.has(previous))next.append(new Option('Unavailable selection: '+previous,previous));next.value=previous;if(input!==next)input.replaceWith(next);input=next;input.onchange=()=>{sync();onChange();};sync();FormUI.refresh();}});
   }
-  FormUI.refresh();return {sync(){controls.forEach(c=>c.sync?.());},read(){return Object.fromEntries(controls.map(c=>[c.key,c.read()]).filter(([,v])=>v!==undefined));},valid(){return controls.every(c=>c.valid());}};
+  FormUI.refresh();return {count:()=>count?Number(count.value):undefined,setChoices(key,items){controls.find(c=>c.key===key)?.setChoices?.(items);},sync(){controls.forEach(c=>c.sync?.());},read(){return Object.fromEntries(controls.map(c=>[c.key,c.read()]).filter(([,v])=>v!==undefined));},valid(){return (!count||count.validity.valid)&&controls.every(c=>c.valid());}};
  }
  function inferredDuration(field,input,model,value,onChange){
   const previous=field.parentElement.closest('.inferred-duration-group');if(previous){previous.before(field);previous.remove();}let select=null;
@@ -39,5 +39,6 @@
   restore(value);return {restore,sync,read:()=>select?.value==='auto'?undefined:Number(input.value)};
  }
  function ratios(input,model,choices,value){input.dataset.inference=String(!!model.ratio_may_be_inferred);input.replaceChildren(...(model.ratio_may_be_inferred?[new Option('Auto (infer)','')]:[]),...choices.map(v=>new Option(v,v)));if(value!==undefined&&value!==''&&!choices.includes(value))input.append(new Option('Unsupported saved value: '+value,value));input.required=!model.ratio_may_be_inferred;input.value=value!==undefined&&[...input.options].some(o=>o.value===value)?value:model.ratio_may_be_inferred?'':choices[0]||'';window.ControlPickers?.sync(input);}
- window.ModelControls={schema,role,roles,roleField,parameters,inferredDuration,ratios};
+ function resourceParameters(editor,bindings){if(!editor)return;const faces=bindings.filter(item=>item.kind==='face_session'&&item.usable===true&&Date.parse(item.session?.expires_at)>Date.now()).flatMap(item=>item.session?.faces||[]);editor.setChoices('face_index',faces.filter(face=>Number.isSafeInteger(face.index)&&face.index>0).map(face=>({value:face.index,label:'Face '+face.index+' · '+face.start_ms+'–'+face.end_ms+' ms'})));}
+ window.ModelControls={resourceParameters,schema,role,roles,roleField,parameters,inferredDuration,ratios};
 })();

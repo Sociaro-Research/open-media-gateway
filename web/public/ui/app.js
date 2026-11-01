@@ -431,7 +431,7 @@ function renderTasks(tasks) {
     changeProject.addEventListener('keydown',event=>{if(event.key==='ArrowRight'){event.preventDefault();window.GatewayProjects?.assign(article.taskData,changeProject);}});
     article.querySelector('.task-menu').addEventListener('toggle',event=>{if(!event.currentTarget.open)window.ControlPickers?.dismiss(changeProject);});
     const resourceModel=providerCatalog.find(p=>p.id===task.provider)?.models.find(m=>m.id===task.model),replayable=task.media_type!=='resource'||!!ResourceControls.intent(resourceModel,task.options?.resource_intent);
-    article.querySelector('.reuse-task').hidden=!replayable;article.querySelector('.retry-task').hidden=!replayable;
+    article.querySelector('.reuse-task').hidden=!replayable;article.querySelector('.retry-task').hidden=!replayable||!!task.options?.session_action;
     article.querySelector('.reuse-task').addEventListener('click', () => reuseTask(article.taskData));
     article.querySelector('.retry-task').addEventListener('click', event => retryTask(article.taskData, event.currentTarget));
     article.querySelector('.task-id').value=task.id;
@@ -854,7 +854,7 @@ function updateModelUI() {
   elements.priceCard.hidden = !model;
   syncOverrideSound(model);
   if (!provider || !model) { clearTimeout(quoteTimer); ++quoteSequence; return; }
-  document.querySelector('#settingsTitle').textContent=model.resource_operation?'Resource settings':'Output settings';
+  document.querySelector('#settingsTitle').textContent=model.session_operation?'Session settings':model.resource_operation?'Resource settings':'Output settings';
   const isVideo = model.media_type === 'video';
   const isImage = model.media_type === 'image';
   const isSpeech = model.media_type === 'speech';
@@ -953,9 +953,11 @@ let quoteTimer;
 function estimateRequest() {
  const provider=selectedProvider(), model=selectedModel();
  if(!provider || !model) return null;
- return {prompt:model.no_prompt ? '' : elements.prompt.value.trim(), provider:provider.id, model:model.id, media_type:model.media_type, options:requestOptions(model),...(playgroundResources?.creation()?{resource_create:playgroundResources.creation()}:{})};
+ return {prompt:model.no_prompt ? '' : elements.prompt.value.trim(), provider:provider.id, model:model.id, media_type:model.media_type, options:requestOptions(model),...(playgroundResources?.creation()?{resource_create:playgroundResources.creation()}:{}),...(playgroundResources?.action()?{session_action:playgroundResources.action()}:{})};
 }
+function sessionPath(request){return '/v1/provider-resources/'+encodeURIComponent(request.session_action.binding_id)+'/actions/'+encodeURIComponent(request.session_action.action);}
 function generationRequest(request) {
+ if(request.session_action){const {binding_id,action,...intent}=request.session_action;return {model:request.model,...intent,...(request.max_expected_cost_usd!==undefined?{max_expected_usd:request.max_expected_cost_usd}:{})};}
  if(request.resource_create)return {...request.resource_create,...(request.max_expected_cost_usd!==undefined?{max_expected_usd:request.max_expected_cost_usd}:{})};
  const {provider, model, media_type, prompt, options: source, ...extra}=request;
  const options={...source};
@@ -989,7 +991,7 @@ function generationRequest(request) {
 }
 function templateRequest(request){return {revision:request.template.revision,inputs:request.template.inputs,provider:request.provider,model:request.model,...(request.project_id?{project_id:request.project_id}:{}),...(request.max_expected_cost_usd!==undefined?{max_expected_cost_usd:request.max_expected_cost_usd}:{})};}
 async function fetchEstimate(request) {
- return api(request.template ? `/v1/templates/${encodeURIComponent(request.template.id)}/estimate` : request.resource_create?'/v1/provider-resources/estimate':'/v1/generations/estimate',{method:'POST',body:JSON.stringify(request.template ? templateRequest(request) : generationRequest(request))});
+ return api(request.template ? `/v1/templates/${encodeURIComponent(request.template.id)}/estimate` : request.resource_create?'/v1/provider-resources/estimate':request.session_action?sessionPath(request)+'/estimate':'/v1/generations/estimate',{method:'POST',body:JSON.stringify(request.template ? templateRequest(request) : generationRequest(request))});
 }
 
 function formatUSD(value) {
@@ -1009,6 +1011,7 @@ function updatePrice() {
  const sequence=++quoteSequence;
  const request=estimateRequest(); if(!request) return;
  if(playgroundResources&&!playgroundResources.valid()){elements.priceValue.textContent='Complete resource inputs';elements.priceCard.classList.add('unknown');FormUI.message(elements.priceDetails,'Complete the resource fields to get a verified estimate.');return;}
+ if(modelParameterEditor&&!modelParameterEditor.valid()){elements.priceValue.textContent='Complete model parameters';elements.priceCard.classList.add('unknown');FormUI.message(elements.priceDetails,'Complete the parameter fields to get a verified estimate.');return;}
  elements.priceValue.textContent='Calculating…';
  FormUI.message(elements.priceDetails,'');
  quoteTimer=setTimeout(async()=>{
@@ -1080,6 +1083,7 @@ async function loadProviders() {
 function requestOptions(model) {
   const options = {};
   if(model.media_type==='video'&&playgroundSound?.value)options.override_sound_id=playgroundSound.value;
+  const count=modelParameterEditor?.count();if(count!==undefined)options.output_count=count;
   const parameters=modelParameterEditor?.read()||{};if(Object.keys(parameters).length)options.parameters=parameters;
 
   if (model.media_type !== 'speech' && !model.no_watermark) options.watermark = elements.watermark.checked;
@@ -1292,8 +1296,8 @@ function reuseTask(task, {sparse=false}={}) {
     if (input.type === 'checkbox') input.checked = value === true;
     else input.value = Array.isArray(value) ? value.join('\n') : value;
   }
-  renderModelParameters(selectedModel(),options.parameters);
-  syncModelResources(selectedModel(),options.resource_references||[],options.resource_intent);
+  renderModelParameters(selectedModel(),options.parameters,options.output_count);
+  syncModelResources(selectedModel(),options.resource_references||[],options.resource_intent,options.session_action);
   window.referencePicker?.restoreMode(options);
   window.referencePicker?.restoreVoices(options.reference_voices);
   window.referencePicker?.restoreRoles(options.reference_roles);
@@ -1349,13 +1353,14 @@ elements.form.addEventListener('submit', async event => {
   if ((!prompt && !lyricsOnly && !model?.prompt_optional && !model?.no_prompt) || !provider || !model) {
     setMessage('Enter a prompt and select a model.', 'error'); return;
   }
-  const request={prompt, provider: provider.id, model: model.id, media_type: model.media_type, options: requestOptions(model),...(playgroundResources?.creation()?{resource_create:playgroundResources.creation()}:{})};
+  const request={prompt, provider: provider.id, model: model.id, media_type: model.media_type, options: requestOptions(model),...(playgroundResources?.creation()?{resource_create:playgroundResources.creation()}:{}),...(playgroundResources?.action()?{session_action:playgroundResources.action()}:{})};
   const projectID=window.GatewayProjects?.selected();
   if(projectID)request.project_id=projectID;
   openGenerationConfirmation(request, elements.submit);
 });
 function retryTask(task, trigger) {
   if (submitting || dialog.open) return;
+  if(task.options?.session_action){setMessage('Copy the operation to review the current session before submitting again.','error');return;}
   document.querySelectorAll('.task-menu[open]').forEach(menu => { menu.open = false; });
   // Use the saved request without copying into or reading from the current draft.
   const model=providerCatalog.find(p=>p.id===task.provider)?.models.find(m=>m.id===task.model),resource=ResourceControls.intent(model,task.options?.resource_intent);
@@ -1384,13 +1389,14 @@ async function openGenerationConfirmation(source, trigger) {
   pendingSubmission = {request, key: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`};
   const rows = [['Provider', provider.name], ['Model', model.display_name], ['Media type', mediaTypeLabel(model.media_type)]];
   if (prompt) rows.push(['Prompt', prompt]);
+  if(request.session_action)rows.push(['Session action',request.session_action.action],...(request.session_action.frame?[['Frame index',String(request.session_action.frame.frame_index)],['Points',String(request.session_action.frame.points.length)]]:[]),...(request.session_action.recover?[['Recovery','Explicit clear']]:[]));
   if(request.resource_create)rows.push(['Resource name',request.resource_create.name],['Resource type',request.resource_create.subtype],['Source files',String(request.resource_create.reference_ids?.length||0)],['Completed generation source',request.resource_create.generated_task_id?'Selected':'None']);
   rows.push(...taskParameterRows(request.options, optionDefaults(model)));
   fillSummary(document.querySelector('#confirmFields'), rows);
   document.querySelector('#confirmPrice').textContent = 'Calculating…';
   confirmButton.disabled=true;
   confirmStatus.hidden = true; confirmStatus.className = '';
-  confirmButton.textContent = request.resource_create?'Confirm and create resource →':'Confirm and generate →';
+  confirmButton.textContent = request.resource_create?'Confirm and create resource →':request.session_action?'Confirm session action →':'Confirm and generate →';
   setMessage(''); dialog.showModal(); cancelButton.focus();
   const submission=pendingSubmission;
   try {
@@ -1451,13 +1457,13 @@ confirmButton.addEventListener('click', async () => {
   try {
     // Keep the same idempotency key for retries after uncertain network failures.
     const [result] = await Promise.allSettled([
-      api(submission.request.template ? `/v1/templates/${encodeURIComponent(submission.request.template.id)}/generations` : submission.request.resource_create?'/v1/provider-resources':'/v1/generations', {method: 'POST', headers: {'Idempotency-Key': submission.key}, body: JSON.stringify(submission.request.template ? templateRequest(submission.request) : generationRequest(submission.request))}),
+      api(submission.request.template ? `/v1/templates/${encodeURIComponent(submission.request.template.id)}/generations` : submission.request.resource_create?'/v1/provider-resources':submission.request.session_action?sessionPath(submission.request):'/v1/generations', {method: 'POST', headers: {'Idempotency-Key': submission.key}, body: JSON.stringify(submission.request.template ? templateRequest(submission.request) : generationRequest(submission.request))}),
       new Promise(resolve => setTimeout(resolve, 2000))
     ]);
     if(pendingSubmission!==submission)return;
     if (result.status === 'rejected') throw result.reason;
     const task = {...submission.request, ...result.value};
-    accepted = true; pendingSubmission = null;
+    accepted = true; pendingSubmission = null;if(submission.request.session_action)playgroundResources?.admitted();
     if(submission.request.template)showConsoleSection('generation');
     await moveRequestToJournal(task);
   } catch (error) {
@@ -1467,6 +1473,7 @@ confirmButton.addEventListener('click', async () => {
       confirmStatus.className = 'error';
       confirmStatus.textContent = `Could not submit: ${error.message}`;
       confirmButton.textContent = 'Retry submission →';
+      if(submission.request.session_action){dialog.close();pendingSubmission=null;const resources=playgroundResources;if(!error.status||error.status>=500)resources?.admitted();queueMicrotask(()=>{if(resources===playgroundResources)resources?.refresh();});setMessage((!error.status||error.status>=500?'Session operation outcome is unconfirmed. No mutation will be retried. Read its current state before explicit recovery. ':'Session changed or the operation was rejected. Review its current state. ')+error.message,'error');return;}
       if(submission.request.template&&error.code==='template_conflict'){dialog.close();pendingSubmission=null;await window.GatewayTemplates?.currentChanged(submission.request.template.id,submission.request.template.revision);}
       else if(['estimate_changed','budget_exceeded','pricing_unavailable'].includes(error.code)) {
         dialog.close();pendingSubmission=null;updatePrice();
@@ -1474,7 +1481,7 @@ confirmButton.addEventListener('click', async () => {
       }
     }
   } finally {
-    submitting = false;
+    submitting = false;playgroundResources?.sync();
     confirmButton.disabled = false; cancelButton.disabled = false; closeButton.disabled = false;
     elements.submit.disabled = !window.GenerationKey.value(); dialog.removeAttribute('aria-busy');
     if (accepted) { loadTasks(); updatePrice(); refreshGenerationBudget(); }
@@ -1609,17 +1616,17 @@ function renderProviderFields(provider){
  FormUI.refresh();
 }
 
-function renderModelParameters(model,values={}){
+function renderModelParameters(model,values={},outputCount=1){
  let area=document.querySelector('#modelParameters');if(!area){area=document.createElement('div');area.id='modelParameters';document.querySelector('#commonMediaFields').append(area);}
- modelParameterEditor=ModelControls.parameters(area,model,values,()=>{pendingSubmission=null;updatePrice();});
+ modelParameterEditor=ModelControls.parameters(area,model,values,()=>{pendingSubmission=null;updatePrice();},outputCount);
 }
 
 window.addEventListener('model-settings-change',()=>{if(window.GenerationKey?.value())loadProviders().catch(()=>{});});
 
-function syncModelResources(model,initial=[],initialIntent=null){
+function syncModelResources(model,initial=[],initialIntent=null,initialSession=null){
  playgroundResources?.dispose();playgroundResources=null;
  let host=document.querySelector('#modelResources');if(!host){host=document.createElement('section');host.id='modelResources';document.querySelector('#commonMediaFields').append(host);}
  if(!model?.resource_operation&&!model?.resource_input_schemas?.length){host.hidden=true;host.replaceChildren();elements.voice.disabled=!model?.supports_voice;return;}
- playgroundResources=ResourceControls.mount(host,{api,model,provider:selectedProvider(),initial,initialIntent,reserved:()=>['image','video','audio'].flatMap(kind=>model['supports_'+kind+'_input']?(window.referencePicker?.values(kind)||[]).map((_,index)=>kind+'_'+(index+1)):[]),onChange:detail=>{elements.voiceField.hidden=!model.supports_voice||playgroundResources?.hasKind('voice');elements.voice.disabled=elements.voiceField.hidden;if(!submitting){const previous=pendingSubmission;pendingSubmission=null;if(detail?.metadata&&previous?.request.provider===selectedProvider()?.id&&previous.request.model===model.id&&dialog.open){dialog.close();setMessage('Resource availability changed. Review the updated inputs.','error');}}updatePrice();}});
- elements.voiceField.hidden=!model.supports_voice||playgroundResources.hasKind('voice');elements.voice.disabled=elements.voiceField.hidden;
+ playgroundResources=ResourceControls.mount(host,{api,model,provider:selectedProvider(),initial,initialIntent,initialSession,locked:()=>submitting,reserved:()=>['image','video','audio'].flatMap(kind=>model['supports_'+kind+'_input']?(window.referencePicker?.values(kind)||[]).map((_,index)=>kind+'_'+(index+1)):[]),onChange:detail=>{ModelControls.resourceParameters(modelParameterEditor,playgroundResources?.bindings()||[]);elements.voiceField.hidden=!model.supports_voice||playgroundResources?.hasKind('voice');elements.voice.disabled=elements.voiceField.hidden;if(!submitting){const previous=pendingSubmission;pendingSubmission=null;if(detail?.metadata&&previous?.request.provider===selectedProvider()?.id&&previous.request.model===model.id&&dialog.open){dialog.close();setMessage('Resource availability changed. Review the updated inputs.','error');}}updatePrice();}});
+ ModelControls.resourceParameters(modelParameterEditor,playgroundResources.bindings());elements.voiceField.hidden=!model.supports_voice||playgroundResources.hasKind('voice');elements.voice.disabled=elements.voiceField.hidden;
 }

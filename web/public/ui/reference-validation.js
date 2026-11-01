@@ -30,5 +30,13 @@ window.ReferenceValidation=(()=>{
   signal.throwIfAborted();onProgress(`Checking ${file.name}…`);
   return api(`/v1/references/uploads/${encodeURIComponent(plan.id)}/complete`,{method:'POST',signal,expectedKey});
  }
- return {target,signature,ids,check,upload};
+ function fileLimit(model,kind,options={}){
+  const base=({image:30,video:200,audio:50}[kind]||0)*1024*1024,rule=model?.reference_media_limits?.[kind];let limit=base;
+  const declared=Number.isSafeInteger(rule?.max_bytes)&&rule.max_bytes>0?rule.max_bytes-(rule.max_bytes_inclusive?0:1):null;
+  const videoMode=model?.reference_modes?.some(mode=>(!options.reference_mode||mode.id===options.reference_mode)&&mode.max_videos>0);
+  if(kind==='video'&&!model?.manual&&model?.supports_video_input&&videoMode&&declared>base)limit=Math.min(300000000,declared);
+  return declared===null?limit:Math.min(limit,declared);
+ }
+ function limitLabel(model,kind,options={}){const bytes=fileLimit(model,kind,options),base=({image:30,video:200,audio:50}[kind]||0)*1024*1024;return ReferenceUpload.formatLimit(bytes,bytes===base?'MiB':'MB');}
+ return {target,signature,ids,check,upload,fileLimit,limitLabel};
 })();

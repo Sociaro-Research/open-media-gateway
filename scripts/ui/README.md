@@ -16,6 +16,25 @@ ignored `.local/` or `dist/`; record limits explicitly.
 
 ## Available fixtures
 
+`provider-sessions.cjs` tests typed local session actions, exact saved point
+precision, zero-based frame bounds, explicit recovery, expiry/revision/key races,
+nonmutating preview artifacts and current face-session metadata.
+`provider-upload-context.cjs` tests actual selected-model validation context and
+inclusive byte boundaries using tiny files with fixture-only metadata sizes. It
+does not perform a large upload or replace host byte-inspection tests.
+Both require `UI_PROVIDER_DESCRIPTOR_FILE` pointing to a sanitized locally
+generated current Kling catalogue (`{data:[{models:...}]}` or `{kling:[...]}`).
+
+`minimax-descriptors.cjs` consumes the actual locally generated registered-manager
+GET `/v1/providers` response from `UI_MINIMAX_DESCRIPTOR_FILE`, without rewriting
+model fields. It exercises H3 mixed direct/managed references and inference,
+regeneration roles, image batch counts/all outputs, Context text/limits, resource
+variants and ordered Video Agent text inputs. Keep source hashes/provenance beside
+the ignored evidence. These loopback output/action mocks do not verify live
+entitlement, native generation, codecs or backend media inspection. Use synthetic
+connections and never production services to generate the descriptor fixtures.
+
+
 `provider-resources.cjs` exercises descriptor-driven resource variants, local
 source uploads/library reuse, owned generated sources, explicit unknown-duration
 permission, tags/bound voices, preset/managed voice exclusivity, binding aliases,

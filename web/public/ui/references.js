@@ -31,10 +31,10 @@ function hashReferenceFile(file,signal){
    for(const kind of ['image','video','audio']) {
      const target=document.querySelector(kind==='image'?'#imageURLsField':`#${kind}URLField`);
      const manual=target.querySelector('.reference-manual');
-     FormUI.disclosure(manual.querySelector('summary'),`Use ${kind} URLs${model.supports_asset_references?' or registered assets':''}`);
+     const managed=!!model.resource_input_schemas?.length;FormUI.disclosure(manual.querySelector('summary'),`Use ${kind} URLs${model.supports_asset_references&&!managed?' or registered assets':''}`);
      let hint=manual.querySelector('[data-asset-hint]');
      if(!hint){hint=document.createElement('p');hint.className='field-hint';hint.dataset.assetHint='';manual.append(hint);}
-     hint.hidden=!model.supports_asset_references;
+     hint.hidden=!model.supports_asset_references||managed;
      hint.textContent='For registered BytePlus assets, paste asset:// followed by the asset ID, one per line. Use assets from the same BytePlus account and project as your provider connection.';
      target.hidden=profile?profile['max_'+(kind==='image'?'images':kind+'s')]===0:!model[`supports_${kind}_input`];
    }
@@ -44,8 +44,8 @@ function hashReferenceFile(file,signal){
  const activeVoices=()=>{if(!mode()?.supports_reference_voice)return {};const visible=[...document.querySelector('#imageURLs').value.split('\n').slice(mode()?.voice_image_start||0),...document.querySelector('#videoURL').value.split('\n')].map(x=>x.trim()).filter(Boolean);return Object.fromEntries(Object.entries(voices).filter(([url])=>visible.includes(url)));};
  function picker(kind) {
   const image=kind==='image',plural=kind==='image'?'images':kind+'s',displayPlural=kind==='audio'?'audio files':plural;
-  const maxBytes=(image?30:kind==='video'?200:50)*1024*1024;
-  const accept=image?'image/png,image/jpeg,image/webp,image/gif':kind==='video'?'video/mp4,video/quicktime,video/webm': 'audio/mpeg,audio/aac,audio/mp4,audio/wave,audio/wav,audio/x-wav,audio/ogg,audio/flac';
+  const maxBytes=()=>ReferenceValidation.fileLimit(selectedModel(),kind,{reference_mode:modeSelect.value}),limitText=()=>ReferenceValidation.limitLabel(selectedModel(),kind,{reference_mode:modeSelect.value});
+  const accept=()=>ReferenceUpload.fileTypes(kind,selectedModel()?.reference_media_limits?.[kind]).join(',');
   if(!image){
     const container=document.querySelector(`#${kind}URLField`),input=document.querySelector(`#${kind}URL`);
     const label=container.querySelector('label'),control=input.closest('.floating-field')||input;
@@ -55,7 +55,7 @@ function hashReferenceFile(file,signal){
     // Move the complete field, including its floating label, into manual entry.
     // The upload section's heading must stay outside that field.
     control.before(heading,manual);if(control===input)manual.append(label);manual.append(control);
-    manual.insertAdjacentHTML('beforebegin',`<div id="${kind}ReferenceDropzone" class="reference-dropzone" role="group" aria-labelledby="${heading.id}"><p>Drop ${displayPlural} here</p><div class="reference-actions"><button type="button" class="secondary" id="${kind}UploadReference">Upload ${displayPlural}</button><button type="button" class="secondary" id="${kind}ChooseReferences">Choose from library</button></div><small>Up to ${maxBytes/1024/1024} MB each</small></div><input id="${kind}ReferenceFiles" type="file" accept="${accept}" multiple hidden><div id="${kind}SelectedReferences" class="selected-references"></div><p id="${kind}ReferenceStatus" class="reference-status" role="status"></p>`);
+    manual.insertAdjacentHTML('beforebegin',`<div id="${kind}ReferenceDropzone" class="reference-dropzone" role="group" aria-labelledby="${heading.id}"><p>Drop ${displayPlural} here</p><div class="reference-actions"><button type="button" class="secondary" id="${kind}UploadReference">Upload ${displayPlural}</button><button type="button" class="secondary" id="${kind}ChooseReferences">Choose from library</button></div><small>Up to ${limitText()} each</small></div><input id="${kind}ReferenceFiles" type="file" accept="${accept()}" multiple hidden><div id="${kind}SelectedReferences" class="selected-references"></div><p id="${kind}ReferenceStatus" class="reference-status" role="status"></p>`);
   }
 
   const field = document.querySelector(image?'#imageURLs':`#${kind}URL`);
@@ -75,7 +75,7 @@ function hashReferenceFile(file,signal){
  let remote,returnFocus=null,previousFocus=null;
   const libraryView=ReferenceLibrary.create({id:image?'referenceLibrary':`${kind}ReferenceLibrary`,description:`Choose ${displayPlural} for this generation.`});
   const library=libraryView.dialog;
-  libraryView.intro.insertAdjacentHTML('afterend',`<div class="reference-dropzone" id="libraryDropzone"><p>Drop ${displayPlural} to add them to your library</p><button type="button" class="secondary" data-upload>Upload ${displayPlural}</button><small>Up to ${maxBytes/1024/1024} MB each</small></div>`);
+  libraryView.intro.insertAdjacentHTML('afterend',`<div class="reference-dropzone" id="libraryDropzone"><p>Drop ${displayPlural} to add them to your library</p><button type="button" class="secondary" data-upload>Upload ${displayPlural}</button><small>Up to ${limitText()} each</small></div>`);
   document.body.append(library);
   let sharedLibrary=false,lastRemoteSource='local',listSequence=0,listController=null;
   const sourceLabel=document.createElement('label');sourceLabel.textContent='Library';const source=document.createElement('select');source.append(new Option('My references','private'),new Option('Template references','shared'));sourceLabel.append(source);library.querySelector('p').after(sourceLabel);
@@ -114,7 +114,8 @@ function hashReferenceFile(file,signal){
     if(kind==='audio')files.disabled=field.closest('#audioURLField').hidden&&!(library.open&&voiceTarget&&mode()?.supports_reference_voice);
   }
   function render() {
-    syncFileInput();
+    const text='Up to '+limitText()+' each';dropzone.querySelector('small').textContent=text;library.querySelector('#libraryDropzone small').textContent=text;
+    syncFileInput();files.accept=accept();
     recheck();
     for(const node of document.querySelectorAll(`[data-reference-cancel="${kind}"]`))node.hidden=!busy;
     const values = urls();syncRoles(values);selected.classList.toggle('has-reference-roles',(ModelControls.schema(selectedModel(),kind)?.roles.length||0)>1);
@@ -211,8 +212,8 @@ function hashReferenceFile(file,signal){
       if(currentEpoch!==epoch)return;
       const expectedKey=window.GenerationKey.value();
       for (const file of list) {
-        if(file.size>maxBytes){failures.push(`${file.name}: size ${file.size} bytes; maximum ${maxBytes} bytes. Reduce the file size.`);continue;}
-        if(!accept.split(',').includes(file.type)){failures.push(`${file.name}: format ${file.type||'unknown'}; use a supported ${kind} file (${accept}).`);continue;}
+        if(file.size>maxBytes()){failures.push(`${file.name}: size ${file.size} bytes; maximum ${maxBytes()} bytes. Reduce the file size.`);continue;}
+        if(!accept().split(',').includes(file.type)){failures.push(`${file.name}: format ${file.type||'unknown'}; use a supported ${kind} file (${accept()}).`);continue;}
         if(providerUpload){const error=remote.fileError(file);if(error){failures.push(`${file.name}: ${error}`);continue;}}
         message(`Uploading ${file.name}…`);
         try {

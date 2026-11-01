@@ -642,3 +642,26 @@ A deletion submission is pending until its job confirms completion. Closing and
 reopening the library retains status recovery without another mutation. Keep
 known rejections distinct from uncertain network/server outcomes; never turn an
 unconfirmed deletion into success or an automatic retry.
+
+### Managed session controls and output variants
+
+Session operations use only the selected model's declared action schema and owned
+local bindings. Show current readiness/expiry and block invalid frames or points.
+Coordinates remain normalized values without an invented origin transform; deletion
+uses the exact saved coordinates. Recovery clear requires an explicit user choice.
+Uncertain mutations never trigger an automatic resubmission. Face selection uses
+current local indices and archived face previews; millisecond fields and zero volume
+values retain their advertised meaning. Reuse shared fields, switches and 12px grids.
+
+A declared maximum output count adds one shared bounded Outputs field. Preserve it
+on Copy and Template Save/reopen; remove it when the next model does not declare
+batch output. Display every archived output/format. Text and JSON previews use safe
+plain text, bounded reading and the shared field typography/spacing; keep Open and
+Download available for full content. Opaque binary results are attachments only.
+Keyboard focus changes the existing preview border without a second ring or shift.
+
+Upload hints and guards use the selected model/workflow's effective byte ceiling
+and declared formats. Ordinary and manual model limits do not inherit a reviewed
+native extension. The existing validation context carries actual connection, native
+model and options; it never sends a numeric upload-limit override. Cover/library
+uploads without a model context retain the ordinary shared limit.
