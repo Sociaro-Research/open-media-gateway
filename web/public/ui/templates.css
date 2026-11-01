@@ -7,6 +7,12 @@
 .template-editor .primary.compact { min-width:0; }
 .template-editor .form-heading h2 { font-size:var(--type-section); line-height:1.35; }
 .template-editor .template-slot { margin:0; gap:16px; }
+/* Match the shared group-heading gap and panel gutters without stacked margins. */
+.template-editor .generation-settings { display:grid; gap:16px; margin-top:0; padding:24px; }
+.template-editor .generation-settings > strong { font-size:var(--type-group); }
+.template-editor .generation-settings > .toggle-grid { margin-top:0; }
+.template-editor .generation-settings > .field-hint { margin:0; }
+.template-editor .generation-settings > :is(.settings-grid,.toggle-grid,.field-hint):empty { display:none; }
 .template-editor .template-slots { display:grid; gap:20px; }
 .template-slot-heading { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px 16px; }
 .template-slot-heading h3 { font-size:var(--type-group); font-weight:600; line-height:1.4; margin:0; overflow-wrap:anywhere; }
@@ -25,6 +31,7 @@
 @media(max-width:600px) {
  .template-slot-heading { align-items:flex-start; flex-direction:column; }
  .template-editor .reference-dropzone { padding:16px; }
+ .template-editor .generation-settings { padding:20px; }
  .template-editor .reference-actions > button { flex:1 1 140px; }
 }
 

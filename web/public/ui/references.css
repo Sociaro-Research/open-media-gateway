@@ -1,7 +1,7 @@
 .reference-dropzone { border: 1px dashed var(--line); border-radius: 12px; padding: 20px 12px; text-align: center; background: var(--panel-2); transition: background .15s, border-color .15s; }
 .reference-dropzone p { margin: 0 0 12px; font-weight: 600; color: var(--text); }
 .reference-dropzone small { display: block; margin-top: 12px; color: var(--muted); font-size: 11px; }
-.reference-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.reference-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
 .reference-actions button { font-size: 12px; padding: 8px 12px; }
 .reference-dropzone.dragover, .reference-card.dragover { background: var(--accent-dark); border-color: var(--accent); outline: 2px solid var(--accent); }
 .reference-status { font-size: 12px; color: var(--muted); margin: 8px 0; overflow-wrap: anywhere; }

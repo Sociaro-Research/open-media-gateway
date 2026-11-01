@@ -51,6 +51,14 @@ ignored `dist/` or `.local/`, or CI artifacts.
 - Put vendor-specific request/response translation in `plugins/provider/<id>`.
 - A media provider should expose every supported media model and capability,
   rather than implementing a video-only special case.
+- For every UI feature or fix, read [the design system](docs/design-system.md)
+  before implementation and compare the rendered result with its
+  [spacing and visual review gate](docs/design-system.md#spacing-and-visual-review-gate)
+  before completion. Use existing spacing tokens and shared patterns; inspect
+  component-to-component spacing and alignment in before/after screenshots,
+  adjacent affected screens, both themes, desktop/mobile and keyboard states.
+  Tests alone do not establish visual acceptance. Record comparisons and limits
+  in ignored local evidence.
 - Add or update tests for behavior changes.
 - Add a PostgreSQL migration for schema changes; never edit an applied migration.
 - Update `docs/openapi.yaml`, `README.md`, and configuration docs when a public

@@ -29,10 +29,16 @@ whitespace and release checks. Store dated run evidence outside the public tree.
 
 ## UI changes
 
-Follow [the design system](docs/design-system.md). Reuse shared fields, dropdowns,
+For every UI feature or fix, read [the design system](docs/design-system.md)
+before implementation and compare the rendered result with it before completion.
+Follow its [spacing and visual review gate](docs/design-system.md#spacing-and-visual-review-gate):
+systematically check harmonious spacing between components, alignment and responsive
+wrapping using existing tokens and shared patterns. Reuse shared fields, dropdowns,
 calendars, model pickers, saves, switches and scrollbars. Fix shared components
-rather than adding local copies. Explain justified exceptions and verify desktop,
-mobile and keyboard behavior.
+rather than adding local copies. Explain justified exceptions. Inspect before/after
+screenshots, adjacent screens using the changed pattern, both themes, desktop/mobile
+and keyboard behavior. Tests alone do not satisfy visual acceptance; record concrete
+design comparisons and unexecuted checks in ignored local evidence.
 
 ## Version control and releases
 

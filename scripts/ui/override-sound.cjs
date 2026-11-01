@@ -57,8 +57,8 @@ const server=http.createServer(async(req,res)=>{
 const gate=()=>{let release,entered;const promise=new Promise(r=>release=r),started=new Promise(r=>entered=r);return {promise,release,entered,started};};
 (async()=>{
  await new Promise(r=>server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+server.address().port;
- const browser=await({chromium,webkit}[engine]).launch({headless:true});const page=await browser.newPage({viewport:{width:1440,height:1000},reducedMotion:'reduce'});page.setDefaultTimeout(10000);
- const errors=[],external=[],results=[];page.on('pageerror',e=>{if(!e.message.startsWith('ResizeObserver loop'))errors.push(e.message);});await page.route('**/*',route=>new URL(route.request().url()).origin===base?route.continue():(external.push(route.request().url()),route.abort()));
+ const browser=await({chromium,webkit}[engine]).launch({headless:true,...(process.env.UI_BROWSER_PATH?{executablePath:process.env.UI_BROWSER_PATH}:{})});const page=await browser.newPage({viewport:{width:1440,height:1000},reducedMotion:'reduce'});page.setDefaultTimeout(10000);
+ let choosers=0;page.on('filechooser',()=>choosers++);const metrics=[];const errors=[],external=[],results=[];page.on('pageerror',e=>{if(!e.message.startsWith('ResizeObserver loop'))errors.push(e.message);});await page.route('**/*',route=>new URL(route.request().url()).origin===base?route.continue():(external.push(route.request().url()),route.abort()));
  const pass=text=>{results.push(text);console.log('PASS',text)};
  const upload=()=>page.locator('#videoReferenceFiles').setInputFiles({name:'motion.mp4',mimeType:'video/mp4',buffer:sample});
  const message=text=>page.waitForFunction(t=>document.querySelector('#videoReferenceStatus').textContent.includes(t),text);

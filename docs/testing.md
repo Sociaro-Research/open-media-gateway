@@ -41,7 +41,7 @@ replace a complete secret-history scan or prove that a deployment is healthy.
 | Change | Additional checks |
 | --- | --- |
 | API, authentication, database or worker | The affected Go packages with race detection and disposable services; update OpenAPI for contract changes. |
-| UI or shared styles | Existing browser fixtures from [the UI guide](../scripts/ui/README.md); check Chromium/WebKit, keyboard, both themes and 1440/390/320 px layouts where applicable. |
+| UI or shared styles | Read [the design system](design-system.md) before implementation and compare rendered output against its [spacing and visual review gate](design-system.md#spacing-and-visual-review-gate). Reuse existing spacing tokens/patterns and inspect component-to-component spacing, alignment and adjacent affected screens in before/after screenshots. Run existing browser fixtures from [the UI guide](../scripts/ui/README.md); check Chromium/WebKit, keyboard, both themes and 1440/390/320 px layouts and relevant states. Tests alone do not establish visual acceptance; record concrete comparisons and unexecuted checks. |
 | Installation or images | `scripts/verify-release.py` with four explicit test images; local/HTTPS owner setup, private services, mock download and restart persistence. |
 | Outbound transport, sessions, uploads or permissions | [Security regressions](security-testing.md) plus affected API/PostgreSQL/browser suites. |
 | Recovery, queueing, storage pressure or throughput | [Reliability and performance runbook](performance-testing.md); use its opt-in flags and isolated environments. |

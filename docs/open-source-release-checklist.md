@@ -75,6 +75,13 @@ while the repository is private before changing its visibility to public.
 - [ ] Run the required checks for the exact release source using the approved
   local workflow, and record executed, skipped and unexecuted checks. Hosted
   Actions are optional and require a separate operator decision.
+- [ ] For every UI feature/fix in the candidate, confirm the [design system](design-system.md)
+  was read before implementation and rendered output was compared with its
+  [spacing and visual review gate](design-system.md#spacing-and-visual-review-gate).
+  Review evidence of systematic component-to-component spacing using existing
+  tokens/patterns, before/after and adjacent-screen inspection, both themes,
+  desktop/mobile, keyboard and applicable state coverage. Tests alone are
+  insufficient; record any unexecuted visual checks.
 - [ ] Check README links, OpenAPI, issue forms and the PR template on GitHub.
 - [ ] Confirm that the application and UI images include the project license
   and notice, preserve third-party notices, and run as non-root.

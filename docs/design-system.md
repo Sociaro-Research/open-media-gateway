@@ -2,7 +2,10 @@
 
 ## 1. Source of truth
 
-Applies to every screen, dialog and popup. Reuse components; fix shared styles instead of adding screen-specific copies. Exceptions must have a functional reason documented here.
+Applies to every screen, dialog and popup. For every UI feature or fix, read this
+document before implementation and compare the rendered result with the applicable
+rules before completion. Reuse components; fix shared styles instead of adding
+screen-specific copies. Exceptions must have a functional reason documented here.
 
 - **Tokens and layout:** `web/public/ui/styles.css`.
 - **Fields, validation and saving:** `web/public/ui/form-ui.js`.
@@ -22,6 +25,38 @@ Applies to every screen, dialog and popup. Reuse components; fix shared styles i
 | Typography | Inherit the Inter/system font stack. Page/section/group headings: 36/20/16px; fields/body: 14px; tables: 13px; secondary detail: 12px. Monospace only for code. |
 | Spacing | Sections: `--space-section` 32px. Heading-to-content: 24/20/16px for page/section/group; shared action heading: 24px. Field groups: 12–20px; panel padding: 24px, 20px on narrow screens. |
 | Shape | Fields and popups: 12px radius, 1px border. Use existing shared classes; do not invent per-screen radii or shadows. |
+
+### Spacing and visual review gate
+
+Spacing is a required acceptance criterion for every UI feature and fix. Build a
+harmonious hierarchy between components using the existing values above and the
+shared CSS patterns; do not introduce a second spacing scale. Use `--space-section`
+for section separation, the existing heading-to-content distances for each heading
+level, and the shared field grids and panel padding for grouped content. Shared
+action groups and switch labels use 12px gaps. Keep the shared 42×24px switch and
+its label vertically centered, with clear separation from neighboring actions.
+
+Prefer the parent's `gap` for sibling spacing. Avoid accumulating child margins
+and parent gaps, collapsed gaps around text nodes, or unintended empty grid tracks.
+Preserve the shared `FormUI` reserved action space (`.stable-action`) that prevents
+layout shifts when Save/Cancel is hidden. Repeated groups must use the same spacing and alignment. Keep feedback
+within its group; showing Save, validation, loading or error states must not cause
+overlaps or erase the separation between controls. On narrow screens, wrap or stack
+groups in reading order, retain label/control gaps and use the existing mobile
+panel gutters. Do not squeeze controls together to make a row fit.
+
+Before accepting any UI change:
+
+- Identify the applicable rules here and their shared CSS/component sources.
+- Capture and inspect before/after rendered screenshots with safe local fixtures.
+  Compare section, heading, field, label/switch, action and panel-edge spacing;
+  check alignment, wrapping and nearby screens that reuse the changed pattern.
+- Inspect both themes at 1440/390/320px, plus any relevant layout breakpoint.
+  Exercise keyboard focus and activation, dirty/saved, enabled/disabled, pending,
+  error/retry and interrupted/repeated operations where applicable.
+- Record concrete design comparisons, screenshots, executed checks and limits in
+  ignored `.local/` or `dist/`. Passing tests or source review alone is not visual
+  acceptance. Report any uninspected state rather than marking the gate complete.
 
 **Themes:** Profile offers Dark, Light and System (default). System follows live OS changes. The independent **Color theme** field chooses an administrator-published preset or **Site default**. Each preset contains both palettes; switching the display mode retains the preset. Both preferences are saved per user. The separate Color themes section creates, names, edits and deletes presets. Its Color theme dropdown initially selects the default, marks it with (default), and ends with + Create new theme. The selected preset has its name, shared Default switch and Delete in one desktop row, with the name occupying half the row and equal flexible gaps of at least 32px, distributed across the full content width, wrapping on narrow screens. The isolated preview contains its heading on the left and shared Dark/Light switch aligned to the right edge in one row. Keep these controls self-explanatory without introductory help text. One versioned Save in that section heading publishes the entire catalog independently of identity, images and layout; both sections preserve the other section's pending edits. Delete is reversible until Save, and the last preset remains the default. Fresh installations ship only **Original**, selected as the default. Legacy colors become **Original** without changing their values. Saved catalogs and user selections are preserved; administrators can create additional presets. Identity, images and layout are shared across presets. Apply the selected palette to every surface, control, table and popup. Light tokens live in `:root[data-theme="light"]`; never add screen-specific theme overrides. Media previews preserve their original colors. Provider logos use their original pixels in dark mode and black RGB with unchanged alpha in light mode.
 

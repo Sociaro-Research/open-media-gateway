@@ -1,5 +1,26 @@
 # UI smoke checks
 
+## Required design and spacing review
+
+For every UI feature or fix, read [the design system](../../docs/design-system.md)
+before implementation and compare rendered output against its
+[spacing and visual review gate](../../docs/design-system.md#spacing-and-visual-review-gate)
+before completion. Reuse its existing tokens and shared spacing patterns.
+Inspect component-to-component gaps, label/switch separation, heading rhythm,
+alignment, panel gutters and wrapping in before/after screenshots and adjacent
+affected screens. Exercise both themes at 1440/390/320px, keyboard behavior and
+applicable dirty/saved, disabled, pending, error/retry and interrupted/repeated states.
+Passing assertions or capturing screenshots without inspecting them is insufficient.
+Keep concrete design comparisons, screenshots and executed/unexecuted checks in
+ignored `.local/` or `dist/`; record limits explicitly.
+
+## Available fixtures
+
+
+
+
+
+
 Run `node scripts/ui/reference-validation.cjs` in Chromium and with
 `UI_BROWSER_ENGINE=webkit` for early reference errors, model changes, library
 binding, rejected replacements, cancellation and stale uploads, plus template
@@ -702,3 +723,11 @@ return to the runner and key-reset cancellation without generation or template
 mutation. Backend `TestTemplateEditingPreservesPartialBindingsAndIsolation` checks
 published revisions, shared/private access, fixed-slot protection and unchanged
 submission state. Evidence stays under `.local/editing/`.
+
+### Shared Template and Playground UI acceptance
+
+Run each fixture with Node/Playwright, then repeat with `UI_BROWSER_ENGINE=webkit`. Set `UI_BROWSER_PATH` when using an installed browser outside Playwright's default cache, and `UI_EVIDENCE_DIR` to a new ignored run directory. All APIs and media are synthetic and local; these checks never authorize live writes or paid providers.
+
+
+
+Inspect the resulting pixels and compare with the design-system spacing gate. Passing geometry assertions does not replace visual acceptance. Keep previous failures alongside successful reruns; report the exact executed browser/state matrix and any unexecuted limits.

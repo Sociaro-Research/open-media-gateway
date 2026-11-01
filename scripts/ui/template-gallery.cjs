@@ -60,7 +60,7 @@ const server=http.createServer(async(req,res)=>{const u=new URL(req.url,'http://
 });
 
 
-(async()=>{await new Promise(r=>server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+server.address().port,browser=await({chromium,webkit}[engine]).launch({headless:true});const page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[],external=[];page.on('pageerror',e=>{if(!e.message.includes('ResizeObserver'))errors.push(e.message)});await page.route('**/*',r=>new URL(r.request().url()).origin===base?r.continue():(external.push(r.request().url()),r.abort()));
+(async()=>{await new Promise(r=>server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+server.address().port,browser=await({chromium,webkit}[engine]).launch({headless:true,...(process.env.UI_BROWSER_PATH?{executablePath:process.env.UI_BROWSER_PATH}:{})});const page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[],external=[];page.on('pageerror',e=>{if(!e.message.includes('ResizeObserver'))errors.push(e.message)});await page.route('**/*',r=>new URL(r.request().url()).origin===base?r.continue():(external.push(r.request().url()),r.abort()));
  try{
   await page.goto(base);await page.waitForFunction(()=>authState==='authenticated');await page.locator('#apiKey').fill('fixture-admin');await page.locator('#apiKey').press('Tab');await page.waitForFunction(()=>GenerationKey.value()==='fixture-admin');await page.locator('#templatesNav').click();await page.getByRole('button',{name:'Dance',exact:true}).waitFor();
   if(process.env.UI_BASELINE){for(const width of [1440,390]){await page.setViewportSize({width,height:1000});await page.screenshot({path:path.join(output,'before-'+width+'.png'),fullPage:true});}return;}
