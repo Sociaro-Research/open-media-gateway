@@ -17,7 +17,11 @@
     header.classList.toggle('wrapped',(compact?symbolWidth:fullWidth)+controlsWidth>header.clientWidth);
   };
   // The logo link must retain its intrinsic width for measuring available space.
-  const observer=new ResizeObserver(layoutHeader);
+  // Defer writes outside ResizeObserver delivery; container changes can otherwise
+  // resize the observed navigation again in the same WebKit delivery cycle.
+  let layoutFrame;
+  const scheduleLayout=()=>{if(layoutFrame)return;layoutFrame=requestAnimationFrame(()=>{layoutFrame=undefined;layoutHeader();});};
+  const observer=new ResizeObserver(scheduleLayout);
   [header,brand,nav,account].forEach(element=>observer.observe(element));
   new MutationObserver(layoutHeader).observe(nav,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['hidden']});
   [wordmark,symbol].forEach(image=>image.addEventListener('load',layoutHeader));
