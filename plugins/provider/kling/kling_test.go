@@ -227,11 +227,10 @@ func TestPriceMatrixAndMeteringIsNotBilling(t *testing.T) {
 func TestMalformedAndFailedTasks(t *testing.T) {
 	for name, body := range map[string]string{
 		"missing code": `{"data":[]}`, "missing data": `{"code":0}`, "empty": `{"code":0,"data":[]}`,
-		"wrong ID":         `{"code":0,"data":[{"id":"other","status":"processing"}]}`,
-		"unknown status":   `{"code":0,"data":[{"id":"task_123","status":"new_unknown"}]}`,
-		"missing output":   `{"code":0,"data":[{"id":"task_123","status":"succeeded"}]}`,
-		"unsafe output":    `{"code":0,"data":[{"id":"task_123","status":"succeeded","outputs":[{"type":"video","url":"https://169.254.169.254/video.mp4","duration":"5"}]}]}`,
-		"invalid duration": `{"code":0,"data":[{"id":"task_123","status":"succeeded","outputs":[{"type":"video","url":"https://cdn.example/video.mp4","duration":"NaN"}]}]}`,
+		"wrong ID":       `{"code":0,"data":[{"id":"other","status":"processing"}]}`,
+		"unknown status": `{"code":0,"data":[{"id":"task_123","status":"new_unknown"}]}`,
+		"missing output": `{"code":0,"data":[{"id":"task_123","status":"succeeded"}]}`,
+		"unsafe output":  `{"code":0,"data":[{"id":"task_123","status":"succeeded","outputs":[{"type":"video","url":"https://169.254.169.254/video.mp4","duration":"5"}]}]}`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			a := adapter(t, func(*http.Request) (*http.Response, error) { return response(200, body), nil })

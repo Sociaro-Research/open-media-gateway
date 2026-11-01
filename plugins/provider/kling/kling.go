@@ -159,23 +159,28 @@ type taskData struct {
 	ID      string `json:"id"`
 	Status  string `json:"status"`
 	Outputs []struct {
-		ID           legacyOpaqueID `json:"id"`
-		WatermarkURL string         `json:"watermark_url"`
-		Type         string         `json:"type"`
-		URL          string         `json:"url"`
-		Duration     string         `json:"duration"`
+		ID       legacyOpaqueID  `json:"id"`
+		Type     string          `json:"type"`
+		URL      string          `json:"url"`
+		Duration json.RawMessage `json:"duration"`
 	} `json:"outputs"`
-	Usage struct {
-		InputDuration string `json:"input_duration"`
-	} `json:"usage"`
-	Billing []struct {
-		ChargeType  string `json:"charge_type"`
-		CashType    string `json:"cash_type"`
-		Amount      string `json:"amount"`
-		Currency    string `json:"currency"`
-		PackageType string `json:"package_type"`
-		ListPrice   string `json:"list_price"`
-	} `json:"billing"`
+	Usage   json.RawMessage `json:"usage"`
+	Billing json.RawMessage `json:"billing"`
+}
+
+func taskOptionalString(raw json.RawMessage) string {
+	var value string
+	_ = json.Unmarshal(raw, &value)
+	return value
+}
+
+type taskBilling struct {
+	ChargeType  string `json:"charge_type"`
+	CashType    string `json:"cash_type"`
+	Amount      string `json:"amount"`
+	Currency    string `json:"currency"`
+	PackageType string `json:"package_type"`
+	ListPrice   string `json:"list_price"`
 }
 
 var taskIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
@@ -232,22 +237,32 @@ func (a *Adapter) GetTask(ctx context.Context, id string) (core.ProviderResult, 
 		if len(task.Outputs) != 1 || task.Outputs[0].Type != "video" || !publicURL(task.Outputs[0].URL) {
 			return core.ProviderResult{}, errors.New("Kling completed task has no single valid video output")
 		}
-		seconds, err := strconv.ParseFloat(task.Outputs[0].Duration, 64)
+		seconds, err := strconv.ParseFloat(taskOptionalString(task.Outputs[0].Duration), 64)
 		if err != nil || seconds <= 0 || math.IsNaN(seconds) || math.IsInf(seconds, 0) {
-			return core.ProviderResult{}, errors.New("Kling completed task has an invalid video duration")
+			// A completed primary video remains available when this optional
+			// duration is absent or malformed. Zero means unknown, not free.
+			seconds = 0
 		}
-		usage := map[string]any{"output_video_duration": seconds}
-		if task.Usage.InputDuration != "" {
-			input, e := strconv.ParseFloat(task.Usage.InputDuration, 64)
-			if e != nil || input <= 0 || math.IsNaN(input) || math.IsInf(input, 0) {
-				return core.ProviderResult{}, errors.New("Kling returned an invalid input duration")
+		usage := map[string]any{}
+		if seconds > 0 {
+			usage["output_video_duration"] = seconds
+		}
+		var optionalUsage struct {
+			InputDuration json.RawMessage `json:"input_duration"`
+		}
+		_ = json.Unmarshal(task.Usage, &optionalUsage)
+		if inputDuration := taskOptionalString(optionalUsage.InputDuration); seconds > 0 && inputDuration != "" {
+			input, e := strconv.ParseFloat(inputDuration, 64)
+			if e == nil && input > 0 && !math.IsNaN(input) && !math.IsInf(input, 0) {
+				usage["input_video_duration"] = input
 			}
-			usage["input_video_duration"] = input
 		}
 		// Retain only recognized billing counters. Units and CNY remain in their
 		// original denomination; none of these are promoted to confirmed USD.
 		billing := []map[string]string{}
-		for _, b := range task.Billing {
+		var reportedBilling []taskBilling
+		_ = json.Unmarshal(task.Billing, &reportedBilling)
+		for _, b := range reportedBilling {
 			if !decimalPattern.MatchString(b.Amount) {
 				continue
 			}
@@ -261,16 +276,12 @@ func (a *Adapter) GetTask(ctx context.Context, id string) (core.ProviderResult, 
 				billing = append(billing, entry)
 			}
 		}
-		if len(billing) > 0 {
+		if seconds > 0 && len(billing) > 0 {
 			usage["billing"] = billing
 		}
 		artifacts := []core.ProviderArtifact{{ID: string(task.Outputs[0].ID), MediaType: "video", Format: "mp4", URL: task.Outputs[0].URL, Duration: seconds, GroupID: string(task.Outputs[0].ID)}}
-		if watermark := task.Outputs[0].WatermarkURL; watermark != "" {
-			if !publicURL(watermark) {
-				return core.ProviderResult{}, errors.New("Kling returned an invalid watermarked output")
-			}
-			artifacts = append(artifacts, core.ProviderArtifact{ID: string(task.Outputs[0].ID) + ":watermark", MediaType: "video", Format: "mp4", URL: watermark, Duration: seconds, GroupID: string(task.Outputs[0].ID)})
-		}
+		// The provider's watermark_url is an optional alternate copy, not the
+		// requested primary output. Do not make its archival a success gate.
 		return core.ProviderResult{Status: core.ProviderSucceeded, ResultURL: task.Outputs[0].URL, Artifacts: artifacts, Usage: core.NormalizeProviderUsage(usage)}, nil
 	default:
 		return core.ProviderResult{}, errors.New("Kling returned an unknown task status")

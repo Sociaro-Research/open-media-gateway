@@ -181,8 +181,11 @@ scene keys, duplicates and malformed prices are rejected. Leaving a scene
 unpriced keeps it unavailable; no template-dependent fee is guessed. Existing
 `kling4_720p_price`/`kling4_1080p_price` USD/second overrides remain supported.
 
-All normalized outputs are archived before success: multiple images/audio,
-recognition JSON, masks, previews and watermarked variants. Read
+All required normalized outputs are archived before success: multiple images/audio,
+recognition JSON, masks, previews and supported watermarked variants. The
+standard Kling 3.0/4.0 video task path returns the primary video only; an
+unsolicited alternate `watermark_url` is not archived or returned. The
+watermark request option is not supported on this path. Read
 `artifacts[{id,media_type,content_url,content_type,size_bytes,sha256}]` from the
 normal generation response. `/v1/generations/{id}/media-access` issues signed
 per-artifact preview/download links. Owner checks, expiry and deletion apply to
