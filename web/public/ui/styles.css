@@ -91,7 +91,7 @@ button { cursor: pointer; }
 .configuration-nav { display: grid; gap: 4px; }
 .configuration-nav button { width: 100%; padding: 12px 14px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); text-align: left; font-size: 13px; font-weight: 600; }
 .configuration-nav button:hover { color: var(--text); background: var(--panel-2); }
-.configuration-nav button.active { color: var(--accent-text,var(--accent)); background: color-mix(in srgb,var(--accent) 5.1%,transparent); box-shadow: inset 2px 0 var(--accent-text,var(--accent)); }
+.configuration-nav button.active { color: var(--accent-text,var(--accent)); background: color-mix(in srgb,var(--accent) 5.1%,transparent); box-shadow: inset 2px 0 var(--accent); }
 .user-identity, .user-menu strong, .user-menu small { display: block; }
 .user-menu strong { max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
 .user-menu small { max-width: 170px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 9px; }
@@ -611,7 +611,7 @@ button, input, textarea, select { font-family: inherit; }
 .organization-field > :is(input, select) { display: block; margin-top: 8px; font-weight: 400; }
 .field-hint { display: block; margin-top: 8px; color: var(--muted); font-size: 12px; font-weight: 400; }
 .organization-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 24px 0; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
-.organization-tabs [aria-pressed=true] { color: var(--accent-text,var(--accent)); border-color: var(--accent-text,var(--accent)); background: color-mix(in srgb,var(--accent) 3.14%,transparent); }
+.organization-tabs [aria-pressed=true] { color: var(--accent-text,var(--accent)); border-color: var(--accent); --interaction-border-color:var(--accent); background: color-mix(in srgb,var(--accent) 3.14%,transparent); }
 .organization-page > .keys-form:first-child { margin-top: 0; }
 .organization-page > button { margin: 8px 12px 8px 0; }
 .organization-dialog > :is(select, button) { margin: 8px 8px 8px 0; }
@@ -1357,7 +1357,7 @@ main > section:not(.system-layout):not(.docs-view):not(#configurationView) { max
 .configuration-nav .subsection-nav button::after { content:none; inset:auto; border:0; }
 .configuration-nav .subsection-nav button:focus-visible { outline:none; text-decoration:underline; text-decoration-thickness:2px; text-underline-offset:.2em; }
 .configuration-nav .subsection-nav [aria-selected=true] { color:var(--accent-text,var(--accent)); }
-.configuration-nav .subsection-nav [aria-selected=true]::after { content:''; position:absolute; top:0; bottom:0; left:-1px; width:2px; background:var(--accent-text,var(--accent)); }
+.configuration-nav .subsection-nav [aria-selected=true]::after { content:''; position:absolute; top:0; bottom:0; left:-1px; width:2px; background:var(--accent); }
 @media (min-width:761px) {
   .system-layout { --rail-offset:224px; }
   .docs-view { --rail-offset:310px; }
@@ -1682,6 +1682,8 @@ input[type=color]:focus-visible { outline:none; box-shadow:none; border:2px soli
  :is(.primary,.secondary,input[type=checkbox],.reference-card):focus-visible,
  .template-card:has(.template-card-title:focus-visible),.reference-card:has(> .reference-choice:focus-visible),
  .template-media:has(> video:focus-visible),.template-card.selected,.reference-card[data-selected="true"] { --interaction-border-color:Highlight; }
+ .organization-tabs [aria-pressed=true], .configuration-nav .subsection-nav [aria-selected=true] { --interaction-border-color:Highlight; color:CanvasText; background:Canvas; }
+ .configuration-nav .subsection-nav [aria-selected=true]::after { background:Highlight; forced-color-adjust:none; }
  input[type=checkbox] { --interaction-border-rest:1px; background:Canvas; }
  input[type=checkbox]:checked { background:Highlight; }
  input[type=checkbox]:focus-visible { background:Canvas; }

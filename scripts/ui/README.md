@@ -868,3 +868,11 @@ Escape/Back/focus, validation/estimate/submission errors, pending/double clicks 
 key-change cleanup. The fixture uses synthetic loopback APIs and the existing
 journal pagination helper, captures both themes at 1440/390/320px, and never calls
 a provider. `UI_EVIDENCE_DIR` selects its retained evidence.
+
+### Active navigation colors
+
+Run `node scripts/ui/active-navigation-colors.cjs` in Chromium and WebKit. The
+local shared-CSS/layout fixture compares top-level, sidebar and subsection active
+indicators with deliberately distinct accent and readable-text roles, including
+all Settings tabs, both themes, 1440/761/760/390/320 px, keyboard/hover, custom
+accent changes and forced colors where supported. No configuration API is used.
