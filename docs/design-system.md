@@ -512,6 +512,13 @@ columns as available width decreases, and stacks below the panel on narrow
 screens. All roles share this screen; existing edit permission adds inline Create
 and Edit actions. There is no management-mode switch.
 
+Authors explicitly choose an image/video gallery cover using the shared file and
+Template library picker, with no cover-mode dropdown or automatic fixed-reference
+choice. Existing `cover_id` bindings and media remain unchanged. Selecting a shared
+file reuses its identity; it does not upload or copy it. A draft can be saved without
+a cover; publication requires a selected cover. Changing a fixed input does not
+change the cover.
+
 Cover media preserves its complete natural aspect ratio, including portrait
 video, and has a textual failure state. Mouse hover previews pause on leave;
 keyboard users focus the video and press Space/Enter; touch users tap the video. Cards have no separate Play/Pause preview button. Reduced-motion preferences

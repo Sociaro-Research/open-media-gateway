@@ -61,8 +61,7 @@ generation or library access.
 3. Upload directly or deliberately select a file from **Template references** to make a slot fixed, or
    leave it for the user. The dance-video/two-face example has two missing image
    slots and one fixed video slot. The shared file keeps its identity and bytes.
-4. Choose an existing fixed image/video as the cover, or upload a separate
-   image/video cover. A separate cover never becomes a generation input.
+4. Explicitly choose an image/video cover from Template references, or upload one. The picker reuses a shared file identity; it has no cover-mode dropdown. A separate cover never becomes a generation input.
 5. **Save** appears only for unsaved changes and permits incomplete work within a selected References workflow.
    Known fixed-media incompatibilities are rejected before saving.
    Creation and draft saves require an available reference-capable default model.

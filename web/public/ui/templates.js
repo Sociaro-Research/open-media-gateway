@@ -236,8 +236,7 @@
   let overrideSoundID=draft.override_sound_id||'';
   const sound=OverrideSound.create({value:overrideSoundID,signal,load:id=>loadImage(id),locked:()=>writing||uploading>0,onBusy:busy=>{if(!fresh(token))return;uploading+=busy?1:-1;lock(uploading>0);},onChange:id=>{if(!fresh(token))return;overrideSoundID=id;cache();},upload:async(file,operationSignal)=>{const body=new FormData();body.append('file',file);return api(`/v1/system/templates/${record.id}/assets`,{method:'POST',body,signal:operationSignal});}});
   form.append(sound.root);
-  const cover=field(form,'Gallery cover','select');form.append(el('p','The cover is only the gallery preview. Replacing a fixed reference does not change a separately selected cover.','field-hint'));
-  let promptEditor=null,coverUpload=null;const widgets=new Set(),assetPreviews=new Map(),imageLoads=new Map(),metadataLoads=new Map(),assetNames=new Map(),previewFailures=new Set();
+  let promptEditor=null,coverUpload=null;const widgets=new Set(),assetPreviews=new Map(),imageLoads=new Map(),metadataLoads=new Map(),assetNames=new Map();
   signal.addEventListener('abort',()=>{for(const item of assetPreviews.values())if(item.url)URL.revokeObjectURL(item.url);assetPreviews.clear();},{once:true});
   const assetTypes=new Map();for(const s of bindings)if(s.asset_id)assetTypes.set(s.asset_id,s.type+'/unknown');if(coverID&&!assetTypes.has(coverID))assetTypes.set(coverID,'image/unknown');
   function selected(){if(!model.value)return null;const [p,m]=JSON.parse(model.value);return adminCatalog.find(x=>x.id===p)?.models.find(x=>x.id===m);}
@@ -270,10 +269,8 @@
    if(event.detail.scope!=='template'||!fresh(token))return;const id=event.detail.id;
    const preview=assetPreviews.get(id);if(preview?.url)URL.revokeObjectURL(preview.url);assetPreviews.delete(id);assetTypes.delete(id);assetNames.delete(id);
    for(const slot of bindings)if(slot.asset_id===id)slot.asset_id='';if(coverID===id)coverID='';if(overrideSoundID===id)sound.clear();
-   covers();cache();renderSlots();checkMedia();if(coverUpload)showPreview(coverUpload,coverID,'image','Cover');
+   cache();renderSlots();checkMedia();if(coverUpload)showPreview(coverUpload,coverID,'image','Cover');
   },{signal});
-  function covers(){cover.replaceChildren(new Option('Choose a fixed image/video or separate cover',''));for(const [id,type] of assetTypes){if(type.startsWith('image/')||type.startsWith('video/')){const slot=bindings.find(s=>s.asset_id===id);cover.append(new Option((slot?'Fixed · '+slot.label:'Separate cover')+(assetNames.has(id)?assetNames.get(id)?' · '+assetNames.get(id):'':' · '+(previewFailures.has(id)?'Filename unavailable':'Loading filename…')),id));}}cover.value=coverID;ControlPickers.sync(cover);}
-  covers();cover.onchange=()=>{coverID=cover.value;if(coverUpload)showPreview(coverUpload,coverID,'image','Cover');cache();};
   function inputLimits(kind){return selected()?.reference_media_limits?.[kind]||{};}
   function rememberAsset(a,name,file){
    assetTypes.set(a.id,a.content_type);assetNames.set(a.id,name||a.id);
@@ -281,7 +278,7 @@
   }
   function loadMetadata(id){
    if(assetNames.has(id))return Promise.resolve({name:assetNames.get(id),content_type:assetTypes.get(id)});
-   if(!metadataLoads.has(id))metadataLoads.set(id,api(`/v1/system/templates/${encodeURIComponent(record.id)}/assets/${encodeURIComponent(id)}/metadata`,{signal}).then(a=>{if(!fresh(token))return null;assetTypes.set(id,a.content_type);assetNames.set(id,a.name||'');covers();return a;}).finally(()=>metadataLoads.delete(id)));return metadataLoads.get(id);
+   if(!metadataLoads.has(id))metadataLoads.set(id,api(`/v1/system/templates/${encodeURIComponent(record.id)}/assets/${encodeURIComponent(id)}/metadata`,{signal}).then(a=>{if(!fresh(token))return null;assetTypes.set(id,a.content_type);assetNames.set(id,a.name||'');return a;}).finally(()=>metadataLoads.delete(id)));return metadataLoads.get(id);
   }
   async function loadImage(id){
    if(assetPreviews.has(id))return assetPreviews.get(id);
@@ -293,22 +290,23 @@
    if(!widget.previewStatus){widget.previewStatus=el('p','','template-preview-status');widget.previewStatus.setAttribute('role','status');widget.root.append(widget.previewStatus);}if(changed||!id||assetPreviews.has(id))FormUI.message(widget.previewStatus,'');
    if(!id||assetPreviews.has(id))return;
    const current=()=>fresh(token)&&widget.root.isConnected&&widget.previewAssetID===id;
-   try{const item=await loadImage(id);if(item&&current()){previewFailures.delete(id);widget.setPreview({...item,name:item.name||name});FormUI.message(widget.previewStatus,'');covers();}}
-   catch(error){if(current()&&error.name!=='AbortError'){previewFailures.add(id);FormUI.message(widget.previewStatus,'Preview unavailable. Retrying automatically. The saved reference is still assigned.','error');covers();}}
+   try{const item=await loadImage(id);if(item&&current()){widget.setPreview({...item,name:item.name||name});FormUI.message(widget.previewStatus,'');}}
+   catch(error){if(current()&&error.name!=='AbortError'){FormUI.message(widget.previewStatus,'Preview unavailable. Retrying automatically. The saved reference is still assigned.','error');}}
   }
   async function copyFile(file,slot,operationSignal){const body=new FormData();body.append('file',file);if(slot)body.append('validation',JSON.stringify(validation()));return api(`/v1/system/templates/${record.id}/assets`,{method:'POST',body,signal:operationSignal});}
   function bindAsset(slot,a,name,file){
    if(slot&&!a.content_type?.startsWith(slot.type+'/')||!slot&&!/^(image|video)\//.test(a.content_type||''))throw Error('The uploaded media does not match this reference type.');
-   rememberAsset(a,name,file);if(slot)slot.asset_id=a.id;else coverID=a.id;covers();cache();
+   rememberAsset(a,name,file);if(slot)slot.asset_id=a.id;else coverID=a.id;cache();
    renderSlots();
    if(coverUpload)showPreview(coverUpload,coverID,a.content_type.startsWith('image/')?'image':'video','Cover');
    if(slot)slots.querySelector(`[data-slot-id="${CSS.escape(slot.id)}"] .reference-status`).textContent='Assigned '+name+' to '+slot.label+'.';
   }
   function uploadControl(slot){
    const kind=slot?.type,label=slot?.label||'Cover',widget=ReferenceUpload.create({label,title:slot?(slot.asset_id?'Replace the fixed '+kind:'Drop '+(kind==='audio'?'an audio file':'an '+kind)+' here'):'Drop a separate cover here',uploadLabel:slot?(slot.asset_id?'Replace '+kind:'Upload '+kind):'Upload cover',kinds:slot?[kind]:['image','video'],limits:slot?inputLimits:()=>({}),signal,locked:()=>writing||uploading>0,
+    onRemove:!slot?()=>{coverID='';cache();renderSlots();checkMedia();showPreview(coverUpload,'','image','Cover');}:undefined,
     onBusy:(busy,{restoreFocus=false}={})=>{if(!fresh(token))return;uploading+=busy?1:-1;lock(uploading>0);if(!busy&&restoreFocus&&slot)slots.querySelector(`[data-slot-id="${CSS.escape(slot.id)}"] [data-upload-picker]`)?.focus({preventScroll:true});},
     onFile:async(file,operationSignal)=>{const started=intent(),a=await copyFile(file,slot,operationSignal);await acceptAsset(slot,a,file.name,file,started,operationSignal);return slot?'Assigned '+file.name+' to '+slot.label+'.':'Cover ready: '+file.name;},
-    ...({onLibrary:()=>chooseLibrary(kind,true,async(item,selectionSignal)=>{const started=intent(),a=await api(`/v1/system/templates/${record.id}/assets`,{method:'POST',body:JSON.stringify({library_reference_id:item.id,...(slot?{validation:validation()}:{})}),signal:selectionSignal});await acceptAsset(slot,a,item.name,null,started,selectionSignal);},slot?validation:null,()=>slot?slot.asset_id:coverID,()=>{if(slot)slot.asset_id='';else coverID='';covers();cache();renderSlots();checkMedia();if(!slot)showPreview(coverUpload,'','image','Cover');})})
+    ...({onLibrary:()=>chooseLibrary(kind,true,async(item,selectionSignal)=>{const started=intent(),a=await api(`/v1/system/templates/${record.id}/assets`,{method:'POST',body:JSON.stringify({library_reference_id:item.id,...(slot?{validation:validation()}:{})}),signal:selectionSignal});await acceptAsset(slot,a,item.name,null,started,selectionSignal);},slot?validation:null,()=>slot?slot.asset_id:coverID,()=>{if(slot)slot.asset_id='';else coverID='';cache();renderSlots();checkMedia();if(!slot)showPreview(coverUpload,'','image','Cover');})})
    });widgets.add(widget);showPreview(widget,slot?.asset_id||(!slot&&coverID),kind||'image',slot?'Fixed '+label:'Cover');return widget;
   }
   function renderSlots(){
@@ -318,13 +316,13 @@
     const label=field(row,'Input label','text',slot.label);label.oninput=()=>{slot.label=label.value;heading.querySelector('h3').textContent=slot.label;widget.setLabel(slot.label);cache();};
     row.append(el('p',slot.asset_id?'Fixed reference. Users cannot replace it.':'Required reference. The user supplies this input when generating.','field-hint'));
     const widget=uploadControl(slot);row.append(widget.root);
-    if(slot.asset_id)row.append(button('Leave for user',()=>{slot.asset_id='';covers();cache();renderSlots();checkMedia();}));slots.append(row);
+    if(slot.asset_id)row.append(button('Leave for user',()=>{slot.asset_id='';cache();renderSlots();checkMedia();}));slots.append(row);
    }
    FormUI.refresh();promptEditor?.refresh();
   }
   const infer=button('Infer and review slots',async()=>{if(writing||uploading)return;lock(true);try{const d=read(),result=await api(`/v1/system/templates/${record.id}/infer`,{method:'POST',body:JSON.stringify(d),signal:controller.signal});if(!fresh(token))return;bindings=result.slots.map(s=>{const previous=bindings.find(x=>x.id===s.id&&x.role===s.role);return {...s,...(previous?{asset_id:previous.asset_id,label:previous.label}:{})};});syntax=result.syntax;cache();renderSlots();checkMedia();say('Review each slot, fixed references and the cover before publishing.');}catch(e){fail(e,token)}finally{if(fresh(token))lock(false);}});
   form.append(infer,slots);
-  coverUpload=uploadControl(null);form.append(coverUpload.root);
+  coverUpload=uploadControl(null);const coverSection=el('section','','template-cover');coverSection.append(el('h3','Gallery cover'),el('p','Choose an image or video. Replacing a fixed reference does not change the cover.','field-hint'),coverUpload.root);form.append(coverSection);
   form.append(el('p','Save preserves your edits. Published templates keep their current revision until you turn publication off and on again.','field-hint'));
   form.append(el('p','Publishing shares this prompt, fixed references and cover with authorized users of this instance. Separate covers are never generation inputs.','field-hint'));
   const actions=el('div','','form-heading-actions');heading.append(actions);
@@ -338,7 +336,7 @@
    }finally{if(fresh(token))lock(false);writing=false;}
   }
   const saveDraft=button('Save',()=>save(),'primary compact'),publicationLabel=el('label','Published','checkbox'),publish=el('input'),publicationHint=el('p','','field-hint');publish.type='checkbox';publish.setAttribute('aria-label','Published');publicationLabel.append(publish);actions.append(saveDraft,publicationLabel);form.append(publicationHint);
-  function syncPublication(){const dirty=draftStamp(read())!==baseline;publish.checked=!!record.published;publish.disabled=writing||!!uploading||dirty||(!record.published&&(!workflowReady()||mediaChecking||!!mediaIssue));publicationHint.textContent=dirty?'Save your changes before changing publication.':'';saveDraft.disabled=writing||!!uploading||!workflowReady()||mediaChecking||!!mediaIssue;}
+  function syncPublication(){const dirty=draftStamp(read())!==baseline;publish.checked=!!record.published;publish.disabled=writing||!!uploading||dirty||(!record.published&&(!coverID||!workflowReady()||mediaChecking||!!mediaIssue));publicationHint.textContent=dirty?'Save your changes before changing publication.':!coverID?'Choose a gallery cover before publishing.':'';saveDraft.disabled=writing||!!uploading||!workflowReady()||mediaChecking||!!mediaIssue;}
   publish.onchange=()=>{const action=publish.checked?'publish':'unpublish';publish.checked=!!record.published;save(action);};infer.disabled=writing||!!uploading||!workflowReady();
   form.onsubmit=e=>{e.preventDefault();save();};form.oninput=event=>{if(event.target!==publish)cache();};renderSlots();FormUI.watch(form,saveDraft,{read:()=>draftStamp(read()),heading:titleHeading});if(!record.savedDraft)savedDraft=structuredClone(read());baseline=draftStamp(savedDraft);FormUI.commit(form,baseline);syncPublication();FormUI.refresh();checkMedia();
   editorUpdate=()=>Promise.all([...widgets].filter(widget=>widget.root.isConnected&&widget.previewAssetID&&!assetPreviews.has(widget.previewAssetID)).map(widget=>showPreview(widget,widget.previewAssetID,widget.previewFallback.kind,widget.previewFallback.name)));
