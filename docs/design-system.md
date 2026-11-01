@@ -594,3 +594,5 @@ Installation mode choices retain the native unselected radio and a thin configur
 The Installation Mode summary uses Change Mode and the shared 16px heading-to-content grid gap without stacked heading/paragraph margins.
 
 Library Play uses a translucent overlay with a larger shared play glyph. Playback replaces the poster in the same card media area; it never adds a second preview region. Keep native controls separate from selection, restore the poster and retry on failure, and dispose playback on close, filter, deletion and navigation.
+
+Dialog and popover close actions use the shared icon-close class: a plain normal-state glyph without border chrome, a 44px target, an accessible Close label and a non-border keyboard focus fill. Forced colors use system Canvas/Highlight colors. Standalone buttons retain their shared border.

@@ -24,7 +24,7 @@
   close();const m=model.metadata||{},p=model.pricing||{},panel=node('aside','model-info-popup');
   panel.id='model-information';panel.setAttribute('role','dialog');panel.setAttribute('aria-label','Model information: '+model.display_name);panel.setAttribute('popover','manual');
   const header=node('div','model-info-header');header.append(node('strong','',model.display_name));
-  const dismiss=node('button','model-info-close','×');dismiss.type='button';dismiss.setAttribute('aria-label','Close model information');dismiss.onclick=()=>close(true);header.append(dismiss);panel.append(header);
+  const dismiss=node('button','model-info-close icon-close','×');dismiss.type='button';dismiss.setAttribute('aria-label','Close model information');dismiss.onclick=()=>close(true);header.append(dismiss);panel.append(header);
   if(m.description)panel.append(node('p','model-info-description',m.description));
   const dl=node('dl','model-info-facts');
   const fact=(label,value)=>{if(value==null||value===''||(Array.isArray(value)&&!value.length))return;dl.append(node('dt','',label),node('dd','',Array.isArray(value)?value.join(', '):String(value)));};
@@ -63,7 +63,7 @@
  }
  function informationButton(title,render,className=''){
   const b=node('button','model-info-button','i');b.type='button';b.setAttribute('aria-label',title);b.setAttribute('aria-haspopup','dialog');b.setAttribute('aria-expanded','false');
-  function show(pinned){clearTimeout(timer);if(active?.button===b){if(pinned)active.pinned=true;return;}close();const panel=node('aside','model-info-popup '+className);panel.id='role-information';panel.setAttribute('role','dialog');panel.setAttribute('aria-label',title);panel.setAttribute('popover','manual');const header=node('div','model-info-header');header.append(node('strong','',title));const dismiss=node('button','model-info-close','×');dismiss.type='button';dismiss.setAttribute('aria-label','Close '+title.toLowerCase());dismiss.onclick=()=>close(true);header.append(dismiss);panel.append(header);render(panel);display(b,panel,pinned);}
+  function show(pinned){clearTimeout(timer);if(active?.button===b){if(pinned)active.pinned=true;return;}close();const panel=node('aside','model-info-popup '+className);panel.id='role-information';panel.setAttribute('role','dialog');panel.setAttribute('aria-label',title);panel.setAttribute('popover','manual');const header=node('div','model-info-header');header.append(node('strong','',title));const dismiss=node('button','model-info-close icon-close','×');dismiss.type='button';dismiss.setAttribute('aria-label','Close '+title.toLowerCase());dismiss.onclick=()=>close(true);header.append(dismiss);panel.append(header);render(panel);display(b,panel,pinned);}
   b.onclick=e=>{e.stopPropagation();if(active?.button===b&&active.pinned)close();else show(true);};b.onpointerenter=e=>{if(e.pointerType==='mouse')show(false);};b.onpointerleave=schedule;b.onkeydown=e=>{e.stopPropagation();if(e.key==='ArrowRight'||e.key==='F2'){e.preventDefault();show(true);active.panel.querySelector('button').focus();}};return b;
  }
  function schedule(){clearTimeout(timer);if(active&&!active.pinned)timer=setTimeout(()=>close(),200);}

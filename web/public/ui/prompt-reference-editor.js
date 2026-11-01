@@ -50,7 +50,7 @@
   const preview=item?.url?.startsWith('asset://')?item.preview_url:item?.url;const src=safeURL(preview);
   const panel=popup;
   if(item&&src){const img=document.createElement(token.kind==='image'?'img':token.kind);if(token.kind==='image')img.alt=`Preview of image ${token.index+1}`;else{img.controls=true;img.preload='none';}img.referrerPolicy='no-referrer';img.onload=()=>{if(popup===panel)position(x,y);};img.onerror=()=>{img.remove();const error=document.createElement('p');error.textContent='Preview unavailable.';if(popup===panel)panel.append(error);};img.src=src;popup.append(img);}else if(item){const unavailable=document.createElement('p');unavailable.textContent=item.url?.startsWith('asset://')?'Open the BytePlus library to load this registered asset’s preview.':'Preview unavailable.';popup.append(unavailable);}
-  if(pinned){const close=document.createElement('button');close.type='button';close.className='model-info-close';close.textContent='×';close.setAttribute('aria-label','Close reference preview');close.onclick=hide;popup.append(close);}
+  if(pinned){const close=document.createElement('button');close.type='button';close.className='model-info-close icon-close';close.textContent='×';close.setAttribute('aria-label','Close reference preview');close.onclick=hide;popup.append(close);}
   document.body.append(popup);if(popup.showPopover)popup.showPopover();position(x,y);
  }
  function position(x,y){if(!popup)return;const rect=popup.getBoundingClientRect();const left=Math.max(8,Math.min(x+14,innerWidth-rect.width-8));const top=y+16+rect.height<innerHeight?y+16:Math.max(8,y-rect.height-12);popup.style.left=left+'px';popup.style.top=top+'px';}

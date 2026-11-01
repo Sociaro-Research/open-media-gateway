@@ -1722,3 +1722,11 @@ input[type=color]:focus-visible { outline:none; box-shadow:none; border:2px soli
 
 /* The group's grid gap owns spacing; inherited heading/paragraph margins must not stack. */
 :is(#systemView,#configurationView) .setup-section > :is(h2,p) { margin:0; }
+
+/* Dialog and popover close icons share a borderless 44px control. */
+.icon-close { display:grid; place-items:center; flex:0 0 44px; width:44px; min-width:44px; height:44px; min-height:44px; padding:0; border:1px solid transparent; border-radius:8px; background:transparent; box-shadow:none; color:var(--muted); font-size:22px; line-height:1; }
+.icon-close::after { display:none; }
+.dialog-heading > .dialog-close.icon-close { align-items:center; }
+.icon-close:hover:not(:disabled) { background:var(--panel-2); color:var(--text); }
+.icon-close:focus-visible { outline:none!important; background:color-mix(in srgb,var(--accent) 16%,var(--field)); color:var(--text); box-shadow:none; }
+@media(forced-colors:active) { .icon-close { forced-color-adjust:none; color:CanvasText; background:Canvas; } .icon-close:hover:not(:disabled),.icon-close:focus-visible { color:HighlightText; background:Highlight; } }

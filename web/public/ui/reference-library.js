@@ -10,7 +10,7 @@
   const dialog=node('dialog','','reference-library');if(id)dialog.id=id;
   const header=node('div','','reference-library-header'),heading=node('h2',title);
   heading.id=(id||'reference-library-'+(++create.sequence))+'Title';dialog.setAttribute('aria-labelledby',heading.id);
-  header.append(heading,button('✕','Close library',()=>onClose?onClose():dialog.close()));header.lastChild.dataset.close='';
+  header.append(heading,button('✕','Close library',()=>onClose?onClose():dialog.close()));header.lastChild.dataset.close='';header.lastChild.classList.add('icon-close');
   const intro=node('p',description),status=node('p','','reference-status'),grid=node('div','','reference-library-grid'),footer=node('div','','reference-library-footer'),more=button('Load more','Load more',()=>{});
   status.dataset.status='';status.setAttribute('role','status');grid.dataset.grid='';more.dataset.more='';more.hidden=true;footer.append(more);dialog.append(header,intro,status,grid,footer);
   dialog.addEventListener('close',()=>{if(!dialog.open)stop(dialog);});

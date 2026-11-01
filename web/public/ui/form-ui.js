@@ -7,7 +7,7 @@
   }
   function dialogHeading(parent,title,onClose){
     const heading=sectionHeading(parent,title),close=document.createElement('button');
-    heading.parentElement.classList.add('dialog-heading');close.className='model-info-close dialog-close';close.type='button';close.textContent='×';close.setAttribute('aria-label','Close '+title.toLowerCase());close.onclick=onClose;heading.parentElement.append(close);return {heading,close};
+    heading.parentElement.classList.add('dialog-heading');close.className='model-info-close dialog-close icon-close';close.type='button';close.textContent='×';close.setAttribute('aria-label','Close '+title.toLowerCase());close.onclick=onClose;heading.parentElement.append(close);return {heading,close};
   }
   function disclosure(summary,text){if(!summary||summary.dataset.disclosureLabel===text)return;summary.dataset.disclosureLabel=text;const label=document.createElement('span'),chevron=document.createElement('span');label.textContent=text;chevron.className='select-chevron';chevron.setAttribute('aria-hidden','true');summary.replaceChildren(label,chevron);}
   function message(target,text='',type=''){target.dataset.messageType=type;target.textContent=text;target.setAttribute('role','status');}
