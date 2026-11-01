@@ -131,7 +131,7 @@
   };
  }
  select.addEventListener('change',()=>{if(select.value===NEW_PROJECT){render();editor();return;}selected=select.value;render();changed();});
- manageButton.onclick=event=>{event.preventDefault();event.stopPropagation();const project=current();if(!project||manageButton.disabled||!canManage)return;ControlPickers.menu(manageButton,{label:'Project actions',items:[{label:'Rename',onSelect:()=>editor(current())},{label:'Delete',onSelect:()=>remove(current())}]});};
+ manageButton.onclick=event=>{event.preventDefault();event.stopPropagation();const project=current();if(!project||manageButton.disabled||!canManage)return;ControlPickers.menu(manageButton,{label:'Project actions',matchFieldWidth:true,items:[{label:'Rename',icon:'rename',onSelect:()=>editor(current())},{label:'Delete',icon:'delete',onSelect:()=>remove(current())}]});};
  window.addEventListener('gateway-key-change',()=>{
   epoch++;reading=null;assignmentMenu?.popup.close(false);ControlPickers.dismiss(manageButton);write?.abort();write=null;if(dialog){dialog.close();dialog.remove();dialog=null;}projects=[];canManage=true;company=false;selected='';if(hasConnectedKey)remember();if(window.GenerationKey?.value())hasConnectedKey=true;feedback();render();load();
  });

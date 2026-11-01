@@ -702,7 +702,8 @@ table :is(.role-editor,.member-limit-form) button { min-height: 44px; }
 table .select-chevron { right:12px; }
 
 .floating-field > .select-trigger:disabled { opacity:.55; cursor:not-allowed; }
-.custom-select > .floating-label { z-index:1; right:42px; }
+/* The trigger reserves a 1px layout border before its 14px content inset. */
+.custom-select > .floating-label { z-index:1; left:calc(14px + 1px); right:42px; }
 table .floating-field > .select-trigger { min-height:44px; padding:9px 42px 9px 12px; font:inherit; line-height:24px; }
 .custom-date > input {
   /* Safari's native date control otherwise keeps an intrinsic minimum width. */
@@ -715,13 +716,13 @@ table .floating-field > .select-trigger { min-height:44px; padding:9px 42px 9px 
 .custom-date > .calendar-trigger { position:absolute; right:10px; top:50%; transform:translateY(-50%); width:32px; height:32px; min-height:32px!important; padding:6px; border:0; background:none; box-shadow:none; color:var(--muted); }
 .calendar-trigger svg { width:20px; height:20px; stroke:currentColor; stroke-width:1.5; }
 .calendar-trigger:hover { color:var(--accent-text,var(--accent)); }
-.control-popup { position:fixed; inset:auto; margin:0; z-index:10000; box-sizing:border-box; padding:6px; border:1px solid var(--line); border-radius:12px; background:var(--popup); color:var(--text); font-family:inherit; font-size:13px; font-weight:400; line-height:1.5; box-shadow:var(--popup-shadow); overflow:auto; }
+.control-popup { --picker-option-inline-padding:12px; position:fixed; inset:auto; margin:0; z-index:10000; box-sizing:border-box; padding:6px; border:1px solid var(--line); border-radius:12px; background:var(--popup); color:var(--text); font-family:inherit; font-size:13px; font-weight:400; line-height:1.5; box-shadow:var(--popup-shadow); overflow:auto; }
 .control-popup::backdrop { background:transparent; }
 .select-popup { outline:none; }
-.picker-option { overflow-wrap:anywhere; position:relative; padding:10px 34px 10px 12px; border-radius:7px; cursor:pointer; }
+.picker-option { overflow-wrap:anywhere; position:relative; padding:10px 34px 10px var(--picker-option-inline-padding,12px); border-radius:7px; cursor:pointer; }
 .picker-option.highlighted,.picker-option:hover:not([aria-disabled=true]) { background:color-mix(in srgb,var(--accent) 9.41%,transparent); }
 .picker-option[aria-selected=true] { color:var(--accent-text,var(--accent)); }
-.picker-option[aria-selected=true]::after { content:'✓'; position:absolute; right:12px; }
+.picker-option[aria-selected=true]::after { content:'✓'; position:absolute; right:var(--picker-option-inline-padding,12px); }
 .picker-option[aria-disabled=true] { opacity:.4; cursor:default; }
 .picker-group { color:var(--muted); padding:10px 12px 4px; font-size:11px; }
 .model-picker-row { display:flex; align-items:center; gap:2px; min-width:0; }
@@ -1600,6 +1601,8 @@ body:has(.detail-dialog[open]) { overflow:hidden; }
 .action-menu .picker-option:hover,.action-menu .picker-option:focus-visible { background:var(--panel-2); color:var(--highlight); }
 .action-menu .menu-check { width:18px; flex:none; }
 .action-menu .menu-label { min-width:0; }
+.action-menu .menu-icon { display:grid; place-items:center; }
+.action-menu .menu-icon svg { display:block; width:16px; height:16px; }
 .action-menu .picker-search-status:empty { display:none; }
 .journal-project-controls { width:344px; display:flex; align-items:center; gap:8px; min-width:0; max-width:100%; }
 .journal-project-controls .journal-project { width:240px; flex:1 1 240px; }
@@ -1679,11 +1682,16 @@ input[type=color]:focus-visible { outline:none; box-shadow:none; border:2px soli
  .primary:focus-visible { background:Canvas; color:CanvasText; }
 }
 
-.picker-separator { height:1px; margin:8px 0; background:var(--line); }
+.picker-separator { height:1px; margin:8px var(--picker-option-inline-padding,12px); background:var(--line); }
 .journal-project-controls { width:min(240px,100%); }
 .journal-project-controls .journal-project { width:100%; flex:1 1 240px; }
 .journal-project-edit { position:absolute; z-index:2; top:50%; right:32px; transform:translateY(-50%); width:44px; min-width:44px; height:44px; min-height:44px; padding:6px; font-size:12px; line-height:20px; }
 .has-project-edit > .select-trigger { padding-right:92px; }
+/* This field action is text-only; retain its 44px target and reserved border. */
+.journal-project-edit { background:transparent; box-shadow:none; }
+.journal-project-edit::after { display:none; }
+.journal-project-edit:focus-visible { color:var(--text); text-decoration:underline; text-decoration-thickness:2px; text-underline-offset:.2em; }
+@media(forced-colors:active) { .journal-project-edit:focus-visible { color:CanvasText; } }
 
 /* Scrollable owners retain their native perimeter; compensate its extra pixel
    with reserved padding so focus never shifts content or adds an outline. */
