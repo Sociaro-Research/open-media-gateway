@@ -118,3 +118,10 @@
 #templateHeadingActions > .field-hint { flex-basis:100%; margin:0; }
 #templateHeadingActions > button { min-width:0!important; max-width:100%; }
 @media(max-width:600px) { #templateHeadingActions { width:100%; } }
+
+/* One card selection target; native title and Edit remain sibling controls. */
+#templatesGallery .template-card:not(.template-draft-card) { cursor:pointer; }
+#templatesGallery .template-card .template-media::after { display:none; }
+#templatesGallery .template-card:has(video:focus-visible) { --interaction-border-color:var(--accent); --interaction-border-width:2px; }
+#templatesGallery .template-card.selected:has(video:focus-visible) { --interaction-border-width:3px; }
+@media(forced-colors:active) { #templatesGallery .template-card:has(video:focus-visible) { --interaction-border-color:Highlight; } }
