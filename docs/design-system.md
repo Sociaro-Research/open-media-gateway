@@ -549,7 +549,8 @@ wrap within narrow panels using shared button styles; no design exception.
 
 Override Sound uses the shared `ReferenceUpload` dropzone, keyboard file picker,
 progress/cancel/retry feedback and native audio preview in Playground and the
-Template editor. Its separate removal action clears the assignment; uploaded
+Template editor. A selected sound shows only the concise Remove action inside
+its selection block; removal reveals the existing audio upload control. Uploaded
 library media retains its existing lifecycle. It adds no independent library
 picker. The section is available for video output and remains visible when an
 existing template assignment needs removal after a model change.

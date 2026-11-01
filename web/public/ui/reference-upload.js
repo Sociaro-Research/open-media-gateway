@@ -19,11 +19,14 @@
   const retry=button('Retry upload',()=>{returnFocus=true;if(lastFile)select([lastFile]);});retry.hidden=true;
   actions.append(upload);if(library)actions.append(library);actions.append(cancel,retry);
   preview.hidden=true;root.append(preview,title,actions,hint,status,input);
-  let busy=false,operation=null,lastFile=null,depth=0,returnFocus=false,assignedName='';
+  let busy=false,operation=null,lastFile=null,depth=0,returnFocus=false,assignedName='',selected=false;
+  const remove=config.onRemove?button('Remove',event=>{event.stopPropagation();if(busy||config.locked?.())return;config.onRemove();if(root.isConnected)focusAction();}):null;
+  if(remove){remove.dataset.uploadRemove='';actions.append(remove);}
+  function focusAction(){const action=remove&&selected?remove:upload;if(!action.disabled)action.focus({preventScroll:true});}
   const retained=()=>config.retainedMessage?config.retainedMessage():assignedName?' Current assignment remains '+assignedName+'.':' No new reference assigned.';
   function limits(kind){const shared={image:30,video:200,audio:50}[kind]*1024*1024,rule=config.limits?.(kind)||{};return {shared,rule};}
   function message(text='',error=false){status.textContent=text;status.classList.toggle('error',error);}
-  function sync(){const locked=busy||!!config.locked?.();upload.disabled=locked;input.disabled=locked;if(library)library.disabled=locked;retry.disabled=locked;cancel.disabled=!busy;cancel.hidden=!busy||config.cancelable?.()===false;root.setAttribute('aria-busy',String(busy));input.accept=config.kinds.flatMap(kind=>types[kind].filter(type=>{const allowed=limits(kind).rule.content_types;return !allowed?.length||allowed.some(item=>equivalent(item)===equivalent(type));})).join(',');hint.textContent=config.hint||config.kinds.map(kind=>{const {shared,rule}=limits(kind);return kind+' · '+(rule.max_bytes&&rule.max_bytes-1<shared?((rule.max_bytes-1)/1_000_000)+' MB':(shared/1024/1024)+' MiB')+' maximum';}).join(' · ');}
+  function sync(){const locked=busy||!!config.locked?.();if(remove){upload.hidden=selected;if(library)library.hidden=selected;remove.hidden=!selected;remove.disabled=locked;title.hidden=selected&&!config.selectedTitle;title.textContent=selected&&config.selectedTitle?config.selectedTitle:config.title;hint.hidden=selected;if(selected)retry.hidden=true;}upload.disabled=locked;input.disabled=locked;if(library)library.disabled=locked;retry.disabled=locked;cancel.disabled=!busy;cancel.hidden=!busy||config.cancelable?.()===false;root.setAttribute('aria-busy',String(busy));input.accept=config.kinds.flatMap(kind=>types[kind].filter(type=>{const allowed=limits(kind).rule.content_types;return !allowed?.length||allowed.some(item=>equivalent(item)===equivalent(type));})).join(',');hint.textContent=config.hint||config.kinds.map(kind=>{const {shared,rule}=limits(kind);return kind+' · '+(rule.max_bytes&&rule.max_bytes-1<shared?((rule.max_bytes-1)/1_000_000)+' MB':(shared/1024/1024)+' MiB')+' maximum';}).join(' · ');}
   function error(file){
    const kind=config.kinds.find(kind=>types[kind].includes(file.type));
    if(!kind)return file.name+': format '+(file.type||'unknown')+'; use a supported '+config.kinds.join(' or ')+' file ('+config.kinds.flatMap(kind=>types[kind]).join(', ')+').';
@@ -38,18 +41,18 @@
    busy=true;retry.hidden=true;message('Uploading '+name+'…');config.onBusy?.(true);sync();
    try{const result=await work(operation.signal);operation.signal.throwIfAborted();if(!config.signal?.aborted){message(typeof result==='string'?result:'Ready');lastFile=null;}}
    catch(e){if(!config.signal?.aborted){message((e.name==='AbortError'?'Upload cancelled. Choose the file again or retry.':e.message)+retained(),true);retry.hidden=!lastFile;}}
-   finally{config.signal?.removeEventListener('abort',abort);operation=null;busy=false;const restoreFocus=requestedFocus||root.contains(document.activeElement);config.onBusy?.(false,{restoreFocus});sync();if(restoreFocus&&root.isConnected&&!config.signal?.aborted&&!upload.disabled)upload.focus({preventScroll:true});}
+   finally{config.signal?.removeEventListener('abort',abort);operation=null;busy=false;const restoreFocus=requestedFocus||root.contains(document.activeElement);config.onBusy?.(false,{restoreFocus});sync();if(restoreFocus&&root.isConnected&&!config.signal?.aborted&&!upload.disabled)focusAction();}
   }
-  function select(files){if(busy||config.locked?.()||!files.length)return;retry.hidden=true;lastFile=null;if(files.length!==1){message('Choose one file for '+config.label+'.',true);return;}const file=files[0],problem=config.validate?'':error(file);input.value='';if(problem){message(problem+retained(),true);return;}lastFile=file;return run(async signal=>{if(config.validate)await config.validate(file,signal);signal.throwIfAborted();return config.onFile(file,signal);},file.name);}
+  function select(files){if(busy||config.locked?.()||remove&&selected||!files.length)return;retry.hidden=true;lastFile=null;if(files.length!==1){message('Choose one file for '+config.label+'.',true);return;}const file=files[0],problem=config.validate?'':error(file);input.value='';if(problem){message(problem+retained(),true);return;}lastFile=file;return run(async signal=>{if(config.validate)await config.validate(file,signal);signal.throwIfAborted();return config.onFile(file,signal);},file.name);}
   input.onchange=()=>select([...input.files]);
-  root.onclick=e=>{if(!e.target.closest('button,input,video,audio')&&!busy&&!config.locked?.()){returnFocus=root.contains(document.activeElement);input.click();}};
-  root.ondragenter=e=>{if(e.dataTransfer?.types.includes('Files')){e.preventDefault();depth++;if(!busy&&!config.locked?.())root.classList.add('dragover');}};
-  root.ondragover=e=>{if(e.dataTransfer?.types.includes('Files')){e.preventDefault();e.dataTransfer.dropEffect=busy||config.locked?.()?'none':'copy';}};
+  root.onclick=e=>{if(!e.target.closest('button,input,video,audio')&&!busy&&!config.locked?.()&&!(remove&&selected)){returnFocus=root.contains(document.activeElement);input.click();}};
+  root.ondragenter=e=>{if(e.dataTransfer?.types.includes('Files')){e.preventDefault();depth++;if(!busy&&!config.locked?.()&&!(remove&&selected))root.classList.add('dragover');}};
+  root.ondragover=e=>{if(e.dataTransfer?.types.includes('Files')){e.preventDefault();e.dataTransfer.dropEffect=busy||config.locked?.()||remove&&selected?'none':'copy';}};
   root.ondragleave=e=>{e.preventDefault();if(--depth<=0){depth=0;root.classList.remove('dragover');}};
   root.ondrop=e=>{e.preventDefault();depth=0;root.classList.remove('dragover');select([...e.dataTransfer.files]);};
   function setPreview(item){
    for(const node of preview.querySelectorAll('video,audio')){node.pause();node.removeAttribute('src');node.load();}
-   assignedName=item?.name||'';preview.replaceChildren();preview.hidden=!item;if(!item)return;
+   selected=!!item;assignedName=item?.name||'';preview.replaceChildren();preview.hidden=!item;sync();if(!item){lastFile=null;retry.hidden=true;return;}
    const name=el('span',item.name||config.label,'reference-name');
    if(item.url&&/^(image|video|audio)\//.test(item.type||'')){
     const kind=item.type.split('/')[0],asset=el(kind==='image'?'img':kind);asset.setAttribute('aria-label',item.name||config.label);
