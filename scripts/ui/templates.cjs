@@ -50,7 +50,10 @@ const server=http.createServer(async(req,res)=>{const u=new URL(req.url,'http://
   if(u.pathname==='/v1/system/templates/template'&&req.method==='GET')result=record;
   if(u.pathname==='/v1/system/templates/template'&&req.method==='PUT'){if(saveFailure){res.writeHead(503,{'Content-Type':'application/json'});return res.end(JSON.stringify({error:{message:'Save unavailable'}}));}if(body.version!==record.version){res.writeHead(409,{'Content-Type':'application/json'});return res.end(JSON.stringify({error:{code:'template_conflict',message:'Template changed; reload and review.'}}));}record={...record,version:record.version+1,draft:body.content||body.draft||record.draft};if(body.action==='publish'){record.published=structuredClone(record.draft);record.revision=record.version};if(body.action==='unpublish')record.published=null;else if(record.published){record.published=structuredClone(record.draft);record.revision=record.version;}result=structuredClone(record);if(!result.draft.description)delete result.draft.description;if(!Object.keys(result.draft.reference_counts||{}).length)delete result.draft.reference_counts;}
   if(u.pathname.endsWith('/infer'))result=body.model==='ordered-image'?{syntax:'ui-reference-v1',slots:Array.from({length:body.reference_counts?.image||0},(_,i)=>({id:'image:'+(i+1),type:'image',index:i+1,role:'reference',label:'Image '+(i+1)}))}:{syntax:'ui-reference-v1',slots:record.draft.slots};
-  if(gate&&u.pathname===gate.path&&!gate.used){gate.used=true;res.writeHead(200,{'Content-Type':'application/json'});res.write('{');await gate.promise;return res.end(JSON.stringify(result).slice(1));}
+  if(gate&&u.pathname===gate.path&&!gate.used&&(!gate.matches||gate.matches(body))){
+   if(gate.skip)gate.skip--;
+   else{gate.used=true;gate.arrived?.();res.writeHead(200,{'Content-Type':'application/json'});res.write('{');await gate.promise;return res.end(JSON.stringify(result).slice(1));}
+  }
   res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify(result));
  }
  if(u.pathname==='/cover.png'){res.setHeader('Content-Type','image/png');return res.end(png)}
@@ -149,7 +152,20 @@ const titleInput=editor.getByLabel('Title',{exact:true}),saveButton=editor.getBy
   model.audio_always_on=false;await page.getByRole('button',{name:'Back to templates',exact:true}).click();await page.getByRole('button',{name:/^Edit /}).first().click();await editor.getByRole('switch',{name:'Audio',exact:true}).click();await saveButton.click();await page.getByText(/^Saved\./).waitFor();assert.equal(record.draft.options.generate_audio,true);
   pass('Optional audio never blocks editor file/library targets, saved true/false preferences survive unsupported and Always On targets');
   model.resolutions=['2k','768p'];await page.getByRole('button',{name:'Back to templates',exact:true}).click();await page.getByRole('button',{name:/^Edit /}).first().click();assert.equal(await editor.locator('select[aria-label="Resolution"] option:checked').innerText(),'1080p (uses 768p)');
-  await audioSlot().getByRole('button',{name:'Remove',exact:true}).click();await audioSlot().locator('input[type=file]').setInputFiles({name:'nearest-resolution.png',mimeType:'image/png',buffer:png});await audioSlot().getByText('Assigned nearest-resolution.png to First face.',{exact:true}).waitFor();assert.equal(requests.filter(x=>x.path.endsWith('/assets')&&x.validationContext).at(-1).validationContext.options.resolution,'768p');assert.equal(await saveButton.isEnabled(),true);await saveButton.click();await page.getByText(/^Saved\./).waitFor();assert.equal(record.draft.options.resolution,'1080p');pass('Nearest output resolution is explained, used for editor validation and preserves the saved preference');
+  await audioSlot().getByRole('button',{name:'Remove',exact:true}).click();
+  const nearestAssetID='asset-'+(assetCounter+1);let releaseValidation,validationTimer;
+  const validationHeld=new Promise(resolve=>{
+   gate={path:'/v1/system/templates/template/validate-media',used:false,skip:1,matches:body=>body?.draft?.slots?.some(slot=>slot.asset_id===nearestAssetID),arrived:resolve,promise:new Promise(done=>releaseValidation=done)};
+  });
+  try{
+   await audioSlot().locator('input[type=file]').setInputFiles({name:'nearest-resolution.png',mimeType:'image/png',buffer:png});
+   await audioSlot().getByText('Assigned nearest-resolution.png to First face.',{exact:true}).waitFor();
+   await Promise.race([validationHeld,new Promise((_,reject)=>validationTimer=setTimeout(()=>reject(new Error('Post-assignment media validation did not arrive')),6000))]);
+   assert.equal(requests.filter(x=>x.path.endsWith('/assets')&&x.validationContext).at(-1).validationContext.options.resolution,'768p');
+   assert.equal(await saveButton.isDisabled(),true,'Save stays disabled during post-assignment media validation');
+  }finally{clearTimeout(validationTimer);releaseValidation();gate=null;}
+  await page.waitForFunction(()=>{const save=document.querySelector('.template-editor button.primary');return save&&!save.hidden&&!save.disabled;},null,{timeout:6000});
+  assert.equal(await saveButton.isEnabled(),true);await saveButton.click();await page.getByText(/^Saved\./).waitFor();assert.equal(record.draft.options.resolution,'1080p');pass('Nearest output resolution is explained, used for editor validation and preserves the saved preference');
   model.resolutions=['720p'];model.ratios=['16:9'];model.duration_from_input=true;model.audio_always_on=true;
   await page.getByRole('button',{name:'Back to templates',exact:true}).click();await page.getByRole('button',{name:/^Edit /}).first().click();
   assert.equal(await editor.locator('select[aria-label="Resolution"] option:checked').innerText(),'1080p (uses 720p)');assert.equal(await editor.locator('select[aria-label="Aspect ratio"] option:checked').innerText(),'Unsupported saved value: 9:16');assert.equal(await editor.getByRole('switch',{name:'Audio',exact:true}).count(),0);await titleInput.fill('Unsupported retained');assert.equal(await saveButton.isDisabled(),true);assert.equal(await editor.getByLabel(/^Duration \(/).inputValue(),'9');
