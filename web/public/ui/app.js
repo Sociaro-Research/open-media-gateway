@@ -1342,6 +1342,7 @@ function retryTask(task, trigger) {
   // Use the saved request without copying into or reading from the current draft.
   openGenerationConfirmation({prompt: task.prompt ?? promptHistory[task.id] ?? '', provider: task.provider, model: task.model, media_type: task.media_type, options: task.options || {}, ...(task.project_id ? {project_id:task.project_id} : {})}, trigger.closest('.task-menu').querySelector('summary'));
 }
+window.GatewayTemplateConfirmations={invalidate(id){if(!submitting&&pendingSubmission?.request.template?.id===id){pendingSubmission=null;if(dialog.open)dialog.close();}}};
 async function openGenerationConfirmation(source, trigger) {
  if(!source?.template && playgroundSound?.busy)return;
   if (submitting || dialog.open) return;
@@ -1383,6 +1384,7 @@ async function openGenerationConfirmation(source, trigger) {
    confirmStatus.textContent=quote.can_generate ? ((quote.cost.customer_expected_usd ?? quote.cost.expected_usd)===0 ? 'This test generation is free.' : 'Cost is recorded after generation.') : `Your budget is exhausted (${formatUSD(quote.remaining_usd)} remaining).`;
   } catch(error) {
    if(pendingSubmission!==submission) return;
+   if(request.template&&error.code==='template_conflict'){dialog.close();pendingSubmission=null;await window.GatewayTemplates?.currentChanged(request.template.id,request.template.revision);return;}
    document.querySelector('#confirmPrice').textContent='Estimate unavailable';
    confirmStatus.hidden=false;confirmStatus.className='error';confirmStatus.textContent=error.message;
   }
@@ -1443,7 +1445,8 @@ confirmButton.addEventListener('click', async () => {
       confirmStatus.className = 'error';
       confirmStatus.textContent = `Could not submit: ${error.message}`;
       confirmButton.textContent = 'Retry submission →';
-      if(['estimate_changed','budget_exceeded','pricing_unavailable'].includes(error.code)) {
+      if(submission.request.template&&error.code==='template_conflict'){dialog.close();pendingSubmission=null;await window.GatewayTemplates?.currentChanged(submission.request.template.id,submission.request.template.revision);}
+      else if(['estimate_changed','budget_exceeded','pricing_unavailable'].includes(error.code)) {
         dialog.close();pendingSubmission=null;updatePrice();
         setMessage(`${error.message}. Review the updated estimate before confirming again.`, 'error');
       }

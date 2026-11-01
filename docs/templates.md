@@ -15,7 +15,7 @@ replaces the Playground draft with the published prompt, settings, selected mode
 and current references. Empty positions and repeated references retain their
 order. Fill or remove empty references before generation. This action neither
 changes the template nor starts generation; returning retains the runner inputs
-until the key or published revision changes. The gallery stays visible while
+until the key or current template content changes. Changes invalidate old inputs and pending estimates; review the refreshed template before continuing. The gallery stays visible while
 selecting or changing templates. Covers show their complete natural aspect ratio;
 video previews play on mouse hover and pause on leave. Focus the cover video and press Space/Enter, or tap it on touch devices, to play or pause. There is no separate Play/Pause preview button. Reduced-motion preferences disable hover play. The prompt
 and fixed references cannot be edited in this form. Confirming submits an ordinary
@@ -51,8 +51,7 @@ generation or library access.
    Models with mandatory audio show it locked on; input-derived duration is not
    configurable. Unsupported saved choices remain visible and block saving until
    corrected or a compatible model is selected.
-   Changing the authoring model or workflow resets draft generation defaults;
-   the published revision is preserved until explicit publication.
+   Changing the authoring model or workflow resets the unsaved generation defaults. Save applies the current content immediately, including when the template is published.
 2. Use **Infer and review slots**. Each stable typed slot has its own index and
    role. Repeated prompt mentions bind once. Numbering must be contiguous within
    each media type. New authoring recognizes the [common UI reference forms](prompt-reference-syntax.md), with `@Image1` recommended; provider hints are informational and prompts are never translated. A prompt without markers needs explicit ordered reference
@@ -64,16 +63,16 @@ generation or library access.
 4. Explicitly choose an image/video cover from Template references, or upload one. The picker reuses a shared file identity; it has no cover-mode dropdown. A separate cover never becomes a generation input.
 5. **Save** appears only for unsaved changes and permits incomplete work within a selected References workflow.
    Known fixed-media incompatibilities are rejected before saving.
-   Creation and draft saves require an available reference-capable default model.
+   Creation and saves require an available reference-capable default model.
    The **Published** switch requires at least one slot and validates the grammar,
    binding order, default model, complete reference contract, available fixed
-   media and cover, then freezes the existing admission defaults.
+   media and cover. Saving an already published template repeats publication validation atomically.
 
 Save hides after success; failures and edits made during a save remain unsaved.
 The Published switch is on for published templates and off for unpublished ones.
-Save pending edits before changing the switch. Draft saves do not alter the current
-published revision; turn publication off and on to publish a newer saved draft. Every write requires the
-current version; concurrent edits return a conflict and retain the browser draft.
+Save pending edits before changing the switch. There is one current template, either published or unpublished. Save updates that content immediately; an unpublished Save keeps it unpublished. The switch only changes visibility. Every write requires the current optimistic-concurrency version; concurrent edits return a conflict and retain unsaved browser edits. Internal freshness tokens reject stale runner, estimate, media-validation and Advanced editing requests. They are not a user-facing version history. Already admitted jobs retain their immutable content and file snapshots.
+
+The administrator API accepts Save as `{version, content}` and visibility as `{version, action: "publish"}` or `{version, action: "unpublish"}`. Responses expose `content` and `is_published`; legacy `draft` and `published` aliases describe the same current content. If both request content aliases are supplied, they must agree. `is_published` is response-only. Migration 081 preserves legacy data without keeping a second editable source or deleting history.
 Unpublish prevents new template submissions. Removal is a soft operation through
 the API. Neither operation deletes original library files, durable copies or
 historical results. Physical cleanup requires a separate authorized operation.
@@ -102,11 +101,8 @@ moving bytes or rewriting recipes. Existing distinct legacy files with identical
 bytes retain their identities. Repeating the upgrade is safe; conflicting asset
 identity metadata fails explicitly. No live migration is implied by source changes.
 
-Deletion checks every active template's draft and published cover/reference
-bindings under the same database lock used to save bindings. The error lists all
-blocking template names, IDs and navigation links. Editing a draft does not
-release an asset still used by its published revision. Unpublishing leaves draft
-uses protected. Removing a template releases its unusable bindings: the current
+Deletion checks every active template's current cover/reference bindings under the same database lock used to save bindings. The error lists all
+blocking template names, IDs and navigation links. Unpublishing leaves current uses protected. Already admitted job snapshots also retain their required files. Removing a template releases its unusable bindings: the current
 lifecycle offers no restore operation. A future restore implementation must
 revalidate assets. Removing one of several uses never permits deletion prematurely.
 
@@ -159,14 +155,12 @@ model may accept only a subset of these formats.
 Container inspection is metadata validation, not a full codec decode or a paid
 provider acceptance guarantee.
 
-Existing incompatible drafts and published revisions are retained without data
-migration, deletion or automatic mode conversion. Administrators can still read
+Existing incompatible template content is retained without deletion or automatic mode conversion. Administrators can still read
 and unpublish them. They are omitted from the consumer gallery; a direct detail
 read explains their unavailability and offers no compatible models. Estimate and
 submission reject them. To use one again, an Administrator explicitly selects an
 eligible model and References mode, infers/reviews the slots and republishes.
-Saving a replacement draft leaves the old published revision unchanged until
-publication; title-only saves cannot bypass the workflow requirement.
+Published Save validates the replacement before atomically applying it; title-only saves cannot bypass the workflow requirement.
 
 Reference-file metadata is optional and additive. Missing `ReferenceMediaLimits`
 or an omitted per-type rule does not erase an adapter's existing workflow,
@@ -274,8 +268,7 @@ deadlines also stop the work.
 Authoring previews support image, video and audio files. Completed files
 retain their filename and immutable asset ID. A selected single-file block exposes only internal Remove. Remove clears the assignment before a new Upload or library selection. Failed or cancelled new selections remain empty and never bind the rejected attempt.
 The gallery cover is separate from generation inputs and does not change when a
-fixed slot is replaced. Saving a draft retains the published revision until an
-explicit Publish. Published detail includes `fixed_references` previews for that revision's bound files. Consumers can select shared files for missing inputs, but cannot replace fixed slots.
+fixed slot is changed. Save updates the current content immediately. Published detail includes `fixed_references` previews for the current bound files. Consumers can select shared files for missing inputs, but cannot replace fixed slots.
 
 Authenticated editor previews explicitly request `preview=1` on the existing
 Administrator asset route. This returns same-origin, range-capable media for the
@@ -286,19 +279,15 @@ Canonical asset authorization precedes applying the trusted physical storage
 owner retained by migration 079; private namespaces and storage key guards are
 unchanged.
 
-Generation settings are stored in the existing recipe options and frozen on
-publication. Both estimates and submitted jobs use that published snapshot; no
-fixed five-second duration is substituted. Existing recipes with missing options
-retain the selected model's admission defaults. Changing models resets settings
-to the new model's supported defaults and requires explicit saving/publication.
+Generation settings are stored in the current template options. Save updates estimates and future submissions immediately when published; admission copies an immutable snapshot into each accepted job. No fixed five-second duration is substituted. Existing recipes with missing options retain the selected model's admission defaults. Changing models resets settings to the new model's supported defaults and requires an explicit Save.
 Generated audio controls the model output and does not replace its soundtrack.
 
 ### Override Sound
 
 Playground and template authors can select or drop an audio file into **Override
 Sound**, and remove the assignment independently of provider audio generation.
-Template authors save `override_sound_id` as a shared audio asset; the published
-revision automatically applies it to every template API generation. Ordinary
+Template authors save `override_sound_id` as a shared audio asset; the current
+published content automatically applies it to every template API generation. Ordinary
 video requests accept `options.override_sound_id`, an accessible reference-library
 ID. Storage keys, owner IDs and URLs are not accepted as override inputs.
 
@@ -321,7 +310,7 @@ terminal processing failures are not automatically retried as paid generations.
 
 The immutable source snapshot is protected against library deletion while a job
 is queued/running, and shared files remain protected while used by a template's
-draft or published revision. Removing a control assignment does not delete the
+current content. Removing a control assignment does not delete the
 library file. Final results use the existing storage accounting, authorization,
 playback, download and retention paths. Processing uses locked, bounded temporary
 files and a ten-minute timeout; normal staging cleanup recovers interrupted files.

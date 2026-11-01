@@ -579,3 +579,7 @@ existing template assignment needs removal after a model change.
 Fields, buttons, switches and selectable Template/reference cards use one visible border. Focus or selection changes that existing perimeter to the configured accent and increases its thickness; never add a second outline, offset ring, separated contour or box-shadow imitation of a border. The shared styles reserve the original layout border and paint the single actual CSS border on its owner, keeping field labels, content and outer geometry stable. Scrollable owners and padded choice/drop blocks may change their native border with equal padding compensation. Borderless controls retain a flush keyboard-focus indicator without an offset. Selected cards use 2px; selected cards with keyboard focus use 3px on the same edge. Child actions keep their own focus state without making the parent appear selected. Forced-colors mode uses system Highlight/CanvasText on that perimeter. Error, disabled and combined states must remain distinguishable.
 
 Primary buttons center their content vertically through the shared flex alignment, including text, icons, pending and disabled states. Do not fix individual labels with transforms or per-screen offsets.
+
+
+
+Templates have one current content and a Published visibility switch. Save applies current edits immediately, including to published templates. Do not expose internal revisions, a separate published draft or version history in the interface. Compare every UI change with this design system and complete the spacing and visual review gate above.

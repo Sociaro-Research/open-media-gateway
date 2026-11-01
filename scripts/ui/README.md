@@ -22,7 +22,11 @@ Duration labels, unknown/input-derived/unsupported capabilities, native validati
 and readable labels in both themes at 1440/390/320px. It blocks external requests
 and submits no generations. `UI_EVIDENCE_DIR` selects its internal screenshots.
 
-
+`template-file-selection.cjs` checks retained covers, image/video library reuse,
+drafts without covers, publication gating, fixed binding removal without deletion,
+save/reload, keyboard focus, author visibility and measured Publish/settings gaps.
+It uses synthetic media in both themes at 1440/390/320px; generate the disposable
+video fixture described below first. `UI_EVIDENCE_DIR` selects its evidence.
 
 `switches.cjs` measures shared switch/label spacing and alignment.
 `override-sound.cjs` covers selected-only internal Remove, remove-before-select,
@@ -741,6 +745,7 @@ submission state. Evidence stays under `.local/editing/`.
 Run each fixture with Node/Playwright, then repeat with `UI_BROWSER_ENGINE=webkit`. Set `UI_BROWSER_PATH` when using an installed browser outside Playwright's default cache, and `UI_EVIDENCE_DIR` to a new ignored run directory. All APIs and media are synthetic and local; these checks never authorize live writes or paid providers.
 
 - `duration-labels.cjs`: selected-model bounds/steps in Duration labels and native validation in both editors, themes and relevant responsive breakpoints.
+- `template-file-selection.cjs`: canonical-only administrator content/visibility responses, explicit image/video shared covers, internal Remove, no copies/deletes, persistence and publication gating.
 - `button-alignment.cjs`: primary/secondary glyph geometry in normal, compact, icon, disabled, pending and dialog contexts.
 - `interaction-borders.cjs`: one actual border perimeter, custom accent, selected/keyboard/invalid/disabled states, stable outer/content geometry and forced colors.
 

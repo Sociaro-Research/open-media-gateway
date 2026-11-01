@@ -42,7 +42,7 @@ const server=http.createServer(async(req,res)=>{
    if(aggregateLimit&&Object.keys(body.inputs||{}).length>1)return json({error:{message:'References: total video duration 14 seconds; maximum 12 seconds. Trim the videos.'}},400);
    if((body.draft?.model||body.model)===failModel)return json({error:{message:explanation}},400);return json({valid:true});
   }
-  if(u.pathname==='/v1/system/templates/template'&&req.method==='PUT'){writes++;record={...record,version:record.version+1,draft:body.draft,...(body.action==='unpublish'?{published:null}:{})};return json(record);}
+  if(u.pathname==='/v1/system/templates/template'&&req.method==='PUT'){writes++;record={...record,version:record.version+1,draft:body.content||body.draft||record.draft,...(body.action==='unpublish'?{published:null}:{})};if(record.published){record.published=structuredClone(record.draft);record.revision=record.version;}return json(record);}
   if(u.pathname==='/v1/templates')return json({data:[{id:'template',title:'Synthetic template',cover_url:'/cover.png',cover_type:'image/png'}]});
   if(u.pathname==='/v1/templates/template')return json({id:'template',revision:record.revision,template:record.published,catalog,default_available:true,asset_error:''});
   if(u.pathname.endsWith('/estimate'))return json({cost:{expected_usd:0},can_generate:true});
