@@ -17,7 +17,7 @@
   for(const record of localDrafts.values()){for(const slot of record.draft.slots||[])if(slot.asset_id===id)slot.asset_id='';if(record.draft.cover_id===id)record.draft.cover_id='';if(record.draft.override_sound_id===id)record.draft.override_sound_id='';}
  });
  let listFingerprint='';
- let view='gallery',useUpdate=null,editorUpdate=null,activeRevision=null;
+ let view='gallery',useUpdate=null,editorUpdate=null,activeRevision=null,validationPending=true;
  function currentRecord(record){const content=record.content||record.draft||record.published,visible=typeof record.is_published==='boolean'?record.is_published:!!record.published;return {...record,content,draft:content,is_published:visible,published:visible?content:null};}
  async function currentChanged(id,revision){if(!active||browseID!==id||view!=='use'||activeRevision!==null&&revision!==undefined&&activeRevision!==revision)return;runnerDrafts.delete(id);window.GatewayTemplateConfirmations?.invalidate(id);await use(id);if(active&&browseID===id&&view==='use'&&activeRevision!==null)say('Template updated. Review the current settings and choose references again.');}
  function replaceUse(detail,id){runnerDrafts.delete(id);window.GatewayTemplateConfirmations?.invalidate(id);const token=next();view='use';browseID=id;showBrowser();emptySelection();renderUse(detail,token,id);say('Template updated. Review the current settings and choose references again.');}
@@ -110,13 +110,40 @@
   }
   async function detail(){
    if(screen!=='use'||!id||!GenerationKey.value())return;
-   try{const incoming=await api('/v1/templates/'+encodeURIComponent(id),{signal});if(valid()){if(!failure)say('');if(useUpdate)useUpdate(incoming);else renderUse(incoming,token,id);}}
-   catch(error){if(valid()&&error.name!=='AbortError'&&[403,404,410].includes(error.status))useUpdate?.(null);throw error;}
+   let selectedToken=token;const keyVersion=generationKeyVersion,key=GenerationKey.value();let latestMetadata=null;
+   const selected=()=>current()&&fresh(selectedToken)&&view==='use'&&browseID===id&&generationKeyVersion===keyVersion&&GenerationKey.value()===key;
+   validationPending=true;window.GatewayTemplateConfirmations?.invalidate(id);window.dispatchEvent(new CustomEvent('gateway-template-validation-pending',{detail:{id}}));useUpdate?.pending?.();
+   for(let attempt=0;attempt<2;attempt++){
+    try{
+     const metadata=await api('/v1/templates/'+encodeURIComponent(id)+'/metadata',{signal});if(!selected())return;
+     if(metadata.id!==id||!Number.isInteger(metadata.revision)||metadata.revision<1||metadata.validation_status!=='pending'||!metadata.template?.title)throw Error('Template validation is unavailable. Update the server and retry.');
+     latestMetadata=metadata;
+     const changed=activeRevision!==null&&activeRevision!==metadata.revision;
+     if(changed||attempt){runnerDrafts.delete(id);window.GatewayTemplateConfirmations?.invalidate(id);selectedToken=next();activeRevision=null;}
+     if(activeRevision===null||!useUpdate?.pending)renderPending(metadata);
+     activeRevision=metadata.revision;
+     const incoming=await api('/v1/templates/'+encodeURIComponent(id)+'?revision='+encodeURIComponent(metadata.revision),{signal});if(!selected())return;
+     if(incoming.id!==id||incoming.revision!==metadata.revision||!['ready','failed'].includes(incoming.validation_status)||!Array.isArray(incoming.catalog)||draftStamp(incoming.content||incoming.template)!==draftStamp(metadata.template))throw Error('Template validation is unavailable. Update the server and retry.');
+     if(incoming.validation_status==='failed'){renderPending(metadata,incoming.asset_error||incoming.workflow_error||'This template is unavailable. Check its references and model, then retry.');return;}
+     validationPending=false;
+     if(useUpdate?.pending)useUpdate(incoming);else renderUse(incoming,selectedToken,id);
+     if(changed||attempt)say('Template updated. Review the current settings and choose references again.');
+     return;
+    }catch(error){
+     if(!selected()||error.name==='AbortError')return;
+     if(error.status===409&&attempt===0){runnerDrafts.delete(id);window.GatewayTemplateConfirmations?.invalidate(id);continue;}
+     if([403,404,410].includes(error.status))clearSelected(id);
+     else {validationPending=true;if(latestMetadata){renderPending(latestMetadata,error.message);say('');return;}useUpdate?.pending?.();say(error.message,'error');}
+     throw error;
+    }
+   }
   }
   await Promise.all([read(authoring),read(listing),read(detail)]);
  }
 
  async function chooseLibrary(kind,administrator,onSelect,validationContext=null,selectedID=()=>null,onClear=null,returnTarget=null){
+  if(!administrator&&validationPending)return;
+  const selectedTemplate=browseID;
   const token=epoch,parentSignal=controller.signal,operation=new AbortController(),signal=operation.signal,previousFocus=returnTarget||document.activeElement;
   let busy=false,uploadPending=false,offset=0,hasMore=false,items=[],sequence=0;
   const kinds=kind?[kind]:administrator&&onSelect?['image','video']:['image','video','audio'],previousSlot=previousFocus?.closest('[data-slot-id]')?.dataset.slotId;
@@ -130,7 +157,7 @@
    selected:item=>item.id===selectedID(),busy:busy||uploadPending,onSelect:onSelect?select:null,
    onDelete:remove
   });more.hidden=!hasMore;more.disabled=busy||uploadPending;uploader.sync();}
-  const uploader=ReferenceUpload.create({label:administrator?'Template reference library':'Reference library',title:'Drop a reference to add it to the library',uploadLabel:'Upload reference',kinds,signal,locked:()=>busy,onBusy:value=>{uploadPending=value;render();},onFile:async(file,uploadSignal)=>{
+  const uploader=ReferenceUpload.create({label:administrator?'Template reference library':'Reference library',title:'Drop a reference to add it to the library',uploadLabel:'Upload reference',kinds,signal,locked:()=>busy||!administrator&&validationPending,onBusy:value=>{uploadPending=value;render();},onFile:async(file,uploadSignal)=>{
    let item;
    if(administrator){const body=new FormData();body.append('file',file);const context=validationContext?.();if(context)body.append('validation',JSON.stringify(context));item=await api(endpoint,{method:'POST',body,signal:uploadSignal});}
    else item=await uploadReference(file,uploadSignal,validationContext?.(),text=>uploader.message(text));
@@ -142,14 +169,15 @@
     message.textContent=items.some(compatible)?'':'No matching files. Upload a reference or load more.';
    }catch(error){if(!signal.aborted)message.textContent=error.message;}finally{if(stamp===sequence){busy=false;if(!signal.aborted)render();}}
   }
-  async function select(item){if(busy||uploadPending||signal.aborted)return;busy=true;render();message.textContent='Checking reference…';
+  async function select(item){if(busy||uploadPending||signal.aborted||!administrator&&validationPending)return;busy=true;render();message.textContent='Checking reference…';
    try{if(item.id===selectedID()&&onClear)await onClear();else await onSelect(item,signal);if(fresh(token)&&!signal.aborted)close();}catch(error){if(!signal.aborted)message.textContent=error.message;}finally{busy=false;if(!signal.aborted)render();}
   }
-  async function remove(item){if(busy||uploadPending||signal.aborted)return;busy=true;render();
+  async function remove(item){if(busy||uploadPending||signal.aborted||!administrator&&validationPending)return;busy=true;render();
    try{await api(endpoint+'/'+encodeURIComponent(item.id),{method:'DELETE',signal});signal.throwIfAborted();window.ReferenceLibrary.deleted(item,administrator?'template':'organization');await load();message.textContent='Deleted '+item.name+'.';window.dispatchEvent(new Event('gateway-storage-change'));}
    catch(error){if(!signal.aborted){message.textContent=error.message;for(const use of error.templates||[]){const link=el('a',use.name+' · '+use.id);link.href=use.url;link.onclick=async event=>{event.preventDefault();try{const record=currentRecord(await api('/v1/system/templates/'+encodeURIComponent(use.id),{signal}));close();renderEditor(localDrafts.get(record.id)||record);}catch(e){if(!signal.aborted)message.textContent=e.message;}};message.append(document.createElement('br'),link);}}}
    finally{busy=false;if(!signal.aborted)render();}
   }
+  if(!administrator)window.addEventListener('gateway-template-validation-pending',event=>{if(event.detail.id===selectedTemplate)close();},{signal});
   more.onclick=()=>load(true);dialog.addEventListener('cancel',event=>{event.preventDefault();close();});parentSignal.addEventListener('abort',close,{once:true});signal.addEventListener('abort',()=>parentSignal.removeEventListener('abort',close),{once:true});document.body.append(dialog);dialog.showModal();await load();
  }
  async function uploadReference(file,signal,validation,onProgress){
@@ -160,7 +188,18 @@
   next();const token=epoch;activeRevision=null;view='use';editing=null;browseID=id;showBrowser();emptySelection();selection.replaceChildren(el('p','Loading selected template…'));useUpdate=detail=>{if(!fresh(token)||browseID!==id)return;if(detail)renderUse(detail,token,id);else clearSelected(id);};selectedCard();return updates.refresh({restart:true,quiet:false});
  }
  function clearSelected(id){runnerDrafts.delete(id);window.GatewayTemplateConfirmations?.invalidate(id);browseID='';activeRevision=null;controller.abort();controller=new AbortController();emptySelection();selectedCard();say('This template is unavailable. Choose another template.','error');}
+ function renderPending(metadata,error=''){
+  validationPending=true;stopMedia(selection);useUpdate=null;
+  const d=metadata.template,card=el('div','','card template-use template-validation-pending');card.dataset.validationStatus=error?'failed':'pending';card.setAttribute('aria-busy',String(!error));card.append(el('h2',d.title));if(d.description)card.append(el('p',d.description));
+  const settings=[d.options?.ratio,d.options?.resolution,d.options?.duration?d.options.duration+' s':null,d.override_sound_id?'Overridden Audio':d.options?.generate_audio?'Audio On':'Audio Off'].filter(Boolean);if(settings.length)card.append(el('p',settings.join(' · '),'field-hint'));
+  const message=el('p',error||'Checking template references and model compatibility…','field-hint');message.setAttribute('role','status');card.append(message);
+  const advanced=button('Advanced editing',()=>{});advanced.disabled=true;card.append(advanced);
+  if(error)card.append(button('Retry validation',()=>updates.refresh({restart:true,quiet:false})));
+  const generate=button('Review generation',()=>{},'primary');generate.disabled=true;
+  document.querySelector('#templateKeyAccess').hidden=true;selection.replaceChildren(card,document.querySelector('#templateKeyHost'),generate);selection.closest('aside').hidden=false;browser.classList.add('has-selection');
+ }
  function renderUse(view,token,id){
+   if(view.validation_status!=='ready')return;
    activeRevision=view.revision;const d=view.content||view.template,form=el('form','','card template-use');form.id='templateUseForm';form.autocomplete='off';
    form.append(el('h2',d.title));if(d.description)form.append(el('p',d.description));
    const fixedRow=el('div','','template-fixed-references');fixedRow.setAttribute('aria-label','Template references');
@@ -182,10 +221,13 @@
    const cached=runnerDrafts.get(id),draft=cached?.revision===view.revision?cached:{revision:view.revision,inputs:{},files:{},model:''};runnerDrafts.set(id,draft);
    const model=field(form,'Model','select');model.required=true;
    ModelPicker.populate(model,view.catalog,{value:draft.model||(view.default_available?ModelPicker.key(d.provider,d.model):''),placeholder:'Choose a compatible model'});
-   const inputs=draft.inputs;let pending=0,unavailable=false,validationIssue='',validationSequence=0,bindingQueue=Promise.resolve();
+   const inputs=draft.inputs,widgets=[];let pendingFocus=null,focusIntent=0;
+   for(const event of ['pointerdown','keydown'])document.addEventListener(event,()=>focusIntent++,{capture:true,signal:controller.signal});
+   document.addEventListener('focusin',event=>{if(pendingFocus&&event.target!==pendingFocus.node&&event.target!==document.body)focusIntent++;},{signal:controller.signal});
+   let pending=0,unavailable=false,validationIssue='',validationSequence=0,bindingQueue=Promise.resolve();
    const target=()=>{const [p,m]=model.value?JSON.parse(model.value):['',''];return ReferenceValidation.target(p,m,d.options);};
    const checkInputs=async(candidate=inputs,signal=controller.signal)=>{if(!model.value)return;const [provider,modelID]=JSON.parse(model.value);try{await api(`/v1/templates/${id}/validate-media`,{method:'POST',body:JSON.stringify({revision:view.revision,provider,model:modelID,inputs:candidate}),signal});}catch(error){if(error.code==='template_conflict'&&fresh(token))await currentChanged(id,view.revision);throw error;}};
-   const ready=()=>{advanced.disabled=unavailable||!!view.asset_error||!!view.workflow_error||!model.value||pending>0;generate.disabled=unavailable||!!view.asset_error||!!view.workflow_error||!!validationIssue||!model.value||pending>0||d.slots.some(s=>!s.asset_id&&!inputs[s.id]);};
+   const ready=()=>{model.disabled=validationPending;window.ControlPickers?.sync(model);advanced.disabled=validationPending||unavailable||!!view.asset_error||!!view.workflow_error||!model.value||pending>0;generate.disabled=validationPending||unavailable||!!view.asset_error||!!view.workflow_error||!!validationIssue||!model.value||pending>0||d.slots.some(s=>!s.asset_id&&!inputs[s.id]);for(const widget of widgets)widget.sync();};
    for(const slot of d.slots){if(slot.asset_id)continue;
     let slotVersion=0,slotAbort=null,previewURL='';
     const begin=()=>{slotAbort?.abort();slotAbort=new AbortController();return {version:++slotVersion,modelSequence:validationSequence,intent:ReferenceValidation.signature(target()),signal:AbortSignal.any([controller.signal,slotAbort.signal])};};
@@ -198,12 +240,12 @@
     function clear(){begin();delete inputs[slot.id];delete draft.files[slot.id];if(previewURL)URL.revokeObjectURL(previewURL);previewURL='';widget.setPreview(null);widget.message('Choose a reference for '+slot.label+'.');validationIssue='';ready();}
     window.addEventListener('gateway-reference-deleted',event=>{if(event.detail.scope==='organization'&&event.detail.keyVersion===generationKeyVersion&&inputs[slot.id]===event.detail.id)clear();},{signal:controller.signal});
     const row=el('div','','template-variable-reference');
-    const widget=ReferenceUpload.create({label:slot.label,title:slot.type==='image'?'Drop here an image of the '+slot.label:'Drop here '+(slot.type==='audio'?'an audio file':'a video')+' for '+slot.label,selectedTitle:slot.label,uploadLabel:'Upload '+slot.type,kinds:[slot.type],signal:controller.signal,locked:()=>unavailable||!model.value,
+    const widget=ReferenceUpload.create({label:slot.label,title:slot.type==='image'?'Drop here an image of the '+slot.label:'Drop here '+(slot.type==='audio'?'an audio file':'a video')+' for '+slot.label,selectedTitle:slot.label,uploadLabel:'Upload '+slot.type,kinds:[slot.type],signal:controller.signal,locked:()=>validationPending||unavailable||!model.value,
      limits:kind=>{const [p,m]=model.value?JSON.parse(model.value):[];return view.catalog.find(x=>x.id===p)?.models.find(x=>x.id===m)?.reference_media_limits?.[kind]||{};},
      onBusy:value=>{pending+=value?1:-1;ready();},
      onFile:async(file,signal)=>{const op=begin();op.signal=AbortSignal.any([op.signal,signal]);const ref=await uploadReference(file,op.signal,target(),text=>{if(current(op))widget.message(text);});await bind(ref,op,file);return 'Assigned '+file.name+' to '+slot.label+'.';},
      onRemove:clear,onLibrary:picker=>chooseLibrary(slot.type,false,async(item,signal)=>{const op=begin();op.signal=AbortSignal.any([op.signal,signal]);pending++;ready();try{await bind(item,op);}finally{pending--;if(fresh(token))ready();}},target,()=>inputs[slot.id],clear,picker.root)
-    });widget.root.setAttribute('aria-description','Required '+slot.type+' reference.');if(draft.files[slot.id]){const item=draft.files[slot.id];widget.setPreview({url:item.url,type:item.content_type,name:item.name||slot.label});widget.message('Assigned '+(item.name||slot.label)+'.');}row.append(widget.root);form.append(row);
+    });widgets.push(widget);widget.root.setAttribute('aria-description','Required '+slot.type+' reference.');if(draft.files[slot.id]){const item=draft.files[slot.id];widget.setPreview({url:item.url,type:item.content_type,name:item.name||slot.label});widget.message('Assigned '+(item.name||slot.label)+'.');}row.append(widget.root);form.append(row);
 
    }
    const advanced=button('Advanced editing',async()=>{
@@ -224,8 +266,9 @@
     if(latest&&(latest.revision!==view.revision||draftStamp(latest.content||latest.template)!==draftStamp(d))){replaceUse(latest,id);return;}
     // Preserve local inputs only while the current server content is unchanged.
     unavailable=!latest||latest.revision!==view.revision||!!latest.asset_error||!!latest.workflow_error||!latest.catalog?.some(p=>p.models.some(m=>ModelPicker.key(p.id,m.id)===model.value));
-    ready();say(latest?.workflow_error||(unavailable?'This template is unavailable. Choose another template.':''),unavailable?'error':'');
+    ready();const restore=pendingFocus;pendingFocus=null;if(restore)requestAnimationFrame(()=>{if(fresh(token)&&!validationPending&&restore.intent===focusIntent&&restore.node.isConnected&&!restore.node.disabled&&document.activeElement===document.body)restore.node.focus({preventScroll:true});});say(latest?.workflow_error||(unavailable?'This template is unavailable. Choose another template.':''),unavailable?'error':'');
    };
+   useUpdate.pending=()=>{const node=document.activeElement;if(!pendingFocus&&(form.contains(node)||node===generate))pendingFocus={node,intent:focusIntent};ready();};
    document.querySelector('#templateKeyAccess').hidden=true;selection.replaceChildren(form,document.querySelector('#templateKeyHost'),generate);selection.closest('aside').hidden=false;browser.classList.add('has-selection');FormUI.refresh();ready();
  }
  async function create(){if(writing||!canEdit)return;const token=epoch;writing=true;

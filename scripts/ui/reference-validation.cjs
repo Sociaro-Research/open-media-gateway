@@ -33,6 +33,7 @@ const server=http.createServer(async(req,res)=>{
   }
   if(u.pathname==='/v1/system/templates')return json({data:[record],catalog});
   if(u.pathname==='/v1/system/templates/library')return json({data:retained,has_more:false,next_offset:retained.length});
+  if(u.pathname==='/v1/templates/template/metadata')return json({id:'template',revision:record.revision,template:record.published,validation_status:'pending'});
   if(u.pathname.endsWith('/metadata'))return json({id:'fixed',content_type:'video/mp4',name:'motion.mp4'});
   if(u.pathname==='/v1/system/templates/template/assets'){
    if(failUpload)return json({error:{message:explanation}},400);return json({id:'asset-'+(++assetCount),content_type:'video/mp4'},201);
@@ -44,7 +45,7 @@ const server=http.createServer(async(req,res)=>{
   }
   if(u.pathname==='/v1/system/templates/template'&&req.method==='PUT'){writes++;record={...record,version:record.version+1,draft:body.content||body.draft||record.draft,...(body.action==='unpublish'?{published:null}:{})};if(record.published){record.published=structuredClone(record.draft);record.revision=record.version;}return json(record);}
   if(u.pathname==='/v1/templates')return json({data:[{id:'template',title:'Synthetic template',cover_url:'/cover.png',cover_type:'image/png'}]});
-  if(u.pathname==='/v1/templates/template')return json({id:'template',revision:record.revision,template:record.published,catalog,default_available:true,asset_error:''});
+  if(u.pathname==='/v1/templates/template')return json({validation_status:'ready',id:'template',revision:record.revision,template:record.published,catalog,default_available:true,asset_error:''});
   if(u.pathname.endsWith('/estimate'))return json({cost:{expected_usd:0},can_generate:true});
   return json({data:[]});
  }
