@@ -6,6 +6,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/Sociaro-Research/open-media-gateway/internal/monitoring"
 )
 
 func TestPublicAPIIsolationAndHeadlessSessions(t *testing.T) {
@@ -91,5 +93,76 @@ func TestPublicAPIForwardsCapabilitiesOnlyOnAPIHost(t *testing.T) {
 				t.Fatal(host, p, w.Code)
 			}
 		}
+	}
+}
+
+func TestPublicAPIPreservesBoundedRouteMetrics(t *testing.T) {
+	for _, configured := range []bool{false, true} {
+		name := "headless"
+		apiURL, uiURL, docsURL := "", "", ""
+		if configured {
+			name = "configured origins"
+			apiURL = "https://api.example.test"
+			uiURL = "https://console.example.test"
+			docsURL = "https://docs.example.test"
+		}
+		t.Run(name, func(t *testing.T) {
+			metrics := monitoring.New("gateway", monitoring.Dependencies{})
+			mux := http.NewServeMux()
+			mux.HandleFunc("GET /v1/metric-fixture/{id}", func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusAccepted) })
+			wrapped, err := WithPublicAPI(mux, apiURL, uiURL, docsURL)
+			if err != nil {
+				t.Fatal(err)
+			}
+			handler := metrics.InstrumentHTTP(wrapped)
+			request := httptest.NewRequest("GET", "https://api.example.test/v1/metric-fixture/private-id?token=private-secret", nil)
+			request.Header.Set("Authorization", "Bearer private-secret")
+			response := httptest.NewRecorder()
+			handler.ServeHTTP(response, request)
+			if response.Code != http.StatusAccepted {
+				t.Fatal(response.Code)
+			}
+			if request.Pattern != "GET /v1/metric-fixture/{id}" {
+				t.Fatalf("registered route pattern lost: %q", request.Pattern)
+			}
+			rejected := []struct {
+				url    string
+				status int
+			}{{"https://api.example.test/private-path?token=private-secret", http.StatusNotFound}}
+			if configured {
+				rejected = append(rejected, struct {
+					url    string
+					status int
+				}{"https://unknown.example.test/v1/metric-fixture/private-id", http.StatusMisdirectedRequest}, struct {
+					url    string
+					status int
+				}{"https://docs.example.test/v1/metric-fixture/private-id", http.StatusNotFound})
+			}
+			for _, test := range rejected {
+				r := httptest.NewRequest("GET", test.url, nil)
+				w := httptest.NewRecorder()
+				handler.ServeHTTP(w, r)
+				if w.Code != test.status || r.Pattern != "" {
+					t.Fatalf("rejected/unmatched request: status=%d pattern=%q", w.Code, r.Pattern)
+				}
+			}
+			scraped := httptest.NewRecorder()
+			metrics.Handler().ServeHTTP(scraped, httptest.NewRequest("GET", "/metrics", nil))
+			body := scraped.Body.String()
+			if !strings.Contains(body, `media_gateway_http_requests_total{method="GET",route="GET /v1/metric-fixture/{id}",service="gateway",status="202"} 1`) {
+				t.Fatal("registered request counter missing")
+			}
+			if !strings.Contains(body, `media_gateway_http_request_duration_seconds_count{method="GET",route="GET /v1/metric-fixture/{id}",service="gateway"} 1`) {
+				t.Fatal("registered duration observation missing")
+			}
+			if !strings.Contains(body, `route="unmatched",service="gateway",status="404"`) {
+				t.Fatal("unmatched request counter missing")
+			}
+			for _, private := range []string{"private-id", "private-path", "private-secret", "unknown.example.test"} {
+				if strings.Contains(body, private) {
+					t.Fatal("request identity leaked into metrics")
+				}
+			}
+		})
 	}
 }

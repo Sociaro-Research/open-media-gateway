@@ -60,6 +60,8 @@ func WithPublicAPI(next http.Handler, apiURL, uiURL, docsURL string, readers ...
 		return nil, fmt.Errorf("separate documentation requires a distinct origin and a configured API origin")
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		original := r
+		defer func() { original.Pattern = r.Pattern }()
 		r = r.WithContext(installation.WithContext(r.Context(), metadata))
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "no-referrer")
