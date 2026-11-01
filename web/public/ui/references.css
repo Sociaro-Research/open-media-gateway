@@ -76,3 +76,9 @@ textarea.reference-hover { cursor:pointer; }
 .reference-library .reference-play { z-index:3; background:color-mix(in srgb,var(--panel) 60%,transparent); font-size:24px; line-height:1; }
 .reference-library .reference-play svg { width:24px; height:24px; display:block; }
 .reference-library-grid .reference-delete { z-index:3; }
+
+/* Shared single-file preview action, using the library card overlay position. */
+.reference-card .reference-preview-remove { min-width:44px; min-height:44px; height:auto; padding:8px 12px; }
+/* Keep native audio controls and preview failure text clear of the overlay. */
+.reference-card:has(> .reference-preview-remove) > audio { margin-top:calc(44px + 8px); }
+.reference-card:has(> .reference-preview-remove) > .reference-placeholder { height:auto; min-height:90px; padding:calc(44px + 8px) 8px 12px; }

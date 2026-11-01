@@ -131,3 +131,8 @@
 
 #templateSelection { display:grid; gap:20px; }
 #templateKeyAccess:not([hidden]) { max-width:400px; margin-bottom:24px; }
+
+/* Empty publication guidance must not reserve a trailing grid row. */
+.template-editor > .field-hint:empty { display:none; }
+.template-editor > .field-hint { margin:0; }
+.template-editor .reference-actions:has(> button):not(:has(> button:not([hidden]))) { display:none; }

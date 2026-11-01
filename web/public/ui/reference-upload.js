@@ -24,7 +24,7 @@
   preview.hidden=true;root.append(preview,title,actions,hint,precision,status,input);
   let busy=false,operation=null,lastFile=null,depth=0,returnFocus=false,assignedName='',selected=false;
   const remove=config.onRemove?button('Remove',event=>{event.stopPropagation();if(busy||config.locked?.())return;config.onRemove();if(root.isConnected)focusAction();}):null;
-  if(remove){remove.dataset.uploadRemove='';actions.append(remove);}
+  if(remove){remove.dataset.uploadRemove='';if(config.removeOnPreview){remove.classList.add('reference-delete','reference-preview-remove');remove.setAttribute('aria-description','Remove '+config.label+' binding');}else actions.append(remove);}
   function focusAction(){const action=remove&&selected?remove:upload;if(!action.disabled)action.focus({preventScroll:true});}
   const retained=()=>config.retainedMessage?config.retainedMessage():assignedName?' Current assignment remains '+assignedName+'.':' No new reference assigned.';
   const allowedTypes=kind=>fileTypes(kind,config.limits?.(kind));
@@ -56,6 +56,7 @@
   root.ondragleave=e=>{e.preventDefault();if(--depth<=0){depth=0;root.classList.remove('dragover');}};
   root.ondrop=e=>{e.preventDefault();depth=0;root.classList.remove('dragover');select([...e.dataTransfer.files]);};
   function setPreview(item){
+   const restoreRemoveFocus=config.removeOnPreview&&remove===document.activeElement;
    for(const node of preview.querySelectorAll('video,audio')){node.pause();node.removeAttribute('src');node.load();}
    selected=!!item;assignedName=item?.name||'';preview.replaceChildren();preview.hidden=!item;sync();if(!item){lastFile=null;retry.hidden=true;return;}
    const name=el('span',item.name||config.label,'reference-name');
@@ -64,9 +65,9 @@
     if(kind==='image')asset.alt=item.name||config.label;else{asset.controls=true;asset.preload='metadata';if(kind==='video')asset.playsInline=true;}
     asset.src=item.url;asset.onerror=()=>{asset.remove();preview.prepend(el('div','Preview unavailable. The saved reference is still assigned.','reference-placeholder'));};preview.append(asset);
    }else preview.append(el('div',item.type?.split('/')[0]||'Reference','reference-placeholder'));
-   preview.append(name);
+   preview.append(name);if(remove&&config.removeOnPreview){preview.append(remove);if(restoreRemoveFocus&&root.isConnected&&!remove.disabled)remove.focus({preventScroll:true});}
   }
-  function setLabel(label){config.label=label;root.setAttribute('aria-label',label);upload.setAttribute('aria-label',config.uploadLabel+' for '+label);}
+  function setLabel(label){config.label=label;if(remove&&config.removeOnPreview)remove.setAttribute('aria-description','Remove '+label+' binding');root.setAttribute('aria-label',label);upload.setAttribute('aria-label',config.uploadLabel+' for '+label);}
   const dispose=()=>{operation?.abort();setPreview(null);};config.signal?.addEventListener('abort',dispose,{once:true});
   const api={root,input,message,sync,setPreview,run,error,setLabel,dispose,clearRetry(){lastFile=null;retry.hidden=true;}};sync();return api;
  }

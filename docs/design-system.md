@@ -562,6 +562,17 @@ fixed files; new unmatched mentions ask the author to infer/review slots. Draft
 saving does not acquire generation-time file requirements. Caret, selection, IME,
 scrolling and plain-text submission remain native.
 
+Authoring orders Title, Short description and Gallery cover first, then Default
+model and Reference workflow in the shared equal-width field grid. Output settings,
+Prompt and reference slots follow; Override Sound is last. Reuse the normal shared
+responsive breakpoint and equal panel gutters. Omit empty publication guidance
+rather than reserving a trailing row. Slot headings use the stable media type and
+per-type index (Image 1, Video 1, Audio 1); the editable Label never renames them.
+Keep fixed/user guidance accessible without repeating it beside or below headings.
+Bound authoring references and covers put Remove at the preview's upper-right
+using the shared ReferenceUpload overlay and library card tokens, with a 44px
+focusable target. Keep audio controls and preview errors clear of that action.
+
 Authoring file controls reuse the Playground reference dropzone/card patterns,
 hide native file-input chrome, and provide keyboard picker buttons, drag/drop,
 filename/preview, explicit assigned state, pending/cancel/error/retry feedback.
