@@ -46,9 +46,10 @@ generation or library access.
    short description and prompt. Configure aspect ratio, resolution, video duration
    and synchronized generated audio in Output settings. Controls use the same
    model catalog values, duration bounds/steps and design elements as Playground.
-   Models with mandatory audio show it locked on; input-derived duration is not
-   configurable. Unsupported saved choices remain visible and block saving until
-   corrected or a compatible model is selected.
+   Models without a configurable audio switch explain their native behavior;
+   the optional saved audio preference never blocks saving or model eligibility.
+   Input-derived duration is not configurable. Other unsupported saved choices
+   remain visible and block saving until corrected or a compatible model is selected.
    Changing the authoring model or workflow resets the unsaved generation defaults. Save applies the current content immediately, including when the template is published.
 2. Use **Infer and review slots**. Each stable typed slot has its own index and
    role. Repeated prompt mentions bind once. Numbering must be contiguous within
@@ -278,7 +279,7 @@ owner retained by migration 079; private namespaces and storage key guards are
 unchanged.
 
 Generation settings are stored in the current template options. Save updates estimates and future submissions immediately when published; admission copies an immutable snapshot into each accepted job. No fixed five-second duration is substituted. Existing recipes with missing options retain the selected model's admission defaults. Changing models resets settings to the new model's supported defaults and requires an explicit Save.
-Generated audio controls the model output and does not replace its soundtrack.
+Generated audio is a preference for models with a configurable switch; it does not replace the soundtrack. Unsupported targets omit the switch and retain native audio behavior.
 
 ### Override Sound
 
@@ -325,3 +326,15 @@ the disposable-service wrapper described in [testing](testing.md).
 Duration puts the selected model's actual bounds or discrete step in its label, without a detached duplicate caption. Prompt labels show the declared model limit and dynamic Unicode code-point count, formatted with thousands separators; unknown limits are not presented as known provider bounds. Validation remains authoritative.
 
 Override Sound is a separate sibling panel after Output settings. Image URL and Advanced settings disclosures use the reference heading typography, a trailing dropdown chevron and the shared 16px expanded-content gap. Selection blocks show only internal Remove while selected; empty blocks show Upload and Choose from library where that scope supports it. Removing a fixed binding leaves its slot for the user and never deletes the library file.
+
+### Optional audio preference
+
+The template's Audio setting is a preference for models with a configurable audio
+switch. It never filters the model chooser, with or without Override Sound. A
+supported selected target receives the saved On/Off value; other targets receive
+no audio switch and use their native behavior. An absent preference stays absent.
+The runner shows Audio On/Off only for a target supporting that preference,
+Model audio default otherwise, and Overridden Audio when a replacement is set.
+Always-on targets are identified as Audio On (model default). Pending metadata
+shows a saved Audio preference rather than promising the selected model's output.
+Media and all other compatibility limits remain mandatory.

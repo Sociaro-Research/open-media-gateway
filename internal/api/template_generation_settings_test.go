@@ -71,7 +71,7 @@ func TestTemplateGenerationSettingsSavePublishAndAdmission(t *testing.T) {
 	}
 }
 
-func TestTemplateDraftRejectsUnsupportedGenerationSettings(t *testing.T) {
+func TestTemplateDraftValidatesSettingsWithOptionalAudio(t *testing.T) {
 	for name, change := range map[string]func(*core.MediaOptions){
 		"ratio":      func(o *core.MediaOptions) { o.Ratio = "7:1" },
 		"resolution": func(o *core.MediaOptions) { o.Resolution = "8K" },
@@ -86,6 +86,12 @@ func TestTemplateDraftRejectsUnsupportedGenerationSettings(t *testing.T) {
 			change(&d.Options)
 			body, _ := json.Marshal(map[string]any{"version": 1, "draft": d})
 			w := sendTest(s.handler(), "PUT", "/v1/system/templates/"+id, string(body), "alice", "")
+			if name == "audio" {
+				if w.Code != 200 || repo.saves != 1 || repo.items[id].Draft.Options.GenerateAudio == nil || !*repo.items[id].Draft.Options.GenerateAudio {
+					t.Fatal("optional preference not retained", w.Code, w.Body.String())
+				}
+				return
+			}
 			if w.Code != 400 || repo.saves != 0 {
 				t.Fatal(w.Code, w.Body.String(), repo.saves)
 			}

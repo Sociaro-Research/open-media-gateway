@@ -282,6 +282,9 @@ func (s *Server) templateAdmin(w http.ResponseWriter, r *http.Request) {
 		normalized.VideoURL = ""
 		normalized.AudioURLs = nil
 		normalized.AudioURL = ""
+		// Target adaptation must not erase the optional saved preference, including
+		// absence. It may apply again when a different model is selected later.
+		normalized.GenerateAudio = definition.Options.GenerateAudio
 		item.Draft.Options = normalized
 	}
 	saved, e := s.templates.Save(r.Context(), item, in.Version, in.Action)

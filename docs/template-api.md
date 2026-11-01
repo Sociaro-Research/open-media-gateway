@@ -11,6 +11,23 @@ video from the shared Template library as `cover_id`. There is no automatic
 fixed-reference fallback. Unpublished content may have no cover. Cover identity
 is separate from generation input slots; changing a slot does not change its cover.
 
+## Optional audio preference
+
+`content.options.generate_audio` is an optional saved preference, not a model
+eligibility requirement. Templates retain absent, false and true values across
+Save and Publish. A selected video model with a configurable audio switch
+receives the saved value. For models without that switch, including always-on
+audio models, template-derived requests omit it and use the model's native audio
+behavior. Omission does not promise silence. Other saved settings, media limits,
+reference roles, ownership and admission checks still apply.
+
+This rule applies to compatibility, media validation, estimates, generation and
+Advanced editing. The resolved job options and immutable template snapshot record
+the selected target's effective options; later template edits cannot change them.
+Direct API callers still receive native validation errors for unsupported explicit
+options. Override Sound independently replaces generated audio and retains its
+existing authorization and mandatory processing behavior.
+
 ## Requests and compatibility
 
 Administrator create/save requests accept `content` or its legacy alias `draft`.

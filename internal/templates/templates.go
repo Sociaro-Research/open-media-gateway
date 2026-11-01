@@ -334,10 +334,19 @@ func (d Definition) ValidateGenerationOptions(model core.MediaModel) error {
 	if o.Duration != 0 && (model.MediaType != "video" || model.DurationFromInput || model.MaxDuration <= 0 || o.Duration < model.MinDuration || o.Duration > model.MaxDuration || model.DurationStep > 0 && (o.Duration-model.MinDuration)%model.DurationStep != 0) {
 		return invalid("video duration")
 	}
-	if o.GenerateAudio != nil && (model.MediaType != "video" || !model.SupportsAudio || !*o.GenerateAudio && model.AudioAlwaysOn) {
-		return invalid("generated audio")
-	}
 	return nil
+}
+
+// GenerationOptionsFor applies optional template preferences to the selected
+// target without changing saved content. An audio switch is meaningful only on
+// a video model with a configurable toggle; other targets retain native audio
+// behavior. Direct API requests do not use this template-only adaptation.
+func (d Definition) GenerationOptionsFor(model core.MediaModel) core.MediaOptions {
+	options := d.Options
+	if model.MediaType != "video" || !model.SupportsAudio || model.AudioAlwaysOn {
+		options.GenerateAudio = nil
+	}
+	return options
 }
 
 // OptionsFor preserves the explicitly reviewed reference workflow and settings.
@@ -358,7 +367,7 @@ func (d Definition) OptionsFor(model core.MediaModel) (core.MediaOptions, error)
 	if model.MediaType != d.MediaType || len(d.Options.ImageURLs)+len(d.Options.Videos())+len(d.Options.Audios())+len(d.Options.ReferenceVoices) > 0 {
 		return core.MediaOptions{}, fmt.Errorf("%w: output differs or reference inputs are undeclared", ErrInvalid)
 	}
-	return d.Options, nil
+	return d.GenerationOptionsFor(model), nil
 }
 
 func (d Definition) Compatible(model core.MediaModel) error {

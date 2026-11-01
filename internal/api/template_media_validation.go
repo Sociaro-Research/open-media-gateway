@@ -103,7 +103,11 @@ func (s *Server) validateDraftMedia(r *http.Request, id string, d templates.Defi
 	if err != nil {
 		return err
 	}
-	return s.referenceValidator(r)(r.Context(), &referencevalidation.Target{Provider: d.Provider, Model: d.Model, Options: d.Options}, files, false)
+	options := d.Options
+	if model, ok := templateModel(s.visibleCatalog(r), d.Provider, d.Model); ok {
+		options = d.GenerationOptionsFor(model)
+	}
+	return s.referenceValidator(r)(r.Context(), &referencevalidation.Target{Provider: d.Provider, Model: d.Model, Options: options}, files, false)
 }
 func (s *Server) templateValidateMedia(w http.ResponseWriter, r *http.Request) {
 	r, cancelInspection := referenceInspectionRequest(w, r)

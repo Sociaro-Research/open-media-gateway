@@ -237,8 +237,15 @@ func TestGenerationSettingsLegacyAndModelCapabilities(t *testing.T) {
 	model.SupportsAudio, model.AudioAlwaysOn = true, true
 	disabled := false
 	d.Options.GenerateAudio = &disabled
-	if d.ValidateGenerationOptions(model) == nil {
-		t.Fatal("mandatory audio disabled")
+	if err := d.ValidateGenerationOptions(model); err != nil {
+		t.Fatal("optional preference filtered always-on model", err)
+	}
+	effective, err := d.OptionsFor(model)
+	if err != nil || effective.GenerateAudio != nil {
+		t.Fatal("always-on switch not omitted", err)
+	}
+	if _, err := core.NormalizeModelOptions(model, d.Options); err == nil {
+		t.Fatal("direct mandatory-audio validation relaxed")
 	}
 	enabled := true
 	d.Options.GenerateAudio = &enabled
