@@ -34,6 +34,18 @@ FIXTURE_CONFIG = {
 }
 smoke.ORIGIN = 'https://app.example.test'
 
+def setUpModule():
+    # Never let fixture Git init/add/commit/config commands target a caller's repo.
+    global _fixture_git_environment
+    clean = {key: value for key, value in os.environ.items() if not key.startswith('GIT_')}
+    _fixture_git_environment = patch.dict(os.environ, clean, clear=True)
+    _fixture_git_environment.start()
+
+
+def tearDownModule():
+    _fixture_git_environment.stop()
+
+
 class RemoteRelease(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()

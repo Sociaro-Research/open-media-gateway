@@ -3,6 +3,7 @@ import argparse
 import contextlib
 import hashlib
 import importlib.util
+import os
 import io
 import json
 from pathlib import Path
@@ -28,6 +29,18 @@ smoke = load('release_smoke')
 checks = load('release_checks')
 window = load('release_ui')
 smoke.ORIGIN = 'https://app.example.test'
+
+
+def setUpModule():
+    # Never let fixture Git init/add/commit/config commands target a caller's repo.
+    global _fixture_git_environment
+    clean = {key: value for key, value in os.environ.items() if not key.startswith('GIT_')}
+    _fixture_git_environment = patch.dict(os.environ, clean, clear=True)
+    _fixture_git_environment.start()
+
+
+def tearDownModule():
+    _fixture_git_environment.stop()
 
 
 class GitHubTransport(unittest.TestCase):
