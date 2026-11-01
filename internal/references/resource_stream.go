@@ -35,7 +35,7 @@ func (r *Resolver) OpenResourceSource(ctx context.Context, source core.ResourceS
 		return empty, err
 	}
 	id, err := uuid.Parse(source.ReferenceID)
-	if err != nil || r == nil || r.library == nil || source.SizeBytes <= 0 || source.SizeBytes > MaxBytes {
+	if err != nil || r == nil || r.library == nil || source.SizeBytes <= 0 || source.SizeBytes > resourceSourceLimit(ctx, source) {
 		return empty, ErrResourceSource
 	}
 	expected, err := hex.DecodeString(source.SHA256)
@@ -133,7 +133,7 @@ func resourceSourceMIME(raw string) (string, bool) {
 	}
 	kind = mediafile.CanonicalContentType(kind)
 	switch kind {
-	case "image/png", "image/jpeg", "image/webp", "image/gif", "video/mp4", "video/quicktime", "video/webm", "audio/mpeg", "audio/wave", "audio/ogg", "audio/flac", "audio/aac", "audio/mp4":
+	case "image/png", "image/jpeg", "image/webp", "image/gif", "image/heic", "video/mp4", "video/quicktime", "video/webm", "audio/mpeg", "audio/wave", "audio/ogg", "audio/flac", "audio/aac", "audio/mp4":
 		return kind, true
 	}
 	return "", false

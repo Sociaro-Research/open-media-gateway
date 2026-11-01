@@ -1,14 +1,17 @@
 package core
 
-import "context"
+import (
+	"context"
+)
 
 // ResourceSourceInput is resolved by the host from an authorized inspected
 // reference. It is never decoded directly from a public request.
 type ResourceSourceInput struct {
-	FPS          float64 `json:"fps,omitempty"`
-	FrameCount   int64   `json:"frame_count,omitempty"`
-	AudioStreams *int    `json:"audio_streams,omitempty"`
-	VideoStreams *int    `json:"video_streams,omitempty"`
+	AudioCodecs  []string `json:"audio_codecs,omitempty"`
+	FPS          float64  `json:"fps,omitempty"`
+	FrameCount   int64    `json:"frame_count,omitempty"`
+	AudioStreams *int     `json:"audio_streams,omitempty"`
+	VideoStreams *int     `json:"video_streams,omitempty"`
 	ReferenceID  string
 	URL          string
 	MediaType    string
@@ -23,6 +26,7 @@ type ResourceSourceInput struct {
 // GeneratedResourceSource pins a completed owner-authorized generation. Provider
 // video-ID eligibility is operation-specific, never inferred from an opaque ID.
 type GeneratedResourceSource struct {
+	Inspection  *InputMediaEvidence
 	TaskID      string
 	TaskHandle  string
 	OutputID    string
@@ -123,11 +127,12 @@ type MediaDimensions struct {
 	Height int `json:"height"`
 }
 type GeneratedResourceRule struct {
-	Model               string  `json:"model"`
-	NativeAudioRequired bool    `json:"native_audio_required,omitempty"`
-	MinDuration         float64 `json:"min_duration"`
-	MaxDuration         float64 `json:"max_duration"`
-	MaxAgeSeconds       int64   `json:"max_age_seconds,omitempty"`
+	AllowUnknownDuration bool    `json:"allow_unknown_duration,omitempty"`
+	Model                string  `json:"model"`
+	NativeAudioRequired  bool    `json:"native_audio_required,omitempty"`
+	MinDuration          float64 `json:"min_duration"`
+	MaxDuration          float64 `json:"max_duration"`
+	MaxAgeSeconds        int64   `json:"max_age_seconds,omitempty"`
 }
 type ResourceVariantSchema struct {
 	Subtype               string                  `json:"subtype"`
@@ -148,4 +153,11 @@ type ResourceOutputSchema struct {
 	GatewayRetentionSeconds int64  `json:"gateway_retention_seconds,omitempty"`
 	RequiresInspectedInput  bool   `json:"requires_inspected_input,omitempty"`
 	ProviderExpiryKnown     bool   `json:"provider_expiry_known"`
+}
+
+// ResourceDeletionValidator is an optional pure preflight. It must not perform
+// network requests or mutate provider state. Known unsupported deletions are
+// rejected before the host reserves a job or makes a usable binding unavailable.
+type ResourceDeletionValidator interface {
+	ValidateResourceDeletion(context.Context, ResourceSnapshot) error
 }

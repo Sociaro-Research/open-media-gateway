@@ -767,11 +767,7 @@ func resourceTaskCreationIntent(options core.MediaOptions) (providerresources.In
 				return intent, providerresources.ErrInvalid
 			}
 			delete(expected, source.ReferenceID)
-			evidence := core.ResourceSourceEvidence{ReferenceID: source.ReferenceID, MediaType: source.MediaType, SHA256: source.SHA256}
-			if source.Duration != nil {
-				duration := *source.Duration
-				evidence.Duration = &duration
-			}
+			evidence := core.InspectedResourceSource(source)
 			intent.Sources = append(intent.Sources, evidence)
 		}
 	}
@@ -784,6 +780,13 @@ func resourceTaskCreationIntent(options core.MediaOptions) (providerresources.In
 			return intent, providerresources.ErrInvalid
 		}
 		evidence := core.ResourceSourceEvidence{ReferenceID: public.GeneratedTaskID, MediaType: "video", SHA256: generated.SHA256}
+		if generated.Inspection != nil {
+			inspection := core.CloneInputMediaEvidence(map[string]core.InputMediaEvidence{"source": *generated.Inspection})["source"]
+			if inspection.ReferenceID != generated.TaskID || inspection.Type != "video" || inspection.SHA256 != generated.SHA256 || inspection.SizeBytes <= 0 || inspection.Duration <= 0 {
+				return intent, providerresources.ErrInvalid
+			}
+			evidence.Inspection = &inspection
+		}
 		if generated.Duration != nil {
 			duration := *generated.Duration
 			evidence.Duration = &duration

@@ -11,7 +11,10 @@ type PromptPolicy struct {
 	NonASCIIBudget int `json:"non_ascii_budget,omitempty"`
 }
 
-const MaxReviewedPromptCharacters = 26000
+// MaxReviewedPromptCharacters is a parser safety bound, not the ordinary or
+// manual-model admission limit. Only an explicit non-manual PromptPolicy may
+// opt into a larger reviewed native ceiling.
+const MaxReviewedPromptCharacters = 40000
 
 func ValidatePromptPolicy(model MediaModel, prompt string) error {
 	if model.NoPrompt {

@@ -20,6 +20,7 @@ import (
 	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
 	"github.com/Sociaro-Research/open-media-gateway/internal/providerconfig"
 	"github.com/Sociaro-Research/open-media-gateway/internal/providerkit"
+	"github.com/Sociaro-Research/open-media-gateway/internal/references"
 	"github.com/Sociaro-Research/open-media-gateway/internal/system"
 	registry "github.com/Sociaro-Research/open-media-gateway/plugins/provider"
 )
@@ -789,6 +790,17 @@ func (p *managedProvider) Generate(ctx context.Context, request core.MediaReques
 		return core.ProviderTask{}, err
 	}
 	ctx = p.connectionScope(ctx, adapter, expected)
+	// Reset any earlier request proof, then bind only the selected operation from
+	// this resolved connection's pure reviewed catalog. Never discover remotely.
+	ctx = references.WithResourceSourceModel(ctx, request.Model, core.MediaModel{})
+	if reviewed, ok := adapter.(interface{ ReviewedCatalogModels() []core.MediaModel }); ok {
+		for _, model := range reviewed.ReviewedCatalogModels() {
+			if model.ID == request.Model {
+				ctx = references.WithResourceSourceModel(ctx, request.Model, model)
+				break
+			}
+		}
+	}
 	if opener, ok := p.manager.referenceImages.(core.ResourceSourceOpener); ok {
 		ctx = core.WithResourceSourceOpener(ctx, opener)
 	}

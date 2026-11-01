@@ -34,6 +34,7 @@ var (
 )
 
 type TaskService struct {
+	admissionScope   AdmissionScopeResolver
 	resourceResolver ReferenceResourceResolver
 	directory        ProviderDirectory
 	repo             TaskRepository
@@ -176,6 +177,16 @@ func (s *TaskService) prepare(ctx context.Context, input CreateMediaInput, idemp
 	if input.Options.OverrideSoundID != "" && mediaType != "video" {
 		return Task{}, fmt.Errorf("%w: Override Sound requires video output", ErrOptionsInvalid)
 	}
+	scope, hasScope, scopeErr := s.admissionConnection(ctx, provider)
+	if hasScope {
+		if scopeErr != nil || scope.ID != provider || scope.OwnerID != identity.ProviderOwnerID(ctx) || scope.Revision == "" {
+			if input.AdmissionError == nil {
+				input.AdmissionError = ErrProviderUnavailable
+			}
+		} else {
+			ctx = WithProviderConnectionScope(WithProviderRevision(ctx, scope.Revision), scope)
+		}
+	}
 	if err := ValidateResourceReferenceIntent(descriptor, input.Options); err != nil {
 		return Task{}, err
 	}
@@ -226,15 +237,16 @@ func (s *TaskService) prepare(ctx context.Context, input CreateMediaInput, idemp
 		ActorID:          identity.ActorID(ctx),
 		OrganizationID:   identity.OrganizationFromContext(ctx).ID,
 		ProviderOwnerID:  identity.ProviderOwnerID(ctx), StorageOwnerID: identity.StorageOwnerID(ctx),
-		APIKeyID:  identity.APIKeyID(ctx),
-		Status:    TaskQueued,
-		Provider:  provider,
-		Model:     model,
-		MediaType: mediaType,
-		Prompt:    prompt,
-		Options:   options,
-		CreatedAt: now,
-		UpdatedAt: now,
+		APIKeyID:         identity.APIKeyID(ctx),
+		Status:           TaskQueued,
+		ProviderIdentity: scope.Revision,
+		Provider:         provider,
+		Model:            model,
+		MediaType:        mediaType,
+		Prompt:           prompt,
+		Options:          options,
+		CreatedAt:        now,
+		UpdatedAt:        now,
 	}
 	if webhookURL != "" {
 		task.WebhookURL = &webhookURL
@@ -252,7 +264,14 @@ func (s *TaskService) prepare(ctx context.Context, input CreateMediaInput, idemp
 				return Task{}, err
 			}
 			if err == nil {
-				task.Cost, task.ProviderIdentity = &cost, fingerprint
+				if task.ProviderIdentity != "" && fingerprint != "" && task.ProviderIdentity != fingerprint {
+					task.AdmissionError = ErrProviderChanged
+				} else {
+					task.Cost = &cost
+					if fingerprint != "" {
+						task.ProviderIdentity = fingerprint
+					}
+				}
 			}
 		} else if ProviderIsFree(providerAdapter) {
 			cost := FreeCost(now)
@@ -337,13 +356,7 @@ func normalizeModelOptions(descriptor MediaModel, options MediaOptions, deferRes
 	options.ResourceSnapshots = slices.Clone(options.ResourceSnapshots)
 	for i := range options.ResourceSnapshots {
 		options.ResourceSnapshots[i].Session = CloneMediaSession(options.ResourceSnapshots[i].Session)
-		options.ResourceSnapshots[i].Sources = slices.Clone(options.ResourceSnapshots[i].Sources)
-		for j := range options.ResourceSnapshots[i].Sources {
-			if d := options.ResourceSnapshots[i].Sources[j].Duration; d != nil {
-				value := *d
-				options.ResourceSnapshots[i].Sources[j].Duration = &value
-			}
-		}
+		options.ResourceSnapshots[i].Sources = CloneResourceSources(options.ResourceSnapshots[i].Sources)
 	}
 	options.ReferenceRoles = maps.Clone(options.ReferenceRoles)
 	options.ReferenceMediaEvidence = CloneInputMediaEvidence(options.ReferenceMediaEvidence)
@@ -396,11 +409,17 @@ func normalizeModelOptions(descriptor MediaModel, options MediaOptions, deferRes
 	if err := ValidateResourceReferences(descriptor, options); !deferResourceLookup && err != nil {
 		return MediaOptions{}, err
 	}
-	if err := ValidateReferenceRoles(descriptor, options); err != nil {
-		return MediaOptions{}, err
-	}
-	if err := ValidateReferenceMode(descriptor, options); err != nil {
-		return MediaOptions{}, err
+	// Mutable resource lookup can fail after an accepted request (for example
+	// after deletion). Preserve its immutable intent for repository idempotency;
+	// AdmissionError still rejects every new request before provider submission.
+	deferredResources := deferResourceLookup && len(options.ResourceReferences) > 0 && len(options.ResourceSnapshots) == 0
+	if !deferredResources {
+		if err := ValidateReferenceRoles(descriptor, options); err != nil {
+			return MediaOptions{}, err
+		}
+		if err := ValidateReferenceMode(descriptor, options); err != nil {
+			return MediaOptions{}, err
+		}
 	}
 	if descriptor.NoSeed && options.Seed != nil {
 		return MediaOptions{}, ErrOptionsInvalid
@@ -418,30 +437,37 @@ func normalizeModelOptions(descriptor MediaModel, options MediaOptions, deferRes
 		enabled := true
 		options.GenerateAudio = &enabled
 	}
-	if descriptor.RequiresAudioInput && strings.TrimSpace(options.AudioURL) == "" {
-		return MediaOptions{}, ErrOptionsInvalid
+	counts, countErr := CountMediaInputs(descriptor, options)
+	if countErr != nil && !deferResourceLookup {
+		return MediaOptions{}, countErr
 	}
-	if !descriptor.SupportsAudioInput && strings.TrimSpace(options.AudioURL) != "" {
-		return MediaOptions{}, ErrOptionsInvalid
+	if countErr == nil {
+		if descriptor.RequiresAudioInput && counts.Audios == 0 {
+			return MediaOptions{}, ErrOptionsInvalid
+		}
+		if !descriptor.SupportsAudioInput && counts.Audios > 0 {
+			return MediaOptions{}, ErrOptionsInvalid
+		}
+		if descriptor.RequiresVideoInput && counts.Videos == 0 {
+			return MediaOptions{}, ErrOptionsInvalid
+		}
+		if !descriptor.SupportsVideoInput && counts.Videos > 0 {
+			return MediaOptions{}, ErrOptionsInvalid
+		}
+		if descriptor.RequiresImageInput && counts.Images == 0 {
+			return MediaOptions{}, ErrOptionsInvalid
+		}
+		if descriptor.MinImageInputs > 0 && counts.Images < descriptor.MinImageInputs {
+			return MediaOptions{}, ErrOptionsInvalid
+		}
+		if !descriptor.SupportsImageInput && counts.Images > 0 {
+			return MediaOptions{}, ErrOptionsInvalid
+		}
+		if descriptor.MaxImageInputs > 0 && counts.Images > descriptor.MaxImageInputs {
+			return MediaOptions{}, ErrOptionsInvalid
+		}
 	}
-	if descriptor.RequiresVideoInput && strings.TrimSpace(options.VideoURL) == "" {
-		return MediaOptions{}, ErrOptionsInvalid
-	}
-	if !descriptor.SupportsVideoInput && strings.TrimSpace(options.VideoURL) != "" {
-		return MediaOptions{}, ErrOptionsInvalid
-	}
-	if descriptor.RequiresImageInput && len(options.ImageURLs) == 0 {
-		return MediaOptions{}, ErrOptionsInvalid
-	}
-	if descriptor.MinImageInputs > 0 && len(options.ImageURLs) < descriptor.MinImageInputs {
-		return MediaOptions{}, ErrOptionsInvalid
-	}
-	if !descriptor.SupportsImageInput && len(options.ImageURLs) > 0 {
-		return MediaOptions{}, ErrOptionsInvalid
-	}
-	if descriptor.MaxImageInputs > 0 && len(options.ImageURLs) > descriptor.MaxImageInputs {
-		return MediaOptions{}, ErrOptionsInvalid
-	}
+
 	if options.NegativePrompt != "" && !descriptor.SupportsNegativePrompt {
 		return MediaOptions{}, ErrOptionsInvalid
 	}

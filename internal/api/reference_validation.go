@@ -18,7 +18,7 @@ func (s *Server) referenceValidator(r *http.Request) referencevalidation.Validat
 	catalog := s.visibleCatalog(r)
 	return func(ctx context.Context, target *referencevalidation.Target, files []referencevalidation.File, complete bool) error {
 		if target == nil {
-			return nil
+			return referencevalidation.ValidateFiles(core.MediaModel{}, files, complete)
 		}
 		if len(target.ReferenceIDs)+len(files) > 64 {
 			return referencevalidation.Invalid("References", "At most 64 reference files can be checked together.")
@@ -70,6 +70,10 @@ func (s *Server) referenceValidator(r *http.Request) referencevalidation.Validat
 			case "audio":
 				options.AudioURLs = append(options.AudioURLs, "https://reference.invalid/input")
 			}
+		}
+		options, err := s.referenceValidationResources(ctx, target.Provider, model, options)
+		if err != nil {
+			return err
 		}
 		normalized, err := core.NormalizeReferenceOptions(model, options)
 		if err != nil {
@@ -241,7 +245,7 @@ func (s *Server) prepareGenerationReferences(r *http.Request, input *core.Create
 		}
 		file.ReferenceIndex = binding.index
 		files = append(files, file)
-		input.ReferenceEvidence[binding.raw] = core.InputMediaEvidence{Type: file.Type, Duration: file.Info.Duration, SHA256: file.SHA256, ReferenceID: id, ContentType: file.Info.ContentType, SizeBytes: file.Info.Size, Width: file.Info.Width, Height: file.Info.Height, FPS: file.Info.FPS, FrameCount: file.Info.FrameCount, AudioStreams: file.Info.AudioStreams, VideoStreams: file.Info.VideoStreams}
+		input.ReferenceEvidence[binding.raw] = core.InputMediaEvidence{AudioCodecs: core.CloneAudioCodecs(file.Info.AudioCodecs), Type: file.Type, Duration: file.Info.Duration, SHA256: file.SHA256, ReferenceID: id, ContentType: file.Info.ContentType, SizeBytes: file.Info.Size, Width: file.Info.Width, Height: file.Info.Height, FPS: file.Info.FPS, FrameCount: file.Info.FrameCount, AudioStreams: file.Info.AudioStreams, VideoStreams: file.Info.VideoStreams}
 	}
 	for _, raw := range input.Options.ReferenceVoices {
 		owner, id, ok := references.ParseSignedReference(raw, s.mediaSigner.secret)

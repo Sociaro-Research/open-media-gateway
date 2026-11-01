@@ -2,6 +2,7 @@ package api
 
 import (
 	"errors"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -211,7 +212,7 @@ func (s *Server) createResource(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	input := core.CreateMediaInput{Provider: body.Provider, Model: model.ID, PublicModel: model.PublicID, MediaType: model.MediaType, MaxExpectedUSD: body.MaxExpectedUSD, Options: options}
-	creation, err := s.resolveResourceCreation(r, intent, body.Provider)
+	creation, err := s.resolveResourceCreation(r, intent, body.Provider, model)
 	input.ResourceCreation = creation
 	input.AdmissionError = err
 	if strings.HasSuffix(r.URL.Path, "/estimate") {
@@ -235,7 +236,7 @@ func (s *Server) createResource(w http.ResponseWriter, r *http.Request) {
 	}
 	s.writeGenerationJSON(w, r, 202, task)
 }
-func (s *Server) resolveResourceCreation(r *http.Request, intent *core.ResourceIntent, provider string) (*core.ResourceCreateRequest, error) {
+func (s *Server) resolveResourceCreation(r *http.Request, intent *core.ResourceIntent, provider string, model core.MediaModel) (*core.ResourceCreateRequest, error) {
 	request := &core.ResourceCreateRequest{Kind: intent.Kind, Subtype: intent.Subtype, Name: intent.Name, Description: intent.Description, Tags: append([]string(nil), intent.Tags...)}
 	if s.references == nil || s.mediaSigner == nil {
 		return nil, providerresources.ErrInvalid
@@ -249,12 +250,15 @@ func (s *Server) resolveResourceCreation(r *http.Request, intent *core.ResourceI
 		if err != nil {
 			return nil, err
 		}
+		if err := validateResourceSourceFile(model, intent.Subtype, inspected); err != nil {
+			return nil, err
+		}
 		sourceURL, err := references.CanonicalReferenceURL(s.assetPublicURL, s.mediaSigner.secret, identity.OwnerID(readContext), ref.ID)
 		if err != nil {
 			return nil, err
 		}
 		info := inspected.Info
-		source := core.ResourceSourceInput{ReferenceID: ref.ID, URL: sourceURL, MediaType: inspected.Type, ContentType: info.ContentType, SizeBytes: info.Size, Width: info.Width, Height: info.Height, SHA256: inspected.SHA256, FrameCount: info.FrameCount, AudioStreams: info.AudioStreams, VideoStreams: info.VideoStreams}
+		source := core.ResourceSourceInput{AudioCodecs: core.CloneAudioCodecs(info.AudioCodecs), ReferenceID: ref.ID, URL: sourceURL, MediaType: inspected.Type, ContentType: info.ContentType, SizeBytes: info.Size, Width: info.Width, Height: info.Height, SHA256: inspected.SHA256, FrameCount: info.FrameCount, FPS: info.FPS, AudioStreams: info.AudioStreams, VideoStreams: info.VideoStreams}
 		if info.Duration > 0 {
 			duration := info.Duration
 			source.Duration = &duration
@@ -290,11 +294,37 @@ func (s *Server) resolveResourceCreation(r *http.Request, intent *core.ResourceI
 			return nil, providerresources.ErrNotFound
 		}
 		primary := task.StoredArtifacts[0]
-		if primary.MediaType != "video" || primary.ProviderID == "" || primary.SHA256 == "" || primary.Duration <= 0 {
+		if primary.MediaType != "video" || primary.ProviderID == "" || primary.SHA256 == "" || primary.Duration < 0 || math.IsNaN(primary.Duration) || math.IsInf(primary.Duration, 0) {
 			return nil, providerresources.ErrInvalid
 		}
-		duration := primary.Duration
-		request.GeneratedVideo = &core.GeneratedResourceSource{TaskID: task.ID, TaskHandle: *task.ProviderTaskID, OutputID: primary.ProviderID, SHA256: primary.SHA256, Operation: task.Model, Model: task.Model, NativeAudio: task.Options.GenerateAudio != nil && *task.Options.GenerateAudio, Duration: &duration}
+		var duration *float64
+		if primary.Duration > 0 {
+			d := primary.Duration
+			duration = &d
+		} else {
+			permitted := false
+			if model.ResourceOperation != nil {
+				for _, variant := range model.ResourceOperation.Variants {
+					if variant.Subtype == intent.Subtype {
+						for _, rule := range variant.GeneratedSources {
+							if rule.Model == task.Model && rule.AllowUnknownDuration {
+								permitted = true
+							}
+						}
+					}
+				}
+			}
+			if !permitted {
+				return nil, providerresources.ErrInvalid
+			}
+		}
+		inspection, err := s.inspectGeneratedVideo(r.Context(), task, primary)
+		if err != nil {
+			return nil, err
+		}
+		// Keep the original optional native duration distinct from the
+		// metadata observed in these exact archived bytes.
+		request.GeneratedVideo = &core.GeneratedResourceSource{TaskID: task.ID, TaskHandle: *task.ProviderTaskID, OutputID: primary.ProviderID, SHA256: primary.SHA256, Operation: task.Model, Model: task.Model, NativeAudio: task.Options.GenerateAudio != nil && *task.Options.GenerateAudio, Duration: duration, Inspection: &inspection}
 	}
 	return request, nil
 }

@@ -51,3 +51,21 @@ func (m *Manager) ResolveResourceConnection(ctx context.Context, id string) (cor
 	}
 	return core.ProviderConnectionScope{ID: id, OwnerID: identity.ProviderOwnerID(ctx), Revision: connectionIdentity(id, connection.definition, connection.credentials)}, nil
 }
+
+// ResolveAdmissionConnection saves the same canonical credential revision used
+// by priced jobs, even when accounting is disabled or an estimate is unknown.
+func (m *Manager) ResolveAdmissionConnection(ctx context.Context, id string) (core.ProviderConnectionScope, error) {
+	adapter, err := m.resolve(ctx, id, true)
+	if err != nil {
+		return core.ProviderConnectionScope{}, err
+	}
+	connection, ok := adapter.(*connectionAdapter)
+	if !ok {
+		return core.ProviderConnectionScope{}, core.ErrProviderUnavailable
+	}
+	revision, err := m.pin(ctx, id, connection.credentials)
+	if err != nil {
+		return core.ProviderConnectionScope{}, err
+	}
+	return core.ProviderConnectionScope{ID: id, OwnerID: identity.ProviderOwnerID(ctx), Revision: revision}, nil
+}

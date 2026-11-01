@@ -84,9 +84,10 @@ Ordinary4.0 text/keyframe prompts retain Gateway's conservative10,000-character
 ceiling.3Omni and O1 have different prompt, video, keyframe, Element, audio and
 multi-shot combinations; they do not inherit4Omni's schema.
 
-Managed uploads retain Gateway's shared limits as well as model limits. In
-particular, the current200MiB shared video-upload ceiling is below4Omni's
-300MB endpoint allowance. Uninspected external video duration remains unknown;
+Managed uploads retain Gateway's ordinary200MiB video limit. An authorized
+Kling4 Omni target uses its inclusive300,000,000-byte endpoint limit across
+upload, stored-reference validation and template promotion; manual and other
+models retain their existing limits. Uninspected external video duration remains unknown;
 Gateway does not fetch arbitrary remote references as a side effect of quoting.
 A required input-duration estimate cannot treat unknown metadata as zero.
 

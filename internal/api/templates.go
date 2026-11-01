@@ -352,7 +352,7 @@ func (s *Server) templateUpload(w http.ResponseWriter, r *http.Request) {
 		defer release()
 		_ = http.NewResponseController(w).SetReadDeadline(time.Now().Add(2 * time.Minute))
 		_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(3 * time.Minute))
-		r.Body = http.MaxBytesReader(w, r.Body, references.MaxBytes+(1<<20))
+		r.Body = http.MaxBytesReader(w, r.Body, references.HardMaxBytes+(1<<20))
 		defer r.Body.Close()
 		if e = r.ParseMultipartForm(1 << 20); e != nil {
 			templateError(w, templates.ErrInvalid)
@@ -376,7 +376,16 @@ func (s *Server) templateUpload(w http.ResponseWriter, r *http.Request) {
 		}
 		defer file.Close()
 		filename = header.Filename
-		data, e = io.ReadAll(io.LimitReader(file, references.MaxBytes+1))
+		limit, limitErr := s.referenceUploadLimit(r, validation)
+		if limitErr != nil {
+			templateError(w, limitErr)
+			return
+		}
+		if header.Size <= 0 || header.Size > limit {
+			templateError(w, referencevalidation.Invalid(filename, "The file exceeds the authorized upload size limit."))
+			return
+		}
+		data, e = io.ReadAll(io.LimitReader(file, limit+1))
 		if e != nil {
 			templateError(w, e)
 			return
@@ -415,7 +424,16 @@ func (s *Server) templateUpload(w http.ResponseWriter, r *http.Request) {
 		}
 		defer object.Reader.Close()
 		filename = source.Name
-		data, e = io.ReadAll(io.LimitReader(object.Reader, references.MaxBytes+1))
+		limit, limitErr := s.referenceUploadLimit(r, validation)
+		if limitErr != nil {
+			templateError(w, limitErr)
+			return
+		}
+		if source.SizeBytes <= 0 || source.SizeBytes > limit || object.SizeBytes != source.SizeBytes {
+			templateError(w, referencevalidation.Invalid(filename, "The file exceeds the authorized upload size limit or its stored size changed."))
+			return
+		}
+		data, e = io.ReadAll(io.LimitReader(object.Reader, limit+1))
 		if e != nil {
 			templateError(w, e)
 			return
@@ -440,7 +458,7 @@ func (s *Server) templateUpload(w http.ResponseWriter, r *http.Request) {
 	if sourceID != "" {
 		item, e = s.templateReferences.Get(templateLibraryContext(r.Context()), sourceID)
 	} else {
-		item, e = s.templateReferences.UploadWithValidation(templateLibraryContext(r.Context()), filename, bytes.NewReader(data), nil, nil)
+		item, e = s.templateReferences.UploadWithValidation(templateLibraryContext(s.referenceUploadContext(r)), filename, bytes.NewReader(data), validation, s.referenceValidator(r))
 	}
 	if e != nil {
 		templateError(w, e)
@@ -731,7 +749,17 @@ func (s *Server) resolveTemplate(r *http.Request, item templates.Record, in temp
 		if !strings.HasPrefix(value, "https://") && !strings.HasPrefix(value, "http://") {
 			return input, fmt.Errorf("%w: public media origin is not configured", templates.ErrInvalid)
 		}
-		input.ReferenceEvidence[value] = core.InputMediaEvidence{Type: slot.Type, Duration: files[len(files)-1].Info.Duration, ContentType: files[len(files)-1].Info.ContentType, SizeBytes: files[len(files)-1].Info.Size, Width: files[len(files)-1].Info.Width, Height: files[len(files)-1].Info.Height, FPS: files[len(files)-1].Info.FPS}
+		info := files[len(files)-1].Info
+		evidence := core.InputMediaEvidence{Type: slot.Type, Duration: info.Duration, ContentType: info.ContentType, SizeBytes: info.Size, Width: info.Width, Height: info.Height, FPS: info.FPS, FrameCount: info.FrameCount, AudioCodecs: core.CloneAudioCodecs(info.AudioCodecs)}
+		if info.AudioStreams != nil {
+			count := *info.AudioStreams
+			evidence.AudioStreams = &count
+		}
+		if info.VideoStreams != nil {
+			count := *info.VideoStreams
+			evidence.VideoStreams = &count
+		}
+		input.ReferenceEvidence[value] = evidence
 		switch slot.Type {
 		case "image":
 			input.Options.ImageURLs = append(input.Options.ImageURLs, value)
@@ -869,7 +897,7 @@ func (s *Server) inspectTemplateMedia(ctx context.Context, key, kind string, siz
 		return mediafile.Info{}, templates.ErrNotFound
 	}
 	defer object.Reader.Close()
-	if size <= 0 || size > references.MaxBytes || object.SizeBytes != size {
+	if size <= 0 || size > references.HardMaxBytes || object.SizeBytes != size {
 		return mediafile.Info{}, templates.ErrNotFound
 	}
 	data, e := io.ReadAll(io.LimitReader(object.Reader, size+1))

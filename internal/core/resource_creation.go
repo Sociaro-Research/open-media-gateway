@@ -25,6 +25,7 @@ func CloneResourceCreation(in *ResourceCreateRequest) *ResourceCreateRequest {
 	clone := func(sources []ResourceSourceInput) []ResourceSourceInput {
 		out := slices.Clone(sources)
 		for i := range out {
+			out[i].AudioCodecs = CloneAudioCodecs(out[i].AudioCodecs)
 			if out[i].AudioStreams != nil {
 				v := *out[i].AudioStreams
 				out[i].AudioStreams = &v
@@ -51,18 +52,16 @@ func CloneResourceCreation(in *ResourceCreateRequest) *ResourceCreateRequest {
 			d := *v.Duration
 			v.Duration = &d
 		}
+		if v.Inspection != nil {
+			inspection := CloneInputMediaEvidence(map[string]InputMediaEvidence{"source": *v.Inspection})["source"]
+			v.Inspection = &inspection
+		}
 		out.GeneratedVideo = &v
 	}
 	if in.BoundVoice != nil {
 		v := *in.BoundVoice
 		v.Session = CloneMediaSession(v.Session)
-		v.Sources = slices.Clone(v.Sources)
-		for i := range v.Sources {
-			if v.Sources[i].Duration != nil {
-				d := *v.Sources[i].Duration
-				v.Sources[i].Duration = &d
-			}
-		}
+		v.Sources = CloneResourceSources(v.Sources)
 		out.BoundVoice = &v
 	}
 	return &out

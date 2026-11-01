@@ -132,6 +132,15 @@ func (m *Manager) CheckCatalogRate(ctx context.Context, id string, model core.Me
 	if err != nil {
 		return err
 	}
+	if hook, ok := adapter.(catalogRateQuoteProvider); ok {
+		quote, handled, e := hook.CatalogRateQuote(model, rate)
+		if e != nil {
+			return fmt.Errorf("pure catalogue tariff rejected: %w", e)
+		}
+		if handled {
+			return validatePureCatalogRateQuote(quote, rate)
+		}
+	}
 	r, _ := referenceRequest(model)
 	typedRequest := false
 	if hook, ok := adapter.(catalogRateRequestProvider); ok {
@@ -156,7 +165,6 @@ func (m *Manager) CheckCatalogRate(ctx context.Context, id string, model core.Me
 			}
 			r.Options.Duration = rate.Duration
 		}
-
 		if rate.Resolution != "" {
 			r.Options.Resolution = rate.Resolution
 		}
@@ -300,15 +308,14 @@ func applyCatalogQuote(base core.TaskCost, err error, model core.MediaModel, req
 	var selected *catalogsync.Rate
 	for i := range entry.Rates {
 		r := &entry.Rates[i]
+		if !r.MatchesConditions(model, request) {
+			continue
+		}
 		duration := request.Options.Duration
 		if duration == 0 {
 			duration = model.DefaultDuration
 		}
 		if r.Duration < 0 || r.Duration > 0 && r.Duration != duration {
-			continue
-		}
-
-		if !r.MatchesConditions(model, request) {
 			continue
 		}
 		if r.Region != base.Pricing.Region || r.Unit != base.Pricing.Unit || r.Per != base.Pricing.Per {

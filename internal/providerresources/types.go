@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"math"
+	"reflect"
 	"regexp"
 	"slices"
 	"strconv"
@@ -140,14 +141,7 @@ func New(repo Repository, current ScopeResolver) *Service {
 }
 
 func CloneSources(in []core.ResourceSourceEvidence) []core.ResourceSourceEvidence {
-	out := slices.Clone(in)
-	for i := range out {
-		if in[i].Duration != nil {
-			n := *in[i].Duration
-			out[i].Duration = &n
-		}
-	}
-	return out
+	return core.CloneResourceSources(in)
 }
 func CloneIntent(in Intent) Intent {
 	in.Sources = CloneSources(in.Sources)
@@ -198,6 +192,18 @@ func ValidateIntent(in Intent) error {
 		}
 		if source.Duration != nil && (*source.Duration <= 0 || math.IsNaN(*source.Duration) || math.IsInf(*source.Duration, 0)) {
 			return ErrInvalid
+		}
+		if e := source.Inspection; e != nil {
+			if e.ReferenceID != source.ReferenceID || e.Type != source.MediaType || e.SHA256 != source.SHA256 || e.SizeBytes < 0 || e.Width < 0 || e.Height < 0 || e.FrameCount < 0 || e.FPS < 0 || math.IsNaN(e.FPS) || math.IsInf(e.FPS, 0) || e.Duration < 0 || math.IsNaN(e.Duration) || math.IsInf(e.Duration, 0) || e.AudioStreams != nil && *e.AudioStreams < 0 || e.VideoStreams != nil && *e.VideoStreams < 0 {
+				return ErrInvalid
+			}
+			// Generated-video duration is optional upstream metadata. Retain
+			// it independently from the observed archived-container timeline;
+			// an inspected duration is not a fabricated native/billing value.
+			generatedVideo := in.GeneratedTaskID != "" && source.ReferenceID == in.GeneratedTaskID && source.MediaType == "video"
+			if !generatedVideo && (source.Duration == nil && e.Duration != 0 || source.Duration != nil && e.Duration != *source.Duration) {
+				return ErrInvalid
+			}
 		}
 	}
 	return nil
@@ -311,7 +317,7 @@ func EqualSources(a, b []core.ResourceSourceEvidence) bool {
 	}
 	for i := range a {
 		x, y := a[i], b[i]
-		if x.ReferenceID != y.ReferenceID || x.MediaType != y.MediaType || x.SHA256 != y.SHA256 || (x.Duration == nil) != (y.Duration == nil) {
+		if !reflect.DeepEqual(x.Inspection, y.Inspection) || x.ReferenceID != y.ReferenceID || x.MediaType != y.MediaType || x.SHA256 != y.SHA256 || (x.Duration == nil) != (y.Duration == nil) {
 			return false
 		}
 		if x.Duration != nil && *x.Duration != *y.Duration {

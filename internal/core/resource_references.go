@@ -136,10 +136,11 @@ type ResourceReference struct {
 // ResourceSourceEvidence pins inspected source identity and duration with a job.
 // Unknown duration remains nil; it cannot be interpreted as a zero-length video.
 type ResourceSourceEvidence struct {
-	ReferenceID string   `json:"reference_id"`
-	MediaType   string   `json:"media_type"`
-	SHA256      string   `json:"sha256"`
-	Duration    *float64 `json:"duration,omitempty"`
+	Inspection  *InputMediaEvidence `json:"inspection,omitempty"`
+	ReferenceID string              `json:"reference_id"`
+	MediaType   string              `json:"media_type"`
+	SHA256      string              `json:"sha256"`
+	Duration    *float64            `json:"duration,omitempty"`
 }
 
 // ResourceSnapshot is server-resolved evidence, persisted privately with an

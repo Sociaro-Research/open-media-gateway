@@ -194,10 +194,10 @@ func (r *Resolver) ResolveDirect(ctx context.Context, o core.MediaOptions) (core
 					}
 				}
 			}
-			if previous, exists := evidence[target]; exists && previous != inspected {
+			if previous, exists := evidence[target]; exists && !core.EqualInputMediaEvidence(previous, inspected) {
 				return o, fmt.Errorf("%w: conflicting evidence for the same reference", core.ErrOptionsInvalid)
 			}
-			evidence[target] = inspected
+			evidence[target] = core.CloneInputMediaEvidence(map[string]core.InputMediaEvidence{"source": inspected})["source"]
 		}
 	}
 	o.ImageURLs = replace(o.ImageURLs)

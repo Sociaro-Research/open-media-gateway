@@ -115,6 +115,11 @@ func audioModels() []core.MediaModel {
 	tts.NoLanguage, tts.SupportsVoice, tts.RequiresVoice = false, true, true
 	tts.MaxPromptCharacters = 1000
 	tts.Voices = audioPresetVoices()
+	tts.Languages = []string{"en", "zh"}
+	for i, voice := range tts.Voices {
+		languages := append([]string(nil), audioPresetVoiceLanguages[voice]...)
+		tts.VoiceChoices = append(tts.VoiceChoices, core.VoiceChoice{ID: voice, Languages: languages, DefaultLanguage: languages[0], IsDefault: i == 0})
+	}
 	tts.ResourceInputSchemas = []core.ResourceInputSchema{{Kind: "voice", MaxCount: 1}}
 	tts.Parameters = []core.ParameterField{number("voice_speed", "Speech rate (one decimal place)", 0.8, 2, false)}
 	tts.ReferenceModes = []core.ReferenceMode{{ID: "none", Label: "Text only"}}

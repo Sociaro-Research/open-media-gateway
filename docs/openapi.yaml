@@ -8165,7 +8165,12 @@ components:
         no_alpha: {type: boolean, description: Reject an image carrying an alpha channel}
         content_types: {type: array, items: {type: string}}
         codecs: {type: array, items: {type: string}}
-        max_bytes: {type: integer, description: Exclusive upper file size bound}
+        allowed_audio_codecs:
+          type: array
+          items: {type: string}
+          description: Optional canonical embedded-audio codec allowlist. Every declared audio stream needs inspected codec proof; unknown count or codec fails only when this constraint is declared. A proven zero audio-stream count passes. AAC/MP3 proof is distinct from an mp4a container tag.
+        max_bytes: {type: integer, description: Upper file size bound; exclusive unless max_bytes_inclusive is true}
+        max_bytes_inclusive: {type: boolean, description: True only for a reviewed model-specific inclusive byte boundary.}
         max_total_bytes: {type: integer, description: Exclusive combined size bound for this media type}
         min_dimension: {type: integer}
         max_dimension: {type: integer}
@@ -9780,6 +9785,14 @@ components:
           type: array
           items:
             "$ref": "#/components/schemas/MediaModel"
+    VoiceChoice:
+      type: object
+      required: [id, languages, default_language]
+      properties:
+        id: {type: string}
+        languages: {type: array, minItems: 1, items: {type: string}}
+        default_language: {type: string, description: A declared member of this voice's languages; Gateway control default.}
+        is_default: {type: boolean, default: false, description: Initial Gateway voice selection.}
     MediaModel:
       type: object
       required:
@@ -9797,6 +9810,13 @@ components:
       - supports_last_frame
       - pricing
       properties:
+        voice_choices:
+          type: array
+          items: {$ref: '#/components/schemas/VoiceChoice'}
+          description: Optional exact voice/language pairs for the existing controls. Select the is_default voice initially; preserve a still-compatible language on voice changes, otherwise use that voice's default_language. Absent metadata retains existing behavior.
+        resource_input_schemas:
+          type: array
+          items: {$ref: '#/components/schemas/ResourceInputSchema'}
         public_id: {type: string, description: Public model identifier used for generation requests}
 
         metadata:
@@ -9941,6 +9961,10 @@ components:
           type: boolean
         requires_voice:
           type: boolean
+        languages:
+          type: array
+          items: {type: string}
+          description: Optional exact values for the existing language control. When omitted, retain the provider's existing language behavior.
         voices:
           type: array
           items:
@@ -10135,6 +10159,13 @@ components:
         bound_voice_binding_id: {type: string, format: uuid}
         tags: {type: array, maxItems: 32, items: {type: string}}
         max_expected_usd: {type: number, minimum: 0, description: Unknown totals cannot satisfy an explicit cap.}
+    ResourceInputSchema:
+      type: object
+      required: [kind, max_count]
+      properties:
+        kind: {type: string}
+        max_count: {type: integer, minimum: 0}
+        subtypes: {type: array, items: {type: string}}
     ProviderResource:
       type: object
       required: [id, provider, kind, status, usable]

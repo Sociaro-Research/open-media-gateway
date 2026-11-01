@@ -158,6 +158,13 @@ func NewGateway(d Dependencies) http.Handler {
 	s.references = library
 	s.resourceRepository = d.ResourceRepository
 	s.resourceScopes = d.ResourceScopes
+	if d.ResourceScopes != nil {
+		if service, ok := d.Service.(interface {
+			SetAdmissionScopeResolver(core.AdmissionScopeResolver)
+		}); ok {
+			service.SetAdmissionScopeResolver(core.AdmissionScopeResolver(d.ResourceScopes))
+		}
+	}
 	if d.ResourceRepository != nil && d.ResourceScopes != nil {
 		s.resourceLifecycle = providerresources.NewLifecycle(d.ResourceRepository, d.ResourceScopes, d.ResourceDirectory)
 		if service, ok := d.Service.(interface {

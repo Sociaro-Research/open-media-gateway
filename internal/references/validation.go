@@ -24,21 +24,24 @@ func InspectFile(name string, data []byte, declared string) (referencevalidation
 	bad := func(message string) (referencevalidation.File, error) {
 		return referencevalidation.File{}, invalidMediaError{referencevalidation.Invalid(cleanName(name), message)}
 	}
-	if len(data) == 0 || int64(len(data)) > MaxBytes {
-		return bad(fmt.Sprintf("size %d bytes; upload a nonempty file no larger than %d bytes.", len(data), MaxBytes))
+	if len(data) == 0 || int64(len(data)) > HardMaxBytes {
+		return bad(fmt.Sprintf("size %d bytes; upload a nonempty file no larger than %d bytes.", len(data), HardMaxBytes))
 	}
 	kind, err := InspectMedia(data)
 	if err != nil {
 		if limit := commonLimit(kind); limit > 0 && int64(len(data)) > limit {
 			return bad(fmt.Sprintf("size %d bytes; detected %s permits at most %d bytes. Reduce the file size.", len(data), kind, limit))
 		}
-		return bad("Detected format " + kind + " is unsupported. Use PNG/JPEG/WebP/GIF, MP4/MOV/WebM or MP3/WAV/AAC/M4A/OGG/FLAC.")
+		return bad("Detected format " + kind + " is unsupported. Use PNG/JPEG/WebP/GIF, HEIC/HEIF with direct HEVC still images or one-level HEVC grids, MP4/MOV/WebM or MP3/WAV/AAC/M4A/OGG/FLAC.")
 	}
 	if declared != "" && mediafile.CanonicalType(declared) != mediafile.CanonicalType(kind) {
 		return bad(fmt.Sprintf("declared format %s does not match detected %s. Export a supported file and select it again.", declared, kind))
 	}
 	info, err := mediafile.Inspect(data, kind)
 	if err != nil {
+		if kind == "image/heic" || kind == "image/heif" {
+			return bad("HEIC/HEIF metadata is invalid or uses an unsupported construction. Use a direct HEVC still image or one-level HEVC grid without auxiliary/alpha items, sequences, encrypted/external data or other derived images; alternatively export PNG/JPEG.")
+		}
 		return bad("Media metadata could not be read. Re-export a valid file with dimensions and, for video/audio, a positive duration; video also needs readable frame timing.")
 	}
 	return referencevalidation.File{Type: strings.SplitN(kind, "/", 2)[0], Name: cleanName(name), Info: info}, nil
@@ -51,7 +54,7 @@ func (l *Library) inspectItem(ctx context.Context, item Image) (referencevalidat
 	case <-ctx.Done():
 		return referencevalidation.File{}, ctx.Err()
 	}
-	if item.SizeBytes <= 0 || item.SizeBytes > MaxBytes {
+	if item.SizeBytes <= 0 || item.SizeBytes > HardMaxBytes {
 		return referencevalidation.File{}, referencevalidation.Invalid(item.Name, "Stored file size is invalid. Select a valid file again.")
 	}
 	object, err := l.store.Open(StorageContext(ctx, item), item.StorageKey)

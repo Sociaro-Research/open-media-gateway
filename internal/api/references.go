@@ -116,7 +116,7 @@ func (s *Server) beginReferenceUpload(w http.ResponseWriter, r *http.Request) {
 		s.referenceError(w, err)
 		return
 	}
-	plan, err := s.references.BeginUploadWithValidation(r.Context(), input, s.referenceValidator(r))
+	plan, err := s.references.BeginUploadWithValidation(s.referenceUploadContext(r), input, s.referenceValidator(r))
 	if err != nil {
 		s.referenceError(w, err)
 		return
@@ -129,7 +129,7 @@ func (s *Server) beginReferenceUpload(w http.ResponseWriter, r *http.Request) {
 }
 func (s *Server) completeReferenceUpload(w http.ResponseWriter, r *http.Request) {
 	_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(3 * time.Minute))
-	item, err := s.references.FinishUploadWithValidation(r.Context(), r.PathValue("id"), s.referenceValidator(r))
+	item, err := s.references.FinishUploadWithValidation(s.referenceUploadContext(r), r.PathValue("id"), s.referenceValidator(r))
 	if err != nil {
 		s.referenceError(w, err)
 		return
@@ -157,10 +157,10 @@ func (s *Server) uploadReferenceLibrary(w http.ResponseWriter, r *http.Request, 
 	// Allow slow uploads independently of the short JSON request deadline.
 	_ = http.NewResponseController(w).SetReadDeadline(time.Now().Add(2 * time.Minute))
 	_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(3 * time.Minute))
-	r.Body = http.MaxBytesReader(w, r.Body, references.MaxBytes+(1<<20))
+	r.Body = http.MaxBytesReader(w, r.Body, references.HardMaxBytes+(1<<20))
 	defer r.Body.Close()
 	if err := r.ParseMultipartForm(1 << 20); err != nil {
-		writeError(w, 400, "invalid_upload", "send one supported media file in the multipart file field (up to 200 MB)")
+		writeError(w, 400, "invalid_upload", "send one supported media file in the multipart file field within the selected model upload limit")
 		return
 	}
 	defer r.MultipartForm.RemoveAll()
@@ -181,7 +181,17 @@ func (s *Server) uploadReferenceLibrary(w http.ResponseWriter, r *http.Request, 
 			return
 		}
 	}
-	item, err := library.UploadWithValidation(r.Context(), header.Filename, file, target, s.referenceValidator(r))
+	ctx := s.referenceUploadContext(r)
+	limit, err := references.UploadLimit(ctx, target)
+	if err != nil {
+		s.referenceError(w, err)
+		return
+	}
+	if header.Size <= 0 || header.Size > limit {
+		s.referenceError(w, referencevalidation.Invalid(header.Filename, "The file exceeds the authorized upload size limit."))
+		return
+	}
+	item, err := library.UploadWithValidation(ctx, header.Filename, file, target, s.referenceValidator(r))
 	if err != nil {
 		s.referenceError(w, err)
 		return

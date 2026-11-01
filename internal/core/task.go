@@ -269,6 +269,8 @@ type MediaModel struct {
 	SupportsGender         bool              `json:"supports_gender,omitempty"`
 	SupportsVoice          bool              `json:"supports_voice,omitempty"`
 	RequiresVoice          bool              `json:"requires_voice,omitempty"`
+	VoiceChoices           []VoiceChoice     `json:"voice_choices,omitempty"`
+	Languages              []string          `json:"languages,omitempty"`
 	Voices                 []string          `json:"voices,omitempty"`
 	Formats                []string          `json:"formats,omitempty"`
 	Pricing                MediaModelPricing `json:"pricing"`

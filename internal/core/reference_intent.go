@@ -31,6 +31,10 @@ func ReferenceRole(model MediaModel, options MediaOptions, kind string, index in
 }
 
 func ValidateReferenceRoles(model MediaModel, options MediaOptions) error {
+	counts, err := CountMediaInputs(model, options)
+	if err != nil {
+		return err
+	}
 	if len(options.ReferenceRoles) > 64 {
 		return fmt.Errorf("%w: too many reference roles", ErrOptionsInvalid)
 	}
@@ -43,13 +47,7 @@ func ValidateReferenceRoles(model MediaModel, options MediaOptions) error {
 		if err != nil {
 			return ErrOptionsInvalid
 		}
-		count := len(options.ImageURLs)
-		if parts[1] == "video" {
-			count = len(options.Videos())
-		}
-		if parts[1] == "audio" {
-			count = len(options.Audios())
-		}
+		count := counts.Count(parts[1])
 		if index > count {
 			return fmt.Errorf("%w: role has no matching reference", ErrOptionsInvalid)
 		}

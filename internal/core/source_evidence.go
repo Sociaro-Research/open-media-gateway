@@ -4,18 +4,19 @@ import "math"
 
 // InputMediaEvidence is populated only from inspected authorized source bytes.
 type InputMediaEvidence struct {
-	FrameCount   int64   `json:"frame_count,omitempty"`
-	AudioStreams *int    `json:"audio_streams,omitempty"`
-	VideoStreams *int    `json:"video_streams,omitempty"`
-	ReferenceID  string  `json:"reference_id,omitempty"`
-	ContentType  string  `json:"content_type,omitempty"`
-	SizeBytes    int64   `json:"size_bytes,omitempty"`
-	Width        int     `json:"width,omitempty"`
-	Height       int     `json:"height,omitempty"`
-	FPS          float64 `json:"fps,omitempty"`
-	SHA256       string  `json:"sha256,omitempty"`
-	Type         string  `json:"type"`
-	Duration     float64 `json:"duration,omitempty"`
+	AudioCodecs  []string `json:"audio_codecs,omitempty"`
+	FrameCount   int64    `json:"frame_count,omitempty"`
+	AudioStreams *int     `json:"audio_streams,omitempty"`
+	VideoStreams *int     `json:"video_streams,omitempty"`
+	ReferenceID  string   `json:"reference_id,omitempty"`
+	ContentType  string   `json:"content_type,omitempty"`
+	SizeBytes    int64    `json:"size_bytes,omitempty"`
+	Width        int      `json:"width,omitempty"`
+	Height       int      `json:"height,omitempty"`
+	FPS          float64  `json:"fps,omitempty"`
+	SHA256       string   `json:"sha256,omitempty"`
+	Type         string   `json:"type"`
+	Duration     float64  `json:"duration,omitempty"`
 }
 
 // InputVideoDuration requires evidence for every input; an absent duration is
@@ -38,6 +39,7 @@ func CloneInputMediaEvidence(in map[string]InputMediaEvidence) map[string]InputM
 	}
 	out := make(map[string]InputMediaEvidence, len(in))
 	for key, value := range in {
+		value.AudioCodecs = CloneAudioCodecs(value.AudioCodecs)
 		if value.AudioStreams != nil {
 			n := *value.AudioStreams
 			value.AudioStreams = &n

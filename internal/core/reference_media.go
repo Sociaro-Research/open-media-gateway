@@ -16,26 +16,28 @@ type ReferenceMediaLimits struct {
 	ReferenceVoice            *MediaFileLimits `json:"reference_voice,omitempty"`
 }
 type MediaFileLimits struct {
-	MinFrames        int64    `json:"min_frames,omitempty"`
-	MaxFrames        int64    `json:"max_frames,omitempty"`
-	RequireAudio     *bool    `json:"require_audio,omitempty"`
-	NoAlpha          bool     `json:"no_alpha,omitempty"`
-	ContentTypes     []string `json:"content_types,omitempty"`
-	Codecs           []string `json:"codecs,omitempty"`
-	MaxBytes         int64    `json:"max_bytes,omitempty"`
-	MaxTotalBytes    int64    `json:"max_total_bytes,omitempty"`
-	MinDimension     int      `json:"min_dimension,omitempty"`
-	MaxDimension     int      `json:"max_dimension,omitempty"`
-	MinPixels        int64    `json:"min_pixels,omitempty"`
-	MaxPixels        int64    `json:"max_pixels,omitempty"`
-	MinRatio         float64  `json:"min_ratio,omitempty"`
-	MaxRatio         float64  `json:"max_ratio,omitempty"`
-	MinDuration      float64  `json:"min_duration,omitempty"`
-	MaxDuration      float64  `json:"max_duration,omitempty"`
-	MinTotalDuration float64  `json:"min_total_duration,omitempty"`
-	MaxTotalDuration float64  `json:"max_total_duration,omitempty"`
-	MinFPS           float64  `json:"min_fps,omitempty"`
-	MaxFPS           float64  `json:"max_fps,omitempty"`
+	AllowedAudioCodecs []string `json:"allowed_audio_codecs,omitempty"`
+	MinFrames          int64    `json:"min_frames,omitempty"`
+	MaxFrames          int64    `json:"max_frames,omitempty"`
+	RequireAudio       *bool    `json:"require_audio,omitempty"`
+	NoAlpha            bool     `json:"no_alpha,omitempty"`
+	ContentTypes       []string `json:"content_types,omitempty"`
+	Codecs             []string `json:"codecs,omitempty"`
+	MaxBytesInclusive  bool     `json:"max_bytes_inclusive,omitempty"`
+	MaxBytes           int64    `json:"max_bytes,omitempty"`
+	MaxTotalBytes      int64    `json:"max_total_bytes,omitempty"`
+	MinDimension       int      `json:"min_dimension,omitempty"`
+	MaxDimension       int      `json:"max_dimension,omitempty"`
+	MinPixels          int64    `json:"min_pixels,omitempty"`
+	MaxPixels          int64    `json:"max_pixels,omitempty"`
+	MinRatio           float64  `json:"min_ratio,omitempty"`
+	MaxRatio           float64  `json:"max_ratio,omitempty"`
+	MinDuration        float64  `json:"min_duration,omitempty"`
+	MaxDuration        float64  `json:"max_duration,omitempty"`
+	MinTotalDuration   float64  `json:"min_total_duration,omitempty"`
+	MaxTotalDuration   float64  `json:"max_total_duration,omitempty"`
+	MinFPS             float64  `json:"min_fps,omitempty"`
+	MaxFPS             float64  `json:"max_fps,omitempty"`
 }
 
 // Clone keeps read-time capability inheritance independent of saved configuration.
@@ -48,11 +50,13 @@ func (limits *ReferenceMediaLimits) Clone() *ReferenceMediaLimits {
 		voice := *limits.ReferenceVoice
 		voice.ContentTypes = slices.Clone(voice.ContentTypes)
 		voice.Codecs = slices.Clone(voice.Codecs)
+		voice.AllowedAudioCodecs = CloneAudioCodecs(voice.AllowedAudioCodecs)
 		result.ReferenceVoice = &voice
 	}
 	for _, rule := range []*MediaFileLimits{&result.Image, &result.Video, &result.Audio} {
 		rule.ContentTypes = slices.Clone(rule.ContentTypes)
 		rule.Codecs = slices.Clone(rule.Codecs)
+		rule.AllowedAudioCodecs = CloneAudioCodecs(rule.AllowedAudioCodecs)
 	}
 	return &result
 }

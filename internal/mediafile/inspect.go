@@ -14,9 +14,12 @@ import (
 	"strings"
 )
 
-var ErrInvalid = errors.New("media cannot be inspected: use a valid PNG, JPEG, GIF, WebP, MP4/MOV/WebM, MP3, WAV, AAC, M4A, OGG or FLAC reference file")
+var ErrInvalid = errors.New("media cannot be inspected: use a valid PNG, JPEG, GIF, WebP, still HEIC/HEIF, MP4/MOV/WebM, MP3, WAV, AAC, M4A, OGG or FLAC reference file")
 
 type Info struct {
+	// AudioCodecs follows declared audio track order; an empty entry is unknown.
+	AudioCodecs []string
+
 	// FrameCount is the primary video sample count; zero means unavailable.
 	FrameCount int64
 	// Track counts are nil when container metadata cannot establish them.
@@ -36,7 +39,11 @@ func Inspect(data []byte, kind string) (Info, error) {
 	result := Info{ContentType: kind, Size: int64(len(data))}
 	switch {
 	case strings.HasPrefix(kind, "image/"):
-		if kind == "image/webp" {
+		if kind == "image/heic" {
+			if err := inspectHEIF(data, &result); err != nil {
+				return result, err
+			}
+		} else if kind == "image/webp" {
 			if len(data) < 30 || string(data[:4]) != "RIFF" || string(data[8:12]) != "WEBP" {
 				return result, ErrInvalid
 			}
@@ -92,6 +99,7 @@ func Inspect(data []byte, kind string) (Info, error) {
 		if err := mp4(data, &result); err != nil {
 			return result, err
 		}
+		mp4AudioCodecEvidence(data, &result)
 	case kind == "video/webm":
 		if err := webm(data, &result); err != nil {
 			return result, err
@@ -114,6 +122,7 @@ func Inspect(data []byte, kind string) (Info, error) {
 				}
 			}
 		}
+		mp4AudioCodecEvidence(data, &result)
 	case kind == "audio/ogg":
 		if err := ogg(data, &result); err != nil {
 			return result, err

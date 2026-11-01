@@ -261,6 +261,14 @@ func receiptResource(r *ProviderResource, nodes *int, budget *receiptBudget) boo
 		}
 	}
 	for _, s := range r.Sources {
+		if len(s.AudioCodecs) > 256 {
+			return false
+		}
+		for _, codec := range s.AudioCodecs {
+			if !receiptString(codec, 128, budget) {
+				return false
+			}
+		}
 		for _, field := range []struct {
 			value string
 			limit int

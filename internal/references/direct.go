@@ -72,7 +72,7 @@ func cleanName(name string) string {
 }
 func commonLimit(kind string) int64 {
 	switch kind {
-	case "image/png", "image/jpeg", "image/webp", "image/gif":
+	case "image/png", "image/jpeg", "image/webp", "image/gif", "image/heic", "image/heif":
 		return 30 << 20
 	case "video/mp4", "video/quicktime", "video/webm":
 		return 200 << 20
@@ -81,8 +81,12 @@ func commonLimit(kind string) int64 {
 	}
 	return 0
 }
-func checkUpload(input UploadInput) error {
+func checkUpload(input UploadInput) error { return checkUploadWithLimit(input, MaxBytes) }
+func checkUploadWithLimit(input UploadInput, videoLimit int64) error {
 	limit := commonLimit(input.ContentType)
+	if strings.HasPrefix(input.ContentType, "video/") && limit > 0 {
+		limit = videoLimit
+	}
 	if limit == 0 {
 		return referencevalidation.Invalid(cleanName(input.Name), "Declared format "+input.ContentType+" is unsupported. Use PNG/JPEG/WebP/GIF, MP4/MOV/WebM or MP3/WAV/AAC/M4A/OGG/FLAC.")
 	}
@@ -109,7 +113,11 @@ func (l *Library) BeginUpload(ctx context.Context, input UploadInput) (UploadPla
 }
 func (l *Library) BeginUploadWithValidation(ctx context.Context, input UploadInput, validate referencevalidation.Validator) (UploadPlan, error) {
 	input.ContentType = mediafile.CanonicalContentType(input.ContentType)
-	if err := checkUpload(input); err != nil {
+	limit, err := UploadLimit(ctx, input.Validation)
+	if err != nil {
+		return UploadPlan{}, err
+	}
+	if err := checkUploadWithLimit(input, limit); err != nil {
 		return UploadPlan{}, err
 	}
 	input.SHA256 = strings.ToLower(input.SHA256)
@@ -145,6 +153,9 @@ func (l *Library) BeginUploadWithValidation(ctx context.Context, input UploadInp
 			}
 			file, e := l.inspectItem(ctx, existing)
 			if e != nil {
+				return e
+			}
+			if e = checkUploadLimit(ctx, input.Validation, existing.Name, file.Info.ContentType, file.Info.Size); e != nil {
 				return e
 			}
 			if e = validateTarget(ctx, input.Validation, []referencevalidation.File{file}, validate); e != nil {
@@ -186,6 +197,9 @@ func (l *Library) FinishUploadWithValidation(ctx context.Context, id string, val
 		if s.Rejected != "" {
 			rejection = fmt.Errorf("%w: %s", referencevalidation.ErrInvalid, s.Rejected)
 			return nil
+		}
+		if e := checkUploadLimit(ctx, s.Validation, s.Item.Name, s.Item.ContentType, s.Item.SizeBytes); e != nil {
+			return e
 		}
 		if s.ResultID != "" {
 			var err error

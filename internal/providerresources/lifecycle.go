@@ -137,6 +137,29 @@ func (l *Lifecycle) apply(ctx context.Context, j Job, result core.ResourceJob) (
 	}
 	return l.refresh(persist, j.ID)
 }
+func lifecycleDeletionSnapshot(b Binding) core.ResourceSnapshot {
+	return core.ResourceSnapshot{Session: CloneSession(b.Session), BindingID: b.ID, ReferenceID: "resource", Kind: b.Kind, RemoteID: b.RemoteID, IsPreset: b.IsPreset, Subtype: b.Subtype, ConnectionIdentity: b.Revision, Sources: CloneSources(b.Sources)}
+}
+
+// Preflight is pure adapter validation under the exact persisted connection.
+// It runs before reservation only for ready/failed remote bindings; accepted
+// pending/completed deletions keep their original replay semantics.
+func (l *Lifecycle) deletionPreflight(ctx context.Context, b Binding) error {
+	scope, err := l.bindingScope(ctx, b)
+	if err != nil {
+		return err
+	}
+	pinned := core.WithProviderConnectionScope(core.WithProviderRevision(ctx, b.Revision), scope)
+	provider, err := l.directory.Provider(pinned, b.ProviderID)
+	if err != nil {
+		return err
+	}
+	if validator, ok := provider.(core.ResourceDeletionValidator); ok {
+		return validator.ValidateResourceDeletion(pinned, lifecycleDeletionSnapshot(b))
+	}
+	return nil
+}
+
 func (l *Lifecycle) Delete(ctx context.Context, bindingID, idem string) (Job, error) {
 	if l == nil || l.repo == nil || l.current == nil || l.directory == nil {
 		return Job{}, ErrInvalid
@@ -154,7 +177,7 @@ func (l *Lifecycle) Delete(ctx context.Context, bindingID, idem string) (Job, er
 	if b.IsPreset {
 		return Job{}, ErrConflict
 	}
-	if b.Kind != "element" && b.Kind != "voice" {
+	if b.Kind != "element" && b.Kind != "voice" && b.Kind != "file_resource" {
 		return Job{}, ErrInvalid
 	}
 	switch b.Status {
@@ -167,6 +190,11 @@ func (l *Lifecycle) Delete(ctx context.Context, bindingID, idem string) (Job, er
 	}
 	if len(idem) > 200 {
 		return Job{}, ErrInvalid
+	}
+	if b.Status == Succeeded || b.Status == Failed {
+		if err := l.deletionPreflight(ctx, b); err != nil {
+			return Job{}, err
+		}
 	}
 	// BeginDelete owns in-use checks and replay-before-state-check ordering under
 	// a row lock. An outstanding job cannot be replaced with another key.

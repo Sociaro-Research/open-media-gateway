@@ -93,11 +93,15 @@ func ReferenceModesFor(m MediaModel) []ReferenceMode {
 	return []ReferenceMode{base}
 }
 
-func referenceFits(p ReferenceMode, o MediaOptions) bool {
-	i, v, a := len(o.ImageURLs), len(o.Videos()), len(o.Audios())
+func referenceFits(p ReferenceMode, counts MediaInputCounts) bool {
+	i, v, a := counts.Images, counts.Videos, counts.Audios
 	return i >= p.MinImages && i <= p.MaxImages && v >= p.MinVideos && v <= p.MaxVideos && a >= p.MinAudios && a <= p.MaxAudios && (p.MaxVisuals == 0 || i+v <= p.MaxVisuals) && i+v >= p.MinVisuals && (!p.RequiresVisual || i+v > 0 || a == 0)
 }
 func ValidateReferenceMode(m MediaModel, o MediaOptions) error {
+	counts, err := CountMediaInputs(m, o)
+	if err != nil {
+		return err
+	}
 	modes := ReferenceModesFor(m)
 	if len(modes) == 0 {
 		if len(o.ReferenceVoices) > 0 || o.ReferenceMode != "" && o.ReferenceMode != "none" {
@@ -109,13 +113,13 @@ func ValidateReferenceMode(m MediaModel, o MediaOptions) error {
 		if o.ReferenceMode != "" && p.ID != o.ReferenceMode {
 			continue
 		}
-		if !referenceFits(p, o) {
+		if !referenceFits(p, counts) {
 			if o.ReferenceMode == "" {
 				continue
 			}
 			return fmt.Errorf("%w: references do not match %s", ErrOptionsInvalid, p.Label)
 		}
-		if len(o.Videos()) > 0 && p.MaxDurationWithVideo > 0 && o.Duration > p.MaxDurationWithVideo {
+		if counts.Videos > 0 && p.MaxDurationWithVideo > 0 && o.Duration > p.MaxDurationWithVideo {
 			return fmt.Errorf("%w: video references limit output to %d seconds", ErrOptionsInvalid, p.MaxDurationWithVideo)
 		}
 		if len(o.ReferenceVoices) > 0 {

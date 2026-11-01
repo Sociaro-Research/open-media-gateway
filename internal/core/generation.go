@@ -46,8 +46,17 @@ func GenerationView(task Task) Generation {
 	if task.ResultDeletedAt == nil {
 		if task.Status == TaskSucceeded {
 			v.Resources = append([]ResourceReference(nil), task.StoredResourceReferences...)
+			groups := map[string]string{}
 			for _, a := range task.StoredArtifacts {
-				v.Artifacts = append(v.Artifacts, GenerationArtifact{ID: a.ID, MediaType: a.MediaType, Format: a.Format, Duration: a.Duration, GroupID: a.GroupID, ContentURL: "/v1/generations/" + task.ID + "/artifacts/" + a.ID + "/content", ContentType: a.ContentType, SizeBytes: a.SizeBytes, SHA256: a.SHA256})
+				group := ""
+				if a.GroupID != "" {
+					group = groups[a.GroupID]
+					if group == "" {
+						group = "group-" + strconv.Itoa(len(groups)+1)
+						groups[a.GroupID] = group
+					}
+				}
+				v.Artifacts = append(v.Artifacts, GenerationArtifact{ID: a.ID, MediaType: a.MediaType, Format: a.Format, Duration: a.Duration, GroupID: group, ContentURL: "/v1/generations/" + task.ID + "/artifacts/" + a.ID + "/content", ContentType: a.ContentType, SizeBytes: a.SizeBytes, SHA256: a.SHA256})
 			}
 		}
 		if task.Status == TaskSucceeded && (task.ResultURL != nil || task.HasStoredResult || task.StorageKey != nil) {

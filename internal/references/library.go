@@ -22,7 +22,7 @@ import (
 
 const MaxBytes int64 = 200 << 20
 
-var ErrInvalidImage = errors.New("use PNG, JPEG, WebP or GIF (30 MB), MP4, MOV or WebM (200 MB), or MP3, WAV, AAC, M4A, OGG or FLAC (50 MB)")
+var ErrInvalidImage = errors.New("use PNG, JPEG, WebP, GIF or still HEIC/HEIF (30 MB), MP4, MOV or WebM (200 MB), or MP3, WAV, AAC, M4A, OGG or FLAC (50 MB)")
 var ErrDuplicate = errors.New("reference content already exists")
 var ErrInUse = errors.New("reference is retained by a template or is being prepared by a provider; remove retained usage before deleting the original")
 var ErrUploadBusy = errors.New("another reference upload is in progress; retry shortly")
@@ -105,12 +105,22 @@ func (l *Library) UploadWithValidation(ctx context.Context, name string, reader 
 	case <-ctx.Done():
 		return Image{}, ctx.Err()
 	}
-	data, err := io.ReadAll(io.LimitReader(reader, MaxBytes+1))
+	limit, err := UploadLimit(ctx, target)
 	if err != nil {
 		return Image{}, err
 	}
+	data, err := io.ReadAll(io.LimitReader(reader, limit+1))
+	if err != nil {
+		return Image{}, err
+	}
+	if int64(len(data)) > limit {
+		return Image{}, invalidMediaError{referencevalidation.Invalid(cleanName(name), "The file exceeds the authorized upload size limit.")}
+	}
 	file, err := InspectFile(name, data, "")
 	if err != nil {
+		return Image{}, err
+	}
+	if err = checkUploadLimit(ctx, target, name, file.Info.ContentType, file.Info.Size); err != nil {
 		return Image{}, err
 	}
 	if err = validateTarget(ctx, target, []referencevalidation.File{file}, validate); err != nil {
@@ -173,10 +183,14 @@ func (l *Library) findDuplicate(ctx context.Context, digest string, size int64) 
 			return Image{}, err
 		}
 		hash := sha256.New()
-		_, err = io.Copy(hash, io.LimitReader(object.Reader, MaxBytes+1))
+		copied, copyErr := io.Copy(hash, io.LimitReader(object.Reader, min(candidate.SizeBytes, HardMaxBytes)+1))
+		err = copyErr
 		object.Reader.Close()
 		if err != nil {
 			return Image{}, err
+		}
+		if candidate.SizeBytes <= 0 || candidate.SizeBytes > HardMaxBytes || copied != candidate.SizeBytes || object.SizeBytes != candidate.SizeBytes {
+			return Image{}, storage.ErrObjectNotFound
 		}
 		candidate.SHA256 = hex.EncodeToString(hash.Sum(nil))
 		if err = l.repo.SetHash(ctx, candidate.ID, candidate.SHA256); err != nil && !errors.Is(err, ErrDuplicate) {
@@ -228,10 +242,19 @@ func (l *Library) Delete(ctx context.Context, id string) error {
 
 // InspectMedia validates the bytes, independently of filename or supplied MIME.
 func InspectMedia(data []byte) (string, error) {
-	if len(data) == 0 || int64(len(data)) > MaxBytes {
+	if len(data) == 0 || int64(len(data)) > HardMaxBytes {
 		return "", ErrInvalidImage
 	}
 	kind := mediafile.CanonicalContentType(http.DetectContentType(data))
+	if len(data) >= 12 && string(data[4:8]) == "ftyp" {
+		switch string(data[8:12]) {
+		case "heic", "heix", "mif1":
+			if _, err := mediafile.Inspect(data, "image/heic"); err != nil {
+				return "image/heic", ErrInvalidImage
+			}
+			kind = "image/heic"
+		}
+	}
 	// ISO-base-media files commonly advertise isom/iso2 rather than an mp4
 	// major brand. Bound the ftyp box before accepting these standard brands.
 	if len(data) >= 16 && string(data[4:8]) == "ftyp" {
@@ -268,7 +291,7 @@ func InspectMedia(data []byte) (string, error) {
 		kind = "audio/aac"
 	}
 	switch kind {
-	case "image/png", "image/jpeg", "image/webp", "image/gif":
+	case "image/png", "image/jpeg", "image/webp", "image/gif", "image/heic":
 		if len(data) > 30<<20 {
 			return kind, ErrInvalidImage
 		}

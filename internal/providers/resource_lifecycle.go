@@ -90,3 +90,20 @@ func (a *connectionAdapter) DeleteResource(ctx context.Context, resource core.Re
 	job.Warning = a.redactText(job.Warning)
 	return job, a.redact(err)
 }
+
+func (p *managedProvider) ValidateResourceDeletion(ctx context.Context, resource core.ResourceSnapshot) error {
+	ctx, adapter, err := p.resourceAdapter(ctx, false)
+	if err != nil {
+		return err
+	}
+	if validator, ok := adapter.(core.ResourceDeletionValidator); ok {
+		return validator.ValidateResourceDeletion(ctx, resource)
+	}
+	return nil
+}
+func (a *connectionAdapter) ValidateResourceDeletion(ctx context.Context, resource core.ResourceSnapshot) error {
+	if validator, ok := a.MediaProvider.(core.ResourceDeletionValidator); ok {
+		return a.redact(validator.ValidateResourceDeletion(ctx, resource))
+	}
+	return nil
+}

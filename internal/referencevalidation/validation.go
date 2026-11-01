@@ -97,6 +97,11 @@ func interval(min, max float64, unit string) string {
 // individual bounds, even while other inputs have yet to be supplied.
 func ValidateFiles(model core.MediaModel, files []File, complete bool) error {
 	limits := model.ReferenceMediaLimits
+	for _, file := range files {
+		if file.Type == "video" && file.Info.Size > ReviewedVideoMaxBytes(model) {
+			return Invalid(file.Name, fmt.Sprintf("size %d bytes; %s accepts video at most %d bytes. Reduce the file size.", file.Info.Size, modelName(model), ReviewedVideoMaxBytes(model)))
+		}
+	}
 	if limits == nil || len(files) == 0 {
 		return nil
 	}
@@ -134,11 +139,18 @@ func ValidateFiles(model core.MediaModel, files []File, complete bool) error {
 			if !accepted {
 				return bad(fmt.Sprintf("format %s; %s accepts %s. Export in a supported format.", info.ContentType, modelName(model), strings.Join(rule.ContentTypes, ", ")))
 			}
-			if rule.MaxBytes > 0 && info.Size >= rule.MaxBytes {
-				return bad(fmt.Sprintf("size %d bytes; %s requires less than %d bytes. Reduce the file size.", info.Size, modelName(model), rule.MaxBytes))
+			if rule.MaxBytes > 0 && (info.Size > rule.MaxBytes || info.Size == rule.MaxBytes && !rule.MaxBytesInclusive) {
+				bound := "less than"
+				if rule.MaxBytesInclusive {
+					bound = "at most"
+				}
+				return bad(fmt.Sprintf("size %d bytes; %s requires %s %d bytes. Reduce the file size.", info.Size, modelName(model), bound, rule.MaxBytes))
 			}
 			if len(rule.Codecs) > 0 && !slices.Contains(rule.Codecs, info.Codec) {
 				return bad(fmt.Sprintf("codec %q; %s accepts %s. Re-export with a supported codec.", info.Codec, modelName(model), strings.Join(rule.Codecs, ", ")))
+			}
+			if !core.AudioCodecsAllowed(info.AudioStreams, info.AudioCodecs, rule.AllowedAudioCodecs) {
+				return bad(fmt.Sprintf("embedded audio codecs are unknown or unsupported; %s accepts %s. Re-export with supported audio or remove the audio track.", modelName(model), strings.Join(rule.AllowedAudioCodecs, ", ")))
 			}
 			if rule.NoAlpha && info.AlphaChannel {
 				return bad(modelName(model) + " does not accept transparency. Export an opaque image.")
