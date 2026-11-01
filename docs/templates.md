@@ -10,9 +10,8 @@ Select a template title in the gallery. Its details, missing typed references an
 generation action appear in the left panel beneath the Playground key control.
 Fixed image/video references fill one equal-width row below the description. Each keeps its natural aspect ratio; videos play muted, inline and continuously without opening a separate preview. Only
 the model and free reference slots are editable. Review the existing generation
-estimate after supplying the missing references. **Advanced editing** explicitly
-replaces the Playground draft with the published prompt, settings, selected model
-and current references. Empty positions and repeated references retain their
+estimate after supplying the missing references. **Advanced editing** directly replaces the Playground draft with the published prompt, settings, selected model
+and current references, without an intermediate confirmation. Empty positions and repeated references retain their
 order. Fill or remove empty references before generation. This action neither
 changes the template nor starts generation; returning retains the runner inputs
 until the key or current template content changes. Changes invalidate old inputs and pending estimates; review the refreshed template before continuing. The gallery stays visible while

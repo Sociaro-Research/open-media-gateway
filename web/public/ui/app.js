@@ -1293,15 +1293,10 @@ async function openTemplateInPlayground(source, signal) {
   const key=GenerationKey.value();
   const response=await api('/v1/providers',{signal,expectedKey:key});signal.throwIfAborted();
   if(!response.data?.some(p=>p.id===source.provider&&p.models.some(m=>m.id===source.model)))throw Error('This model is no longer available. Choose another model.');
-  return new Promise(resolve=>{
-    const modal=document.createElement('dialog'),text=document.createElement('p'),actions=document.createElement('div'),apply=document.createElement('button');
-    const close=()=>{signal.removeEventListener('abort',close);modal.close();modal.remove();resolve();};
-    FormUI.dialogHeading(modal,'Advanced editing',close);
-    text.textContent='Open these template values in Playground? This replaces the current Playground draft. The template stays unchanged.';
-    actions.className='dialog-actions';apply.type='button';apply.className='primary';apply.textContent='Open in Playground';
-    apply.onclick=()=>{if(signal.aborted||GenerationKey.value()!==key){close();return;}providerCatalog=response.data;close();showConsoleSection('generation');reuseTask(source,{sparse:true});};
-    actions.append(apply);modal.append(text,actions);modal.addEventListener('cancel',e=>{e.preventDefault();close();});signal.addEventListener('abort',close,{once:true});document.body.append(modal);modal.showModal();
-  });
+  if(GenerationKey.value()!==key)return;
+  providerCatalog=response.data;
+  showConsoleSection('generation');
+  reuseTask(source,{sparse:true});
 }
 function closeConfirmation() {
   if (submitting) return;
