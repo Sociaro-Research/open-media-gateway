@@ -9,6 +9,10 @@ import (
 )
 
 func (s *Server) estimateGeneration(w http.ResponseWriter, r *http.Request, input core.CreateMediaInput) {
+	if err := s.validateGenerationReferences(r, input); err != nil {
+		s.referenceError(w, err)
+		return
+	}
 	estimator, ok := s.service.(interface {
 		Estimate(context.Context, core.CreateMediaInput) (core.CostEstimate, error)
 	})
@@ -18,6 +22,8 @@ func (s *Server) estimateGeneration(w http.ResponseWriter, r *http.Request, inpu
 	}
 	quote, err := estimator.Estimate(r.Context(), input)
 	switch {
+	case errors.Is(err, core.ErrProjectInvalid):
+		invalidParameter(w, "project_id", err.Error())
 	case errors.Is(err, core.ErrCostLimitInvalid):
 		invalidParameter(w, "max_expected_cost_usd", err.Error())
 	case errors.Is(err, core.ErrPricingUnavailable):

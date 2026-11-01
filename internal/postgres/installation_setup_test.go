@@ -99,6 +99,10 @@ func TestInstallationOwnerSetup(t *testing.T) {
 	if !methods()["setup_required"] {
 		t.Fatal("failure consumed code")
 	}
+	var profilePending bool
+	if err = db.QueryRow(`SELECT setup_pending FROM system_settings`).Scan(&profilePending); err != nil || profilePending {
+		t.Fatal("failed owner setup opened profile guide", err)
+	}
 	if _, err = db.Exec(`DROP TRIGGER reject_setup_session ON user_sessions; DROP FUNCTION reject_setup_session()`); err != nil {
 		t.Fatal(err)
 	}
@@ -126,6 +130,9 @@ func TestInstallationOwnerSetup(t *testing.T) {
 	if success == nil || rejected != 1 {
 		t.Fatal("concurrent setup did not serialize")
 	}
+	if err = db.QueryRow(`SELECT setup_pending FROM system_settings`).Scan(&profilePending); err != nil || !profilePending {
+		t.Fatal("new owner has no setup guide", err)
+	}
 	var cookie *http.Cookie
 	for _, c := range success.Result().Cookies() {
 		if c.Name == "media_gateway_session" {
@@ -152,7 +159,7 @@ func TestInstallationOwnerSetup(t *testing.T) {
 		t.Fatal("closed code readable", err)
 	}
 	expect(call("/auth/setup", body, false), 409)
-	if state := methods(); state["setup_required"] || !state["email"] || state["email_delivery"] {
+	if state := methods(); state["setup_required"] || state["email"] || state["email_delivery"] || !state["email_confirmation"] {
 		t.Fatal(state)
 	}
 	expect(call("/auth/email/login", map[string]string{"email": body["email"], "password": body["password"]}, false), 200)

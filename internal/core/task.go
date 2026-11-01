@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/Sociaro-Research/open-media-gateway/internal/money"
+	"strings"
 	"time"
 )
 
@@ -23,6 +24,11 @@ var (
 )
 
 type Task struct {
+	// Checked only for NEW admissions after idempotency resolution. Never stored.
+	AdmissionError         error           `json:"-"`
+	TemplateSnapshot       json.RawMessage `json:"template_snapshot,omitempty"`
+	ProjectVersion         int64           `json:"project_version,omitempty"`
+	ProjectID              string          `json:"project_id,omitempty"`
 	IdentitySnapshot       json.RawMessage `json:"-"`
 	MinimizeRequestLogging bool            `json:"-"`
 	HadImageInput          bool            `json:"-"`
@@ -110,14 +116,17 @@ type MediaOptions struct {
 }
 
 type CreateMediaInput struct {
-	PublicModel    string       `json:"-"`
-	MaxExpectedUSD *money.USD   `json:"max_expected_cost_usd,omitempty"`
-	Prompt         string       `json:"prompt"`
-	Provider       string       `json:"provider,omitempty"`
-	Model          string       `json:"model"`
-	MediaType      string       `json:"media_type,omitempty"`
-	WebhookURL     string       `json:"webhook_url,omitempty"`
-	Options        MediaOptions `json:"options"`
+	AdmissionError   error           `json:"-"`
+	TemplateSnapshot json.RawMessage `json:"-"`
+	ProjectID        string          `json:"project_id,omitempty"`
+	PublicModel      string          `json:"-"`
+	MaxExpectedUSD   *money.USD      `json:"max_expected_cost_usd,omitempty"`
+	Prompt           string          `json:"prompt"`
+	Provider         string          `json:"provider,omitempty"`
+	Model            string          `json:"model"`
+	MediaType        string          `json:"media_type,omitempty"`
+	WebhookURL       string          `json:"webhook_url,omitempty"`
+	Options          MediaOptions    `json:"options"`
 }
 
 type ServiceInfo struct {
@@ -138,9 +147,44 @@ type ProviderDescriptor struct {
 	Models                []MediaModel `json:"models"`
 }
 
+// ReferencePromptRecommendation is informational API evidence, never admission
+// grammar or permission to rewrite a prompt. Omission means no reviewed advice.
+type ReferencePromptRecommendation struct {
+	Text      string   `json:"text"`
+	Kind      string   `json:"kind"`
+	SourceURL string   `json:"source_url"`
+	Modes     []string `json:"modes,omitempty"`
+}
+
+// AcceptsObservation restricts parsed advice to the reviewed endpoint/workflows.
+// It does not grant capabilities or alter mandatory operational completeness.
+func (r *ReferencePromptRecommendation) AcceptsObservation(p ReferencePromptRecommendation) bool {
+	if r == nil || p.SourceURL != r.SourceURL || p.Kind != "example" || strings.TrimSpace(p.Text) == "" || len(p.Text) > 2048 || len(p.Modes) != len(r.Modes) {
+		return false
+	}
+	for i, mode := range r.Modes {
+		if p.Modes[i] != mode {
+			return false
+		}
+	}
+	return true
+}
+
+func (r *ReferencePromptRecommendation) Clone() *ReferencePromptRecommendation {
+	if r == nil {
+		return nil
+	}
+	copy := *r
+	copy.Modes = append([]string(nil), r.Modes...)
+	return &copy
+}
+
 type MediaModel struct {
-	ReferencePromptSyntax   string `json:"reference_prompt_syntax,omitempty"`
-	SupportsAssetReferences bool   `json:"supports_asset_references,omitempty"`
+	ReferencePromptRecommendation *ReferencePromptRecommendation `json:"reference_prompt_recommendation,omitempty"`
+	ReferenceMediaLimits          *ReferenceMediaLimits          `json:"reference_media_limits,omitempty"`
+	ReferencePromptTypes          []string                       `json:"reference_prompt_types,omitempty"`
+	ReferencePromptSyntax         string                         `json:"reference_prompt_syntax,omitempty"`
+	SupportsAssetReferences       bool                           `json:"supports_asset_references,omitempty"`
 
 	NoPrompt               bool              `json:"no_prompt,omitempty"`
 	PromptOptional         bool              `json:"prompt_optional,omitempty"`
@@ -203,6 +247,8 @@ type MediaModelPricing struct {
 }
 
 type TaskRepository interface {
+	// Resolve matching/conflicting idempotent requests first. Before inserting
+	// any NEW task, reject task.AdmissionError without charging or enqueueing.
 	CreateOrGet(context.Context, Task, string, string) (Task, bool, error)
 	Get(context.Context, string) (Task, error)
 	ListRecent(context.Context, int) ([]Task, error)

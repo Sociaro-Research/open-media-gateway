@@ -1,3 +1,4 @@
+const {useFixtureKey}=require('./fixture-key.cjs');
 const {evidencePath} = require('./evidence.cjs');
 // Reference picker smoke tests. Uses only mocked providers and temporary images.
 const {chromium,webkit} = require('playwright');
@@ -10,7 +11,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const assert = require('node:assert/strict');
-const ui = path.resolve(__dirname, '../../web/public/ui');
+const ui = process.env.UI_SOURCE_DIR || path.resolve(__dirname, '../../web/public/ui');
 // Independent PNG fixture; reference tests must not depend on site branding.
 const image = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=', 'base64');
 const output = process.env.UI_SCREENSHOT_DIR || evidencePath('/tmp/media-gateway-references-ui');
@@ -34,7 +35,8 @@ const server = http.createServer((req, res) => {
     {id:'image',display_name:'Image with references',media_type:'image',resolutions:['1024*1024'],supports_image_input:true,max_image_inputs:1,requires_image_input:true,pricing:{known:true,reference_price_usd:0}}];
   models.push({id:'assets',display_name:'Seedance registered assets',media_type:'video',resolutions:['720p'],ratios:['16:9'],min_duration:4,max_duration:15,default_duration:5,supports_image_input:true,max_image_inputs:9,supports_video_input:true,supports_audio_input:true,supports_asset_references:true,pricing:{known:true,reference_price_usd:0},reference_modes:[{id:'references',label:'References',min_images:0,max_images:9,min_videos:0,max_videos:3,min_audios:0,max_audios:3},{id:'first_last_frames',label:'First and last frames',min_images:2,max_images:2,min_videos:0,max_videos:0,min_audios:0,max_audios:0,image_roles:['First frame','Last frame']}]});
   const provider={id:'mock',name:'Mock',live:false,credentials_configured:true,default_model:'video',models};
-  let library=[],counter=0,uploadCount=0,posts=[],failDelete=false,failUpload=false,delayUpload=0,direct=false,directPuts=0,completions=0,preparations=0,blockDirect=false,headerSigned=false;
+  let sharedHold=null,releaseShared=null,sharedReadStarted=false;
+  let library=[],counter=0,uploadCount=0,posts=[],failDelete=false,failUpload=false,uploadHold=null,releaseUpload=null,uploadWaiting=false,direct=false,directPuts=0,completions=0,preparations=0,blockDirect=false,headerSigned=false;
   const tlsDir=fs.mkdtempSync(path.join(os.tmpdir(),'gateway-direct-ui-'));
   execFileSync('openssl',['req','-x509','-newkey','rsa:2048','-nodes','-keyout',path.join(tlsDir,'key.pem'),'-out',path.join(tlsDir,'cert.pem'),'-days','1','-subj','/CN=localhost'],{stdio:'ignore'});
   const storageServer=https.createServer({key:fs.readFileSync(path.join(tlsDir,'key.pem')),cert:fs.readFileSync(path.join(tlsDir,'cert.pem'))},(req,res)=>{
@@ -71,10 +73,11 @@ const server = http.createServer((req, res) => {
       const item={id:String(++counter),name:'Direct.png',url:`/references/test/${counter}?signature=test`,size_bytes:image.length,content_type:'image/png'};
       library.unshift(item);return json(item);
     }
+    if(url.pathname==='/v1/system/template-references'){sharedReadStarted=true;if(sharedHold)await sharedHold;try{return await json({data:[{id:'shared-image',name:'Shared image.png',url:'/references/shared/shared-image?signature=fixture',content_type:'image/png',size_bytes:image.length}],has_more:false,next_offset:1});}catch{return;}}
     if(url.pathname==='/v1/references' && request.method()==='POST'){
       uploadCount++;assert.match(request.headers()['content-type'],/^multipart\/form-data; boundary=/);
       assert.ok(request.postDataBuffer().includes(Buffer.from('name="file"')));
-      if(delayUpload)await new Promise(resolve=>setTimeout(resolve,delayUpload));
+      if(uploadHold){uploadWaiting=true;await uploadHold;}
       if(failUpload)return route.fulfill({status:503,json:{error:{message:'Storage unavailable'}}});
       const item={id:String(++counter),name:`Image ${counter}.png`,url:`/references/test/${counter}?signature=test`,size_bytes:image.length,content_type:'image/png'};
       library.unshift(item);return json(item);
@@ -89,6 +92,8 @@ const server = http.createServer((req, res) => {
     }
     return json({});
   });
+  async function chooseSharedSource(dialog,value){const control=dialog.getByLabel('Library',{exact:true});if(await control.evaluate(n=>n.tagName)==='SELECT')await control.selectOption(value);else{await control.click();await page.getByRole('option',{name:value==='shared'?'Template references':'My references',exact:true}).click();}}
+  async function chooseProviderSource(dialog,value){const control=dialog.getByRole('combobox',{name:'image reference source',exact:true});if(await control.evaluate(n=>n.tagName)==='SELECT')await control.selectOption(value);else{await control.click();await page.getByRole('option',{name:value==='provider'?'BytePlus':'My storage',exact:true}).click();}}
   const waitMessage=text=>page.waitForFunction(text=>document.querySelector('#referenceStatus').textContent.includes(text),text);
   async function drop(selector,name='dropped.png'){
     const transfer=await page.evaluateHandle(({bytes,name})=>{const d=new DataTransfer();d.items.add(new File([new Uint8Array(bytes)],name,{type:'image/png'}));return d;},{bytes:[...image],name});
@@ -96,10 +101,10 @@ const server = http.createServer((req, res) => {
   }
   try {
     await page.goto(`http://127.0.0.1:${server.address().port}`);
-    await page.locator('#createGenerationKey').click();
+    await useFixtureKey(page,'fixture-key');
     await page.waitForFunction(()=>selectedModel()?.id==='video');
     await page.locator('#chooseReferences').click();await waitMessage('empty');
-    await page.getByRole('button',{name:'Done',exact:true}).click();
+    await page.getByRole('button',{name:'Close library',exact:true}).click();
     await drop('#referenceDropzone');await waitMessage('1 file saved');
     assert.equal(await page.locator('#selectedReferences .reference-card').count(),1);
     const first=await page.locator('#imageURLs').inputValue();assert.match(first,/^http:\/\/127\.0\.0\.1:\d+\/references\//);
@@ -125,7 +130,7 @@ const server = http.createServer((req, res) => {
     await page.getByRole('button',{name:'Confirm delete Image 1.png',exact:true}).click();await waitMessage('File deleted');
     assert.ok(!(await page.locator('#imageURLs').inputValue()).includes(first));
     await page.getByRole('button',{name:'Use Image 2.png in generation',exact:true}).click();
-    await page.getByRole('button',{name:'Done',exact:true}).click();
+    await page.getByRole('button',{name:'Close library',exact:true}).click();
     await page.locator('#prompt').fill('A short free test generation');
     await page.locator('#submitButton').click();await page.locator('#confirmDialog').waitFor({state:'visible'});
     const summary=await page.locator('#confirmFields').innerText();assert.ok(summary.includes('Image 3.png'));assert.ok(!summary.includes('signature='));
@@ -139,7 +144,7 @@ const server = http.createServer((req, res) => {
     const uploadsBefore=uploadCount;
     await page.locator('#referenceFiles').setInputFiles({name:'bad.svg',mimeType:'image/svg+xml',buffer:Buffer.from('<svg/>')});await waitMessage('supported image');assert.equal(uploadCount,uploadsBefore);
     failUpload=true;await drop('#referenceDropzone');await waitMessage('Storage unavailable');assert.equal(await page.locator('#selectedReferences .reference-card').count(),0);failUpload=false;
-    delayUpload=600;await drop('#referenceDropzone');await page.locator('#submitButton').click();await waitMessage('Wait for');await waitMessage('1 file saved');delayUpload=0;
+    uploadWaiting=false;uploadHold=new Promise(resolve=>releaseUpload=resolve);await drop('#referenceDropzone');for(let wait=0;!uploadWaiting&&wait<200;wait++)await page.waitForTimeout(10);assert.equal(uploadWaiting,true);await page.locator('#submitButton').click();await waitMessage('Wait for');releaseUpload();uploadHold=null;await waitMessage('1 file saved');
     await page.setViewportSize({width:390,height:844});
     await page.locator('#chooseReferences').click();await page.waitForFunction(()=>!document.querySelector('#referenceStatus').textContent.includes('Loading'));
     await page.screenshot({path:path.join(output,'library-mobile.png')});
@@ -186,10 +191,14 @@ const server = http.createServer((req, res) => {
     await page.locator('#prompt').fill('Use the registered character with the scene, video and audio references.');
     for(const width of [1440,390,320]){
       await page.setViewportSize({width,height:1000});
-      assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`asset picker overflows at ${width}px`);
+      await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+      assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`asset picker overflows at ${width}px: `+JSON.stringify(await page.evaluate(()=>[...document.querySelectorAll('body *')].filter(n=>n.getBoundingClientRect().right>innerWidth).map(n=>({tag:n.tagName,id:n.id,cls:n.className,right:n.getBoundingClientRect().right,width:n.getBoundingClientRect().width})).slice(0,12))));
       await page.locator('#imageURLsField').scrollIntoViewIfNeeded();
       await page.screenshot({path:path.join(output,`registered-assets-${width}.png`)});
     }
+    // Settle the textarea-to-button focus handoff after the viewport sweep.
+    // WebKit can scroll on focus between pointerdown and pointerup otherwise.
+    await page.locator('#submitButton').focus();
     await page.locator('#submitButton').click();await page.locator('#confirmDialog').waitFor({state:'visible'});
     assert.match(await page.locator('#confirmFields').innerText(),/asset:\/\/asset-example-character/);
     await page.locator('#confirmSubmit').click();await page.waitForFunction(()=>!document.querySelector('#confirmDialog').open);
@@ -198,13 +207,28 @@ const server = http.createServer((req, res) => {
     assert.deepEqual(posts[1].options.video_urls,[assetVideo]);assert.deepEqual(posts[1].options.audio_urls,[assetAudio]);
     assert.equal(posts[1].options.reference_mode,'references');
     await page.locator('#referenceMode').selectOption('first_last_frames');
-    assert.match(await page.locator('#selectedReferences .reference-card').first().innerText(),/First frame/);
-    assert.match(await page.locator('#selectedReferences .reference-card').nth(1).innerText(),/Last frame/);
+    // Common UI grammar labels the ordered inputs; roles stay in the selected mode contract.
+    assert.match(await page.locator('#selectedReferences .reference-card').first().innerText(),/@Image1/);
+    assert.match(await page.locator('#selectedReferences .reference-card').nth(1).innerText(),/@Image2/);assert.deepEqual(await page.evaluate(()=>selectedModel().reference_modes.find(m=>m.id===document.querySelector('#referenceMode').value).image_roles),['First frame','Last frame']);
     await page.locator('#model').selectOption(JSON.stringify(['mock','image']));
     assert.equal(await page.locator('#imageURLsField [data-asset-hint]').isVisible(),false);
     assert.equal(await page.locator('#imageURLsField summary').innerText(),'Use image URLs');
+    await page.locator('#model').selectOption(JSON.stringify(['mock','assets']));
+    await page.locator('#chooseReferences').click();const sharedDialog=page.locator('#referenceLibrary');await sharedDialog.locator('.reference-card').first().waitFor();
+    await chooseSharedSource(sharedDialog,'shared');await sharedDialog.getByRole('button',{name:'Use Shared image.png in generation',exact:true}).waitFor();
+    assert.equal(await sharedDialog.getByRole('button',{name:/^(Delete|Register)/}).count(),0);assert.equal(await sharedDialog.locator('[data-upload]').isVisible(),false);
+    await sharedDialog.getByRole('button',{name:'Close library',exact:true}).click();const beforePrivateUpload=preparations;
+    await page.evaluate(()=>document.querySelector('#referenceStatus').textContent='');await page.locator('#referenceFiles').setInputFiles({name:'private-after-shared.png',mimeType:'image/png',buffer:image});await waitMessage('1 file saved');assert.equal(preparations,beforePrivateUpload+1);
+    await page.locator('#chooseReferences').click();await sharedDialog.getByRole('button',{name:'Use Shared image.png in generation',exact:true}).waitFor();await chooseSharedSource(sharedDialog,'private');await sharedDialog.getByRole('button',{name:/^Use /}).first().waitFor();
+    sharedHold=new Promise(resolve=>{releaseShared=resolve;});sharedReadStarted=false;await chooseSharedSource(sharedDialog,'shared');for(let wait=0;!sharedReadStarted&&wait<100;wait++)await page.waitForTimeout(10);assert.equal(sharedReadStarted,true);
+    await chooseProviderSource(sharedDialog,'provider');await chooseProviderSource(sharedDialog,'local');releaseShared();sharedHold=null;
+    await sharedDialog.getByRole('button',{name:/^Use /}).first().waitFor();assert.equal(await sharedDialog.getByRole('button',{name:'Use Shared image.png in generation',exact:true}).count(),0);await sharedDialog.getByRole('button',{name:'Close library',exact:true}).click();
+    console.log('Shared library passed: read-only selection, no private provider-registration action, ordinary upload after closing shared library and delayed shared→BytePlus→private source isolation.');
     assert.deepEqual(errors,[]);
     console.log('Registered assets passed: mixed image/video/audio references, unchanged request URIs, keyboard reorder, frame roles, capability hints and 1440/390/320px layout.');
     console.log('Reference UI passed: direct S3 PUT without gateway credentials, no proxy fallback, chunked hashing, workspace cancellation, CSP, upload, drop, replace, reorder, library, pagination, limits, deletion, failures, generation, persistence and mobile.');
-  } finally {await browser.close();server.close();storageServer.close();fs.rmSync(tlsDir,{recursive:true,force:true});}
+  } catch(error) {
+    console.error('Reference fixture state:',await page.evaluate(()=>({model:document.querySelector('#model').value,mode:document.querySelector('#referenceMode').value,invalid:[...document.querySelectorAll('#taskForm :invalid')].map(e=>({id:e.id,message:e.validationMessage})),messages:[...document.querySelectorAll('#formMessage,#referenceStatus,#videoReferenceStatus,#audioReferenceStatus')].map(e=>e.textContent),errors:document.querySelector('#promptReferenceError')?.textContent})));
+    await page.screenshot({path:path.join(output,'failure-'+(process.env.UI_BROWSER_ENGINE||'chromium')+'.png'),fullPage:true});throw error;
+  } finally {releaseUpload?.();await browser.close();server.close();storageServer.close();fs.rmSync(tlsDir,{recursive:true,force:true});}
 })().catch(error=>{console.error(error);process.exitCode=1;server.close();});

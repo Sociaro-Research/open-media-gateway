@@ -6,7 +6,7 @@ const root=path.resolve(__dirname,'../../web/public/ui');
 const keys=['bg','panel','panel-2','field','popup','line','switch-off','text','muted','accent','accent-dark','highlight','on-accent','on-highlight','blue','red','success','yellow','on-warning','chart-2','chart-3','chart-4','chart-5','chart-6'];
 const dark=['#0a0a0a', '#141414', '#1c1c1c', '#101010', '#1c1c1c', '#303030', '#404040', '#f5f5f5', '#a3a3a3', '#e5e5e5', '#262626', '#ffffff', '#171717', '#171717', '#6ca8ff', '#f08088', '#79d6a0', '#f3c45b', '#171717', '#24a5bf', '#9767dc', '#db9950', '#4aa881', '#d86e9a'];
 const light=['#fafafa', '#ffffff', '#f0f0f0', '#ffffff', '#ffffff', '#d4d4d4', '#737373', '#171717', '#525252', '#262626', '#f0f0f0', '#444444', '#ffffff', '#ffffff', '#235dba', '#b42336', '#147844', '#916000', '#ffffff', '#24a5bf', '#9767dc', '#db9950', '#4aa881', '#d86e9a'];
-const defaults={name:'',description:'',contact_email:'',dark:Object.fromEntries(keys.map((k,i)=>[k,dark[i]])),light:Object.fromEntries(keys.map((k,i)=>[k,light[i]])),assets:{},site_max_width:1280,content_max_width:null,sidebar_subsections:false,version:1};
+const defaults={name:'',description:'',contact_email:'',dark:Object.fromEntries(keys.map((k,i)=>[k,dark[i]])),light:Object.fromEntries(keys.map((k,i)=>[k,light[i]])),assets:{},site_max_width:1280,content_max_width:null,sidebar_subsections:true,version:1};
 let settings=structuredClone(defaults),fail=false,puts=0,admin=true;
 const server=http.createServer(async(req,res)=>{
  const p=new URL(req.url,'http://localhost').pathname,json=(data,code=200)=>{res.writeHead(code,{'Content-Type':'application/json'});res.end(JSON.stringify(data));};
@@ -36,6 +36,8 @@ const server=http.createServer(async(req,res)=>{
  try{
   await page.goto(base+'/system');await page.getByRole('tab',{name:'Appearance',exact:true}).click();const form=page.locator('.branding-settings'),colors=page.locator('.branding-color-settings'),saveColors=async()=>{await colors.getByRole('button',{name:'Save',exact:true}).click();await colors.getByRole('button',{name:'Saved',exact:true}).waitFor();};await form.getByLabel('Site name',{exact:true}).waitFor();
   assert.equal(await form.getByRole('button',{name:'Save',exact:true}).isVisible(),false);
+  assert.equal(await form.getByRole('switch',{name:'Show subsections in the left menu'}).isChecked(),true,'new installations must enable sidebar subsections');
+  assert.equal(await page.locator('.system-settings-tabs').getAttribute('aria-orientation'),'vertical');
   assert.equal(await page.title(),'Media gateway');
   assert.equal(await page.locator('.brand img[src]').count(),0);
   assert.equal(await page.locator('link[rel=icon],link[rel=apple-touch-icon]').count(),0);
@@ -104,7 +106,7 @@ const server=http.createServer(async(req,res)=>{
   assert.equal(await siteWidth.inputValue(),'1280');assert.equal(await contentWidth.inputValue(),'');
   const saveLayout=async()=>{await form.getByRole('button',{name:'Save',exact:true}).click();await form.getByRole('button',{name:'Saved',exact:true}).waitFor();};
   const tabIDs=locator=>locator.evaluateAll(tabs=>tabs.map(tab=>tab.id));
-  const settingsTabs=await tabIDs(page.locator('#systemContent .system-settings-tabs [role=tab]'));
+  const settingsTabs=await tabIDs(page.locator('.system-settings-tabs [role=tab]'));
   assert.ok(settingsTabs.includes('settings-tab-system')&&settingsTabs.includes('settings-tab-appearance'),'settings tabs are missing');
   assert.equal(new Set(settingsTabs).size,settingsTabs.length,'duplicate settings tabs');
   await siteWidth.fill('959');const invalidPuts=puts;await form.getByRole('button',{name:'Save',exact:true}).click();assert.equal(puts,invalidPuts);await siteWidth.fill('1600');await contentWidth.fill('1000');await tree.check();await saveLayout();
@@ -136,6 +138,7 @@ const server=http.createServer(async(req,res)=>{
   await contentWidth.fill('1280');await tree.uncheck();await saveLayout();g=await geometry();assert.ok(Math.abs(g.menu.x-20)<1,'horizontal-tab menu lost safe margin');assert.ok(Math.abs(g.content.width-1280)<1);assert.ok(Math.abs(g.content.x+g.content.width/2-960)<1,'safe gutters shifted centered content');assert.equal(await page.locator('#systemContent [role=tablist]').getAttribute('aria-orientation'),'horizontal');await page.evaluate(()=>GatewayTheme.apply('light'));await page.screenshot({path:evidencePath('/tmp/gateway-branding-ui/layout-safe-margins.png')});
   await siteWidth.fill('960');await contentWidth.fill('');await tree.uncheck();await saveLayout();g=await geometry();assert.ok(Math.abs(g.shell.width-960)<1);assert.equal(await page.locator('#systemContent [role=tablist]').getAttribute('aria-orientation'),'horizontal');assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
   await siteWidth.fill('1280');await saveLayout();assert.equal(settings.site_max_width,1280);assert.equal(settings.content_max_width,null);assert.equal(settings.sidebar_subsections,false);
+  await page.reload();await page.getByRole('tab',{name:'Appearance',exact:true}).click();await siteWidth.waitFor();assert.equal(await tree.isChecked(),false,'saved disabled choice must survive reload');assert.equal(await page.locator('.system-settings-tabs').getAttribute('aria-orientation'),'horizontal');
   await page.locator('[data-system-page=administrators]').click();await page.getByRole('heading',{name:'Users',exact:true}).waitFor();await page.mouse.move(0,0);
   const single=await navStyle(page.locator('[data-system-page=administrators]'));assert.equal(single.color,colorRGB(single.accent));assert.ok(single.shadow.includes('inset'),'sections without subsections lost their side marker');assert.notEqual(single.background,'rgba(0, 0, 0, 0)');
   admin=false;await page.reload();await page.waitForFunction(()=>document.querySelector('#systemNav').hidden);assert.equal(await form.count(),0);assert.deepEqual(errors,[]);console.log('PASS: appearance draft, save/reload, validation, upload, conflict/retry, image removal, themes, public pages, keyboard, 1440/390/320px layout widths, sidebar navigation and non-admin UI.');

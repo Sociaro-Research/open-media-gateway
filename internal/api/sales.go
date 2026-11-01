@@ -24,7 +24,7 @@ func (s *Server) salesStructure(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var result system.SalesStructure
-	if r.Method == http.MethodGet {
+	if readMethod(r.Method) {
 		result, err = repo.SalesStructure(r.Context(), identity.ActorID(r.Context()))
 	} else {
 		id := r.PathValue("employee")

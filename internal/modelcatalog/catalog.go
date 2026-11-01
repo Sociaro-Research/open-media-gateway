@@ -58,6 +58,11 @@ func IsInactive(provider, id string, now time.Time) bool {
 // Enrich returns independent slices: no account metadata is ever written into
 // the shared catalogue or another account's cached model descriptor.
 func Enrich(provider string, model core.MediaModel) core.MediaModel {
+	if model.ReferencePromptRecommendation == nil {
+		model.ReferencePromptRecommendation = ReferenceRecommendation(provider, model.ID)
+	} else {
+		model.ReferencePromptRecommendation = model.ReferencePromptRecommendation.Clone()
+	}
 	metadata, ok := catalog[provider][model.ID]
 	if !ok && model.Metadata == nil {
 		return model

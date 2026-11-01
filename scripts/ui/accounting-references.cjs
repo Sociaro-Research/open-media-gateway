@@ -1,3 +1,4 @@
+const {useFixtureKey}=require('./fixture-key.cjs');
 const {evidencePath} = require('./evidence.cjs');
 // Exercise account reports and model-specific media selection without paid calls.
 const {chromium}=require('playwright');
@@ -32,17 +33,17 @@ const server=http.createServer((req,res)=>{const file=path.join(root,req.url==='
   return json({data:[]});
  });
  try{
- await page.goto(`http://127.0.0.1:${server.address().port}`);await page.waitForFunction(()=>consoleInitialized&&window.Workspace?.ready());await page.locator('#createGenerationKey').click();await page.waitForFunction(()=>document.querySelector('#model').value.includes('seedance'));
- await page.locator('#generationKeyBudget').getByText('Test organization · Shared providers · Organization storage',{exact:true}).waitFor();
+ await page.goto(`http://127.0.0.1:${server.address().port}`);await page.waitForFunction(()=>consoleInitialized&&window.Workspace?.ready());await useFixtureKey(page,'fixture-key');await page.waitForFunction(()=>document.querySelector('#model').value.includes('seedance'));
+ await page.locator('#generationKeyBudget').getByText('Test organization · Shared providers and storage',{exact:true}).waitFor();
  assert.equal(await page.locator('#generationKeyBudget').getByText('Organization allowance unavailable.',{exact:true}).count(),0);
  await page.locator('#chooseReferences').click();await page.getByRole('button',{name:'Use first.png in generation'}).click();await page.getByRole('button',{name:'Use last.png in generation'}).click();
  assert.match(await page.locator('#referenceLibrary .reference-card').first().innerText(),/32 KB/);
- await page.getByRole('button',{name:'Done',exact:true}).click();assert.match(await page.locator('#selectedReferences').innerText(),/First frame/);assert.match(await page.locator('#selectedReferences').innerText(),/Last frame/);
+ await page.getByRole('button',{name:'Close library',exact:true}).click();assert.match(await page.locator('#selectedReferences').innerText(),/First frame/);assert.match(await page.locator('#selectedReferences').innerText(),/Last frame/);
  assert.equal(await page.locator('#videoURLField').isVisible(),false);
  await page.locator('#referenceMode').selectOption('references');await page.locator('#videoChooseReferences').click();
  await page.locator('#videoReferenceLibrary .reference-card').waitFor();assert.equal(await page.locator('#videoReferenceLibrary .reference-card').count(),1);assert.match(await page.locator('#videoReferenceLibrary .reference-card').innerText(),/1.5 MB/);
- await page.getByRole('button',{name:'Use motion.mp4 in generation'}).click();await page.locator('#videoReferenceLibrary').getByRole('button',{name:'Done',exact:true}).click();
- await page.locator('#audioChooseReferences').click();await page.locator('#audioReferenceLibrary .reference-card').waitFor();assert.equal(await page.locator('#audioReferenceLibrary .reference-card').count(),1);await page.getByRole('button',{name:'Use voice.mp3 in generation'}).click();await page.locator('#audioReferenceLibrary').getByRole('button',{name:'Done',exact:true}).click();
+ await page.getByRole('button',{name:'Use motion.mp4 in generation'}).click();await page.locator('#videoReferenceLibrary').getByRole('button',{name:'Close library',exact:true}).click();
+ await page.locator('#audioChooseReferences').click();await page.locator('#audioReferenceLibrary .reference-card').waitFor();assert.equal(await page.locator('#audioReferenceLibrary .reference-card').count(),1);await page.getByRole('button',{name:'Use voice.mp3 in generation'}).click();await page.locator('#audioReferenceLibrary').getByRole('button',{name:'Close library',exact:true}).click();
  await page.locator('#prompt').fill('A scene with image, video and audio references');await page.locator('#submitButton').click();await page.locator('#confirmSubmit').click();await page.waitForFunction(()=>!document.querySelector('#confirmDialog').open);
  assert.equal(posts.length,1);assert.equal(posts[0].options.reference_mode,'references');assert.equal(posts[0].options.video_urls.length,1);assert.equal(posts[0].options.audio_urls.length,1);assert.equal(posts[0].input_reference.length,2);
  await page.locator('#model').selectOption(JSON.stringify([provider.id,wan.id]));

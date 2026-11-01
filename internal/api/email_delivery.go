@@ -16,7 +16,7 @@ func (s *Server) emailDeliverySettings(w http.ResponseWriter, r *http.Request) {
 	}
 	var settings auth.DeliverySettings
 	var err error
-	if r.Method == http.MethodGet {
+	if readMethod(r.Method) {
 		settings, err = s.emailDelivery.Settings(r.Context())
 	} else {
 		var in struct {

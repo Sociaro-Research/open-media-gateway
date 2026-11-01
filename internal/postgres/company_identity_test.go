@@ -163,7 +163,8 @@ func TestCompanyIdentityMigrationKeepsHistoricalCompanies(t *testing.T) {
 		t.Fatal(e)
 	}
 	r := NewSystemRepository(db)
-	if e = r.SetAdmin(ctx, "", admin.ID, true, true); e != nil {
+	// Historical fixtures must not call current-schema settings readers.
+	if _, e = db.Exec(`UPDATE users SET is_system_admin=TRUE WHERE id=$1`, admin.ID); e != nil {
 		t.Fatal(e)
 	}
 	first, second, invite := uuid.NewString(), uuid.NewString(), uuid.NewString()

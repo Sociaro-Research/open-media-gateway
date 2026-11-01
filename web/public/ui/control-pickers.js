@@ -4,11 +4,36 @@
   const el=(tag,cls,text)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(text!=null)n.textContent=text;return n;};
   const action=(text,fn,label=text)=>{const b=el('button','picker-action',text);b.type='button';b.setAttribute('aria-label',label);b.onclick=fn;return b;};
   function close(restore=false){window.ModelInfo?.close();if(!active)return;const {panel,trigger}=active;active=active.parent;panel.dispose?.();panel.remove();trigger.setAttribute('aria-expanded','false');if(restore&&trigger.isConnected)trigger.focus();}
-  function position(){const chain=[];for(let entry=active;entry;entry=entry.parent)chain.unshift(entry);for(const {panel,trigger} of chain){const r=(trigger.closest('.floating-field')||trigger).getBoundingClientRect();if(panel.classList.contains('select-popup'))panel.style.width=Math.min(Math.max(r.width,panel.classList.contains('model-select-popup')?600:200),innerWidth-24)+'px';panel.style.maxHeight=Math.min(panel.classList.contains('model-select-popup')?540:panel.classList.contains('select-popup')?320:innerHeight-24,innerHeight-24)+'px';const h=panel.getBoundingClientRect().height,w=panel.getBoundingClientRect().width;panel.style.left=Math.max(12,Math.min(r.left,innerWidth-w-12))+'px';panel.style.top=(r.bottom+8+h<=innerHeight-12?r.bottom+8:Math.max(12,r.top-h-8))+'px';}}
+  function position(){
+    const chain=[];for(let entry=active;entry;entry=entry.parent)chain.unshift(entry);
+    for(const {panel,trigger,side} of chain){
+      const r=(trigger.closest('.floating-field')||trigger).getBoundingClientRect();
+      if(panel.classList.contains('select-popup'))panel.style.width=Math.min(Math.max(r.width,panel.classList.contains('model-select-popup')?600:200),innerWidth-24)+'px';
+      panel.style.maxHeight=Math.min(panel.classList.contains('model-select-popup')?540:panel.matches('.select-popup,.action-menu')?320:innerHeight-24,innerHeight-24)+'px';
+      let {width:w,height:h}=panel.getBoundingClientRect();
+      const beside=side&&(r.right+8+w<=innerWidth-12||r.left-w-8>=12);
+      if(side&&!beside){panel.style.maxHeight=Math.max(44,Math.min(320,Math.max(innerHeight-r.bottom-20,r.top-20)))+'px';h=panel.getBoundingClientRect().height;}
+      const left=beside?(r.right+8+w<=innerWidth-12?r.right+8:r.left-w-8):r.left;
+      panel.style.left=Math.max(12,Math.min(left,innerWidth-w-12))+'px';
+      panel.style.top=(beside?Math.max(12,Math.min(r.top,innerHeight-h-12)):(r.bottom+8+h<=innerHeight-12?r.bottom+8:Math.max(12,r.top-h-8)))+'px';
+    }
+  }
+
   // Outside clicks and Escape are handled below. Native auto-dismiss would close
   // the popup before a second trigger click, causing that click to reopen it.
   // Nested filters keep their parent picker open; dismissal unwinds one level.
-  function show(trigger,panel){while(active&&!active.panel.contains(trigger))close();panel.classList.add('control-popup');panel.id='control-popup-'+(++serial);panel.setAttribute('popover','manual');(trigger.closest('dialog')||document.body).append(panel);active={trigger,panel,parent:active};trigger.setAttribute('aria-expanded','true');trigger.setAttribute('aria-controls',panel.id);if(panel.showPopover)panel.showPopover();panel.addEventListener('toggle',e=>{if(e.newState==='closed'&&active?.panel===panel)close();});position();}
+  function show(trigger,panel,side=false){while(active&&!active.panel.contains(trigger))close();panel.classList.add('control-popup');panel.id='control-popup-'+(++serial);panel.setAttribute('popover','manual');(trigger.closest('dialog')||document.body).append(panel);active={trigger,panel,parent:active,side};trigger.setAttribute('aria-expanded','true');trigger.setAttribute('aria-controls',panel.id);if(panel.showPopover)panel.showPopover();panel.addEventListener('toggle',e=>{if(e.newState==='closed'&&active?.panel===panel)close();});position();}
+  function menu(trigger,{label,items,side=false,focus=true,onClose}){
+    const panel=el('div','action-menu'),list=el('div'),status=el('p','picker-search-status');panel.setAttribute('role','menu');panel.tabIndex=-1;panel.setAttribute('aria-label',label);status.setAttribute('role','status');panel.append(list,status);let busy=false;
+    const dismiss=(restore=true)=>{if(active?.panel===panel)close(restore);};
+    const buttons=()=>[...list.querySelectorAll('button:not(:disabled)')];
+    function update(next){const focused=list.contains(document.activeElement),key=document.activeElement?.dataset.menuKey;list.replaceChildren();for(const item of next){const b=el('button','picker-option');b.type='button';b.dataset.menuKey=item.key??item.label;b.setAttribute('role',item.checked===undefined?'menuitem':'menuitemcheckbox');if(item.checked!==undefined)b.setAttribute('aria-checked',String(item.checked));b.disabled=busy||!!item.disabled;const mark=el('span','menu-check',item.checked?'✓':'');mark.setAttribute('aria-hidden','true');b.append(mark,el('span','menu-label',item.label));b.onclick=async()=>{if(busy||b.disabled)return;busy=true;status.textContent='Saving…';for(const n of list.querySelectorAll('button'))n.disabled=true;try{await item.onSelect?.();dismiss();}catch(error){if(panel.isConnected)status.textContent=error.message||'Could not save. Try again.';}finally{busy=false;if(panel.isConnected){for(const n of list.querySelectorAll('button'))n.disabled=n.dataset.disabled==='true';buttons()[0]?.focus();}}};b.dataset.disabled=String(!!item.disabled);list.append(b);}position();if(focused)([...list.querySelectorAll('button')].find(b=>b.dataset.menuKey===key&&!b.disabled)||buttons()[0]||panel).focus();}
+    panel.onkeydown=e=>{const enabled=buttons(),index=enabled.indexOf(document.activeElement);if(['ArrowDown','ArrowUp','Home','End'].includes(e.key)){e.preventDefault();const next=e.key==='Home'?0:e.key==='End'?enabled.length-1:(index+(e.key==='ArrowDown'?1:-1)+enabled.length)%enabled.length;enabled[next]?.focus();}else if(e.key==='ArrowLeft'&&side){e.preventDefault();e.stopPropagation();dismiss();}else if(e.key==='Tab')dismiss();};
+    panel.dispose=()=>onClose?.();show(trigger,panel,side);update(items);if(focus)buttons()[0]?.focus();
+    return {update,close:dismiss,focus:()=> (buttons()[0]||panel).focus(),message(text){status.textContent=text;position();},rebind(next,{focus=false}={}){
+      if(active?.panel!==panel)return;trigger.setAttribute('aria-expanded','false');trigger=next;active.trigger=next;next.setAttribute('aria-expanded','true');next.setAttribute('aria-controls',panel.id);position();if(focus)next.focus({preventScroll:true});
+    },get focused(){return panel.contains(document.activeElement)||document.activeElement===trigger;},get open(){return panel.isConnected;}};
+  }
   function changed(control){control.dispatchEvent(new Event('input',{bubbles:true}));control.dispatchEvent(new Event('change',{bubbles:true}));}
   document.addEventListener('pointerdown',e=>{if(window.ModelInfo?.contains(e.target))return;while(active&&!active.panel.contains(e.target)&&!active.trigger.contains(e.target))close();},true);
   document.addEventListener('keydown',e=>{if(active&&e.key==='Escape'){e.preventDefault();close(true);}});
@@ -102,6 +127,6 @@
     if(select){if(!customTrigger){trigger.setAttribute('role','combobox');state.text=el('span','select-value');trigger.append(state.text,el('span','select-chevron'));wrap.classList.add('custom-select');}control.classList.add('picker-source');control.tabIndex=-1;control.setAttribute('aria-hidden','true');}else{trigger.innerHTML='<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="3" y="4" width="14" height="13" rx="2"/><path d="M3 8h14M6 2v4M14 2v4"/></svg>';wrap.classList.add('custom-date');}
     if(!customTrigger)wrap.append(trigger);trigger.onclick=()=>select?selectPicker(control,state):datePicker(control,state);trigger.onkeydown=e=>{if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();select?selectPicker(control,state):datePicker(control,state);}};control.addEventListener('change',()=>sync(control));control.addEventListener('keydown',e=>{if(e.altKey&&e.key==='ArrowDown'){e.preventDefault();datePicker(control,state);}});sync(control);
   }
-  window.ControlPickers={enhance,sync,search(control,config){searches.set(control,config);enhance(control);controls.get(control)?.trigger.setAttribute('aria-haspopup','dialog');},contains(node){for(let entry=active;entry;entry=entry.parent)if(entry.panel.contains(node)||entry.trigger.contains(node))return true;return false;}};
+  window.ControlPickers={enhance,sync,menu,dismiss(trigger){if(active?.trigger===trigger)close();},search(control,config){searches.set(control,config);enhance(control);controls.get(control)?.trigger.setAttribute('aria-haspopup','dialog');},contains(node){for(let entry=active;entry;entry=entry.parent)if(entry.panel.contains(node)||entry.trigger.contains(node))return true;return false;}};
   new MutationObserver(()=>{while(active&&!active.trigger.isConnected)close();}).observe(document.body,{childList:true,subtree:true});
 })();

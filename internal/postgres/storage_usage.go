@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
 	"github.com/Sociaro-Research/open-media-gateway/internal/storage"
+	"github.com/Sociaro-Research/open-media-gateway/internal/templates"
 )
 
 func (r *StorageSettingsRepository) RecordObject(ctx context.Context, key, task string, size int64) error {
@@ -20,7 +21,7 @@ func (r *StorageSettingsRepository) RemoveObject(ctx context.Context, key string
 }
 func (r *StorageSettingsRepository) SharedUsage(ctx context.Context) (storage.Usage, error) {
 	var u storage.Usage
-	e := r.db.QueryRowContext(ctx, `SELECT COALESCE(SUM(size_bytes),0)::bigint,COUNT(*) FILTER(WHERE size_bytes IS NULL),(SELECT shared_storage_limit_bytes FROM system_settings WHERE id=TRUE) FROM stored_objects WHERE owner_id=$1 AND deleted_at IS NULL`, identity.OwnerID(ctx)).Scan(&u.UsedBytes, &u.UnknownObjects, &u.LimitBytes)
+	e := r.db.QueryRowContext(ctx, `SELECT COALESCE(SUM(size_bytes),0)::bigint,COUNT(*) FILTER(WHERE size_bytes IS NULL),(SELECT shared_storage_limit_bytes FROM system_settings WHERE id=TRUE) FROM stored_objects WHERE (owner_id=$1 OR ($1 IN ($2,$3) AND owner_id IN ($2,$3))) AND deleted_at IS NULL`, identity.OwnerID(ctx), identity.SharedOwnerID, templates.LibraryOwnerID).Scan(&u.UsedBytes, &u.UnknownObjects, &u.LimitBytes)
 	return u, e
 }
 func (r *StorageSettingsRepository) PendingObjects(ctx context.Context) ([]storage.PendingObject, error) {

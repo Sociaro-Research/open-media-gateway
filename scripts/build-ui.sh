@@ -1,6 +1,7 @@
 #!/bin/sh
 set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+python3 "$root/scripts/check-ui-updates.py"
 output=${1:-"$root/dist/gateway-ui.tar.gz"}
 mkdir -p "$(dirname -- "$output")"
 staging=$(mktemp -d)

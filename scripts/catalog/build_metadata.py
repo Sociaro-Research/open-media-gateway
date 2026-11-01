@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Rebuild reviewed metadata from downloaded official documentation. See docs/model-catalog.md."""
 import json,re,calendar,sys
+from copy import deepcopy
 from pathlib import Path
 from html.parser import HTMLParser
 ROOT=Path(__file__).resolve().parents[2]
@@ -189,5 +190,16 @@ for id,d,url in [
  ('tts-1','2023-11-06','https://openai.com/index/new-models-and-developer-products-announced-at-devday/'),
  ('tts-1-hd','2023-11-06','https://openai.com/index/new-models-and-developer-products-announced-at-devday/')]:
  m=catalog['openai'][id];m['release_date']=d;source(m,'Release announcement',url)
+# Exact, reviewed retirements must not be inherited by a live family alias.
+for id,base,shutdown in [('gpt-image-1','gpt-image-1','2026-10-23'),('gpt-audio-mini-2025-10-06','gpt-audio-mini','2026-07-23')]:
+ if id not in catalog['openai']:
+  catalog['openai'][id]=deepcopy(catalog['openai'][base])
+  catalog['openai'][id]['snapshot']=id
+  date(catalog['openai'][id],id)
+ m=catalog['openai'][id]
+ m['shutdown_date']=shutdown
+ m['checked_at']='2026-10-24'
+ fact(m,'Lifecycle status','Retired by provider')
+ source(m,'Deprecations','https://developers.openai.com/api/docs/deprecations')
 (ROOT/'internal/modelcatalog/catalog.json').write_text(json.dumps(catalog,indent=2,ensure_ascii=False)+'\n')
 print({p:len(v) for p,v in catalog.items()})

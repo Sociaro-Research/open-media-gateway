@@ -109,12 +109,12 @@ func TestCatalogSyncPersistedWorkflow(t *testing.T) {
 	}
 	check()
 	runs, err := repo.Runs(ctx, "fixture", 50, 0)
-	if err != nil || len(runs) != 2 || runs[0].Version != 1 || runs[0].EmailStatus != "not_needed" || len(mailer.keys) != 2 {
+	if err != nil || len(runs) != 2 || runs[0].Version != 1 || runs[0].EmailStatus != "sent" || runs[0].Completeness == nil || runs[0].Completeness.Status != "incomplete" || len(mailer.keys) != 3 {
 		t.Fatal("quiet check", runs, err)
 	}
 	transport.body = strings.Replace(transport.body, "2026-06", "2026-07", 1)
 	check()
-	if len(mailer.keys) != 3 || !strings.Contains(mailer.text[2], "PREVIOUS WARNINGS") || !strings.Contains(mailer.text[2], "checks: 3") {
+	if len(mailer.keys) != 4 || !strings.Contains(mailer.text[3], "PREVIOUS WARNINGS") || !strings.Contains(mailer.text[3], "checks: 3") {
 		t.Fatal("old warnings missing from change report")
 	}
 	provider.capture.Models = append(provider.capture.Models, core.MediaModel{ID: "new"})

@@ -16,25 +16,30 @@
        const tab=button(label,()=>selectTab(id)),panel=el('section',undefined,'system-settings-panel');tab.id='settings-tab-'+id;tab.setAttribute('role','tab');tab.setAttribute('aria-controls','settings-panel-'+id);panel.id='settings-panel-'+id;panel.setAttribute('role','tabpanel');panel.setAttribute('aria-labelledby',tab.id);sections[id]={tab,panel};tabs.append(tab);panels.append(panel);
       }
       GatewayLayout.bind(tabs,{scope:content,label:'Settings',anchor:view.querySelector('[data-system-page=settings]')});
-      selectTab(settingsTab);const systemPanel=sections.system.panel;systemPanel.append(el('h2','System'));
+      let markupEditor,markupMounted=false;const markupWrites=new Map();const syncMarkup=()=>{if(markupMounted)for(const [previous,version]of [...markupWrites].sort((a,b)=>a[0]-b[0]))markupEditor?.setSystemVersion(version,previous);};const advanceMarkup=(version,previous)=>{if(previous!==undefined){markupWrites.set(previous,version);syncMarkup();}};
+      selectTab(settingsTab);const systemPanel=sections.system.panel,setupButton=window.SetupSelector?.mount(systemPanel,data,(next,previous)=>{if(token!==epoch)return;const changedElsewhere=previous&&data.version!==previous.version;reconcile(next,confirmed,previous?.version);FormUI.message(status,changedElsewhere?'Settings changed elsewhere. Your edits are preserved. Review the current values before saving.':'');},()=>token===epoch);const advancedHeading=el('h2','Advanced settings');systemPanel.append(advancedHeading);
       const form=el('form',undefined,'system-settings');
-      form.innerHTML=`<label class="system-toggle"><input type="checkbox" name="shared"><span><strong>Enable shared providers and storage</strong><small>Users can create keys for shared connections. Each organization starts with a $0 balance and no credit. Set funding in Organizations.</small></span></label><label class="system-toggle"><input type="checkbox" name="generation"><span><strong>Show Playground</strong><small>Show the Playground screen. API generation stays available when this is off.</small></span></label>
-      <label class="system-toggle"><input type="checkbox" name="providers"><span><strong>Allow personal provider configuration</strong><small>Let users view and manage their own provider connections in the console and API. Administrators retain access. Saved connections are preserved, but personal keys cannot start new generations while this is disabled.</small></span></label>
+      form.innerHTML=`<label class="system-toggle"><input type="checkbox" name="generation"><span><strong>Show Playground</strong><small>Show the Playground screen. API generation stays available when this is off.</small></span></label>
       <label class="system-toggle"><input type="checkbox" name="inlineReferences"><span><strong>Allow reference files in generation requests</strong><small>Allow supported providers to receive reference image contents with the request. When off, providers receive only HTTP(S) links or supported registered asset references. Applies to shared and personal connections when generation starts.</small></span></label>
-      <p class="field-explanation">Without shared access, users need a personal connection to use a paid provider.</p>
+      <label class="system-toggle"><input type="checkbox" name="customerWorkspaces"><span><strong>Allow customer workspace onboarding</strong><small>Opt in to browser-authorized installation connections and one self-service company per account. Requires shared resources and working sign-in; grants no credit or provider access without consent.</small></span></label>
       <button class="primary compact" type="submit">Save</button>`;
+      form.elements.customerWorkspaces.checked=!!data.customer_workspaces;
       form.elements.inlineReferences.checked=data.allow_inline_references!==false;
-      form.elements.shared.checked=!!data.shared_resources;form.elements.generation.checked=data.generation_ui;form.elements.providers.checked=data.personal_providers;
-      systemPanel.append(form);const save=form.querySelector('button[type=submit]');FormUI.watch(form,save,{heading:systemPanel.querySelector('h2')});
-      let markupEditor;
-      form.addEventListener('submit',async e=>{e.preventDefault();const baseline=FormUI.snapshot(form);save.disabled=true;FormUI.message(status,'Saving…');
-        try{const next=await api('/v1/system/settings',{method:'PUT',body:JSON.stringify({allow_inline_references:form.elements.inlineReferences.checked,shared_resources:form.elements.shared.checked,generation_ui:form.elements.generation.checked,personal_providers:form.elements.providers.checked,version:data.version})});if(token!==epoch)return;data.version=next.version;markupEditor?.setSystemVersion(next.version);window.applySystemAccess(next,true);FormUI.saved(form,baseline);FormUI.message(status,'');}
-        catch(error){if(token===epoch)FormUI.message(status,error.status===409?'Another administrator changed the settings. Reopen Settings before saving.':error.message,'error');}
-        finally{save.disabled=false;FormUI.update(form);}
+      form.elements.generation.checked=data.generation_ui;
+      const fields={generation:'generation_ui',inlineReferences:'allow_inline_references',customerWorkspaces:'customer_workspaces'},values=state=>Object.fromEntries(Object.values(fields).map(key=>[key,!!state[key]])),read=()=>Object.fromEntries(Object.entries(fields).map(([name,key])=>[key,form.elements[name].checked]));
+      let confirmed=values(data),saving=false,refreshing=false;
+      systemPanel.append(form);const save=form.querySelector('button[type=submit]');FormUI.watch(form,save,{heading:advancedHeading,read:()=>JSON.stringify(read()),valid:()=>!saving&&!refreshing});
+      function reconcile(next,submitted=confirmed,previousVersion){advanceMarkup(next.version,previousVersion);if(next.version<data.version)return false;const draft=read();for(const [name,key]of Object.entries(fields))if(draft[key]===submitted[key])form.elements[name].checked=!!next[key];confirmed=values(next);Object.assign(data,next);FormUI.commit(form,JSON.stringify(confirmed));return true;}
+      function update(){if(setupButton)setupButton.disabled=saving||refreshing;FormUI.update(form);}
+      async function recover(){if(token!==epoch)return;try{const next=await api('/v1/system/settings');if(token!==epoch)return;if(reconcile(next)){window.applySystemAccess(next,true);window.SetupSelector?.reflect(next);}refreshing=false;update();FormUI.message(status,'Settings changed. Current values are loaded; your edits are retained. Review them before saving again.','error');}catch{if(token!==epoch)return;FormUI.message(status,'Could not load the changed settings. Retrying automatically…','error');setTimeout(recover,1500);}}
+      form.addEventListener('submit',async e=>{e.preventDefault();if(saving||refreshing||save.disabled)return;const submitted=read(),version=data.version;saving=true;update();FormUI.message(status,'Saving…');
+        try{const next=await api('/v1/system/settings',{method:'PUT',body:JSON.stringify({...submitted,version})});if(token!==epoch)return;if(reconcile(next,submitted,version))window.applySystemAccess(next,true);FormUI.saved(form,JSON.stringify(confirmed));FormUI.message(status,'');}
+        catch(error){if(token!==epoch)return;if(error.status===409){refreshing=true;void recover();}else FormUI.message(status,error.message,'error');}
+        finally{saving=false;update();}
       });
       await window.SalesBonuses.settings(sections.sales.panel,api,()=>token===epoch);
 	  await window.BrandingSettings.mount(sections.appearance.panel,api,()=>token===epoch);
-	  markupEditor=await window.MarkupSettings.mount(sections.markups.panel,api,{current:()=>token===epoch,onSystemSaved:version=>{data.version=version}});
+	  markupEditor=await window.MarkupSettings.mount(sections.markups.panel,api,{current:()=>token===epoch,onSystemSaved:version=>{data.version=Math.max(data.version,version);syncMarkup();}});markupMounted=true;syncMarkup();
       await window.RequestLimits.mount(sections.limits.panel,api,{current:()=>token===epoch});
       await window.EmailDeliverySettings.mount(sections.email.panel,api,()=>token===epoch);
       await window.CatalogSync?.settings(sections.catalog.panel,api,()=>token===epoch);

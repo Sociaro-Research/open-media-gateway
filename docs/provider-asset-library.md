@@ -101,29 +101,23 @@ ordinary ordered generation reference inputs after status becomes `Active`.
 Raw externally supplied `asset://` URIs remain supported, but Gateway cannot
 verify their ownership/readiness from a workspace binding that does not exist.
 
-## Numbered prompt previews
+## Prompt reference previews
 
-Existing saved manual models inherit this display hint from their selected API
-profile at read time; their saved configuration and upstream IDs are unchanged.
-Models advertise `reference_prompt_syntax: "numbered"` independently of remote
-asset support. Seedance 2.x, Wan 3.0 and Wan 2.7 reference-to-video profiles enable
-image previews. The editor recognizes case-insensitive `@Image1`, `@Image 1`,
-`Image1` and `Image 1`. It preserves the prompt exactly; recognition is a UI aid,
-not normalization or a promise that every spelling is accepted by every model.
-Use the provider's documented spelling when writing prompts.
+Playground and Templates share the [common UI reference forms](prompt-reference-syntax.md).
+Use `@Image1` for concise image references; `Picture` is an image alias. Balanced
+angle/square/brace wrappers accept a contiguous, space-separated or underscore
+index. The at-sign form permits no space. Bare `Image 1` is ordinary prose.
+This recognition is independent of remote asset support and legacy saved recipe
+metadata. The prompt is transmitted unchanged; an informational provider API
+hint does not select the parser or promise every UI form has native meaning.
 
-Hover the colored marker on desktop, tap it on touch screens, or put the caret
-in it and press Alt+Down. Escape/outside tap closes a pinned preview. A missing
-index is red and dotted, and explains that no corresponding image is selected.
-Playground lists missing image numbers and blocks its generation form until the
-images are added or the prompt is corrected. This is browser-only assistance;
-the generation API does not validate prompt reference mentions. Numbering
-follows selected image order, including after drag/keyboard reordering. Wan's
-first-frame-plus-references mode excludes the first frame from reference-image
-numbering. Agnes Video 2.5/Flash advertises `picture` instead: in References mode,
-`<Picture 1>` and `<Picture 2>` receive the same image previews. OpenAI profiles
-do not advertise either numbered syntax. BytePlus library operations are not
-enabled for Wan or Agnes.
+Hover a colored marker, tap it on touch screens, or put the caret in it and press
+Alt+Down. Escape/outside tap closes a pinned preview. Missing files and unsupported
+media produce a field message. The generation API does not impose this UI
+mention grammar. Numbering follows each media type's selected order, including
+after reordering. Wan's first-frame-plus-references mode excludes the first frame
+from reference-image numbering. BytePlus library operations remain distinct
+from reference previews and are not enabled for other providers.
 
 ## Other provider mechanisms
 
@@ -143,7 +137,7 @@ supported by the preview layer without pretending it is the BytePlus library.
 - [BytePlus virtual portrait library](https://docs.byteplus.com/en/docs/modelark/private-virtual-avatar-library-guide-preview)
 - [CreateAsset](https://docs.byteplus.com/en/docs/modelark/create-asset-api)
 - [Portrait inputs and ordered prompt references](https://docs.byteplus.com/en/docs/modelark/seedance-portrait-asset-guide)
-- [Wan prompt reference syntax](https://www.alibabacloud.com/help/en/model-studio/text-to-video-prompt)
+- [Wan video API reference](https://www.alibabacloud.com/help/en/model-studio/wan3-video-generation-api-reference)
 
 `provider_assets_test.go` covers durable recovery, source retention, shared
 bindings, isolation, task admission and deletion with isolated PostgreSQL.

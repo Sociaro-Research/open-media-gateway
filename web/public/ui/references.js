@@ -26,6 +26,8 @@ function hashReferenceFile(file,signal){
      if(modes.some(item=>item.id===previous))modeSelect.value=previous;
    }
    const profile=mode();
+	const ratios=profile?.ratios?.length?profile.ratios:model.ratios;
+	if(ratios?.length){const ratio=document.querySelector('#ratio'),previous=ratio.value;fillSelect(ratio,ratios,ratios.includes(previous)?previous:ratios[0]);ControlPickers.sync(ratio);}
    for(const kind of ['image','video','audio']) {
      const target=document.querySelector(kind==='image'?'#imageURLsField':`#${kind}URLField`);
      const manual=target.querySelector('.reference-manual');
@@ -39,6 +41,7 @@ function hashReferenceFile(file,signal){
    document.querySelector('#referenceModeHint').textContent=profile?.image_roles?.length ? 'Image order: '+profile.image_roles.join(' → ')+'.' : '';
  }
  modeSelect.addEventListener('change',()=>{voiceTarget=null;configure();pickers.forEach(p=>p.render());updatePrice();});
+ const activeVoices=()=>{if(!mode()?.supports_reference_voice)return {};const visible=[...document.querySelector('#imageURLs').value.split('\n').slice(mode()?.voice_image_start||0),...document.querySelector('#videoURL').value.split('\n')].map(x=>x.trim()).filter(Boolean);return Object.fromEntries(Object.entries(voices).filter(([url])=>visible.includes(url)));};
  function picker(kind) {
   const image=kind==='image',plural=kind==='image'?'images':kind+'s',displayPlural=kind==='audio'?'audio files':plural;
   const maxBytes=(image?30:kind==='video'?200:50)*1024*1024;
@@ -65,7 +68,11 @@ function hashReferenceFile(file,signal){
   const dragType = 'application/x-gateway-reference';
   let items = [], offset = 0, hasMore = false, busy = false, loading = false, epoch = 0;
   let controller = new AbortController();
- let remote;
+  let checkedSignature='',checking=false,validationError='';
+  const validationTarget=()=>{const model=selectedModel();const t=model?ReferenceValidation.target(selectedProvider()?.id,model.id,requestOptions(model)):null;if(t&&kind==='audio'&&voiceTarget)t.role='reference_voice';return t;};
+  const selectionSignature=()=>JSON.stringify([validationTarget(),urls(),kind==='audio'?activeVoices():null]);
+  const candidateIDs=values=>[...new Set([...(validationTarget()?.reference_ids||[]).filter(id=>!ReferenceValidation.ids(urls()).includes(id)),...ReferenceValidation.ids(values)])];
+ let remote,returnFocus=null,previousFocus=null;
   const library = document.createElement('dialog');
   library.className = 'reference-library'; library.id = image?'referenceLibrary':`${kind}ReferenceLibrary`;
   library.setAttribute('aria-labelledby', `${kind}ReferenceLibraryTitle`);
@@ -73,8 +80,11 @@ function hashReferenceFile(file,signal){
     <p>Choose ${displayPlural} for this generation.</p>
     <div class="reference-dropzone" id="libraryDropzone"><p>Drop ${displayPlural} to add them to your library</p><button type="button" class="secondary" data-upload>Upload ${displayPlural}</button><small>Up to ${maxBytes/1024/1024} MB each</small></div>
     <p class="reference-status" role="status" data-status></p><div class="reference-library-grid" data-grid></div>
-    <div class="reference-library-footer"><button type="button" class="secondary" data-more hidden>Load more</button><button type="button" class="primary" data-close>Done</button></div>`;
+    <div class="reference-library-footer"><button type="button" class="secondary" data-more hidden>Load more</button></div>`;
   document.body.append(library);
+  let sharedLibrary=false,lastRemoteSource='local',listSequence=0,listController=null;
+  const sourceLabel=document.createElement('label');sourceLabel.textContent='Library';const source=document.createElement('select');source.append(new Option('My references','private'),new Option('Template references','shared'));sourceLabel.append(source);library.querySelector('p').after(sourceLabel);
+  source.onchange=()=>{if(loading||busy){source.value=sharedLibrary?'shared':'private';return;}sharedLibrary=source.value==='shared';library.querySelector('[data-upload]').closest('.reference-dropzone').hidden=sharedLibrary;load();};
   const grid = library.querySelector('[data-grid]');
   const libraryStatus = library.querySelector('[data-status]');
   const more = library.querySelector('[data-more]');
@@ -89,7 +99,7 @@ function hashReferenceFile(file,signal){
     const node = document.createElement('button'); node.type = 'button'; node.className = 'secondary'; node.textContent = text;
     node.setAttribute('aria-label', label); node.addEventListener('click', action); return node;
   }
-  function write(values) { field.value = [...new Set(values)].join('\n'); field.dispatchEvent(new Event('input', {bubbles:true})); }
+  function write(values,validated=false) { field.value = [...new Set(values)].join('\n');if(validated){checkedSignature=selectionSignature();checking=false;validationError='';} field.dispatchEvent(new Event('input', {bubbles:true})); }
   function preview(card, url, name) {
     const providerPreview=metadata.get(url)?.preview_url;
     if(url.startsWith('asset://')&&providerPreview&&window.ProviderReferenceLibrary?.safeURL(providerPreview)){const n=document.createElement(image?'img':kind==='video'?'video':'div');if(image||kind==='video'){n.src=providerPreview;n.alt=name;n.referrerPolicy='no-referrer';n.preload='metadata';n.muted=true;}else n.textContent='Audio';card.append(n);return;}
@@ -107,12 +117,14 @@ function hashReferenceFile(file,signal){
   }
   function render() {
     syncFileInput();
+    recheck();
+    for(const node of document.querySelectorAll(`[data-reference-cancel="${kind}"]`))node.hidden=!busy;
     const values = urls();
     selected.replaceChildren(...values.map((url, index) => {
       const card = document.createElement('div'); card.className = 'reference-card';
       const name = metadata.get(url)?.name || (url.startsWith('asset://') ? url.slice(8) : `Reference ${index + 1}`);
       preview(card, url, name);
-      const title = document.createElement('span'); title.className = 'reference-name'; title.textContent = `${mode()?.image_roles?.[image?index:-1] || index + 1}. ${name}`; title.title = name;
+      const title = document.createElement('span'); title.className = 'reference-name'; const spec=window.ReferencePrompts?.contract(selectedModel(),{reference_mode:document.querySelector('#referenceMode').value});const offset=image&&mode()?.id==='first_frame_references'?1:0;const address=spec?.types.includes(kind)&&index>=offset?ReferencePrompts.label(spec.syntax,kind,index-offset):'';title.textContent = `${address||mode()?.image_roles?.[image?index:-1]||index+1}. ${name}`; title.title = name;
       const remove = button('×', `Remove ${name} from generation`, () => write(urls().filter((_, i) => i !== index)));
       remove.classList.add('reference-remove'); remove.disabled = busy;
       card.draggable = !busy; card.tabIndex = 0; card.title = 'Drag to reorder. Use Alt + Left or Right Arrow with the keyboard.';
@@ -127,7 +139,7 @@ function hashReferenceFile(file,signal){
       });
       card.append(title, remove);
       if(kind!=='audio'&&mode()?.supports_reference_voice&&!(image&&index<(mode()?.voice_image_start||0))){
-        const voice=button(voices[url]?'Change voice reference':'Add voice reference',`Voice reference for ${name}`,()=>{voiceTarget={url};pickers[2].open();});voice.classList.add('reference-voice');card.append(voice);
+        const voice=button(voices[url]?'Change voice reference':'Add voice reference',`Voice reference for ${name}`,()=>{voiceTarget={url};pickers[2].open(voice);});voice.classList.add('reference-voice');card.append(voice);
         if(voices[url]) card.append(button('Clear voice',`Clear voice for ${name}`,()=>{delete voices[url];render();updatePrice();}));
       }
       bindDrop(card, index); return card;
@@ -136,12 +148,32 @@ function hashReferenceFile(file,signal){
     if (library.open) renderLibrary();
     window.dispatchEvent(new Event('gateway-reference-change'));
   }
-  function select(item) {
-    const values = urls(), url = absolute(item.url);
-    if(kind==='audio'&&voiceTarget){voices[voiceTarget.url]=url;voiceTarget=null;library.close();pickers.forEach(p=>p.render());updatePrice();return;}
-    if (values.includes(url)) { write(values.filter(value => value !== url)); message(); return; }
-    if (values.length >= limit()) { message(`This model accepts up to ${limit()} ${plural}. Remove one first.`, true); return; }
-    write([...values, url]); message();
+  async function select(item) {
+    const values=urls(),url=absolute(item.url),voiceIntent=kind==='audio'?voiceTarget:null;
+    if(!voiceIntent&&values.includes(url)){write(values.filter(value=>value!==url));message();return;}
+    if(busy)return;
+    if(!voiceIntent&&values.length>=limit()){message(`This model accepts up to ${limit()} ${plural}. Remove one first.`,true);return;}
+    const token=epoch,validation=validationTarget(),intent=ReferenceValidation.signature(validation),selection=selectionSignature();
+    busy=true;message(`Checking ${item.name}…`);renderLibrary();
+    try{
+      await ReferenceValidation.check(voiceIntent?ReferenceValidation.ids([url]):candidateIDs([...values,url]),validation,{signal:controller.signal});
+      if(token!==epoch)return;
+      if(intent!==ReferenceValidation.signature(validationTarget())||selection!==selectionSignature()){message('Selection, model or workflow changed. Choose the file again.',true);return;}
+      if(voiceIntent){if(voiceTarget===voiceIntent){voices[voiceIntent.url]=url;voiceTarget=null;library.close();pickers.forEach(p=>p.render());updatePrice();}return;}
+      metadata.set(url,item);write([...values,url],true);message();
+    }catch(error){if(token===epoch&&error.name!=='AbortError')message(error.message,true);}
+    finally{if(token===epoch){busy=false;render();}}
+  }
+  function recheck(){
+    const stamp=selectionSignature();if(stamp===checkedSignature)return;
+    checkedSignature=stamp;const previousIssue=validationError;validationError='';const referenceIDs=candidateIDs(urls()),voiceIDs=kind==='audio'&&mode()?.supports_reference_voice?ReferenceValidation.ids(Object.values(activeVoices())):[];
+    if(!referenceIDs.length&&!voiceIDs.length){checking=false;if(status.textContent==='Checking reference compatibility…'||previousIssue&&status.textContent===previousIssue)message();return;}
+    const token=epoch;checking=true;message('Checking reference compatibility…');
+    Promise.all([ReferenceValidation.check(referenceIDs,validationTarget(),{signal:controller.signal}),...voiceIDs.map(id=>ReferenceValidation.check([id],{...validationTarget(),role:'reference_voice'},{signal:controller.signal}))]).then(()=>{
+      if(token===epoch&&stamp===selectionSignature()){checking=false;if(status.textContent==='Checking reference compatibility…')message();}
+    }).catch(error=>{
+      if(token===epoch&&stamp===selectionSignature()){checking=false;if(error.name!=='AbortError'){validationError=error.message;message(validationError,true);}}
+    });
   }
   function renderLibrary() {
     if(remote?.active()){remote.render();return;}
@@ -163,29 +195,31 @@ function hashReferenceFile(file,signal){
         actions.append(button('Cancel', `Keep ${name}`, renderLibrary), button('Delete file', `Confirm delete ${name}`, () => deleteItem(item)));
         remove.disabled = true; card.append(warning, actions);
       });
-      remove.classList.add('reference-delete'); remove.disabled = busy; card.append(choose, remove); remote?.decorate(card,item); return card;
+      remove.classList.add('reference-delete'); remove.disabled = busy; choose.disabled=choose.disabled||!!item.deleting;card.append(choose);if(!sharedLibrary)card.append(remove); if(!sharedLibrary)remote?.decorate(card,item); return card;
     }));
     more.hidden = !hasMore; more.disabled = busy || loading;
   }
   async function load(append = false) {
     if(remote?.active())return remote.load(append);
-    if (loading || busy) return;
+    if (busy) return;
+    const sequence=++listSequence,requestedShared=sharedLibrary;listController?.abort();listController=new AbortController();
     const currentEpoch = epoch; loading = true; more.disabled = true; message('Loading library…');
     try {
-      const data = await api(`/v1/references?offset=${append ? offset : 0}`, {signal:controller.signal});
-      if (currentEpoch !== epoch) return;
+      const data = await api(`${requestedShared?"/v1/system/template-references":"/v1/references"}?offset=${append ? offset : 0}`, {signal:AbortSignal.any([controller.signal,listController.signal])});
+      if (currentEpoch !== epoch || sequence!==listSequence) return;
       items = append ? [...items, ...(data.data || []).filter(item => !items.some(old => old.id === item.id))] : (data.data || []);
       offset = data.next_offset || items.length; hasMore = !!data.has_more;
       items.forEach(item => metadata.set(absolute(item.url), item));
       message(items.length ? '' : 'Your library is empty. Upload a reference file.');
  window.StorageQuota?.refresh().catch(()=>{});
-    } catch (error) { if (currentEpoch === epoch) message(`Could not load library: ${error.message}`, true); }
-    finally { if (currentEpoch === epoch) { loading = false; render(); } }
+    } catch (error) { if (currentEpoch === epoch && sequence===listSequence && error.name!=='AbortError') message(`Could not load library: ${error.message}`, true); }
+    finally { if (currentEpoch === epoch && sequence===listSequence) { loading = false; render(); } }
   }
   async function upload(list, replaceIndex = null) {
-    if (busy || loading || !list.length) return;
+    if ((library.open&&sharedLibrary) || busy || loading || !list.length) return;
     if(remote?.active()&&!remote.prepareUpload())return;
-    const currentEpoch = epoch, modelID = selectedModel()?.id, signal = controller.signal, voiceIntent = kind==='audio'?voiceTarget:null, providerUpload=!!remote?.active();
+    const currentEpoch = epoch, modelID = selectedModel()?.id, validation=validationTarget(), intent=ReferenceValidation.signature(validation), signal = controller.signal, voiceIntent = kind==='audio'?voiceTarget:null, providerUpload=!!remote?.active();
+    let expectedSelection=selectionSignature();
     busy = true; remote?.setUploading(true); render();
     let added = 0, duplicates = [], failures = [], unattached = 0;
     try {
@@ -193,46 +227,35 @@ function hashReferenceFile(file,signal){
       if(currentEpoch!==epoch)return;
       const expectedKey=window.GenerationKey.value();
       for (const file of list) {
-        if (file.size > maxBytes || !accept.split(',').includes(file.type)) { failures.push(`${file.name}: use a supported ${kind} file, up to ${maxBytes/1024/1024} MB`); continue; }
+        if(file.size>maxBytes){failures.push(`${file.name}: size ${file.size} bytes; maximum ${maxBytes} bytes. Reduce the file size.`);continue;}
+        if(!accept.split(',').includes(file.type)){failures.push(`${file.name}: format ${file.type||'unknown'}; use a supported ${kind} file (${accept}).`);continue;}
         if(providerUpload){const error=remote.fileError(file);if(error){failures.push(`${file.name}: ${error}`);continue;}}
         message(`Uploading ${file.name}…`);
         try {
           await window.StorageQuota?.check();
           if(currentEpoch!==epoch)return;
-          const sha256=await hashReferenceFile(file,signal);
+          const uploadValidation={...validation,reference_ids:validationTarget()?.reference_ids?.filter(id=>replaceIndex===null||id!==ReferenceValidation.ids([urls()[replaceIndex]])[0])||[]};
+          const item=await ReferenceValidation.upload(file,{validation:uploadValidation,signal,expectedKey,onProgress:text=>message(text)});
           if(currentEpoch!==epoch)return;
-          const plan=await api('/v1/references/uploads',{method:'POST',body:JSON.stringify({name:file.name,content_type:file.type,size_bytes:file.size,sha256}),signal,expectedKey});
-          if(currentEpoch!==epoch)return;
-          let item;
-          if(plan.mode==='existing')item=plan.reference;
-          else if(plan.mode==='local'){
-            const body=new FormData();body.append('file',file);
-            item=await api('/v1/references',{method:'POST',body,signal,expectedKey});
-          }else if(plan.mode==='s3'){
-            let response;
-            try {
-              // Never send gateway credentials to storage or relay file bytes through the gateway.
-              response=await fetch(plan.target.url,{method:'PUT',headers:plan.target.headers,body:file,credentials:'omit',redirect:'error',signal});
-            }catch(error){if(error.name==='AbortError')throw error;throw new Error('Could not upload directly to storage. Check your connection and the bucket CORS settings.');}
-            if(!response.ok)throw new Error(`Storage rejected the upload (HTTP ${response.status}).`);
-            if(currentEpoch!==epoch)return;
-            item=await api(`/v1/references/uploads/${encodeURIComponent(plan.id)}/complete`,{method:'POST',signal,expectedKey});
-          }else throw new Error('Unknown upload method.');
-          if (currentEpoch !== epoch) return;
           if(providerUpload){await remote.registerUploaded(item);added++;continue;}
           const url = absolute(item.url); metadata.set(url, item); if (item.duplicate) duplicates.push(file.name); else added++;
           const values = urls();
           // An upload belongs to the picker intent that started it, even after reopening.
           if(voiceIntent){
-            if(voiceTarget===voiceIntent){voices[voiceIntent.url]=url;voiceTarget=null;library.close();pickers.forEach(p=>p.render());updatePrice();}
+            if(voiceTarget===voiceIntent&&expectedSelection===selectionSignature()){voices[voiceIntent.url]=url;voiceTarget=null;library.close();pickers.forEach(p=>p.render());updatePrice();}
             else unattached++;
             continue;
           }
           if (values.includes(url)) continue;
-          if (modelID !== selectedModel()?.id || !selectedModel()?.[`supports_${kind}_input`]) { unattached++; continue; }
-          if (replaceIndex !== null && replaceIndex < values.length) { values[replaceIndex] = url; replaceIndex = null; write(values); }
-          else if (values.length < limit()) write([...values, url]);
+          if (expectedSelection!==selectionSignature() || intent !== ReferenceValidation.signature(validationTarget()) || modelID !== selectedModel()?.id || !selectedModel()?.[`supports_${kind}_input`]) { unattached++; continue; }
+          const candidate=replaceIndex!==null&&replaceIndex<values.length?values.map((v,i)=>i===replaceIndex?url:v):[...values,url];
+          await ReferenceValidation.check(candidateIDs(candidate),validation,{signal,expectedKey});
+          if(currentEpoch!==epoch)return;
+          if(expectedSelection!==selectionSignature()||intent!==ReferenceValidation.signature(validationTarget())){unattached++;continue;}
+          if (replaceIndex !== null && replaceIndex < values.length) { values[replaceIndex] = url; replaceIndex = null; write(values,true); }
+          else if (values.length < limit()) write([...values, url],true);
           else unattached++;
+          expectedSelection=selectionSignature();
         } catch (error) { if (currentEpoch === epoch) failures.push(`${file.name}: ${error.message}`); }
         if (currentEpoch !== epoch) return;
       }
@@ -280,6 +303,8 @@ function hashReferenceFile(file,signal){
   }
   function validate() {
     if(remote&&!remote.validate())return false;
+    if (checking) { message('Wait for reference validation to finish.',true);return false; }
+    if(validationError){message(validationError,true);return false;}
     if (busy) { message('Wait for the reference operation to finish.', true); return false; }
     const model = selectedModel(); if (!model?.[`supports_${kind}_input`]) return true;
     const count = urls().length, minimum = mode()?.["min_"+plural] ?? (image?Math.max(model.min_image_inputs || 0, model.requires_image_input ? 1 : 0):model[`requires_${kind}_input`]?1:0);
@@ -291,18 +316,23 @@ function hashReferenceFile(file,signal){
   function reset() {
     remote?.reset();
     draggedURL = null; epoch++; controller.abort(); controller = new AbortController(); busy = false; loading = false;
+    checkedSignature='';checking=false;validationError='';
     items = []; metadata.clear(); offset = 0; hasMore = false; library.close(); files.value = ''; write([]); message();
   }
+  const cancelUpload=()=>{
+    epoch++;controller.abort();controller=new AbortController();busy=false;loading=false;checking=false;checkedSignature='';files.value='';remote?.setUploading(false);render();message('Upload cancelled. Your previous selection is unchanged.');
+  };
+  for(const host of [status,libraryStatus]){const cancel=button('Cancel upload','Cancel reference upload',cancelUpload);cancel.dataset.referenceCancel=kind;cancel.hidden=true;host.after(cancel);}
   bindDrop(dropzone); bindDrop(library.querySelector('#libraryDropzone'));
   document.querySelector(image?'#uploadReference':`#${kind}UploadReference`).addEventListener('click', () => { if (!busy) files.click(); });
   library.querySelector('[data-upload]').addEventListener('click', () => { if (!busy) files.click(); });
   files.addEventListener('change', () => upload([...files.files]));
-  document.querySelector(image?'#chooseReferences':`#${kind}ChooseReferences`).addEventListener('click', () => { library.showModal(); renderLibrary(); load(); });
+  document.querySelector(image?'#chooseReferences':`#${kind}ChooseReferences`).addEventListener('click', event => { returnFocus=event.currentTarget;previousFocus=document.activeElement;library.showModal(); renderLibrary(); load(); });
   function cancelVoice(){if(kind==='audio'){voiceTarget=null;syncFileInput();}}
   library.querySelectorAll('[data-close]').forEach(node => node.addEventListener('click', () => {cancelVoice();library.close();}));
   library.addEventListener('cancel',cancelVoice);
   // Native close events may be queued until after the picker has reopened.
-  library.addEventListener('close',()=>{if(!library.open)cancelVoice();});
+  library.addEventListener('close',()=>{if(!library.open){listSequence++;listController?.abort();loading=false;cancelVoice();const label=returnFocus?.getAttribute('aria-label');const trigger=returnFocus?.isConnected?returnFocus:label?[...document.querySelectorAll('button[aria-label]')].find(n=>n.getAttribute('aria-label')===label):null;const active=document.activeElement;if(trigger&&!trigger.disabled&&!trigger.closest('[hidden]')&&(active===document.body||active===previousFocus||active===returnFocus||library.contains(active)))trigger.focus();}});
   more.addEventListener('click', () => load(true));
   field.addEventListener('input', render);
   function describe(url, index) {
@@ -310,8 +340,8 @@ function hashReferenceFile(file,signal){
     try { const parsed = new URL(url); if (parsed.origin === location.origin && parsed.pathname.startsWith('/references/')) return `Library reference ${index + 1}`; } catch {}
     return url;
   }
-  remote=window.ProviderReferenceLibrary?.mount({kind,library,field,metadata,more,message,urls,write,select,renderSelected:render,loadLocal:()=>load()});
-  return {render,validate,describe,reset,values:urls,info:url=>metadata.get(url),open(){library.showModal();render();load();},has:url=>metadata.has(url)};
+  remote=window.ProviderReferenceLibrary?.mount({kind,library,field,metadata,more,message,urls,write,select,renderSelected:render,loadLocal:()=>load(),onSourceChange:value=>{if(value!==lastRemoteSource){lastRemoteSource=value;listSequence++;listController?.abort();loading=false;items=[];offset=0;hasMore=false;}sourceLabel.hidden=value==='provider';if(value==='provider'){sharedLibrary=false;source.value='private';library.querySelector('.reference-dropzone').hidden=false;}}});
+  return {render,validate,describe,reset,values:urls,info:url=>metadata.get(url),issue:()=>validationError,open(trigger){returnFocus=trigger||document.activeElement;previousFocus=document.activeElement;library.showModal();render();load();},has:url=>metadata.has(url)};
  }
  for(const kind of ["image","video","audio"])pickers.push(picker(kind));
  window.referencePicker={configure,get(kind,index){const p=pickers[['image','video','audio'].indexOf(kind)];const url=p?.values()[index];return url?{url,name:p.describe(url,index),...p.info(url)}:null;},restoreMode(options){
@@ -324,6 +354,6 @@ function hashReferenceFile(file,signal){
 
    }
    modeSelect.value=modes.some(item=>item.id===value)?value:modes[0]?.id||'';
- },voices(){if(!mode()?.supports_reference_voice)return {};const visible=[...document.querySelector('#imageURLs').value.split('\n').slice(mode()?.voice_image_start||0),...document.querySelector('#videoURL').value.split('\n')];return Object.fromEntries(Object.entries(voices).filter(([url])=>visible.includes(url)));},restoreVoices(value){voices=value||{};},render(){configure();pickers.forEach(p=>p.render());},validate(){return pickers.every(p=>p.validate());},describe(url,index){return (pickers.find(p=>p.has(url))||pickers[0]).describe(url,index);},reset(){voices={};voiceTarget=null;pickers.forEach(p=>p.reset());}};
+ },voices:activeVoices,restoreVoices(value){voices=value||{};},render(){configure();pickers.forEach(p=>p.render());},validate(){const valid=pickers.every(p=>p.validate());if(!valid){const issue=pickers.map(p=>p.issue()).find(Boolean);if(issue)setMessage(issue,'error');}return valid;},describe(url,index){return (pickers.find(p=>p.has(url))||pickers[0]).describe(url,index);},reset(){voices={};voiceTarget=null;pickers.forEach(p=>p.reset());}};
  window.referencePicker.render();
 })();

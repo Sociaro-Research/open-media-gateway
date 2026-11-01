@@ -467,6 +467,11 @@ func videoPayload(request core.MediaRequest) any {
 		"ratio":      request.Options.Ratio,
 		"duration":   request.Options.Duration,
 	}
+	// Omission uses HappyHorse's documented 16:9 default. Do not send an empty
+	// ratio or substitute for an explicit value; native validation checks it.
+	if lower == "happyhorse-1.1-r2v" && request.Options.Ratio == "" {
+		delete(parameters, "ratio")
+	}
 	if request.Options.Watermark != nil {
 		parameters["watermark"] = *request.Options.Watermark
 	}

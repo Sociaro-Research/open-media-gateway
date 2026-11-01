@@ -1,23 +1,19 @@
 package api
 
 import (
-	"bytes"
 	"net/http/httptest"
 	"testing"
-
-	"github.com/Sociaro-Research/open-media-gateway/plugins/provider/openai"
 )
 
-func TestOpenAIIconRemainsSourceSVG(t *testing.T) {
-	handler := New(serviceStub{}, healthStub{}, "secret")
-	result := httptest.NewRecorder()
-	handler.ServeHTTP(result, httptest.NewRequest("GET", "/provider-assets/openai/icon.svg", nil))
-	if result.Code != 200 || result.Header().Get("Content-Type") != "image/svg+xml" || !bytes.Equal(result.Body.Bytes(), openai.Icon()) {
-		t.Fatal(result.Code, result.Header())
-	}
-	missing := httptest.NewRecorder()
-	handler.ServeHTTP(missing, httptest.NewRequest("GET", "/provider-assets/openai/icon.png", nil))
-	if missing.Code != 404 {
-		t.Fatal(missing.Code)
+func TestLegacyProviderLogosAreAbsent(t *testing.T) {
+	h := New(serviceStub{}, healthStub{}, "secret")
+	for _, id := range []string{"openai", "agnes", "alibaba", "bytedance", "sonilo"} {
+		for _, ext := range []string{"svg", "png"} {
+			w := httptest.NewRecorder()
+			h.ServeHTTP(w, httptest.NewRequest("GET", "/provider-assets/"+id+"/icon."+ext, nil))
+			if w.Code != 404 {
+				t.Fatal(id, ext, w.Code)
+			}
+		}
 	}
 }

@@ -18,8 +18,27 @@ func (r *ReferenceRepository) CreateUpload(ctx context.Context, s references.Upl
 	if err != nil {
 		return err
 	}
-	_, err = r.db.ExecContext(ctx, `INSERT INTO reference_uploads(owner_id,id,state,expires_at,actor_id) VALUES ($1,$2,$3,$4,$5)`, identity.OwnerID(ctx), s.Item.ID, data, s.ExpiresAt, nullableString(identity.ActorID(ctx)))
-	return err
+	db, ok := r.db.(*sql.DB)
+	if !ok {
+		return errors.New("upload admission requires a database")
+	}
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	policy, err := lockAdmissionPolicy(ctx, tx)
+	if err != nil {
+		return err
+	}
+	if err = checkAdmissionPolicy(ctx, tx, policy); err != nil {
+		return err
+	}
+	_, err = tx.ExecContext(ctx, `INSERT INTO reference_uploads(owner_id,id,state,expires_at,actor_id) VALUES ($1,$2,$3,$4,$5)`, identity.OwnerID(ctx), s.Item.ID, data, s.ExpiresAt, nullableString(identity.ActorID(ctx)))
+	if err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 func (r *ReferenceRepository) UseUpload(ctx context.Context, id string, remove bool, fn func(context.Context, *references.UploadSession, references.Repository) error) error {
 	if _, err := uuid.Parse(id); err != nil {

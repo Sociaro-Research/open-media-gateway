@@ -29,7 +29,7 @@ func (s *Server) clientManagerPolicy(next http.Handler) http.Handler {
 		}
 		if manager {
 			path := r.URL.Path
-			allowed := path == "/v1/me" || path == "/v1/info" || path == "/v1/organizations" || path == "/v1/sales/team"
+			allowed := strings.HasPrefix(path, "/provider-assets/") || path == "/v1/me" || path == "/v1/info" || path == "/v1/organizations" || path == "/v1/sales/team"
 			parts := strings.Split(strings.Trim(path, "/"), "/")
 			if len(parts) >= 3 && parts[0] == "v1" && parts[1] == "organizations" {
 				allowed = len(parts) == 3 || len(parts) == 4 && (parts[3] == "members" || parts[3] == "credits" || parts[3] == "balance-history" || parts[3] == "reports") || len(parts) == 5 && parts[3] == "reports"

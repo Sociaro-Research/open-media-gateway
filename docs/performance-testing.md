@@ -153,6 +153,42 @@ only their labelled volumes and image tags; it never uses `down -v` or prunes
 unrelated Docker resources. Keep the evidence directory private. This tests
 container/service recovery, not a host reboot, Cloudflare, real providers or S3.
 
+### Ready-made bundle recovery guide
+
+To exercise the exact commands shipped in the bundle's
+[backup and recovery guide](../deploy/ghcr/backup-restore.md), use four explicit
+local test images (the same images accepted by `scripts/verify-release.py`):
+
+```sh
+python3 scripts/verify-bundle-recovery.py \
+  --output .local/bundle-recovery-new-run \
+  --gateway-image YOUR_LOCAL_GATEWAY_IMAGE \
+  --ui-image YOUR_LOCAL_UI_IMAGE \
+  --postgres-image YOUR_LOCAL_POSTGRES_17_IMAGE \
+  --redis-image YOUR_LOCAL_REDIS_74_IMAGE
+python3 -m unittest discover -s scripts/tests -p 'test_release_recovery.py' -v
+```
+
+Repeat with `--https` and another new output directory to cover the included
+HTTPS configuration/volumes. The output directory must be new and private.
+The runner generates its own projects, secrets, loopback API port and synthetic data; it cannot accept an
+existing installation, project name or `.env`. It uses only free mock generation
+and a disabled synthetic provider credential. Allow disk space for the saved
+images and a second installation. It packages/extracts the actual offline guide,
+executes its marked command blocks, restores into separate volumes and verifies
+migration history, three saved downloads, the original administrator key,
+encrypted provider settings, Redis data, unchanged `.env`, optional-volume byte
+markers and a new mock generation. It exercises compatible application rollback
+without replacing PostgreSQL, and verifies checksum/existing-target refusals plus
+rejection of original binds, volume-driver aliases, fixed volumes/networks and
+inherited container mounts before any recovery resource is created. Evidence stays in the requested directory; cleanup removes only this
+run's generated containers and labelled volumes/networks, without `down -v`.
+
+HTTPS/monitoring volumes are checked with synthetic markers; the runner does not
+issue certificates or start those services. It does not verify S3 object backups,
+external bind mounts, PostgreSQL major upgrades, a different application release
+or live routing/cutover. Such configurations need a separate recovery drill.
+
 ## Measured load
 
 Performance timings run without the race detector. The built-in Go arrival

@@ -35,6 +35,9 @@ func customerPrices(value any, profits ...bool) {
 			customerPrices(item, keepProfit)
 		}
 	case map[string]any:
+		if metadata, ok := v["metadata"].(map[string]any); ok {
+			delete(metadata, "operational") // Imported model evidence retains administrator-only provenance.
+		}
 		if !keepProfit {
 			for _, key := range []string{"profit_usd", "profit_status", "profit_recognized_at", "recognized_profit_requests", "pending_profit_requests"} {
 				delete(v, key)

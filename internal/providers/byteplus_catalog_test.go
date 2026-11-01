@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -194,4 +195,89 @@ func TestBytePlusVideoReferenceSelectorAndFrozenReserve(t *testing.T) {
 			t.Fatal("accepted native snapshot mutated")
 		}
 	}
+}
+
+func TestBytePlusRedesignedSavedReportReplay(t *testing.T) {
+	dir := os.Getenv("GATEWAY_CATALOG_REPAIR_EVIDENCE")
+	if dir == "" {
+		t.Skip("no retained installation evidence")
+	}
+	body, err := os.ReadFile(filepath.Join(dir, "saved-evidence.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var evidence struct {
+		Runs []struct {
+			ID      string          `json:"id"`
+			Payload catalogsync.Run `json:"payload"`
+		} `json:"runs"`
+	}
+	if err = json.Unmarshal(body, &evidence); err != nil {
+		t.Fatal(err)
+	}
+	var observations []catalogsync.Observation
+	for _, r := range evidence.Runs {
+		if r.ID == "2afd43d3-5e11-4aef-8e8e-ed2ae57c5770" {
+			observations = r.Payload.Sources
+		}
+	}
+	if len(observations) == 0 {
+		t.Fatal("saved report not found")
+	}
+	body, err = os.ReadFile(filepath.Join(dir, "bytedance-state.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var previous catalogsync.State
+	if err = json.Unmarshal(body, &previous); err != nil {
+		t.Fatal(err)
+	}
+	for i, ob := range observations {
+		if ob.Source.ID == "pricing" {
+			body, err = os.ReadFile(filepath.Join(dir, ob.Hash+".txt"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			entries, _, err := catalogsync.Parse(ob.Source, body)
+			if err != nil {
+				t.Fatal(err)
+			}
+			observations[i].Entries = entries
+		}
+	}
+	m, ctx, capture := bytePlusCatalogFixture(t)
+	check := func(model core.MediaModel, rate catalogsync.Rate) error {
+		return m.CheckCatalogRate(ctx, "bytedance", model, rate)
+	}
+	now := time.Date(2026, 10, 24, 8, 0, 0, 0, time.UTC)
+	next, run := catalogsync.Reconcile(previous, capture, observations, now, check)
+	for _, w := range run.OpenWarnings {
+		if w.Source == "pricing" {
+			t.Fatal("pricing warning remains", w)
+		}
+	}
+	if len(run.ResolvedWarnings) != 45 {
+		t.Fatalf("resolved %d, want 45 pricing warnings", len(run.ResolvedWarnings))
+	}
+	if len(run.OpenWarnings) != 1 || run.OpenWarnings[0].Source != "models" {
+		t.Fatal("separate source error was hidden", run.OpenWarnings)
+	}
+	for id, before := range previous.Models {
+		for _, old := range before.Rates {
+			old.Source = ""
+			found := false
+			for _, newRate := range next.Models[id].Rates {
+				newRate.Source = ""
+				found = found || reflect.DeepEqual(old, newRate)
+			}
+			if !found {
+				t.Fatal("confirmed tariff changed or disappeared", id, old)
+			}
+		}
+	}
+	_, repeat := catalogsync.Reconcile(next, capture, observations, now.Add(time.Hour), check)
+	if len(repeat.Changes) != 0 || len(repeat.NewWarnings) != 0 {
+		t.Fatal("repeat is not quiet", repeat)
+	}
+	t.Logf("saved run replay: %d pricing warnings resolved, %d independent models-source warning retained; all confirmed prices unchanged; repeat quiet", len(run.ResolvedWarnings), len(run.OpenWarnings))
 }

@@ -381,7 +381,7 @@ func TestPublicReferenceAndRouteCoverage(t *testing.T) {
 		t.Fatal(err)
 	}
 	source = append(source, organizationSource...)
-	for _, name := range []string{"openai.go", "payments.go", "audit.go", "provider_assets.go"} {
+	for _, name := range []string{"openai.go", "payments.go", "audit.go", "provider_assets.go", "templates.go"} {
 		adapterSource, err := os.ReadFile(name)
 		if err != nil {
 			t.Fatal(err)
@@ -393,7 +393,7 @@ func TestPublicReferenceAndRouteCoverage(t *testing.T) {
 	routes := map[string]bool{}
 	for _, match := range routePattern.FindAllStringSubmatch(string(source), -1) {
 		path := match[2]
-		if !strings.HasPrefix(path, "/legal/") && !strings.HasPrefix(path, "/v1/") && !strings.HasPrefix(path, "/auth/") && !strings.HasPrefix(path, "/media/") && !strings.HasPrefix(path, "/references/") && path != "/healthz" && path != "/site.json" {
+		if !strings.HasPrefix(path, "/legal/") && !strings.HasPrefix(path, "/v1/") && !strings.HasPrefix(path, "/auth/") && !strings.HasPrefix(path, "/media/") && !strings.HasPrefix(path, "/references/") && !strings.HasPrefix(path, "/template-media/") && !strings.HasPrefix(path, "/provider-assets/") && path != "/healthz" && path != "/site.json" {
 			continue
 		}
 		routes[strings.ToLower(match[1])+" "+normalize(path)] = true

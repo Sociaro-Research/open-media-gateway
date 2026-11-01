@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/Sociaro-Research/open-media-gateway/internal/modelcatalog"
 	"io"
 	"net/http"
 	"net/url"
@@ -49,6 +50,9 @@ func (t *connectionTransport) RoundTrip(original *http.Request) (*http.Response,
 		if strings.Contains(original.URL.Path, "/models") {
 			operation = "models"
 		}
+	}
+	if providerkit.IsCredentialCheck(original.Context()) {
+		operation = "check"
 	}
 	if endpoint := c.Endpoints[operation]; endpoint != "" {
 		endpoint = strings.ReplaceAll(endpoint, "{task_id}", url.PathEscape(path.Base(original.URL.Path)))
@@ -193,18 +197,38 @@ func (a *connectionAdapter) ListModels(ctx context.Context) ([]core.MediaModel, 
 	for i, m := range result {
 		index[m.ID] = i
 	}
-	syntax := map[string]string{}
+	profiles := map[string]core.MediaModel{}
 	if a.definition.Profiles != nil {
 		for _, profile := range a.definition.Profiles() {
-			syntax[profile.ID] = profile.ReferencePromptSyntax
+			profiles[profile.ID] = profile
 		}
 	}
 	for _, manual := range a.connection().Models {
 		model := manual.Model
-		// Existing saved profiles predate this UI-only hint. Inherit it at read
-		// time, preserving credentials, request contracts and pinned identities.
+		if model.ReferencePromptRecommendation == nil {
+			model.ReferencePromptRecommendation = modelcatalog.Enrich(a.definition.ID, profiles[manual.Profile]).ReferencePromptRecommendation.Clone()
+		}
+		// Inherit reviewed reference metadata at read time, preserving saved
+		// configuration, credentials, aliases and pinned connection identities.
 		if model.ReferencePromptSyntax == "" {
-			model.ReferencePromptSyntax = syntax[manual.Profile]
+			model.ReferencePromptSyntax = profiles[manual.Profile].ReferencePromptSyntax
+		}
+		if model.ReferenceMediaLimits == nil {
+			model.ReferenceMediaLimits = profiles[manual.Profile].ReferenceMediaLimits.Clone()
+		} else {
+			model.ReferenceMediaLimits = model.ReferenceMediaLimits.Clone()
+		}
+		if native := profiles[manual.Profile].ReferenceMediaLimits; native != nil && model.ReferenceMediaLimits.MaxVideoAndOutputDuration == 0 {
+			// Older saved descriptors predate this cross-field rule. Inherit it
+			// without rewriting the saved profile or connection identity.
+			model.ReferenceMediaLimits.MaxVideoAndOutputDuration = native.MaxVideoAndOutputDuration
+		}
+		if native := profiles[manual.Profile].ReferenceMediaLimits; native != nil && native.ReferenceVoice != nil && model.ReferenceMediaLimits.ReferenceVoice == nil {
+			inherited := native.Clone()
+			model.ReferenceMediaLimits.ReferenceVoice = inherited.ReferenceVoice
+		}
+		if len(model.ReferencePromptTypes) == 0 {
+			model.ReferencePromptTypes = append([]string(nil), profiles[manual.Profile].ReferencePromptTypes...)
 		}
 		if i, ok := index[model.ID]; ok {
 			result[i] = model
@@ -262,6 +286,17 @@ func (a *connectionAdapter) CheckCredentials(ctx context.Context) error {
 		return errors.New("catalog discovery is disabled; use an explicit model generation to verify access")
 	}
 	return a.redact(validateAdapter(ctx, a.MediaProvider))
+}
+func (a *connectionAdapter) CredentialStatus() providerkit.CredentialCheck {
+	if native, ok := a.MediaProvider.(interface {
+		CredentialStatus() providerkit.CredentialCheck
+	}); ok {
+		status := native.CredentialStatus()
+		status.Err = a.redact(status.Err)
+		status.Warning = a.redactText(status.Warning)
+		return status
+	}
+	return providerkit.CredentialCheck{}
 }
 func (a *connectionAdapter) ValidateRequest(ctx context.Context, r core.MediaRequest) error {
 	if manual, ok := a.manual(r.Model); ok {

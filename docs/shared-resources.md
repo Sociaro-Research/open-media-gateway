@@ -1,6 +1,6 @@
 # Shared providers and storage
 
-System administrators can enable **shared providers and storage** in System → Settings. Shared credentials belong to a stable installation identity; changing administrator roles never transfers or removes them. Administrators configure these connections under System. Personal connections remain under Configuration when personal provider access is enabled.
+System administrators enable **shared providers and storage** through **Settings → System → Choose setup → Service for companies**. Its optional personal-provider control belongs to that same reviewed scenario; Advanced settings has no duplicate policy switches. Shared credentials belong to a stable installation identity; changing administrator roles never transfers or removes them. Administrators configure these connections under System. Personal connections remain under Configuration when personal provider access is enabled.
 
 Every new API key must belong to an organization and one of its members. Provider and storage choices are immutable: use a new key for a different combination. The Generation screen creates a real key for the selected organization and remembers it in the tab for up to 24 hours.
 

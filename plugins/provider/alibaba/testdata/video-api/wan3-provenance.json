@@ -1,0 +1,13 @@
+{
+  "name": "wan3",
+  "url": "https://help.aliyun.com/en/model-studio/wan3-video-generation-api-reference",
+  "final_url": "https://help.aliyun.com/en/model-studio/wan3-video-generation-api-reference",
+  "checked_at": "2026-10-26T19:06:57.858249+00:00",
+  "status": 200,
+  "content_type": "text/html;charset=UTF-8",
+  "sha256": "0f25f11c400db98ec85ad63cb5fc87687c288306e1dee2b2d84569b97df770ad",
+  "bytes": 136448,
+  "normalized_sha256": "2a7674b7d016137cef30a5ab587ce5cc3a2df482f73db331a10848fce6c8668e",
+  "fixture_type": "Normalized factual parameter fixture; not a verbatim or complete source snapshot",
+  "fixture_sha256": "dc7143a7f695de58c021b0b767af4df4d6583fa75dd7efa1bad107e61312a129"
+}

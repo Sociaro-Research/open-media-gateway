@@ -89,7 +89,7 @@ func (m *Manager) Methods(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ready, _ := m.emailDeliveryAvailable(r.Context())
-	emailJSON(w, http.StatusOK, map[string]bool{"setup_required": required, "google": !required && settings.Google, "email": !required && settings.Email && m.email != nil, "email_delivery": ready, "email_confirmation": !required && settings.Email && m.email != nil})
+	emailJSON(w, http.StatusOK, map[string]bool{"setup_required": required, "google": !required && settings.Google, "email": !required && settings.Email && m.email != nil && ready, "email_delivery": ready, "email_confirmation": !required && settings.Email && m.email != nil})
 }
 
 func (m *Manager) emailDeliveryAvailable(ctx context.Context) (bool, error) {

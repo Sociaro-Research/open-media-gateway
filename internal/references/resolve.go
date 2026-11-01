@@ -14,6 +14,7 @@ import (
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
 	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
 	"github.com/Sociaro-Research/open-media-gateway/internal/storage"
+	"github.com/Sociaro-Research/open-media-gateway/internal/templates"
 	"github.com/google/uuid"
 )
 
@@ -70,13 +71,19 @@ func (r *Resolver) resolve(ctx context.Context, images []string, inline bool) ([
 		if len(r.secret) == 0 || !hmac.Equal([]byte(parsed.Query().Get("signature")), []byte(Signature(r.secret, owner, id))) {
 			continue
 		}
-		if owner != identity.OwnerID(ctx) {
+		if owner != identity.OwnerID(ctx) && owner != templates.LibraryOwnerID {
 			return nil, fmt.Errorf("reference belongs to another account")
+		}
+		readContext := ctx
+		if owner == templates.LibraryOwnerID {
+			readContext = identity.WithOrganization(ctx, "", false)
+			readContext = identity.WithDataOwnerID(readContext, owner)
+			readContext = identity.WithResourceOwners(readContext, identity.ProviderOwnerID(ctx), identity.SharedOwnerID)
 		}
 		if direct, ok := r.library.(interface {
 			DirectReferenceURL(context.Context, string) (string, error)
 		}); ok {
-			target, err := direct.DirectReferenceURL(ctx, id)
+			target, err := direct.DirectReferenceURL(readContext, id)
 			if err != nil {
 				return nil, err
 			}
@@ -89,7 +96,7 @@ func (r *Resolver) resolve(ctx context.Context, images []string, inline bool) ([
 		if !inline {
 			continue
 		}
-		item, object, err := r.library.Open(ctx, id)
+		item, object, err := r.library.Open(readContext, id)
 		if err != nil {
 			return nil, fmt.Errorf("read reference %d from storage: %w", i+1, err)
 		}

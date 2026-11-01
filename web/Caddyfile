@@ -80,7 +80,7 @@
 			}
 		}
 	}
-	@backend path /legal/privacy /legal/terms /v1/* /auth/* /healthz /media/* /references/* /branding/assets/* /site.json /openapi.json /openapi.yaml
+	@backend path /legal/privacy /legal/terms /v1/* /auth/* /healthz /media/* /references/* /template-media/* /branding/assets/* /site.json /openapi.json /openapi.yaml
 	handle @backend {
 		reverse_proxy {$GATEWAY_UPSTREAM:gateway:8080}
 	}
@@ -106,18 +106,20 @@
 	handle /ui/docs.js {
 		file_server
 	}
-	@privateAssets path /ui/* /provider-assets/*
+	# Logo reads enforce cookie/bearer authorization and provider visibility in Go.
+	handle /provider-assets/* {
+		reverse_proxy {$GATEWAY_UPSTREAM:gateway:8080}
+	}
+	@privateAssets path /ui/*
 	handle @privateAssets {
 		header Vary Cookie
 		forward_auth {$GATEWAY_UPSTREAM:gateway:8080} {
 			uri /auth/session
 			header_up -Authorization
 		}
-		@providerIcons path /provider-assets/*
-		reverse_proxy @providerIcons {$GATEWAY_UPSTREAM:gateway:8080}
 		file_server
 	}
-	@console path / /system /organizations /api-keys /configuration /profile
+	@console path / /templates /system /organizations /api-keys /configuration /profile
 	handle @console {
 		header Vary Cookie
 		reverse_proxy {$GATEWAY_UPSTREAM:gateway:8080} {

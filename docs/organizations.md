@@ -2,6 +2,14 @@
 
 Organizations own generation records, reference files and result files. Each organization key has an immutable recipient (`user_id`) and issuer (`created_by`). Requests, reports and weekly allowances use the recipient; issuing a key does not transfer the issuer's permissions. Personal keys have no organization. Roles apply within each organization, independently of the user's personal workspace.
 
+GET and HEAD select read operations and ignore write-shaped request bodies;
+settings, credits, checkout and membership changes require their registered write
+methods and existing scope/role checks. The generation-only HEAD scope exception
+is limited to the registered organization generation/report `content` and
+`last-frame` aliases. Other organization HEAD endpoints retain their management
+scope requirements. Every HEAD response omits the body, including errors, while
+preserving media headers and the original method for direct-storage signing.
+
 ## Organization roles
 
 | Function | Supermanager | Manager | Content Officer | Developer | Member |
@@ -26,6 +34,26 @@ Full access covers retained data only. Minimized request logging removes sensiti
 When creating an organization key, select an active recipient in the User dropdown. API requests accept an optional `user_id`, defaulting to the issuer for backward compatibility. The organization and recipient cannot be changed later. A Member cannot issue or revoke even their own keys. Removing a recipient revokes all their organization keys, regardless of issuer; history and accepted tasks remain. The secret is shown once to the authorized issuer. Anyone holding a bearer secret acts as its recipient: attribution identifies the assigned key account, not the physical person using it.
 
 Migration 050 preserves established access: existing Managers become Supermanagers, existing Members become Developers, and existing keys record their owner as issuer. New invitations default to Member; the issuer may choose another role they can assign. Existing generations and expenses are not reassigned. Legacy unfinished uploads without author attribution can be completed by full-content roles; other users must start a new upload. Rollback requires a pre-migration database backup.
+
+## Company generation projects
+
+Projects belong to the company, not their creator or API key. All company keys
+see the same project list; the recorded creator remains provenance only.
+Supermanagers, Developers and Members can create, rename, delete and assign
+company projects independently of generation authorship. Content Officers read
+projects without modifying them; Managers retain metadata-only access and cannot
+change projects. Existing role-filtered generation content, expenses and file
+deletion remain unchanged. Company project deletion clears tags for everyone,
+never generation records or files. Profile projects remain isolated and personal.
+
+Migration 077 adds indexes only: every existing project ID, name, version and
+assignment remains intact and becomes company-visible. Legacy duplicate names
+remain separate; selectors distinguish them with a short project-ID suffix.
+New same-name creates converge under a company/name transaction lock; a retry
+chooses the oldest existing duplicate by creation time then ID. Stop old writers
+before rollout: old binaries do not participate in this lock. Application
+rollback retains schema and data; old UI shows the former creator-scoped view.
+Do not down-migrate, merge duplicates or restore the database automatically.
 
 ## Funding and limits
 

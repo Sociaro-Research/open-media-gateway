@@ -43,6 +43,8 @@ func referenceModes(m core.MediaModel) []core.ReferenceMode {
 		if strings.Contains(id, "2-5") {
 			base.MaxAudios = 10
 			base.MaxVideos = 10
+			frame.Ratios = []string{"adaptive"}
+			frames.Ratios = []string{"adaptive"}
 		}
 		modes = []core.ReferenceMode{{ID: "none", Label: "Text only"}, frame, frames, base}
 	default:

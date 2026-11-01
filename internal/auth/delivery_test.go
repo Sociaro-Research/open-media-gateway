@@ -64,8 +64,8 @@ func TestDynamicDeliveryAndSecretHandling(t *testing.T) {
 		}
 		return v
 	}
-	if !methods()["email"] || methods()["email_delivery"] {
-		t.Fatal("password login must be independent of delivery")
+	if methods()["email"] || methods()["email_delivery"] || !methods()["email_confirmation"] {
+		t.Fatal("unconfigured delivery must hide email login while retaining existing links")
 	}
 	key := "fixture-private-resend-key"
 	settings, err := sender.Update(ctx, "admin", DeliveryUpdate{Provider: "resend", From: "Sociaro <login@example.test>", APIKey: key, Version: 1})
@@ -117,7 +117,7 @@ func TestDynamicDeliveryAndSecretHandling(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !methods()["email"] || methods()["email_delivery"] || len(repo.record.KeyCiphertext) > 0 {
+	if methods()["email"] || methods()["email_delivery"] || len(repo.record.KeyCiphertext) > 0 {
 		t.Fatal("disconnect retained availability or key")
 	}
 	if err = sender.Send(ctx, "user@example.test", "verify", "unused", "unused"); !errors.Is(err, ErrDeliveryUnavailable) {

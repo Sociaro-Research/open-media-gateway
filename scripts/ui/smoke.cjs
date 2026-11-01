@@ -1,3 +1,4 @@
+const {useFixtureKey}=require('./fixture-key.cjs');
 const {evidencePath} = require('./evidence.cjs');
 // Run with Node and Playwright installed (NODE_PATH may point to a shared runtime).
 const {chromium} = require('playwright');
@@ -66,7 +67,7 @@ const providers = [{id:'mock',name:'Test provider',live:false,credentials_config
   });
   try {
     await page.goto(`http://127.0.0.1:${server.address().port}`);
-    await page.locator('#createGenerationKey').click();
+    await useFixtureKey(page,'fixture-generation-key');
     await page.waitForFunction(()=>selectedModel()?.id==='test-video');
     assert.equal(await page.locator('#health').count(),0);
     assert.equal(await page.locator('#summary').count(),0);

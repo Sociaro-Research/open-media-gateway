@@ -20,13 +20,16 @@ import (
 	"github.com/Sociaro-Research/open-media-gateway/internal/monitoring"
 	"github.com/Sociaro-Research/open-media-gateway/internal/organization"
 	"github.com/Sociaro-Research/open-media-gateway/internal/payments"
+	"github.com/Sociaro-Research/open-media-gateway/internal/playgroundkey"
 	"github.com/Sociaro-Research/open-media-gateway/internal/postgres"
 	"github.com/Sociaro-Research/open-media-gateway/internal/providerassets"
 	"github.com/Sociaro-Research/open-media-gateway/internal/providerconfig"
 	"github.com/Sociaro-Research/open-media-gateway/internal/providers"
 	"github.com/Sociaro-Research/open-media-gateway/internal/queue"
 	"github.com/Sociaro-Research/open-media-gateway/internal/references"
+	"github.com/Sociaro-Research/open-media-gateway/internal/remoteworkspace"
 	"github.com/Sociaro-Research/open-media-gateway/internal/storage"
+	wa "github.com/Sociaro-Research/open-media-gateway/internal/workspaceauth"
 	stripepayment "github.com/Sociaro-Research/open-media-gateway/plugins/payment/stripe"
 )
 
@@ -164,11 +167,21 @@ func run() error {
 	}
 	assetService := providerassets.New(postgres.NewProviderAssetRepository(db), providerManager)
 	go assetService.Run(ctx)
+	templateRepository := postgres.NewTemplateRepository(db)
+	defer templateRepository.Close()
+	playgroundKeys, err := playgroundkey.New(postgres.NewAPIKeyRepository(db), postgres.NewAPIKeyRepository(db), cfg.ProviderCredentialsKey)
+	if err != nil {
+		return err
+	}
 	handler := api.NewGateway(api.Dependencies{
-		CatalogSync: catalogRepository,
-		Service:     service, Health: api.NewDependenciesHealth(db, redisQueue), APIKey: cfg.ClientAPIKey,
+		PlaygroundKeys:         playgroundKeys,
+		CatalogSync:            catalogRepository,
+		WorkspaceAuthorization: wa.New(postgres.NewSystemRepository(db), credentialsCipher),
+		RemoteWorkspace:        remoteworkspace.New(postgres.NewSystemRepository(db), credentialsCipher, httpclient.NewPublic(30*time.Second)),
+		Service:                service, Health: api.NewDependenciesHealth(db, redisQueue), APIKey: cfg.ClientAPIKey,
 		Storage: mediaStorage, SigningSecret: cfg.MediaURLSigningSecret, MediaURLTTL: cfg.MediaURLTTL,
 		ProviderAssets: assetService, AssetPublicURL: cfg.AuthPublicURL,
+		Templates:     templateRepository,
 		ProviderAdmin: providerManager, Auth: authManager, References: references.New(postgres.NewReferenceRepository(db), mediaStorage),
 		System: postgres.NewSystemRepository(db), Payments: funding,
 		Keys:           api.WithRequestLimits(postgres.NewAPIKeyRepository(db), postgres.NewSystemRepository(db), redisQueue),

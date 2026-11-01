@@ -23,7 +23,7 @@ TOOL_DIR = Path(__file__).resolve().parent
 UI_CHECKS = [('separation.cjs',), ('smoke.cjs', '--generations-only'),
              ('branding.cjs',), ('profile.cjs',), ('report-details.cjs',),
              ('workspaces.cjs',), ('control-pickers.cjs',), ('email-login.cjs',),
-             ('provider-connections.cjs',), ('storage-settings.cjs',)]
+             ('provider-connections.cjs',), ('storage-settings.cjs',), ('auto-update-test.cjs',)]
 
 
 def project_ui_checks(project):

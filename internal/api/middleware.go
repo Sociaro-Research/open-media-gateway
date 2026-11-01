@@ -33,6 +33,9 @@ func recoverPanic(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if recovered := recover(); recovered != nil {
+				if recovered == http.ErrAbortHandler {
+					panic(recovered)
+				}
 				slog.Error("panic in HTTP handler", "error", recovered)
 				writeError(w, http.StatusInternalServerError, "internal_error", "internal server error")
 			}

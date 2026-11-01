@@ -142,15 +142,16 @@ Appearance includes a shared **Layout** group, independent of the color theme:
   CSS pixels. Content is centered on the site when space permits; near the menu
   it shrinks without overlap. Individual controls and readable text can keep
   smaller functional limits. Mobile retains automatic width and 12px gutters.
-- **Show subsections in the left menu:** off by default. When on, desktop Settings,
+- **Show subsections in the left menu:** on by default. When on, desktop Settings,
   Profile and organization details move their existing tabs into an expandable
   group under the parent section. Selection and drafts survive location changes.
   Mobile uses tabs in the content in either mode.
 
 The optional API fields are `site_max_width`, `content_max_width` (integer or null)
-and `sidebar_subsections` (boolean). Legacy JSON records inherit the original
-1280px site width and horizontal tabs without a migration. New values use the
-existing versioned appearance record and appear in the branding audit event.
+and `sidebar_subsections` (boolean). JSON records without these fields inherit the
+1280px site width and enabled sidebar subsections without a migration. Explicitly
+saved navigation choices, including disabled subsections, are preserved. New
+values use the existing versioned appearance record and appear in the branding audit event.
 Width or navigation drafts apply to the site only after a successful save.
 
 ## Persistence and API

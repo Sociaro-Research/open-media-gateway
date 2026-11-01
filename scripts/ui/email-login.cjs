@@ -119,7 +119,7 @@ const server=http.createServer((req,res)=>{if(registrationHandler&&['/auth/email
   assert.equal(posts.filter(p=>p.action==='complete').length,1);
   assert.ok(await page.evaluate(()=>![...Object.values(localStorage),...Object.values(sessionStorage)].some(v=>v.includes('passphrase')||v.includes('a'.repeat(43)))));
   signedIn=false;verifyFailure=true;await page.goto(base+'/#email_verify='+token);await page.getByText(/This confirmation link has expired/).waitFor();
-  assert.equal(await page.locator('.email-auth-form:visible').count(),0);await click('authBack');await passwordMetadata('login');
+  assert.equal(await page.locator('.email-auth-form:visible').count(),0);await click('authBack');assert.equal(await page.locator('#emailLogin').isVisible(),false);assert.equal(await page.locator('#email-login-form').isVisible(),false);assert.equal(await page.locator('#googleLogin').isVisible(),true);
   delivery=true;await page.reload();await click('emailLogin');
   for(const width of [320,390,1440]){
    await page.setViewportSize({width,height:900});await switchUnderHeading('login');assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
@@ -127,6 +127,8 @@ const server=http.createServer((req,res)=>{if(registrationHandler&&['/auth/email
    await click('authSwitch');await switchUnderHeading('register');assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
    await page.screenshot({path:evidencePath(`/tmp/gateway-auth-signup-${process.env.UI_BROWSER_ENGINE||'chromium'}-${width}.png`)});await click('authSwitch');
   }
+  delivery=false;await page.goto(base+'/#email_reset='+('b'.repeat(43)));await page.getByRole('heading',{name:'Choose a new password'}).waitFor();await password().fill('A synthetic reset passphrase 456!');await submit().tap();await page.getByText('Password saved. Email sign-in is currently unavailable. Contact your administrator.',{exact:true}).waitFor();assert.equal(await page.locator('#email-login-form').isVisible(),false);assert.equal(await page.locator('#emailLogin').isVisible(),false);assert.equal(await page.locator('#googleLogin').isVisible(),true);
+  delivery=true;await page.reload();await click('emailLogin');
   failLogin=false;await email().fill('user@example.test');await password().fill('A long secret passphrase 123!');await submit().tap();await page.locator('#authGate').waitFor({state:'hidden'});
   assert.deepEqual(errors,[]);console.log('Email UI passed: stable password-manager metadata, show/hide by touch and keyboard, responsive layout, email-only signup, login/reset, token exchange, resumable password setup and sign-in only after password creation. Native password-manager popups depend on browser settings.');
  }finally{await browser.close();server.close();}

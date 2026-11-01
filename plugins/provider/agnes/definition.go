@@ -15,9 +15,8 @@ func Definition() providerkit.Definition {
 	return providerkit.Definition{
 		CatalogSources: catalogSources(),
 		CatalogReviews: catalogDocumentReviews(),
-		Icon:           Icon(), IconType: "image/png",
-		PublicCatalog: true,
-		ID:            "agnes", Name: "Agnes AI", DefaultModel: DefaultModel, ModelEnv: "AGNES_MODEL",
+		PublicCatalog:  true,
+		ID:             "agnes", Name: "Agnes AI", DefaultModel: DefaultModel, ModelEnv: "AGNES_MODEL",
 		Description: "Image generation, editing and composition; video generation with keyframes and media references.",
 		Fields: []providerkit.Field{
 			{Key: "api_key", Label: "API key", Secret: true, Required: true, Env: "AGNES_API_KEY"},

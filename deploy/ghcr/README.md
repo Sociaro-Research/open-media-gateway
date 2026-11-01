@@ -154,8 +154,10 @@ the readable modes of the packaged monitoring directories and all named volumes.
 
 ## Updates
 
-Back up PostgreSQL, media, `.env` and other persistent volumes (including HTTPS
-certificates) before upgrading. Extract the next bundle to a new directory.
+Complete [Backup, verification and recovery](backup-restore.md) **before**
+upgrading. It includes database/volume discovery, a maintenance snapshot, a
+separate-project recovery drill and application rollback. Extract the next
+bundle to a new directory.
 Copy the existing `.env` into it, preserving secrets, public URLs, mode and
 `COMPOSE_PROJECT_NAME`. Replace only the four `*_IMAGE` values with those in the
 new `.env.example`. Do not rerun initialization. Use the same Compose project

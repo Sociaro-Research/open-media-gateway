@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
+	"github.com/Sociaro-Research/open-media-gateway/internal/modelcatalog"
 )
 
 type transportFunc func(*http.Request) (*http.Response, error)
@@ -57,7 +58,7 @@ func TestCatalogUsesReviewedAccountModelsAndCache(t *testing.T) {
 
 func TestAllImageModelsGenerateAndEdit(t *testing.T) {
 	for _, id := range modelIDs {
-		if !strings.Contains(id, "image") {
+		if !strings.Contains(id, "image") || modelcatalog.IsInactive("openai", id, time.Now()) {
 			continue
 		}
 		for _, edit := range []bool{false, true} {

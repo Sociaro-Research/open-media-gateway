@@ -9,12 +9,13 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
 	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
 )
 
-const taskColumns = `COALESCE((SELECT o.id::text FROM organizations o WHERE o.id=tasks.owner_id),''), COALESCE(actor_id::text,''), id, status, provider, model, media_type, prompt, request_options, webhook_url, provider_task_id, result_url, provider_result_url, last_frame_url, storage_key, result_content_type, result_size_bytes, result_sha256, stored_at, error, provider_usage, created_at, updated_at, owner_id, api_key_id, last_frame_storage_key, cost, provider_identity,provider_owner_id,storage_owner_id,result_deleted_at,(result_deleted_at IS NULL AND (storage_key IS NOT NULL OR EXISTS(SELECT 1 FROM stored_objects o WHERE o.task_id=tasks.id AND o.owner_id=tasks.owner_id AND o.deleted_at IS NULL))) AS has_stored_result,worker_started_at,worker_poll_errors,public_model,minimize_request_logging,had_image_input,identity_snapshot`
+const taskColumns = `COALESCE((SELECT o.id::text FROM organizations o WHERE o.id=tasks.owner_id),''), COALESCE(actor_id::text,''), id, status, provider, model, media_type, prompt, request_options, webhook_url, provider_task_id, result_url, provider_result_url, last_frame_url, storage_key, result_content_type, result_size_bytes, result_sha256, stored_at, error, provider_usage, created_at, updated_at, owner_id, api_key_id, last_frame_storage_key, cost, provider_identity,provider_owner_id,storage_owner_id,result_deleted_at,(result_deleted_at IS NULL AND (storage_key IS NOT NULL OR EXISTS(SELECT 1 FROM stored_objects o WHERE o.task_id=tasks.id AND o.owner_id=tasks.owner_id AND o.deleted_at IS NULL))) AS has_stored_result,worker_started_at,worker_poll_errors,public_model,minimize_request_logging,had_image_input,identity_snapshot,COALESCE(project_id::text,''),project_version,template_snapshot`
 
 type TaskRepository struct {
 	db *sql.DB
@@ -27,6 +28,13 @@ func NewTaskRepository(db *sql.DB) *TaskRepository {
 // CreateOrGet atomically persists the task, its Redis outbox marker and the
 // initial webhook event. A repeated idempotency key returns the original task.
 func (r *TaskRepository) CreateOrGet(ctx context.Context, task core.Task, idempotencyKey, requestHash string) (core.Task, bool, error) {
+	if task.ProjectID != "" {
+		id, err := uuid.Parse(task.ProjectID)
+		if err != nil {
+			return core.Task{}, false, core.ErrProjectInvalid
+		}
+		task.ProjectID = id.String()
+	}
 	optionsJSON, err := json.Marshal(task.Options)
 	if err != nil {
 		return core.Task{}, false, fmt.Errorf("encode task options: %w", err)
@@ -36,6 +44,10 @@ func (r *TaskRepository) CreateOrGet(ctx context.Context, task core.Task, idempo
 		return core.Task{}, false, err
 	}
 	defer tx.Rollback()
+	policy, err := lockAdmissionPolicy(ctx, tx)
+	if err != nil {
+		return core.Task{}, false, err
+	}
 	if task.OrganizationID != "" {
 		if err := tx.QueryRowContext(ctx, `SELECT minimize_request_logging FROM organizations WHERE id=$1 FOR SHARE`, task.OrganizationID).Scan(&task.MinimizeRequestLogging); err != nil {
 			return core.Task{}, false, fmt.Errorf("read organization logging policy: %w", err)
@@ -50,14 +62,18 @@ func (r *TaskRepository) CreateOrGet(ctx context.Context, task core.Task, idempo
 	result, err := tx.ExecContext(ctx, `
 		INSERT INTO tasks (
 			id, status, provider, model, media_type, prompt, request_options, webhook_url,
-			idempotency_key, request_hash, created_at, updated_at, owner_id, api_key_id, cost, provider_identity,provider_owner_id,storage_owner_id,actor_id,minimize_request_logging,had_image_input
+			idempotency_key, request_hash, created_at, updated_at, owner_id, api_key_id, cost, provider_identity,provider_owner_id,storage_owner_id,actor_id,minimize_request_logging,had_image_input,project_id,template_snapshot
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,$17,$18,$19,$20,$21)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,$17,$18,$19,$20,$21,$22,$23)
 		ON CONFLICT (owner_id, idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING`,
 		task.ID, task.Status, task.Provider, task.Model, task.MediaType, task.Prompt, optionsJSON, task.WebhookURL,
-		nullableString(idempotencyKey), requestHash, task.CreatedAt, task.UpdatedAt, identity.OwnerID(ctx), task.APIKeyID, encodedCost, task.ProviderIdentity, resourceOwner(task.ProviderOwnerID, identity.OwnerID(ctx)), resourceOwner(task.StorageOwnerID, identity.OwnerID(ctx)), nullableString(identity.ActorID(ctx)), task.MinimizeRequestLogging, task.HadImageInput,
+		nullableString(idempotencyKey), requestHash, task.CreatedAt, task.UpdatedAt, identity.OwnerID(ctx), task.APIKeyID, encodedCost, task.ProviderIdentity, resourceOwner(task.ProviderOwnerID, identity.OwnerID(ctx)), resourceOwner(task.StorageOwnerID, identity.OwnerID(ctx)), nullableString(identity.ActorID(ctx)), task.MinimizeRequestLogging, task.HadImageInput, nullableString(task.ProjectID), nullableJSON(task.TemplateSnapshot),
 	)
 	if err != nil {
+		var pg *pgconn.PgError
+		if errors.As(err, &pg) && pg.Code == "23503" && pg.ConstraintName == "tasks_project_id_fkey" {
+			return core.Task{}, false, core.ErrProjectInvalid
+		}
 		return core.Task{}, false, fmt.Errorf("insert task: %w", err)
 	}
 	rows, err := result.RowsAffected()
@@ -80,6 +96,20 @@ func (r *TaskRepository) CreateOrGet(ctx context.Context, task core.Task, idempo
 		return stored, false, nil
 	}
 
+	if task.ProjectID != "" {
+		if err := projectAccess(ctx, tx, task.ProjectID); err != nil {
+			return core.Task{}, false, err
+		}
+	}
+	if task.AdmissionError != nil {
+		return core.Task{}, false, task.AdmissionError
+	}
+
+	if task.APIKeyID != nil {
+		if err := checkAdmissionPolicy(ctx, tx, policy); err != nil {
+			return core.Task{}, false, err
+		}
+	}
 	if err := checkProviderAssets(ctx, tx, task); err != nil {
 		return core.Task{}, false, err
 	}
@@ -288,7 +318,7 @@ func (r *TaskRepository) transition(ctx context.Context, id string, eventType co
 		// Preserve only the options required to render task dimensions and
 		// reconcile provider usage. This runs in the terminal transition so no
 		// completed task can be committed with its original request content.
-		if _, err := tx.ExecContext(ctx, `UPDATE tasks SET prompt='',
+		if _, err := tx.ExecContext(ctx, `UPDATE tasks SET prompt='',template_snapshot=CASE WHEN template_snapshot IS NULL THEN NULL ELSE jsonb_build_object('id',template_snapshot->'id','revision',template_snapshot->'revision') END,
 			request_options=jsonb_strip_nulls(jsonb_build_object(
 				'resolution',request_options->'resolution',
 				'ratio',request_options->'ratio',
@@ -392,13 +422,13 @@ type rowScanner interface {
 
 func scanTask(row rowScanner, task *core.Task) error {
 	var options []byte
-	var usage, cost, snapshot []byte
+	var usage, cost, snapshot, templateSnapshot []byte
 	err := row.Scan(
 		&task.OrganizationID, &task.ActorID, &task.ID, &task.Status, &task.Provider, &task.Model, &task.MediaType, &task.Prompt, &options, &task.WebhookURL,
 		&task.ProviderTaskID, &task.ResultURL, &task.ProviderResultURL, &task.LastFrameURL, &task.StorageKey,
 		&task.ResultType, &task.ResultSize, &task.ResultSHA256, &task.StoredAt,
 		&task.Error, &usage, &task.CreatedAt, &task.UpdatedAt,
-		&task.OwnerID, &task.APIKeyID, &task.LastFrameStorageKey, &cost, &task.ProviderIdentity, &task.ProviderOwnerID, &task.StorageOwnerID, &task.ResultDeletedAt, &task.HasStoredResult, &task.WorkerStartedAt, &task.WorkerPollErrors, &task.PublicModel, &task.MinimizeRequestLogging, &task.HadImageInput, &snapshot,
+		&task.OwnerID, &task.APIKeyID, &task.LastFrameStorageKey, &cost, &task.ProviderIdentity, &task.ProviderOwnerID, &task.StorageOwnerID, &task.ResultDeletedAt, &task.HasStoredResult, &task.WorkerStartedAt, &task.WorkerPollErrors, &task.PublicModel, &task.MinimizeRequestLogging, &task.HadImageInput, &snapshot, &task.ProjectID, &task.ProjectVersion, &templateSnapshot,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return core.ErrTaskNotFound
@@ -407,6 +437,7 @@ func scanTask(row rowScanner, task *core.Task) error {
 		return fmt.Errorf("scan task: %w", err)
 	}
 	task.IdentitySnapshot = snapshot
+	task.TemplateSnapshot = templateSnapshot
 	if err := json.Unmarshal(options, &task.Options); err != nil {
 		return fmt.Errorf("decode task options: %w", err)
 	}
@@ -426,13 +457,13 @@ func scanTask(row rowScanner, task *core.Task) error {
 
 func scanTaskWithHash(row rowScanner, task *core.Task, requestHash *string) error {
 	var options []byte
-	var usage, cost, snapshot []byte
+	var usage, cost, snapshot, templateSnapshot []byte
 	err := row.Scan(
 		&task.OrganizationID, &task.ActorID, &task.ID, &task.Status, &task.Provider, &task.Model, &task.MediaType, &task.Prompt, &options, &task.WebhookURL,
 		&task.ProviderTaskID, &task.ResultURL, &task.ProviderResultURL, &task.LastFrameURL, &task.StorageKey,
 		&task.ResultType, &task.ResultSize, &task.ResultSHA256, &task.StoredAt,
 		&task.Error, &usage, &task.CreatedAt, &task.UpdatedAt,
-		&task.OwnerID, &task.APIKeyID, &task.LastFrameStorageKey, &cost, &task.ProviderIdentity, &task.ProviderOwnerID, &task.StorageOwnerID, &task.ResultDeletedAt, &task.HasStoredResult, &task.WorkerStartedAt, &task.WorkerPollErrors, &task.PublicModel, &task.MinimizeRequestLogging, &task.HadImageInput, &snapshot,
+		&task.OwnerID, &task.APIKeyID, &task.LastFrameStorageKey, &cost, &task.ProviderIdentity, &task.ProviderOwnerID, &task.StorageOwnerID, &task.ResultDeletedAt, &task.HasStoredResult, &task.WorkerStartedAt, &task.WorkerPollErrors, &task.PublicModel, &task.MinimizeRequestLogging, &task.HadImageInput, &snapshot, &task.ProjectID, &task.ProjectVersion, &templateSnapshot,
 		requestHash,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -442,6 +473,7 @@ func scanTaskWithHash(row rowScanner, task *core.Task, requestHash *string) erro
 		return fmt.Errorf("scan idempotent task: %w", err)
 	}
 	task.IdentitySnapshot = snapshot
+	task.TemplateSnapshot = templateSnapshot
 	if err := json.Unmarshal(options, &task.Options); err != nil {
 		return fmt.Errorf("decode task options: %w", err)
 	}
@@ -518,4 +550,11 @@ func resourceOwner(value, owner string) string {
 		return owner
 	}
 	return value
+}
+
+func nullableJSON(value json.RawMessage) any {
+	if len(value) == 0 {
+		return nil
+	}
+	return []byte(value)
 }

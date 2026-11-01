@@ -189,17 +189,19 @@ so deploying support can resolve an old warning on the next check.
 
 **Administration → Model catalogue** offers checks, open warnings and published
 versions, filtered by provider, with JSON details/export and source snapshots.
-An error, warning, applied change and no-change result are distinguishable. A
-check can apply safe changes while also retaining unsupported candidates.
+An error, warning, incomplete or partial verification, applied change and no-change result
+are distinguishable. A check can apply safe changes while also retaining
+unsupported candidates.
 
-Email is sent after a check with applied changes, a new/changed warning, or a
-resolved warning. An unchanged check with only old unresolved warnings stays in
-the journal and sends no email. Every email includes:
+Email is sent after a check with applied changes, a new/changed warning, a
+resolved warning, or incomplete/partial operational verification. A fully verified
+unchanged check stays in the journal without email. Every email includes:
 
 1. Applied changes with before/after values and sources.
 2. New warnings requiring attention, highlighted in HTML.
 3. Previous warnings still open, with their age and check count.
 4. Resolved warnings.
+5. Operational completeness, current contracts, missing fields and source provenance.
 
 Mail work is persisted with the check transaction. Transient failures retry with
 the same idempotency key, every 15 minutes, up to ten scheduled attempts; final
@@ -251,3 +253,116 @@ Run this check when registering/changing sources or investigating upstream forma
 changes. It verifies current fetching/parsing, not authenticated model discovery,
 provider billing acceptance or future website stability. Keep the tested source
 revision, command and limitations with your local or CI evidence.
+
+## Catalogue verification coverage
+
+Every new catalogue check records `completeness` in the run journal/API and
+email report, independently of publication changes and existing warnings.
+`incomplete` means required native-contract verification is missing. `partial`
+means required native-contract fields are verified but optional provider details
+remain unverified. Neither result changes model eligibility or request validation.
+Both queue the existing daily report when a recipient is configured, even when
+nothing was published. Historical runs without this assessment are **not
+assessed**, never implicitly complete.
+
+The `operational-v1` requirements cover the connected adapter's supported active
+models, excluding retired models and explicitly excluded operations. Each field
+states whether it is required. Requirements follow the existing native contract:
+output modality and prompt policy, exposed output selectors, selectable video
+duration, audio formats/voices where applicable, and effective reference workflows
+and counts. Effective workflows retain the existing core fallback when no separate
+workflow list is declared. Native support is not inferred from optional metadata.
+A zero count means unsupported by that declared gateway workflow; it does not
+assert that the upstream provider cannot implement a different operation.
+
+`ReferenceMediaLimits` was introduced for Templates and is optional augmentation.
+Its absence is **not** proof of a pre-existing synchronization/parser defect or
+missing provider capability. File formats, sizes, dimensions and clip durations
+are reported as optional details when represented there. Missing optional values
+remain visible, but cannot make required-contract verification fail. Changes to
+optional file metadata also cannot invalidate otherwise matching native-contract
+proof. Ordered references need no invented marker grammar. Tariffs stay in their
+existing records and change reports; the protocol view omits pricing rather than
+representing an omitted price as zero.
+
+Present native values remain **unknown** until a matching structured interpretation
+is available in this run. A URL, generic capability fact, document acknowledgment
+or stable document hash alone does not verify executable fields. The generic
+structured mechanism is `manifest-v1`. Provider definitions can additionally
+interpret already-fetched `document` text into typed `operational_fields`.
+Native-contract matching excludes optional file metadata, which is assessed
+separately. Provider interpretation is pure: it receives no credentials and
+cannot activate models, change native options or publish tariffs.
+Provider prose parsers are not declared broken merely because they do not emit
+this new coverage representation. Missing mappings are reported as unverified,
+without pretending to have lost previously supported fields. This requirement set
+is not a claim to enumerate every vendor fact or verify a paid operation.
+
+Failed retrieval, stale/unchecked sources and preserved last-confirmed evidence
+remain explicit, with original source identities and snapshot hashes. Required
+field uncertainty or unresolved source/supported-model warnings prevents complete
+coverage. Warning fingerprints and resolution rules, rates, catalogue versions,
+activation and native validators are unchanged.
+
+### Detailed video API verification sources
+
+Alibaba defaults include the Wan3, Wan2.7 R2V and HappyHorse R2V API references.
+BytePlus defaults include the public Singapore ModelArk generation-task Markdown
+endpoint advertised by its API documentation. The older documentation alias can
+return a JavaScript shell; it is not silently treated as a verified contract.
+Exact supported model IDs/family mappings remain explicit in their provider
+modules. New models, formats and workflows are never enabled from prose.
+
+The provider-owned interpreters extract typed selector sets, ranges, workflow
+counts, prompt namespaces and represented file constraints. Verification checks
+that the gateway's supported values fit the published contract. Effective visual
+counts include the existing combined-visual bound; independent maxima must not
+produce a false disagreement. Source values that cannot be recognized stay absent,
+and disagreements produce per-field adapter-review evidence rather than guessed
+metadata. Untyped document changes still require review even when known fields
+parse successfully; an unchanged fingerprint never acknowledges an old warning.
+
+Wan3 also documents a combined input-video plus output-duration ceiling. This is
+published as a typed source relation. Independent native maxima do not establish
+a coupled constraint: coverage stays incomplete if their sum exceeds the source
+limit. An omitted or failed current interpretation preserves the last-confirmed
+relation and cannot verify it. Publishing evidence does not install an admission
+rule or change native request validation.
+
+Compatible typed facts are published under administrator model metadata
+`operational`, with their source URL, normalized snapshot and last-confirmed check
+time. Runtime descriptors merge these informational facts without replacing native
+capabilities or prices. Failed, missing or incompatible observations preserve the
+last-confirmed values and their original provenance. Current verification status
+is in the check's coverage, not an implied freshness guarantee on historical facts.
+Customer projections retain the existing restriction on imported source evidence.
+
+Default registrations initialize new schedules. Existing administrator-edited
+schedules are preserved: add the intended API sources deliberately when adopting
+this change. Missing expected sources are reported as `not_checked`, distinct from
+failed retrieval or a successfully fetched but uninterpretable shell. Registering
+sources in code does not trigger a live check or alter existing configuration.
+
+Operational facts from multiple sources are reconciled by exact model and field
+before publication. Different provider values remain a conflict even when both
+cover the gateway's narrower supported subset. The last-confirmed published fact
+and provenance are preserved, with stable per-field review evidence. Identical
+subsequent observations cannot create another publication version or new alert.
+Agreement uses a deterministic source identity for provenance; it does not prefer
+one conflicting value over another.
+
+Per-source `operational_history` retains the exact last-confirmed field snapshot
+when a later document omits a field. History is read-only and never counts as a
+current observation. Missing, null, stale or failed source evidence cannot resolve
+an outstanding conflict or establish current agreement. Fresh agreement from the
+known sources can resolve the field conflict; any independent changed-document
+warning still requires its own existing review. No native options or prices are
+changed by this informational reconciliation.
+
+For explicitly unordered alternatives (resolution, aspect ratio, format, voice,
+workflow, MIME/codec and reference-modality choices), comparison ignores list
+order and duplicate values. Conflict grouping, native equality and publication
+change detection share this field-aware rule. Source values and snapshot hashes
+remain exact; ordered positions, frame roles and unknown arrays are not sorted.
+Changing an alternative's membership remains a factual difference, and an
+order-only document edit still retains its independent fingerprint review.

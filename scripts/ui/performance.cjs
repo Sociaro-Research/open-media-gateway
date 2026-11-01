@@ -1,3 +1,4 @@
+const {useFixtureKey}=require('./fixture-key.cjs');
 const {evidencePath} = require('./evidence.cjs');
 // Deterministic browser request/DOM budgets. Real backend load is measured separately.
 const {chromium,webkit}=require('playwright');
@@ -46,7 +47,7 @@ fs.writeFileSync(path.join(output,`ui-${engine===webkit?'webkit':'chromium'}-sou
   await page.addInitScript(()=>{
    window.perfLongTasks=[];try{new PerformanceObserver(list=>window.perfLongTasks.push(...list.getEntries().map(e=>e.duration))).observe({type:'longtask',buffered:true});}catch{}
   });
-  await page.goto(`http://127.0.0.1:${server.address().port}`);await page.locator('#createGenerationKey').click();await page.waitForFunction(()=>document.querySelectorAll('.task').length===50);
+  await page.goto(`http://127.0.0.1:${server.address().port}`);await useFixtureKey(page,'fixture-generation-key');await page.waitForFunction(()=>document.querySelectorAll('.task').length===50);
   await page.waitForFunction(()=>[...document.querySelectorAll('.task-media')].every(e=>e.getAttribute('src')));
   await page.evaluate(()=>{window.preservedCard=document.querySelector('[data-task-id="task-1"]');window.preservedPlayer=window.preservedCard.querySelector('.task-media');});
   await page.evaluate(async()=>{window.preservedPlayer.muted=true;window.preservedPlayer.loop=true;await window.preservedPlayer.play();});

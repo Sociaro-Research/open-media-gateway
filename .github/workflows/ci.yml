@@ -234,6 +234,11 @@ jobs:
           GATEWAY_PERF_OUTPUT: ui-performance-results
         run: |
           make build-ui
+          node --test scripts/ui/auto-update-test.cjs
+          node scripts/ui/automatic-update-dom.cjs
+          UI_BROWSER_ENGINE=webkit node scripts/ui/automatic-update-dom.cjs
+          node scripts/ui/templates.cjs
+          UI_BROWSER_ENGINE=webkit node scripts/ui/templates.cjs
           node scripts/ui/separation.cjs
           node scripts/ui/monitoring.cjs
           node scripts/ui/origin-security.cjs
@@ -246,6 +251,7 @@ jobs:
           node scripts/ui/profile.cjs
           node scripts/ui/support.cjs
           node scripts/ui/report-details.cjs
+          UI_BROWSER_ENGINE=webkit node scripts/ui/report-details.cjs
           UI_SCREENSHOT_DIR=ui-performance-results/report-pagination node scripts/ui/report-pagination.cjs
           UI_SCREENSHOT_DIR=ui-performance-results/report-pagination UI_BROWSER_ENGINE=webkit node scripts/ui/report-pagination.cjs
           node scripts/ui/audit-log.cjs
@@ -258,6 +264,9 @@ jobs:
           node scripts/ui/installation-setup.cjs
           node scripts/ui/email-delivery.cjs
           node scripts/ui/catalog-sync.cjs
+          UI_BROWSER_ENGINE=webkit node scripts/ui/catalog-sync.cjs
+          node scripts/ui/provider-reference-state.cjs
+          UI_BROWSER_ENGINE=webkit node scripts/ui/provider-reference-state.cjs
           node scripts/ui/model-picker.cjs
           node scripts/ui/provider-assets.cjs
           UI_BROWSER_ENGINE=webkit node scripts/ui/provider-assets.cjs

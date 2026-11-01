@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/references"
+	"github.com/Sociaro-Research/open-media-gateway/internal/referencevalidation"
 )
 
 // Multipart edit/video uploads use the existing durable reference library. Their
@@ -95,8 +96,42 @@ func (s *Server) multipartGeneration(w http.ResponseWriter, r *http.Request) (ma
 		probe[k] = v
 	}
 	probe[key] = json.RawMessage(`"https://reference.invalid/upload"`)
-	if _, param, err := s.openAIInput(r, probe); err != nil {
+	input, param, err := s.openAIInput(r, probe)
+	if err != nil {
 		invalidParameter(w, param, err.Error())
+		return nil, false
+	}
+	// Inspect the whole bounded multipart batch before retaining its first file.
+	inspected := []referencevalidation.File{}
+	for _, header := range files {
+		file, e := header.Open()
+		if e != nil {
+			invalidParameter(w, key, "Could not read uploaded file.")
+			return nil, false
+		}
+		data, e := io.ReadAll(io.LimitReader(file, 32<<20))
+		file.Close()
+		if e != nil {
+			invalidParameter(w, key, "Could not read uploaded file.")
+			return nil, false
+		}
+		if detected := http.DetectContentType(data); !strings.HasPrefix(detected, "image/") {
+			invalidParameter(w, key, header.Filename+": format "+detected+"; input reference must be an image")
+			return nil, false
+		}
+		media, e := references.InspectFile(header.Filename, data, "")
+		if e != nil {
+			s.referenceError(w, e)
+			return nil, false
+		}
+		if media.Type != "image" {
+			invalidParameter(w, key, "Input reference must be an image.")
+			return nil, false
+		}
+		inspected = append(inspected, media)
+	}
+	if err = s.referenceValidator(r)(r.Context(), &referencevalidation.Target{Provider: input.Provider, Model: input.Model, Options: input.Options}, inspected, false); err != nil {
+		s.referenceError(w, err)
 		return nil, false
 	}
 	urls := []string{}
@@ -104,16 +139,6 @@ func (s *Server) multipartGeneration(w http.ResponseWriter, r *http.Request) (ma
 		file, err := header.Open()
 		if err != nil {
 			invalidParameter(w, key, "could not read uploaded file")
-			return nil, false
-		}
-		// Sniff before persistence; image-edit inputs must not store an audio/video
-		// file under an image parameter simply because its filename says .png.
-		prefix := make([]byte, 512)
-		n, _ := file.Read(prefix)
-		_, _ = file.Seek(0, 0)
-		if !strings.HasPrefix(http.DetectContentType(prefix[:n]), "image/") {
-			_ = file.Close()
-			invalidParameter(w, key, "input reference must be an image")
 			return nil, false
 		}
 		item, err := s.references.Upload(r.Context(), header.Filename, file)
@@ -236,14 +261,14 @@ func (s *Server) inputReferenceURLs(r *http.Request, raw json.RawMessage) ([]str
 			if json.Unmarshal(value, &one) != nil {
 				return nil, errors.New("file_id must be a string")
 			}
-			item, err := s.references.Get(r.Context(), one)
+			item, refContext, err := s.generationReference(r.Context(), one)
 			if err != nil {
 				return nil, errors.New("reference file is not available to this API key")
 			}
 			if !strings.HasPrefix(item.ContentType, "image/") {
 				return nil, errors.New("reference file must be an image")
 			}
-			return []string{s.referenceAbsoluteURL(r, item)}, nil
+			return []string{s.referenceAbsoluteURL(r.WithContext(refContext), item)}, nil
 		}
 	}
 	return nil, fmt.Errorf("use an image URL, {image_url: URL}, {file_id: reference ID}, or an array of these")

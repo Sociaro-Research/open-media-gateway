@@ -1,0 +1,13 @@
+{
+  "name": "happyhorse",
+  "url": "https://help.aliyun.com/en/model-studio/happyhorse-reference-to-video-api-reference",
+  "final_url": "https://help.aliyun.com/en/model-studio/happyhorse-reference-to-video-api-reference",
+  "checked_at": "2026-10-26T19:07:02.487479+00:00",
+  "status": 200,
+  "content_type": "text/html;charset=UTF-8",
+  "sha256": "939f3aeddcf75a28bf54295b61123d4ebcf4e4d7143ee7d78279d7942e4f5f87",
+  "bytes": 91874,
+  "normalized_sha256": "237636d19dfd5b1eabf85c89f1c61aeaa29f16c0fc8e8b47ea3e87abceb6bc64",
+  "fixture_type": "Normalized factual parameter fixture; not a verbatim or complete source snapshot",
+  "fixture_sha256": "fb3133fa12fb7920bd2cca545764b8b848c8798772f17db9b80622a168eaf75f"
+}

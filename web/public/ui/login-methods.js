@@ -14,7 +14,7 @@
    const header=el('div',null,'provider-detail-header'),title=el('div',null,'provider-title-line');title.append(el('h3',creating?'New login method':data.name));header.append(title);box.append(header);
    const label=el('label',null,'master-switch'),enabled=el('input');enabled.type='checkbox';enabled.checked=creating?false:data.enabled;enabled.setAttribute('aria-label',data.name+' enabled');label.append(enabled);header.append(label);
    const form=el('form',null,'provider-settings-form login-provider-editor'),message=el('p'),warning=el('p',null,'settings-warning');message.role='status';warning.role='status';box.append(form);form.autocomplete='off';
-   const warn=()=>{warning.textContent=data.provider==='email'&&data.enabled&&!delivery?'Configure Email delivery to enable registration and password recovery. Existing accounts can sign in.':'';warning.hidden=!warning.textContent};warnings.set(box,warn);
+   const warn=()=>{warning.textContent=data.provider==='email'&&data.enabled&&!delivery?'Email login is enabled, but it will not be shown to users until Email delivery is configured. The enabled preference is preserved.':'';warning.hidden=!warning.textContent};warnings.set(box,warn);
    let client,secret;
    if(creating){const l=el('label','Provider'),select=el('select');for(const p of available.filter(p=>records.some(r=>r.provider===p.id&&!r.connected)))select.append(new Option(p.name,p.id));select.value=data.provider;l.append(select);form.append(l);select.onchange=()=>{const next=card(records.find(r=>r.provider===select.value),true);warnings.delete(box);box.replaceWith(next);draft=next;FormUI.refresh()}}
    if(data.provider==='google'){

@@ -10,6 +10,12 @@ allowed declared media type and verify SHA-256 and size using S3 metadata. SHA-2
 existing file, regardless of filename. Provider-specific formats and duration,
 dimension and file-size limits still apply.
 
+WAV MIME labels `audio/wave`, `audio/wav` and `audio/x-wav` identify the same
+format and normalize to `audio/wave` for new uploads and template validation.
+Existing uploads using these labels remain usable. Template validation still
+inspects the stored bytes and enforces the selected model's supported formats
+and limits; WAV support depends on the model.
+
 Drag selected thumbnails to reorder them. The × control removes a reference from
 the current generation; Delete in My storage permanently removes its file.
 Source deletion is blocked until a provider registration has finished ingesting it.
@@ -114,3 +120,9 @@ upload sessions; the worker cleans up expired sessions and unfinished parts.
 Run `node scripts/ui/references.cjs` with Playwright installed for browser tests;
 `NODE_PATH`, `UI_BROWSER_PATH` and `UI_SCREENSHOT_DIR` work as in the existing UI
 smoke suite. It uses mocked API responses and never calls a paid provider.
+
+MP4 average frame rate is calculated from the weighted `stts` sample timing
+table in the media timescale, rather than the nominal label or a padded track
+header duration. Duration checks use the longer of header and sample duration,
+so shorter headers cannot bypass model duration/combined-duration limits.
+This does not round 23.976 FPS to 24 or relax provider-specific limits.

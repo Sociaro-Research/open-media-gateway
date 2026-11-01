@@ -94,10 +94,7 @@
         if (name && parent !== group) {
           const provider = parent.providerInfo || {}, header = el('div', 'picker-group model-picker-provider'), mark = el('span', 'model-picker-provider-mark');
           header.setAttribute('role', 'presentation'); mark.setAttribute('aria-hidden', 'true'); mark.dataset.initial = [...name.trim()][0]?.toUpperCase() || '?';
-          if (provider.icon_url) {
-            const icon = el('img'); icon.src = provider.icon_url; icon.alt = ''; icon.width = icon.height = 32; icon.classList.toggle('monochrome', !!provider.icon_monochrome);
-            icon.addEventListener('error', () => icon.remove(), {once:true}); mark.append(icon);
-          }
+          ProviderLogos.image(mark, {...provider,name});
           const title = el('strong', 'model-picker-provider-name', name); title.title = name;
           header.append(mark, title); list.append(header);
         }

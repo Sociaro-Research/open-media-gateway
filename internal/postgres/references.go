@@ -9,6 +9,7 @@ import (
 	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
 	"github.com/Sociaro-Research/open-media-gateway/internal/references"
 	"github.com/Sociaro-Research/open-media-gateway/internal/storage"
+	"github.com/Sociaro-Research/open-media-gateway/internal/templates"
 )
 
 type referenceDB interface {
@@ -20,7 +21,7 @@ type ReferenceRepository struct{ db referenceDB }
 
 func NewReferenceRepository(db *sql.DB) *ReferenceRepository { return &ReferenceRepository{db: db} }
 func (r *ReferenceRepository) List(ctx context.Context, limit, offset int) ([]references.Image, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT id, name, content_type, size_bytes, storage_key, created_at, COALESCE(content_sha256, '') FROM reference_images WHERE owner_id=$1 AND ($4='' OR actor_id::text=$4) ORDER BY created_at DESC, id DESC LIMIT $2 OFFSET $3`, identity.OwnerID(ctx), limit, offset, identity.ContentAuthorFilter(ctx))
+	rows, err := r.db.QueryContext(ctx, `SELECT id, name, content_type, size_bytes, storage_key, created_at, COALESCE(content_sha256, ''),deleting FROM reference_images WHERE owner_id=$1 AND ($4='' OR actor_id::text=$4) ORDER BY created_at DESC, id DESC LIMIT $2 OFFSET $3`, identity.OwnerID(ctx), limit, offset, identity.ContentAuthorFilter(ctx))
 	if err != nil {
 		return nil, err
 	}
@@ -28,7 +29,7 @@ func (r *ReferenceRepository) List(ctx context.Context, limit, offset int) ([]re
 	items := []references.Image{}
 	for rows.Next() {
 		var item references.Image
-		if err := rows.Scan(&item.ID, &item.Name, &item.ContentType, &item.SizeBytes, &item.StorageKey, &item.CreatedAt, &item.SHA256); err != nil {
+		if err := rows.Scan(&item.ID, &item.Name, &item.ContentType, &item.SizeBytes, &item.StorageKey, &item.CreatedAt, &item.SHA256, &item.Deleting); err != nil {
 			return nil, err
 		}
 		items = append(items, item)
@@ -37,7 +38,11 @@ func (r *ReferenceRepository) List(ctx context.Context, limit, offset int) ([]re
 }
 func (r *ReferenceRepository) Get(ctx context.Context, id string) (references.Image, error) {
 	var item references.Image
-	err := r.db.QueryRowContext(ctx, `SELECT id, name, content_type, size_bytes, storage_key, created_at, COALESCE(content_sha256, '') FROM reference_images WHERE owner_id=$1 AND id=$2 AND ($3='' OR actor_id::text=$3)`, identity.OwnerID(ctx), id, identity.ContentAuthorFilter(ctx)).Scan(&item.ID, &item.Name, &item.ContentType, &item.SizeBytes, &item.StorageKey, &item.CreatedAt, &item.SHA256)
+	db := r.db
+	if tx, ok := ctx.Value(referenceTransactionKey{}).(*sql.Tx); ok {
+		db = tx
+	}
+	err := db.QueryRowContext(ctx, `SELECT id, name, content_type, size_bytes, storage_key, created_at, COALESCE(content_sha256, ''),COALESCE(storage_owner_id::text,owner_id::text) FROM reference_images WHERE NOT deleting AND owner_id=$1 AND id=$2 AND ($3='' OR actor_id::text=$3)`, identity.OwnerID(ctx), id, identity.ContentAuthorFilter(ctx)).Scan(&item.ID, &item.Name, &item.ContentType, &item.SizeBytes, &item.StorageKey, &item.CreatedAt, &item.SHA256, &item.StorageOwnerID)
 	if errors.Is(err, sql.ErrNoRows) {
 		err = storage.ErrObjectNotFound
 	}
@@ -48,27 +53,27 @@ func (r *ReferenceRepository) Insert(ctx context.Context, item references.Image)
 	return referenceWriteError(err)
 }
 func (r *ReferenceRepository) Delete(ctx context.Context, id string) error {
-	_, err := r.db.ExecContext(ctx, `DELETE FROM reference_images WHERE owner_id=$1 AND id=$2 AND ($3='' OR actor_id::text=$3)`, identity.OwnerID(ctx), id, identity.ContentAuthorFilter(ctx))
+	_, err := r.db.ExecContext(ctx, `DELETE FROM reference_images WHERE NOT deleting AND owner_id=$1 AND id=$2 AND ($3='' OR actor_id::text=$3)`, identity.OwnerID(ctx), id, identity.ContentAuthorFilter(ctx))
 	return err
 }
 
 func referenceWriteError(err error) error {
 	var pgerr *pgconn.PgError
-	if errors.As(err, &pgerr) && pgerr.Code == "23505" && pgerr.ConstraintName == "reference_images_owner_hash" {
+	if errors.As(err, &pgerr) && pgerr.Code == "23505" && (pgerr.ConstraintName == "reference_images_owner_hash" || pgerr.ConstraintName == "reference_images_shared_upload_hash") {
 		return references.ErrDuplicate
 	}
 	return err
 }
 func (r *ReferenceRepository) FindByHash(ctx context.Context, digest string) (references.Image, error) {
 	var item references.Image
-	err := r.db.QueryRowContext(ctx, `SELECT id,name,content_type,size_bytes,storage_key,created_at,content_sha256 FROM reference_images WHERE owner_id=$1 AND content_sha256=$2 AND ($3='' OR actor_id::text=$3)`, identity.OwnerID(ctx), digest, identity.ContentAuthorFilter(ctx)).Scan(&item.ID, &item.Name, &item.ContentType, &item.SizeBytes, &item.StorageKey, &item.CreatedAt, &item.SHA256)
+	err := r.db.QueryRowContext(ctx, `SELECT id,name,content_type,size_bytes,storage_key,created_at,content_sha256,COALESCE(storage_owner_id::text,owner_id::text) FROM reference_images WHERE NOT deleting AND owner_id=$1 AND content_sha256=$2 AND ($3='' OR actor_id::text=$3)`, identity.OwnerID(ctx), digest, identity.ContentAuthorFilter(ctx)).Scan(&item.ID, &item.Name, &item.ContentType, &item.SizeBytes, &item.StorageKey, &item.CreatedAt, &item.SHA256, &item.StorageOwnerID)
 	if errors.Is(err, sql.ErrNoRows) {
 		err = storage.ErrObjectNotFound
 	}
 	return item, err
 }
 func (r *ReferenceRepository) UnhashedBySize(ctx context.Context, size int64) ([]references.Image, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT id,name,content_type,size_bytes,storage_key,created_at FROM reference_images WHERE owner_id=$1 AND size_bytes=$2 AND content_sha256 IS NULL AND ($3='' OR actor_id::text=$3) ORDER BY created_at,id`, identity.OwnerID(ctx), size, identity.ContentAuthorFilter(ctx))
+	rows, err := r.db.QueryContext(ctx, `SELECT id,name,content_type,size_bytes,storage_key,created_at,COALESCE(storage_owner_id::text,owner_id::text) FROM reference_images WHERE owner_id=$1 AND size_bytes=$2 AND content_sha256 IS NULL AND ($3='' OR actor_id::text=$3) ORDER BY created_at,id`, identity.OwnerID(ctx), size, identity.ContentAuthorFilter(ctx))
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +81,7 @@ func (r *ReferenceRepository) UnhashedBySize(ctx context.Context, size int64) ([
 	var items []references.Image
 	for rows.Next() {
 		var item references.Image
-		if err := rows.Scan(&item.ID, &item.Name, &item.ContentType, &item.SizeBytes, &item.StorageKey, &item.CreatedAt); err != nil {
+		if err := rows.Scan(&item.ID, &item.Name, &item.ContentType, &item.SizeBytes, &item.StorageKey, &item.CreatedAt, &item.StorageOwnerID); err != nil {
 			return nil, err
 		}
 		items = append(items, item)
@@ -109,11 +114,76 @@ func (r *ReferenceRepository) DeleteWithGuard(ctx context.Context, id string, re
 	if pending {
 		return references.ErrInUse
 	}
+	if identity.OwnerID(ctx) == templates.LibraryOwnerID {
+		if _, err = tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(199079)`); err != nil {
+			return err
+		}
+		rows, e := tx.QueryContext(ctx, `SELECT id,COALESCE(NULLIF(draft->>'title',''),NULLIF(published->>'title',''),'Untitled template') FROM generation_templates WHERE removed_at IS NULL AND (draft->>'cover_id'=$1 OR published->>'cover_id'=$1 OR EXISTS(SELECT 1 FROM jsonb_array_elements(COALESCE(NULLIF(draft->'slots','null'::jsonb),'[]')) s WHERE s->>'asset_id'=$1) OR EXISTS(SELECT 1 FROM jsonb_array_elements(COALESCE(NULLIF(published->'slots','null'::jsonb),'[]')) s WHERE s->>'asset_id'=$1)) ORDER BY id`, id)
+		if e != nil {
+			return e
+		}
+		blockers := []references.TemplateUse{}
+		for rows.Next() {
+			var use references.TemplateUse
+			if e = rows.Scan(&use.ID, &use.Name); e != nil {
+				rows.Close()
+				return e
+			}
+			use.URL = "/templates?edit=" + use.ID
+			blockers = append(blockers, use)
+		}
+		e = rows.Err()
+		rows.Close()
+		if e != nil {
+			return e
+		}
+		if len(blockers) > 0 {
+			return &references.InUseError{Templates: blockers}
+		}
+	}
+
+	if identity.OwnerID(ctx) == templates.LibraryOwnerID {
+		if _, err = tx.ExecContext(ctx, `INSERT INTO deleted_template_assets(id) VALUES($1) ON CONFLICT DO NOTHING`, id); err != nil {
+			return err
+		}
+		if _, err = tx.ExecContext(ctx, `UPDATE reference_images SET deleting=true WHERE owner_id=$1 AND id=$2`, identity.OwnerID(ctx), id); err != nil {
+			return err
+		}
+		if err = tx.Commit(); err != nil {
+			return err
+		}
+		if err = remove(); err != nil {
+			return err
+		}
+		_, err = r.db.ExecContext(ctx, `DELETE FROM reference_images WHERE owner_id=$1 AND id=$2 AND deleting`, identity.OwnerID(ctx), id)
+		return err
+	}
 	if err = remove(); err != nil {
 		return err
 	}
-	if _, err = tx.ExecContext(ctx, `DELETE FROM reference_images WHERE owner_id=$1 AND id=$2 AND ($3='' OR actor_id::text=$3)`, identity.OwnerID(ctx), id, identity.ContentAuthorFilter(ctx)); err != nil {
+	if _, err = tx.ExecContext(ctx, `DELETE FROM reference_images WHERE NOT deleting AND owner_id=$1 AND id=$2 AND ($3='' OR actor_id::text=$3)`, identity.OwnerID(ctx), id, identity.ContentAuthorFilter(ctx)); err != nil {
 		return err
 	}
 	return tx.Commit()
+}
+
+func (r *ReferenceRepository) Rename(ctx context.Context, id, name string) error {
+	result, err := r.db.ExecContext(ctx, `UPDATE reference_images SET name=$3 WHERE NOT deleting AND owner_id=$1 AND id=$2`, identity.OwnerID(ctx), id, name)
+	if err != nil {
+		return err
+	}
+	n, err := result.RowsAffected()
+	if err == nil && n != 1 {
+		return storage.ErrObjectNotFound
+	}
+	return err
+}
+
+func (r *ReferenceRepository) GetForDelete(ctx context.Context, id string) (references.Image, error) {
+	var item references.Image
+	err := r.db.QueryRowContext(ctx, `SELECT id,name,content_type,size_bytes,storage_key,created_at,COALESCE(content_sha256,''),COALESCE(storage_owner_id::text,owner_id::text) FROM reference_images WHERE owner_id=$1 AND id::text=$2 AND ($3='' OR actor_id::text=$3)`, identity.OwnerID(ctx), id, identity.ContentAuthorFilter(ctx)).Scan(&item.ID, &item.Name, &item.ContentType, &item.SizeBytes, &item.StorageKey, &item.CreatedAt, &item.SHA256, &item.StorageOwnerID)
+	if errors.Is(err, sql.ErrNoRows) {
+		err = storage.ErrObjectNotFound
+	}
+	return item, err
 }

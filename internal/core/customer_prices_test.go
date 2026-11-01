@@ -131,3 +131,17 @@ func TestCatalogResolvesEveryModelWithOnePolicyRead(t *testing.T) {
 		}
 	}
 }
+
+func TestImportedOperationalProvenanceRemainsAdministratorOnly(t *testing.T) {
+	data, err := CustomerJSON(MediaModel{Metadata: &ModelMetadata{Operational: map[string]OperationalFact{"field": {Value: json.RawMessage(`"PRIVATE_SOURCE_VALUE"`), Source: ModelSource{URL: "https://private-source.example.test"}, Snapshot: "private-hash", CheckedAt: "2026-10-26T00:00:00Z"}}}})
+	if err != nil || strings.Contains(string(data), "PRIVATE_SOURCE_VALUE") || strings.Contains(string(data), "private-source") {
+		t.Fatal("new imported evidence bypassed existing customer metadata projection", string(data), err)
+	}
+}
+
+func TestOrdinaryOperationalParameterIsNotImportedMetadata(t *testing.T) {
+	data, err := CustomerJSON(map[string]any{"parameters": map[string]any{"operational": true}})
+	if err != nil || !strings.Contains(string(data), `"operational":true`) {
+		t.Fatal("unrelated parameter was redacted", string(data), err)
+	}
+}

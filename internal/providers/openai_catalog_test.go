@@ -38,7 +38,7 @@ func openaiCatalogFixture(t *testing.T) (*Manager, context.Context, catalogsync.
 		t.Fatal(err)
 	}
 	capture, err := m.CaptureCatalog(ctx, "openai")
-	if err != nil || len(capture.Reviewed) != 24 || len(capture.Inactive) != 5 || len(capture.TariffAliases) != 11 {
+	if err != nil || len(capture.Reviewed) != 24 || len(capture.Inactive) != 7 || len(capture.TariffAliases) != 11 {
 		t.Fatal(capture, err)
 	}
 	return m, ctx, capture
@@ -122,10 +122,15 @@ func openaiReportReplay(t *testing.T, pricingFile string) {
 	check := func(model core.MediaModel, rate catalogsync.Rate) error {
 		return m.CheckCatalogRate(ctx, "openai", model, rate)
 	}
-	now := time.Date(2026, 10, 12, 12, 0, 0, 0, time.UTC)
+	now := time.Date(2026, 10, 24, 12, 0, 0, 0, time.UTC)
 	state, run := catalogsync.Reconcile(previous, capture, observations, now, check)
-	if len(run.ResolvedWarnings) != 20 || len(run.OpenWarnings) != 0 {
+	if len(run.ResolvedWarnings) != 20 || len(run.OpenWarnings) != 2 {
 		t.Fatalf("resolved %d/20, open %+v", len(run.ResolvedWarnings), run.OpenWarnings)
+	}
+	for _, warning := range run.OpenWarnings {
+		if (warning.Model != "gpt-image-1" && warning.Model != "gpt-audio-mini-2025-10-06") || !strings.Contains(warning.Reason, "deactivated model") {
+			t.Fatal("unrelated warning", warning)
+		}
 	}
 	for _, id := range []string{"sora-2", "sora-2-pro"} {
 		e := state.Models[id]
@@ -134,18 +139,25 @@ func openaiReportReplay(t *testing.T, pricingFile string) {
 		}
 	}
 	for _, model := range capture.Reviewed {
+		if state.Models[model.ID].Inactive {
+			continue
+		}
 		if len(state.Models[model.ID].Rates) != 1 {
 			t.Fatal("snapshot or alias tariff missing", model.ID)
 		}
 	}
 	_, repeat := catalogsync.Reconcile(state, capture, observations, now.Add(24*time.Hour), check)
-	if len(repeat.Changes) != 0 || len(repeat.NewWarnings) != 0 || len(repeat.OpenWarnings) != 0 || repeat.EmailStatus != "not_needed" {
+	if len(repeat.Changes) != 0 || len(repeat.NewWarnings) != 0 || len(repeat.OpenWarnings) != 2 || repeat.EmailStatus != "not_needed" {
 		t.Fatal("quiet repeat changed catalogue", repeat)
 	}
 	// A future snapshot must still require review, even if its base is known.
 	capture.IDs = append(capture.IDs, "gpt-image-2-2099-01-01")
 	_, unknown := catalogsync.Reconcile(state, capture, observations, now, check)
-	if len(unknown.OpenWarnings) != 1 || unknown.OpenWarnings[0].Model != "gpt-image-2-2099-01-01" {
+	foundUnknown := false
+	for _, w := range unknown.OpenWarnings {
+		foundUnknown = foundUnknown || w.Model == "gpt-image-2-2099-01-01"
+	}
+	if len(unknown.OpenWarnings) != 3 || !foundUnknown {
 		t.Fatal("unknown snapshot inherited a contract", unknown)
 	}
 
@@ -162,10 +174,13 @@ func openaiReportReplay(t *testing.T, pricingFile string) {
 	}
 	capture.IDs = capture.IDs[:len(capture.IDs)-1]
 	updated, changed := catalogsync.Reconcile(state, capture, observations, now.Add(48*time.Hour), check)
-	if len(changed.OpenWarnings) != 0 || len(changed.Changes) == 0 {
+	if len(changed.OpenWarnings) != 2 || len(changed.Changes) == 0 {
 		t.Fatal(changed)
 	}
 	for _, model := range capture.Reviewed {
+		if state.Models[model.ID].Inactive {
+			continue
+		}
 		r, _ := referenceRequest(model)
 		adapter, err := m.resolve(ctx, "openai", true)
 		if err != nil {
@@ -289,4 +304,110 @@ func TestOpenAIPricingColumnOrderRetainedStateReplay(t *testing.T) {
 		t.Fatalf("repeat: %+v", repeat)
 	}
 	t.Log("Retained baseline: 39 warnings, 0 changes; fixed pricing: 37 resolved, 2 document warnings retained, all stored rates unchanged; quiet repeat verified")
+}
+
+func TestOpenAIRetirementUpgradePreservesHistoricalPrices(t *testing.T) {
+	_, _, capture := openaiCatalogFixture(t)
+	now := time.Date(2026, 10, 24, 0, 0, 0, 0, time.UTC)
+	previous, _ := catalogsync.Reconcile(catalogsync.State{}, capture, nil, now, func(core.MediaModel, catalogsync.Rate) error { return nil })
+	for _, id := range []string{"gpt-image-1", "gpt-audio-mini-2025-10-06"} {
+		entry := previous.Models[id]
+		entry.Inactive = false
+		for _, model := range capture.Reviewed {
+			if model.ID == id {
+				copy := model
+				entry.Contract = &copy
+			}
+		}
+		entry.Metadata.ShutdownDate = "2027-01-20"
+		var facts []core.ModelFact
+		for _, f := range entry.Metadata.Facts {
+			if f.Label != "Lifecycle status" {
+				facts = append(facts, f)
+			}
+		}
+		entry.Metadata.Facts = facts
+		entry.Rates = []catalogsync.Rate{{Unit: "token", Per: 1000000, Price: 12345, Region: "global"}}
+		previous.Models[id] = entry
+	}
+	next, run := catalogsync.Reconcile(previous, capture, nil, now, func(core.MediaModel, catalogsync.Rate) error { return nil })
+	for id, date := range map[string]string{"gpt-image-1": "2026-10-23", "gpt-audio-mini-2025-10-06": "2026-07-23"} {
+		e := next.Models[id]
+		if !e.Inactive || e.Contract != nil || e.Metadata.ShutdownDate != date || !reflect.DeepEqual(e.Rates, previous.Models[id].Rates) {
+			t.Fatal("retirement lost price/history or retained execution", id, e)
+		}
+		if previous.Models[id].Inactive || previous.Models[id].Metadata.ShutdownDate != "2027-01-20" {
+			t.Fatal("previous state mutated")
+		}
+	}
+	for _, id := range []string{"gpt-audio-mini", "gpt-audio-mini-2025-12-15", "gpt-image-1-mini", "tts-1"} {
+		if next.Models[id].Inactive || next.Models[id].Contract == nil {
+			t.Fatal("unrelated active model retired", id)
+		}
+	}
+	if len(run.ResolvedWarnings) != 0 {
+		t.Fatal("retirement acknowledged unrelated warnings")
+	}
+	_, repeat := catalogsync.Reconcile(next, capture, nil, now.Add(time.Hour), func(core.MediaModel, catalogsync.Rate) error { return nil })
+	if len(repeat.Changes) != 0 || repeat.EmailStatus != "not_needed" {
+		t.Fatal("retirement upgrade repeats", repeat)
+	}
+}
+
+func TestOpenAIRetirementSavedStateReplay(t *testing.T) {
+	dir := os.Getenv("GATEWAY_CATALOG_REPAIR_EVIDENCE")
+	if dir == "" {
+		t.Skip("no retained installation evidence")
+	}
+	data, err := os.ReadFile(dir + "/openai-state.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var previous catalogsync.State
+	if err = json.Unmarshal(data, &previous); err != nil {
+		t.Fatal(err)
+	}
+	data, err = os.ReadFile(dir + "/saved-evidence.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var evidence struct {
+		Runs []struct {
+			ID      string          `json:"id"`
+			Payload catalogsync.Run `json:"payload"`
+		} `json:"runs"`
+	}
+	if err = json.Unmarshal(data, &evidence); err != nil {
+		t.Fatal(err)
+	}
+	var observations []catalogsync.Observation
+	for _, r := range evidence.Runs {
+		if r.ID == "06aa24a4-550f-4d25-bf96-2eb65b1c4141" {
+			observations = r.Payload.Sources
+		}
+	}
+	if len(observations) == 0 {
+		t.Fatal("target report missing")
+	}
+	m, ctx, capture := openaiCatalogFixture(t)
+	check := func(model core.MediaModel, rate catalogsync.Rate) error {
+		return m.CheckCatalogRate(ctx, "openai", model, rate)
+	}
+	now := time.Date(2026, 10, 24, 8, 0, 0, 0, time.UTC)
+	next, run := catalogsync.Reconcile(previous, capture, observations, now, check)
+	for id, date := range map[string]string{"gpt-image-1": "2026-10-23", "gpt-audio-mini-2025-10-06": "2026-07-23"} {
+		if !next.Models[id].Inactive || next.Models[id].Contract != nil || next.Models[id].Metadata.ShutdownDate != date {
+			t.Fatal("saved state not retired", id)
+		}
+	}
+	for id, before := range previous.Models {
+		if !reflect.DeepEqual(before.Rates, next.Models[id].Rates) {
+			t.Fatal("historical tariff changed", id)
+		}
+	}
+	_, repeat := catalogsync.Reconcile(next, capture, observations, now.Add(time.Hour), check)
+	if len(repeat.Changes) != 0 || len(repeat.NewWarnings) != 0 {
+		t.Fatal("saved-state replay is not quiet", repeat)
+	}
+	t.Logf("saved run upgrade: %d changes; warnings %d -> %d; all historical rates preserved; repeat quiet", len(run.Changes), len(previous.Warnings), len(run.OpenWarnings))
 }

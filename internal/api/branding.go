@@ -28,7 +28,7 @@ func (s *Server) brandingSettings(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 503, "unavailable", "appearance settings are unavailable")
 		return
 	}
-	if r.Method == "GET" {
+	if readMethod(r.Method) {
 		settings, err := store.Branding(r.Context())
 		if err != nil {
 			systemError(w, err)

@@ -8,7 +8,6 @@ import (
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
 	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
 	"github.com/Sociaro-Research/open-media-gateway/internal/markup"
-	"github.com/Sociaro-Research/open-media-gateway/internal/providers"
 	registry "github.com/Sociaro-Research/open-media-gateway/plugins/provider"
 	"github.com/google/uuid"
 )
@@ -38,7 +37,7 @@ func (s *Server) markupSettings(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 403, "forbidden", "API key belongs to another organization")
 		return
 	}
-	if r.Method == "GET" {
+	if readMethod(r.Method) {
 		p, err := repo.Markups(r.Context(), identity.ActorID(r.Context()), org)
 		if err != nil {
 			systemError(w, err)
@@ -126,13 +125,10 @@ func (s *Server) markupCatalog(w http.ResponseWriter, r *http.Request) {
 		if item.ID == "mock" {
 			continue
 		}
-		p := provider{ID: item.ID, Name: item.Name, Models: []model{}, IconURL: item.IconURL, IconMonochrome: item.IconMonochrome}
+		p := provider{ID: item.ID, Name: item.Name, Models: []model{}, IconURL: providerLogoForViewer(item.IconURL, r), IconMonochrome: item.IconMonochrome}
 		if d, ok := registry.Find(item.ID); ok {
 			if p.Name == "" {
 				p.Name = d.Name
-			}
-			if p.IconURL == "" {
-				p.IconURL, p.IconMonochrome = providers.IconURL(d), d.IconMonochrome
 			}
 		}
 		for _, m := range item.Models {
@@ -146,7 +142,7 @@ func (s *Server) markupCatalog(w http.ResponseWriter, r *http.Request) {
 		if d.ID == "mock" || seen[d.ID] {
 			continue
 		}
-		p := provider{ID: d.ID, Name: d.Name, Models: []model{}, IconURL: providers.IconURL(d), IconMonochrome: d.IconMonochrome}
+		p := provider{ID: d.ID, Name: d.Name, Models: []model{}}
 		result = append(result, p)
 	}
 	s.writeViewerJSON(w, r, 200, map[string]any{"data": result})

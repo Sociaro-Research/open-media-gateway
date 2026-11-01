@@ -142,20 +142,26 @@ func (a *Adapter) Generate(ctx context.Context, request core.MediaRequest) (core
 		content = append(content, map[string]any{"type": "audio_url", "audio_url": map[string]string{"url": url}, "role": "reference_audio"})
 	}
 	payload := struct {
-		Model           string           `json:"model"`
-		Content         []map[string]any `json:"content"`
-		Resolution      string           `json:"resolution,omitempty"`
-		CameraFixed     *bool            `json:"camera_fixed,omitempty"`
-		Ratio           string           `json:"ratio,omitempty"`
-		Duration        int              `json:"duration,omitempty"`
-		GenerateAudio   *bool            `json:"generate_audio,omitempty"`
-		Watermark       *bool            `json:"watermark,omitempty"`
-		Draft           *bool            `json:"draft,omitempty"`
-		Seed            *int64           `json:"seed,omitempty"`
-		ReturnLastFrame *bool            `json:"return_last_frame,omitempty"`
+		OmniReferenceTaskType string           `json:"omni_reference_task_type,omitempty"`
+		Model                 string           `json:"model"`
+		Content               []map[string]any `json:"content"`
+		Resolution            string           `json:"resolution,omitempty"`
+		CameraFixed           *bool            `json:"camera_fixed,omitempty"`
+		Ratio                 string           `json:"ratio,omitempty"`
+		Duration              int              `json:"duration,omitempty"`
+		GenerateAudio         *bool            `json:"generate_audio,omitempty"`
+		Watermark             *bool            `json:"watermark,omitempty"`
+		Draft                 *bool            `json:"draft,omitempty"`
+		Seed                  *int64           `json:"seed,omitempty"`
+		ReturnLastFrame       *bool            `json:"return_last_frame,omitempty"`
 	}{Model: request.Model, Content: content, GenerateAudio: request.Options.GenerateAudio,
 		Draft: request.Options.Draft, Seed: request.Options.Seed,
 		ReturnLastFrame: request.Options.ReturnLastFrame}
+	// The selected workflow means new reference-based generation, not provider
+	// inference of an edit/extend task with incompatible duration/ratio semantics.
+	if request.Model == "dreamina-seedance-2-5-260628" && request.Options.ReferenceMode == "references" {
+		payload.OmniReferenceTaskType = "reference"
+	}
 	if !legacyCommands {
 		payload.CameraFixed = request.Options.CameraFixed
 		payload.Resolution = request.Options.Resolution
@@ -268,7 +274,28 @@ func describeModel(id string) (result core.MediaModel) {
 	defer func() {
 		result.ReferenceModes = referenceModes(result)
 		if strings.HasPrefix(result.ID, "dreamina-seedance-2-") {
+			// Reviewed input limits: ModelArk Create video generation task API,
+			// checked 2026-10-26. The references workflow explicitly selects
+			// reference generation for 2.5 rather than auto edit/extend inference.
+			result.ReferenceMediaLimits = &core.ReferenceMediaLimits{MaxFiles: 12,
+				Image: core.MediaFileLimits{ContentTypes: []string{"image/png", "image/jpeg", "image/gif", "image/webp"}, MaxBytes: 30_000_000, MinDimension: 300, MaxDimension: 6000, MinRatio: 0.4, MaxRatio: 2.5},
+				Video: core.MediaFileLimits{ContentTypes: []string{"video/mp4", "video/quicktime"}, Codecs: []string{"avc1", "avc3", "hvc1", "hev1"}, MaxBytes: 200_000_001, MinDimension: 300, MaxDimension: 6000, MinPixels: 407696, MaxPixels: 8295044, MinRatio: 0.4, MaxRatio: 2.5, MinDuration: 2, MaxDuration: 15, MaxTotalDuration: 15, MinFPS: 24, MaxFPS: 60},
+				Audio: core.MediaFileLimits{ContentTypes: []string{"audio/mpeg", "audio/wave", "audio/wav", "audio/x-wav"}, MaxBytes: 15_000_001, MinDuration: 2, MaxDuration: 15, MaxTotalDuration: 15}}
+			if result.ID == "dreamina-seedance-2-5-260628" {
+				result.ReferenceMediaLimits.MaxFiles = 50
+				result.ReferenceMediaLimits.Video.MaxDuration = 30
+				result.ReferenceMediaLimits.Video.MaxTotalDuration = 30
+				result.ReferenceMediaLimits.Audio.MaxDuration = 30
+				result.ReferenceMediaLimits.Audio.MaxTotalDuration = 30
+			}
 			result.ReferencePromptSyntax = "numbered"
+			result.ReferencePromptTypes = []string{"image"}
+			if result.SupportsVideoInput {
+				result.ReferencePromptTypes = append(result.ReferencePromptTypes, "video")
+			}
+			if result.SupportsAudioInput {
+				result.ReferencePromptTypes = append(result.ReferencePromptTypes, "audio")
+			}
 		}
 	}()
 	if strings.Contains(strings.ToLower(id), "seedream") {
@@ -287,8 +314,11 @@ func describeModel(id string) (result core.MediaModel) {
 		}
 		return core.MediaModel{
 			ID: id, DisplayName: id, MediaType: "image", Resolutions: resolutions,
-			Formats:            imageFormats(id),
-			SupportsImageInput: true, MaxImageInputs: maxInputs,
+			// Image generation API, reviewed 2026-10-26. Templates inspects
+			// the supported PNG/JPEG/WebP/GIF subset of native image formats.
+			ReferenceMediaLimits: &core.ReferenceMediaLimits{MaxFiles: maxInputs, Image: core.MediaFileLimits{ContentTypes: []string{"image/png", "image/jpeg", "image/webp", "image/gif"}, MaxBytes: 30_000_001, MinDimension: 15, MinPixels: 196, MaxPixels: 36_000_000, MinRatio: 1.0 / 16, MaxRatio: 16}},
+			Formats:              imageFormats(id),
+			SupportsImageInput:   true, MaxImageInputs: maxInputs,
 			Pricing: core.MediaModelPricing{ReferenceDescription: "Price depends on the model and image count"},
 		}
 	}

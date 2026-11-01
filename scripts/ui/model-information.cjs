@@ -1,3 +1,4 @@
+const {useFixtureKey}=require('./fixture-key.cjs');
 const {evidencePath} = require('./evidence.cjs');
 // Content-first model selection across providers. All API responses are fixtures.
 const {chromium, webkit} = require('playwright');
@@ -48,7 +49,7 @@ const server = http.createServer((req, res) => {
     await page.goto(`http://127.0.0.1:${server.address().port}`);
     assert.equal(await page.locator('#generationFields').isVisible(),false);
     assert.equal(await page.locator('#provider').count(),0);
-    await page.locator('#createGenerationKey').click();
+    await useFixtureKey(page,'fixture-key');
     await page.waitForFunction(()=>selectedModel()?.id==='shared-id');
     assert.equal(await page.locator('#mediaType').count(),0);
     assert.deepEqual(await page.locator('#model optgroup').evaluateAll(es=>es.map(e=>[e.label,e.children.length])),[['Alibaba',2],['BytePlus',2]]);

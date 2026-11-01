@@ -22,6 +22,7 @@ import (
 	"github.com/Sociaro-Research/open-media-gateway/internal/providerconfig"
 	"github.com/Sociaro-Research/open-media-gateway/internal/references"
 	"github.com/Sociaro-Research/open-media-gateway/internal/storage"
+	"github.com/Sociaro-Research/open-media-gateway/internal/testmedia"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
 )
@@ -32,6 +33,7 @@ type rollbackMultipartS3 struct {
 	requests                    []string
 	size                        int64
 	digest                      string
+	data                        []byte
 	badSize, badHash, completed bool
 	omitChecksum                bool
 }
@@ -49,6 +51,9 @@ func (m *rollbackMultipartS3) RoundTrip(r *http.Request) (*http.Response, error)
 			return nil, fmt.Errorf("optional multipart checksum extension is incompatible with R2")
 		}
 		m.digest = r.Header.Get("X-Amz-Meta-Sha256")
+		if m.data == nil {
+			m.data = testmedia.PNG512("rollback")
+		}
 		fmt.Fprint(w, `<InitiateMultipartUploadResult><UploadId>upload-1</UploadId></InitiateMultipartUploadResult>`)
 	case r.Method == "GET" && q.Get("uploadId") != "":
 		if m.completed {
@@ -76,6 +81,9 @@ func (m *rollbackMultipartS3) RoundTrip(r *http.Request) (*http.Response, error)
 		}
 		m.completed = true
 		fmt.Fprint(w, `<CompleteMultipartUploadResult><ETag>"done"</ETag></CompleteMultipartUploadResult>`)
+	case r.Method == "GET" && q.Get("uploadId") == "" && !q.Has("uploads"):
+		w.Header().Set("Content-Type", "image/png")
+		w.Write(m.data)
 	case r.Method == "HEAD":
 		w.Header().Set("Content-Length", fmt.Sprint(m.size))
 		w.Header().Set("Content-Type", "image/png")
@@ -134,6 +142,7 @@ func (r *rollbackRemote) RoundTrip(req *http.Request) (*http.Response, error) {
 		if r.uploaded[key] {
 			return nil, errors.New("repeated byte upload")
 		}
+		f.data = append([]byte{}, data...)
 		r.uploaded[key] = true
 		r.puts++
 		w.Header().Set("ETag", `"part-etag"`)
@@ -258,7 +267,7 @@ func TestDirectDuplicateCompletionCommitRollback(t *testing.T) {
 				t.Fatal(err)
 			}
 			library := references.New(NewReferenceRepository(db), manager)
-			payload := bytes.Repeat([]byte("x"), 512)
+			payload := testmedia.PNG512("rollback")
 			sum := sha256.Sum256(payload)
 			input := references.UploadInput{Name: "file.png", ContentType: "image/png", SizeBytes: 512, SHA256: hex.EncodeToString(sum[:])}
 			first, err := library.BeginUpload(ctx, input)

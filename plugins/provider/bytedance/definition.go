@@ -1,6 +1,7 @@
 package bytedance
 
 import (
+	"github.com/Sociaro-Research/open-media-gateway/internal/catalogsync"
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
 	"github.com/Sociaro-Research/open-media-gateway/internal/providerkit"
 	"net/http"
@@ -10,9 +11,11 @@ import (
 
 func Definition() providerkit.Definition {
 	return providerkit.Definition{
-		AssetLibrary:   newAssetLibrary,
-		CatalogSources: catalogSources(),
-		LegacyIdentity: true,
+		AssetLibrary:               newAssetLibrary,
+		CatalogSources:             catalogSources(),
+		CatalogInterpret:           interpretVideoAPI,
+		CatalogVerificationSources: map[string][]catalogsync.Source{"dreamina-seedance-2-5-260628": {videoAPISource}},
+		LegacyIdentity:             true,
 		Profiles: func() []core.MediaModel {
 			var result []core.MediaModel
 			for _, id := range []string{"seedream-4-0-250828", "seedream-4-5-251128", "seedance-1-0-pro-fast-251015", "seedance-1-5-pro-251215", "dreamina-seedance-2-0-260128", "dreamina-seedance-2-5-260628"} {
@@ -27,7 +30,6 @@ func Definition() providerkit.Definition {
 			{Key: "asset_project", Label: "Asset library project", Group: "assets", Default: "default", Env: "BYTEPLUS_ASSET_PROJECT"},
 			{Key: "asset_region", Label: "Asset library region", Group: "assets", Default: "ap-southeast-1", Env: "BYTEPLUS_ASSET_REGION"},
 			{Key: "billing_access_key_id", Label: "Billing AccessKey ID", Secret: true, Group: "billing", Env: "BYTEPLUS_BILLING_ACCESS_KEY_ID"}, {Key: "billing_access_key_secret", Label: "Billing AccessKey Secret", Secret: true, Group: "billing", Env: "BYTEPLUS_BILLING_SECRET_ACCESS_KEY"}},
-		Icon: Icon(), IconType: "image/png", IconMonochrome: false,
 		Quote: quotePublic, Bills: fetchBills, NormalizeBill: normalizeBill,
 		BillingHelp: "Add separate BytePlus Billing AccessKey credentials; the ModelArk inference key does not grant billing access.",
 		Factory: func(c providerkit.Credentials, s providerkit.Settings, client *http.Client) (core.MediaProvider, error) {

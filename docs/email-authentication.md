@@ -1,6 +1,6 @@
 # Email authentication
 
-The login card offers the sign-in methods enabled in **Administration → Settings → Login methods**. Existing password accounts can sign in without email delivery. Registration and sending recovery links require a configured delivery provider. Email supports registration, confirmation,
+The login card offers the methods enabled and available in **Administration → Settings → Login methods**. Email login is hidden until email delivery is configured, even when its enabled preference is retained. Google remains independently available when configured. Registration and sending recovery links also require configured email delivery. Email supports registration, confirmation,
 password login, resending confirmation and password recovery. All verified users
 use the same HttpOnly browser sessions, organization memberships and API-key rules.
 Creating an email account does not join an organization or grant administrator rights.
@@ -38,11 +38,10 @@ The connection is separate from generation providers and is editable only by a
 system administrator, not an organization administrator.
 
 Settings take effect on all gateway replicas without restarting. The login card
-shows **Continue with email** when the Email switch is enabled.
+shows **Continue with email** only when the Email switch is enabled and local delivery configuration is ready.
 Selecting **Not configured** removes the delivery connection; it does not change
 login-method switches. Without delivery, requesting registration/recovery emails
-is blocked; existing password login, verified grants, links and sessions remain
-usable while the Email switch is enabled.
+is blocked and the email login choice is hidden. Existing sessions, verification links and restricted grants remain usable while the Email switch is enabled. The existing password API endpoint retains its configured-method policy; hiding the browser choice does not revoke credentials or sessions.
 Saving performs local format validation, not a provider connection test. Invalid or
 revoked keys and an unverified sending domain will produce a delivery error when
 someone requests an email; saving settings never sends real mail.
@@ -211,9 +210,9 @@ challenges or active sessions. Re-enabling restores access; existing challenge e
 The switches are read from PostgreSQL on each authentication request and fail closed if settings cannot
 be read. Email delivery remains available for notifications regardless of these switches.
 
-With email sign-in enabled but no delivery provider, existing accounts can sign
-in; registration and recovery actions are unavailable until delivery is configured.
-The administrator card shows a warning. Both methods may be disabled;
+With email enabled but delivery unconfigured, the login choice is hidden and new registration/recovery links are unavailable. The administrator card explains that the enabled preference is preserved but email login is not shown. Restoring valid local delivery configuration restores the choice without toggling the preference. Readiness checks the supported provider, sender and usable encrypted credential locally; it sends no probe and does not track transient provider outages. A configured provider can still fail when sending an email.
+
+If Google is also unavailable, ordinary users see no sign-in choice. Configure an available method before signing out of an administrator session. Fresh installations retain one-time owner setup; server operators retain the documented [administrator management-key recovery](system-administration.md#headless-installation-and-existing-accounts). This change adds no new recovery mechanism. Both methods may be disabled;
 existing administrator sessions and authorized API keys remain usable to restore them.
 
 ## Login provider administration

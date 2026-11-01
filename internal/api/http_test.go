@@ -17,6 +17,8 @@ import (
 
 type serviceStub struct{ task core.Task }
 
+func (s serviceStub) ValidateMediaRequest(context.Context, core.CreateMediaInput) error { return nil }
+
 func (s serviceStub) CreateMediaRequest(context.Context, core.CreateMediaInput, string) (core.Task, error) {
 	return s.task, nil
 }

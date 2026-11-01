@@ -19,15 +19,21 @@ import (
 	"github.com/Sociaro-Research/open-media-gateway/internal/modelaccess"
 	"github.com/Sociaro-Research/open-media-gateway/internal/organization"
 	"github.com/Sociaro-Research/open-media-gateway/internal/payments"
+	"github.com/Sociaro-Research/open-media-gateway/internal/playgroundkey"
 	"github.com/Sociaro-Research/open-media-gateway/internal/providerassets"
 	"github.com/Sociaro-Research/open-media-gateway/internal/providers"
 	"github.com/Sociaro-Research/open-media-gateway/internal/references"
+	"github.com/Sociaro-Research/open-media-gateway/internal/remoteworkspace"
 	"github.com/Sociaro-Research/open-media-gateway/internal/storage"
 	"github.com/Sociaro-Research/open-media-gateway/internal/system"
+	wa "github.com/Sociaro-Research/open-media-gateway/internal/workspaceauth"
+
+	"github.com/Sociaro-Research/open-media-gateway/internal/templates"
 	"github.com/google/uuid"
 )
 
 type Service interface {
+	ValidateMediaRequest(context.Context, core.CreateMediaInput) error
 	CreateMediaRequest(context.Context, core.CreateMediaInput, string) (core.Task, error)
 	GetTask(context.Context, string) (core.Task, error)
 	ListTasks(context.Context, int) ([]core.Task, error)
@@ -54,25 +60,30 @@ type BrowserAuth interface {
 }
 
 type Server struct {
-	providerAssets *providerassets.Service
-	assetPublicURL string
-	catalogSync    catalogsync.Repository
-	modelAccess    modelaccess.Store
-	payments       *payments.Manager
-	system         system.Repository
-	service        Service
-	health         HealthChecker
-	apiKey         string
-	storage        storage.Store
-	storageAdmin   StorageAdministration
-	mediaSigner    *mediaURLSigner
-	providerAdmin  ProviderAdministration
-	loginProviders *auth.LoginProviderManager
-	emailDelivery  *auth.DeliveryManager
-	onboarding     *organization.Onboarding
-	auth           BrowserAuth
-	keys           apikey.Repository
-	references     *references.Library
+	playgroundKeys         *playgroundkey.Manager
+	templates              templates.Repository
+	workspaceAuthorization *wa.Manager
+	remoteWorkspaceManager *remoteworkspace.Manager
+	providerAssets         *providerassets.Service
+	assetPublicURL         string
+	catalogSync            catalogsync.Repository
+	modelAccess            modelaccess.Store
+	payments               *payments.Manager
+	system                 system.Repository
+	service                Service
+	health                 HealthChecker
+	apiKey                 string
+	storage                storage.Store
+	storageAdmin           StorageAdministration
+	mediaSigner            *mediaURLSigner
+	providerAdmin          ProviderAdministration
+	loginProviders         *auth.LoginProviderManager
+	emailDelivery          *auth.DeliveryManager
+	onboarding             *organization.Onboarding
+	auth                   BrowserAuth
+	keys                   apikey.Repository
+	references             *references.Library
+	templateReferences     *references.Library
 }
 
 func New(service Service, health HealthChecker, apiKey string) http.Handler {
@@ -107,31 +118,39 @@ func NewWithPayments(service Service, health HealthChecker, apiKey string, media
 
 // Dependencies keeps management services independent of browser authentication.
 type Dependencies struct {
-	ProviderAssets *providerassets.Service
-	AssetPublicURL string
-	CatalogSync    catalogsync.Repository
-	Service        Service
-	Health         HealthChecker
-	APIKey         string
-	Storage        storage.Store
-	SigningSecret  string
-	MediaURLTTL    time.Duration
-	ProviderAdmin  ProviderAdministration
-	Auth           *auth.Manager
-	References     *references.Library
-	System         system.Repository
-	Payments       *payments.Manager
-	Keys           apikey.Repository
-	LoginProviders *auth.LoginProviderManager
-	EmailDelivery  *auth.DeliveryManager
-	Onboarding     *organization.Onboarding
+	PlaygroundKeys         *playgroundkey.Manager
+	Templates              templates.Repository
+	WorkspaceAuthorization *wa.Manager
+	RemoteWorkspace        *remoteworkspace.Manager
+	ProviderAssets         *providerassets.Service
+	AssetPublicURL         string
+	CatalogSync            catalogsync.Repository
+	Service                Service
+	Health                 HealthChecker
+	APIKey                 string
+	Storage                storage.Store
+	SigningSecret          string
+	MediaURLTTL            time.Duration
+	ProviderAdmin          ProviderAdministration
+	Auth                   *auth.Manager
+	References             *references.Library
+	System                 system.Repository
+	Payments               *payments.Manager
+	Keys                   apikey.Repository
+	LoginProviders         *auth.LoginProviderManager
+	EmailDelivery          *auth.DeliveryManager
+	Onboarding             *organization.Onboarding
 }
 
 func NewGateway(d Dependencies) http.Handler {
 	service, health, apiKey, mediaStorage, signingSecret, mediaURLTTL := d.Service, d.Health, d.APIKey, d.Storage, d.SigningSecret, d.MediaURLTTL
 	providerAdmin, authManager, library, sys, funding := d.ProviderAdmin, d.Auth, d.References, d.System, d.Payments
 	s := &Server{service: service, health: health, apiKey: apiKey, storage: mediaStorage, providerAdmin: providerAdmin, payments: funding}
+	s.remoteWorkspaceManager = d.RemoteWorkspace
+	s.workspaceAuthorization = d.WorkspaceAuthorization
 	s.references = library
+	s.templates = d.Templates
+	s.playgroundKeys = d.PlaygroundKeys
 	s.providerAssets = d.ProviderAssets
 	s.assetPublicURL = strings.TrimRight(d.AssetPublicURL, "/")
 	s.system = sys
@@ -161,13 +180,33 @@ func NewGateway(d Dependencies) http.Handler {
 
 func (s *Server) handler() http.Handler {
 	mux := http.NewServeMux()
+	s.registerTemplateRoutes(mux)
+	mux.Handle("POST /v1/playground-key/restore", s.authenticate(http.HandlerFunc(s.playgroundKey)))
+	mux.Handle("POST /v1/playground-key/create", s.authenticate(http.HandlerFunc(s.playgroundKey)))
 	mux.HandleFunc("GET /site.json", s.siteConfiguration)
 	mux.HandleFunc("GET /legal/{kind}", s.legalDocument)
 	mux.HandleFunc("GET /auth/session", s.browserSession)
 	mux.HandleFunc("GET /auth/monitoring", s.monitoringSession)
 	mux.HandleFunc("GET /branding/assets/{asset}", func(w http.ResponseWriter, r *http.Request) { brandingAsset(w, r, s.brandingReader()) })
+	mux.HandleFunc("POST /auth/workspace/start", s.startWorkspaceAuthorization)
+	mux.HandleFunc("POST /auth/workspace/poll", s.pollWorkspaceAuthorization)
+	mux.HandleFunc("POST /auth/workspace/cancel", s.cancelWorkspaceAuthorization)
+	mux.Handle("POST /v1/workspace-authorizations/inspect", s.authenticate(http.HandlerFunc(s.inspectWorkspaceAuthorization)))
+	mux.Handle("POST /v1/workspace-authorizations/approve", s.authenticate(http.HandlerFunc(s.approveWorkspaceAuthorization)))
+	mux.Handle("GET /v1/workspace-installations", s.authenticate(http.HandlerFunc(s.workspaceInstallations)))
+	mux.Handle("DELETE /v1/workspace-installations/{id}", s.authenticate(http.HandlerFunc(s.workspaceInstallations)))
 	s.registerOrganizations(mux)
 	s.registerAudit(mux)
+	mux.Handle("POST /v1/system/setup-profile", s.authenticate(http.HandlerFunc(s.setupProfile)))
+	mux.Handle("GET /v1/system/remote-workspace/authorization", s.authenticate(http.HandlerFunc(s.remoteAuthorization)))
+	mux.Handle("POST /v1/system/remote-workspace/authorization", s.authenticate(http.HandlerFunc(s.remoteAuthorization)))
+	mux.Handle("DELETE /v1/system/remote-workspace/authorization", s.authenticate(http.HandlerFunc(s.remoteAuthorization)))
+	mux.Handle("POST /v1/system/remote-workspace/authorization/poll", s.authenticate(http.HandlerFunc(s.pollRemoteAuthorization)))
+	mux.Handle("GET /v1/system/remote-workspace", s.authenticate(http.HandlerFunc(s.remoteWorkspace)))
+	mux.Handle("POST /v1/system/remote-workspace", s.authenticate(http.HandlerFunc(s.remoteWorkspace)))
+	mux.Handle("DELETE /v1/system/remote-workspace", s.authenticate(http.HandlerFunc(s.remoteWorkspace)))
+	mux.Handle("GET /v1/system/remote-workspace/proxy/{path...}", s.authenticate(http.HandlerFunc(s.remoteWorkspaceProxy)))
+	mux.Handle("POST /v1/system/remote-workspace/proxy/{path...}", s.authenticate(http.HandlerFunc(s.remoteWorkspaceProxy)))
 	mux.Handle("GET /v1/system/model-settings", s.authenticate(http.HandlerFunc(s.modelSettings)))
 	mux.Handle("PUT /v1/system/model-settings/{model}", s.authenticate(http.HandlerFunc(s.modelSettings)))
 	mux.Handle("GET /v1/organizations/{org}/model-access", s.authenticate(http.HandlerFunc(s.modelSettings)))
@@ -193,6 +232,7 @@ func (s *Server) handler() http.Handler {
 		mux.Handle("GET /v1/system/providers", s.authenticate(http.HandlerFunc(s.listAdminProviders)))
 		mux.Handle("GET /v1/system/providers/{id}", s.authenticate(http.HandlerFunc(s.getAdminProvider)))
 		mux.Handle("PUT /v1/system/providers/{id}", s.authenticate(http.HandlerFunc(s.updateAdminProvider)))
+		mux.Handle("PUT /v1/system/providers/{id}/logo", s.authenticate(http.HandlerFunc(s.uploadProviderLogo)))
 		mux.Handle("POST /v1/system/providers/{id}/check", s.authenticate(http.HandlerFunc(s.checkAdminProvider)))
 		mux.Handle("GET /v1/system/storage", s.authenticate(http.HandlerFunc(s.getStorageSettings)))
 		mux.Handle("PUT /v1/system/storage", s.authenticate(http.HandlerFunc(s.updateStorageSettings)))
@@ -231,8 +271,7 @@ func (s *Server) handler() http.Handler {
 	}
 	mux.HandleFunc("GET /openapi.json", openAPISpec)
 	mux.HandleFunc("GET /openapi.yaml", openAPISpec)
-	mux.HandleFunc("GET /provider-assets/{id}/icon.png", providerIcon)
-	mux.HandleFunc("GET /provider-assets/{id}/icon.svg", providerSVGIcon)
+	mux.Handle("GET /provider-assets/{owner}/{id}/icon.png", s.authenticate(http.HandlerFunc(s.providerLogo)))
 	mux.HandleFunc("GET /healthz", s.healthz)
 	if s.auth != nil {
 		mux.Handle("GET /v1/info", s.authenticate(http.HandlerFunc(s.info)))
@@ -240,8 +279,8 @@ func (s *Server) handler() http.Handler {
 		mux.HandleFunc("GET /v1/info", s.info)
 	}
 	if s.auth != nil {
-		mux.HandleFunc("GET /auth/google", s.auth.Login)
-		mux.HandleFunc("GET /auth/google/callback", s.auth.Callback)
+		mux.HandleFunc("GET /auth/google", getOnly(s.auth.Login))
+		mux.HandleFunc("GET /auth/google/callback", getOnly(s.auth.Callback))
 		mux.HandleFunc("POST /auth/logout", s.auth.Logout)
 		if emailAuth, ok := s.auth.(interface {
 			Methods(http.ResponseWriter, *http.Request)
@@ -281,6 +320,7 @@ func (s *Server) handler() http.Handler {
 		mux.Handle("GET /v1/admin/providers", s.authenticate(http.HandlerFunc(s.listAdminProviders)))
 		mux.Handle("GET /v1/admin/providers/{id}", s.authenticate(http.HandlerFunc(s.getAdminProvider)))
 		mux.Handle("PUT /v1/admin/providers/{id}", s.authenticate(http.HandlerFunc(s.updateAdminProvider)))
+		mux.Handle("PUT /v1/admin/providers/{id}/logo", s.authenticate(http.HandlerFunc(s.uploadProviderLogo)))
 		mux.Handle("POST /v1/admin/providers/{id}/check", s.authenticate(http.HandlerFunc(s.checkAdminProvider)))
 	}
 	if s.storageAdmin != nil {
@@ -295,7 +335,7 @@ func (s *Server) handler() http.Handler {
 	protection.SetDenyHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusForbidden, "cross_origin_request", "cross-origin browser mutations are not allowed")
 	}))
-	return requestLogging(recoverPanic(protection.Handler(mux)))
+	return requestLogging(headResponses(recoverPanic(protection.Handler(mux))))
 }
 
 func (s *Server) info(w http.ResponseWriter, r *http.Request) {
@@ -381,8 +421,15 @@ func (s *Server) listProviders(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) submitGeneration(w http.ResponseWriter, r *http.Request, input core.CreateMediaInput) {
+	input.AdmissionError = s.validateGenerationReferences(r, input)
 	task, err := s.service.CreateMediaRequest(r.Context(), input, r.Header.Get("Idempotency-Key"))
+	if err != nil && input.AdmissionError != nil && errors.Is(err, input.AdmissionError) {
+		s.referenceError(w, input.AdmissionError)
+		return
+	}
 	switch {
+	case errors.Is(err, core.ErrProjectInvalid):
+		invalidParameter(w, "project_id", err.Error())
 	case errors.Is(err, core.ErrCostLimitInvalid):
 		invalidParameter(w, "max_expected_cost_usd", err.Error())
 	case errors.Is(err, core.ErrPromptRequired), errors.Is(err, core.ErrPromptTooLong), errors.Is(err, core.ErrModelRequired),
@@ -438,7 +485,7 @@ func (s *Server) authenticate(next http.Handler) http.Handler {
 			}
 			provided = parts[1]
 		}
-		management := strings.HasPrefix(r.URL.Path, "/v1/sales/") || strings.HasPrefix(r.URL.Path, "/v1/client-onboardings") || strings.HasPrefix(r.URL.Path, "/v1/organizations") || strings.HasPrefix(r.URL.Path, "/v1/invitations") || strings.HasPrefix(r.URL.Path, "/v1/system/") || strings.HasPrefix(r.URL.Path, "/v1/audit/") || r.URL.Path == "/v1/me" || r.URL.Path == "/v1/info" || strings.HasPrefix(r.URL.Path, "/v1/admin/") || r.URL.Path == "/v1/api-keys" || strings.HasPrefix(r.URL.Path, "/v1/api-keys/")
+		management := strings.HasPrefix(r.URL.Path, "/provider-assets/") || strings.HasPrefix(r.URL.Path, "/v1/playground-key/") || strings.HasPrefix(r.URL.Path, "/v1/workspace-authorizations/") || strings.HasPrefix(r.URL.Path, "/v1/workspace-installations") || strings.HasPrefix(r.URL.Path, "/v1/sales/") || strings.HasPrefix(r.URL.Path, "/v1/client-onboardings") || strings.HasPrefix(r.URL.Path, "/v1/organizations") || strings.HasPrefix(r.URL.Path, "/v1/invitations") || strings.HasPrefix(r.URL.Path, "/v1/system/") || strings.HasPrefix(r.URL.Path, "/v1/audit/") || r.URL.Path == "/v1/me" || r.URL.Path == "/v1/info" || strings.HasPrefix(r.URL.Path, "/v1/admin/") || r.URL.Path == "/v1/api-keys" || strings.HasPrefix(r.URL.Path, "/v1/api-keys/")
 		if !management && !hasBearer && !hasXKey {
 			writeError(w, http.StatusUnauthorized, "unauthorized", "a Gateway API key is required; browser sign-in does not authorize generation")
 			return
@@ -457,13 +504,19 @@ func (s *Server) authenticate(next http.Handler) http.Handler {
 			user, key, err := s.keys.Authenticate(r.Context(), apikey.Hash(provided))
 			if err == nil {
 				scope := apikey.Generation
-				if (strings.HasPrefix(r.URL.Path, "/v1/organizations") && r.Method != http.MethodGet && r.Method != http.MethodHead) || r.URL.Path == "/v1/invitations/accept" {
+				if strings.HasPrefix(r.URL.Path, "/provider-assets/") && !slices.Contains(key.Scopes, apikey.Generation) {
+					scope = apikey.ProvidersManage
+					if slices.Contains(key.Scopes, apikey.SystemManage) {
+						scope = apikey.SystemManage
+					}
+				}
+				if (strings.HasPrefix(r.URL.Path, "/v1/organizations") && r.Method != http.MethodGet && !organizationArtifactHEAD(r)) || r.URL.Path == "/v1/invitations/accept" {
 					scope = apikey.OrganizationsManage
 				}
 				if strings.HasPrefix(r.URL.Path, "/v1/organizations/") && (strings.HasSuffix(r.URL.Path, "/storage") || strings.Contains(r.URL.Path, "/payments") || strings.HasSuffix(r.URL.Path, "/payment-methods") || strings.HasSuffix(r.URL.Path, "/balance-history")) {
 					scope = apikey.OrganizationsManage
 				}
-				if strings.HasPrefix(r.URL.Path, "/v1/audit/") || strings.HasPrefix(r.URL.Path, "/v1/system/") || (strings.HasPrefix(r.URL.Path, "/v1/organizations/") && (strings.HasSuffix(r.URL.Path, "/markups") || strings.HasSuffix(r.URL.Path, "/limits") || strings.HasSuffix(r.URL.Path, "/model-access"))) {
+				if strings.HasPrefix(r.URL.Path, "/v1/audit/") || (strings.HasPrefix(r.URL.Path, "/v1/system/") && !sharedTemplateRead(r)) || (strings.HasPrefix(r.URL.Path, "/v1/organizations/") && (strings.HasSuffix(r.URL.Path, "/markups") || strings.HasSuffix(r.URL.Path, "/limits") || strings.HasSuffix(r.URL.Path, "/model-access"))) {
 					scope = apikey.SystemManage
 				}
 				if strings.HasPrefix(r.URL.Path, "/v1/admin/providers") {
@@ -488,7 +541,7 @@ func (s *Server) authenticate(next http.Handler) http.Handler {
 				}
 				ctx := identity.WithAPIKeyID(identity.WithUser(r.Context(), user), key.ID)
 				ctx = identity.WithSystemPermission(ctx, slices.Contains(key.Scopes, apikey.SystemManage))
-				if !management {
+				if !management || strings.HasPrefix(r.URL.Path, "/provider-assets/") {
 					provider, storage := user.ID, user.ID
 					if key.ResourceMode == "shared" {
 						storage = identity.SharedOwnerID

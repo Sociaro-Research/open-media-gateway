@@ -142,7 +142,7 @@ func (v Generation) MarshalJSON() ([]byte, error) {
 	if v.MinimizeRequestLogging {
 		// The response and persisted webhook share this representation. Never
 		// copy in-flight content into a second long-lived record.
-		for _, key := range []string{"prompt", "input", "instructions", "image", "input_reference", "voice", "webhook_url"} {
+		for _, key := range []string{"prompt", "input", "instructions", "image", "input_reference", "voice", "webhook_url", "template_snapshot"} {
 			delete(fields, key)
 		}
 		fields["options"] = map[string]any{}

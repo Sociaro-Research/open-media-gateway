@@ -2,8 +2,11 @@ package providers
 
 import (
 	"context"
+	"encoding/json"
+	"github.com/Sociaro-Research/open-media-gateway/internal/modelcatalog"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"testing"
 
@@ -91,5 +94,45 @@ func TestCatalogTariffsOnlyMatchReviewedReferenceAndRegionRules(t *testing.T) {
 		if err != nil || cost.ExpectedUSD != base.ExpectedUSD {
 			t.Fatal("incompatible reference tariff applied", cost, err)
 		}
+	}
+}
+
+func TestReferenceRecommendationParsedPublicationProjection(t *testing.T) {
+	model := modelcatalog.Enrich("bytedance", core.MediaModel{ID: "dreamina-seedance-2-5-260628"})
+	body, err := os.ReadFile("../../plugins/provider/bytedance/testdata/video-api/seedance-parameters.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(body) + "\n```json\n{\"model\":\"" + model.ID + "\",\"content\":[{\"text\":\"Use @Image1\"}]}\n```"
+	manager, _, ctx := fixtureConnection(t)
+	source := catalogsync.Source{ID: "endpoint", URL: model.ReferencePromptRecommendation.SourceURL, Parser: "document"}
+	entries, err := manager.InterpretCatalogSource(ctx, "bytedance", source, text)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fact json.RawMessage
+	for _, e := range entries {
+		if e.ID == model.ID {
+			fact = e.OperationalFields["reference_prompt_recommendation"]
+		}
+	}
+	if len(fact) == 0 {
+		t.Fatal("parsed advice missing")
+	}
+	state := catalogsync.State{Models: map[string]catalogsync.Entry{model.ID: {ID: model.ID, Metadata: &core.ModelMetadata{Operational: map[string]core.OperationalFact{"reference_prompt_recommendation": {Value: fact, Source: core.ModelSource{URL: source.URL}}}}}}}
+	projected := applyCatalogModel(model, state)
+	if !strings.Contains(projected.ReferencePromptRecommendation.Text, "@Image1") || strings.Contains(projected.ReferencePromptRecommendation.Text, "@Video1") {
+		t.Fatal("unobserved advice", projected.ReferencePromptRecommendation)
+	}
+	forged := state.Models[model.ID].Metadata.Operational["reference_prompt_recommendation"]
+	forged.Source.URL = "https://unreviewed.example.test/catalogue"
+	state.Models[model.ID].Metadata.Operational["reference_prompt_recommendation"] = forged
+	if got := applyCatalogModel(model, state); got.ReferencePromptRecommendation.Text != model.ReferencePromptRecommendation.Text {
+		t.Fatal("foreign persisted fact projected as provider advice")
+	}
+
+	projected.ReferencePromptRecommendation.Modes[0] = "mutated"
+	if model.ReferencePromptRecommendation.Modes[0] == "mutated" {
+		t.Fatal("mutated native model")
 	}
 }

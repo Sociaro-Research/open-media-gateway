@@ -6,9 +6,12 @@ import (
 
 // ReferenceMode is shared by API validation and the console. Array order assigns frame roles.
 type ReferenceMode struct {
-	MinVisuals           int `json:"min_visuals,omitempty"`
-	MaxDurationWithVideo int `json:"max_duration_with_video,omitempty"`
-	VoiceImageStart      int `json:"voice_image_start,omitempty"`
+	Ratios               []string `json:"ratios,omitempty"`
+	DefaultImageRole     string   `json:"default_image_role,omitempty"`
+	LastImageRole        string   `json:"last_image_role,omitempty"`
+	MinVisuals           int      `json:"min_visuals,omitempty"`
+	MaxDurationWithVideo int      `json:"max_duration_with_video,omitempty"`
+	VoiceImageStart      int      `json:"voice_image_start,omitempty"`
 
 	SupportsReferenceVoice bool     `json:"supports_reference_voice,omitempty"`
 	ID                     string   `json:"id"`
@@ -22,6 +25,21 @@ type ReferenceMode struct {
 	MaxVisuals             int      `json:"max_visuals,omitempty"`
 	ImageRoles             []string `json:"image_roles,omitempty"`
 	RequiresVisual         bool     `json:"requires_visual,omitempty"`
+}
+
+// ReferenceImageRole resolves both fixed keyframes and ordered first/middle/last
+// sequences without depending on provider or model names.
+func ReferenceImageRole(mode ReferenceMode, index, count int) string {
+	if index <= len(mode.ImageRoles) && index > 0 {
+		return mode.ImageRoles[index-1]
+	}
+	if index == count && mode.LastImageRole != "" {
+		return mode.LastImageRole
+	}
+	if mode.DefaultImageRole != "" {
+		return mode.DefaultImageRole
+	}
+	return "reference"
 }
 
 func (o MediaOptions) Videos() []string {

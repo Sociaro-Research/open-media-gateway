@@ -186,7 +186,55 @@ func (m *Manager) Get(ctx context.Context, id string) (AdminProvider, error) {
 }
 
 func (m *Manager) Check(ctx context.Context, id string) (AdminProvider, error) {
-	return m.describe(ctx, id, true)
+	info, err := m.describe(ctx, id, true)
+	if err != nil || !info.Configured {
+		return info, err
+	}
+	spec, _ := m.findSpec(id)
+	if !spec.AuthenticatedCheck {
+		return info, nil
+	}
+	call, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	started := time.Now()
+	adapter, err := m.resolve(call, id, false)
+	if err == nil {
+		err = validateAdapter(call, adapter)
+	}
+	applyCredentialStatus(&info, adapter)
+	if err != nil {
+		info.CheckLatencyMS = time.Since(started).Milliseconds()
+		info.Status, info.StatusMessage = "error", err.Error()
+		return info, nil
+	}
+	return info, nil
+}
+
+func applyCredentialStatus(info *AdminProvider, adapter core.MediaProvider) {
+	reader, ok := adapter.(interface {
+		CredentialStatus() providerkit.CredentialCheck
+	})
+	if !ok {
+		return
+	}
+	check := reader.CredentialStatus()
+	if check.CheckedAt.IsZero() {
+		return
+	}
+	info.LastCheckedAt = &check.CheckedAt
+	info.CheckLatencyMS = check.LatencyMS
+	if check.Err != nil {
+		info.Status, info.StatusMessage = "error", check.Err.Error()
+	} else {
+		info.Status = "authenticated"
+		info.StatusMessage = "Account query authenticated. Model access, available funds and generation output are not verified."
+		if check.Warning != "" {
+			info.StatusMessage += " " + check.Warning
+		}
+		if !info.Enabled {
+			info.StatusMessage += " Provider is disabled."
+		}
+	}
 }
 
 func (m *Manager) Update(ctx context.Context, id string, update ProviderUpdate) (AdminProvider, error) {
@@ -329,7 +377,7 @@ func (m *Manager) describe(ctx context.Context, id string, checkProvider bool) (
 	}
 	result := AdminProvider{
 		SupportsBillingCredentials: spec.Bills != nil,
-		Fields:                     spec.Fields, Values: publicValues(spec, credentials, false), Hints: publicValues(spec, credentials, true), IconURL: IconURL(spec), IconMonochrome: spec.IconMonochrome, BillingHelp: spec.BillingHelp,
+		Fields:                     spec.Fields, Values: publicValues(spec, credentials, false), Hints: publicValues(spec, credentials, true), IconURL: m.logoURL(ctx, id), IconMonochrome: true, BillingHelp: spec.BillingHelp,
 		DefaultTimeoutSeconds: max(1, int64(defaultTimeout/time.Second)),
 		ID:                    id, Name: spec.Name, Description: spec.Description, APIType: spec.ID, Version: record.Version, Archived: record.Archived, Connection: publicConnection(credentials.Connection),
 		Enabled: record.Enabled, Configured: configured, CredentialSource: record.CredentialSource,
@@ -357,6 +405,14 @@ func (m *Manager) describe(ctx context.Context, id string, checkProvider bool) (
 		} else {
 			result.Status = "disabled"
 			result.StatusMessage = "Provider disabled and hidden from Playground."
+		}
+		if spec.AuthenticatedCheck {
+			m.mu.Lock()
+			cached, exists := m.adapters[m.cacheKey(ctx, id)]
+			m.mu.Unlock()
+			if exists && cached.fingerprint == credentialFingerprint(credentials) {
+				applyCredentialStatus(&result, cached.adapter)
+			}
 		}
 		return result, nil
 	}
@@ -398,6 +454,9 @@ func (m *Manager) describe(ctx context.Context, id string, checkProvider bool) (
 	} else {
 		result.Status = "disabled"
 		result.StatusMessage = "Configuration saved. Provider is disabled."
+	}
+	if spec.AuthenticatedCheck {
+		applyCredentialStatus(&result, adapter)
 	}
 	return result, nil
 }
@@ -618,18 +677,6 @@ func (m *Manager) findSpec(id string) (providerkit.Definition, bool) {
 }
 func (m *Manager) isFree(id string) bool { d, ok := m.findSpec(id); return ok && d.Free }
 
-// IconURL identifies embedded provider artwork with a content-versioned URL.
-func IconURL(d providerkit.Definition) string {
-	if len(d.Icon) == 0 {
-		return ""
-	}
-	ext := "png"
-	if d.IconType == "image/svg+xml" {
-		ext = "svg"
-	}
-	digest := sha256.Sum256(d.Icon)
-	return "/provider-assets/" + d.ID + "/icon." + ext + "?v=" + hex.EncodeToString(digest[:8])
-}
 func publicValues(d providerkit.Definition, c Credentials, secrets bool) map[string]string {
 	v := map[string]string{}
 	for _, f := range d.Fields {
@@ -670,12 +717,8 @@ type managedProvider struct {
 
 func (p *managedProvider) Name() string { return p.id }
 
-func (p *managedProvider) ProviderIcon() (string, bool) {
-	spec, ok := p.manager.findSpec(p.id)
-	if !ok {
-		return "", false
-	}
-	return IconURL(spec), spec.IconMonochrome
+func (p *managedProvider) ProviderIcon(ctx context.Context) (string, bool) {
+	return p.manager.logoURL(ctx, p.id), true
 }
 
 func (p *managedProvider) DisplayName() string {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"net/http"
 	"path"
 	"strings"
@@ -11,6 +12,8 @@ import (
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
 	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
+	"github.com/Sociaro-Research/open-media-gateway/internal/mediafile"
+	"github.com/Sociaro-Research/open-media-gateway/internal/referencevalidation"
 	"github.com/Sociaro-Research/open-media-gateway/internal/storage"
 	"github.com/google/uuid"
 )
@@ -19,16 +22,19 @@ var ErrUploadExpired = errors.New("upload expired; select the file again")
 var ErrDirectUploadRequired = storage.ErrDirectUploadRequired
 
 type UploadInput struct {
-	Name        string `json:"name"`
-	ContentType string `json:"content_type"`
-	SizeBytes   int64  `json:"size_bytes"`
-	SHA256      string `json:"sha256"`
+	Validation  *referencevalidation.Target `json:"validation,omitempty"`
+	Name        string                      `json:"name"`
+	ContentType string                      `json:"content_type"`
+	SizeBytes   int64                       `json:"size_bytes"`
+	SHA256      string                      `json:"sha256"`
 }
 type UploadSession struct {
-	Item      Image                 `json:"item"`
-	Storage   storage.PendingUpload `json:"storage"`
-	ExpiresAt time.Time             `json:"expires_at"`
-	ResultID  string                `json:"result_id,omitempty"`
+	Validation *referencevalidation.Target `json:"validation,omitempty"`
+	Rejected   string                      `json:"rejected,omitempty"`
+	Item       Image                       `json:"item"`
+	Storage    storage.PendingUpload       `json:"storage"`
+	ExpiresAt  time.Time                   `json:"expires_at"`
+	ResultID   string                      `json:"result_id,omitempty"`
 }
 type ExpiredUpload struct{ Owner, ID string }
 type UploadRepository interface {
@@ -64,22 +70,32 @@ func cleanName(name string) string {
 	}
 	return name
 }
-func validUpload(input UploadInput) bool {
-	sum, err := hex.DecodeString(input.SHA256)
-	if err != nil || len(sum) != 32 || input.SizeBytes <= 0 {
-		return false
-	}
-	limit := int64(0)
-	switch input.ContentType {
+func commonLimit(kind string) int64 {
+	switch kind {
 	case "image/png", "image/jpeg", "image/webp", "image/gif":
-		limit = 30 << 20
+		return 30 << 20
 	case "video/mp4", "video/quicktime", "video/webm":
-		limit = 200 << 20
+		return 200 << 20
 	case "audio/mpeg", "audio/wave", "audio/wav", "audio/x-wav", "audio/ogg", "audio/flac":
-		limit = 50 << 20
+		return 50 << 20
 	}
-	return input.SizeBytes <= limit
+	return 0
 }
+func checkUpload(input UploadInput) error {
+	limit := commonLimit(input.ContentType)
+	if limit == 0 {
+		return referencevalidation.Invalid(cleanName(input.Name), "Declared format "+input.ContentType+" is unsupported. Use PNG/JPEG/WebP/GIF, MP4/MOV/WebM or MP3/WAV/OGG/FLAC.")
+	}
+	if input.SizeBytes <= 0 || input.SizeBytes > limit {
+		return referencevalidation.Invalid(cleanName(input.Name), fmt.Sprintf("size %d bytes; %s requires a nonempty file at most %d bytes. Reduce the file size.", input.SizeBytes, input.ContentType, limit))
+	}
+	sum, err := hex.DecodeString(input.SHA256)
+	if err != nil || len(sum) != 32 {
+		return referencevalidation.Invalid(cleanName(input.Name), "A complete SHA-256 checksum is required. Select the file again.")
+	}
+	return nil
+}
+func validUpload(input UploadInput) bool { return checkUpload(input) == nil }
 func (l *Library) RequiresDirectUpload(ctx context.Context) (bool, error) {
 	store, ok := l.store.(DirectStore)
 	if !ok {
@@ -89,8 +105,12 @@ func (l *Library) RequiresDirectUpload(ctx context.Context) (bool, error) {
 	return plan != nil, err
 }
 func (l *Library) BeginUpload(ctx context.Context, input UploadInput) (UploadPlan, error) {
-	if !validUpload(input) {
-		return UploadPlan{}, ErrInvalidImage
+	return l.BeginUploadWithValidation(ctx, input, nil)
+}
+func (l *Library) BeginUploadWithValidation(ctx context.Context, input UploadInput, validate referencevalidation.Validator) (UploadPlan, error) {
+	input.ContentType = mediafile.CanonicalContentType(input.ContentType)
+	if err := checkUpload(input); err != nil {
+		return UploadPlan{}, err
 	}
 	input.SHA256 = strings.ToLower(input.SHA256)
 	store, ok := l.store.(DirectStore)
@@ -110,7 +130,7 @@ func (l *Library) BeginUpload(ctx context.Context, input UploadInput) (UploadPla
 		return UploadPlan{}, errors.New("direct upload repository is unavailable")
 	}
 	item := Image{ID: id, Name: cleanName(input.Name), ContentType: input.ContentType, SizeBytes: input.SizeBytes, SHA256: input.SHA256, StorageKey: pending.Key, CreatedAt: time.Now().UTC()}
-	session := UploadSession{Item: item, Storage: *pending, ExpiresAt: time.Now().UTC().Add(30 * time.Minute)}
+	session := UploadSession{Item: item, Storage: *pending, ExpiresAt: time.Now().UTC().Add(30 * time.Minute), Validation: input.Validation}
 	// Persist the unique destination first, so even a lost S3 initiation response
 	// leaves enough information for the cleanup worker to reclaim its parts.
 	if err = repo.CreateUpload(ctx, session); err != nil {
@@ -120,6 +140,16 @@ func (l *Library) BeginUpload(ctx context.Context, input UploadInput) (UploadPla
 	err = repo.UseUpload(ctx, id, false, func(ctx context.Context, s *UploadSession, refs Repository) error {
 		existing, err := refs.FindByHash(ctx, input.SHA256)
 		if err == nil {
+			if e := CheckRead(ctx); e != nil {
+				return e
+			}
+			file, e := l.inspectItem(ctx, existing)
+			if e != nil {
+				return e
+			}
+			if e = validateTarget(ctx, input.Validation, []referencevalidation.File{file}, validate); e != nil {
+				return e
+			}
 			existing.Duplicate = true
 			plan.Existing = &existing
 			s.ResultID = existing.ID
@@ -138,6 +168,9 @@ func (l *Library) BeginUpload(ctx context.Context, input UploadInput) (UploadPla
 	return plan, err
 }
 func (l *Library) FinishUpload(ctx context.Context, id string) (Image, error) {
+	return l.FinishUploadWithValidation(ctx, id, nil)
+}
+func (l *Library) FinishUploadWithValidation(ctx context.Context, id string, validate referencevalidation.Validator) (Image, error) {
 	repo, ok := l.repo.(UploadRepository)
 	if !ok {
 		return Image{}, storage.ErrObjectNotFound
@@ -148,12 +181,24 @@ func (l *Library) FinishUpload(ctx context.Context, id string) (Image, error) {
 	}
 	var result Image
 	var cleanupDuplicate bool
+	var rejection error
 	err := repo.UseUpload(ctx, id, false, func(ctx context.Context, s *UploadSession, refs Repository) error {
+		if s.Rejected != "" {
+			rejection = fmt.Errorf("%w: %s", referencevalidation.ErrInvalid, s.Rejected)
+			return nil
+		}
 		if s.ResultID != "" {
 			var err error
 			result, err = refs.Get(ctx, s.ResultID)
 			result.Duplicate = s.ResultID != s.Item.ID
 			cleanupDuplicate = result.Duplicate && s.Storage.UploadID != ""
+			if err == nil && s.Validation != nil {
+				file, e := l.inspectItem(ctx, result)
+				if e != nil {
+					return e
+				}
+				return validateTarget(ctx, s.Validation, []referencevalidation.File{file}, validate)
+			}
 			return err
 		}
 		if time.Now().After(s.ExpiresAt) {
@@ -167,6 +212,25 @@ func (l *Library) FinishUpload(ctx context.Context, id string) (Image, error) {
 		media, err := store.CompleteUpload(ctx, s.Storage)
 		if err != nil {
 			return err
+		}
+		// Completion creates a private, unselectable object first. Inspect its
+		// actual bytes before inserting any library reference or deduplicating.
+		pending := s.Item
+		pending.StorageKey = media.StorageKey
+		inspectCtx := identity.WithResourceOwners(ctx, identity.ProviderOwnerID(ctx), s.Storage.StorageOwner)
+		file, e := l.inspectItem(inspectCtx, pending)
+		if e == nil {
+			e = validateTarget(ctx, s.Validation, []referencevalidation.File{file}, validate)
+		}
+		if e != nil {
+			if !errors.Is(e, referencevalidation.ErrInvalid) {
+				return e
+			}
+			// Commit the rejection before deleting temporary bytes. Uncertain DB
+			// outcomes remain recoverable by retry and the existing cleanup worker.
+			s.Rejected = e.Error()
+			rejection = e
+			return nil
 		}
 		existing, err := refs.FindByHash(ctx, s.Item.SHA256)
 		if err == nil {
@@ -187,6 +251,22 @@ func (l *Library) FinishUpload(ctx context.Context, id string) (Image, error) {
 		result = s.Item
 		return nil
 	})
+	if err == nil && rejection != nil {
+		cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+		defer cancel()
+		// On cleanup failure retain the durable rejected session for the worker.
+		_ = repo.UseUpload(cleanup, id, false, func(ctx context.Context, s *UploadSession, _ Repository) error {
+			if s.Rejected == "" || s.Storage.UploadID == "" {
+				return nil
+			}
+			if e := store.AbortUpload(ctx, s.Storage, true); e != nil {
+				return e
+			}
+			s.Storage.UploadID = ""
+			return nil
+		})
+		return Image{}, rejection
+	}
 	if err == nil && cleanupDuplicate {
 		// Keep the completed object recoverable until ResultID is durable. A
 		// rollback after deleting it would leave neither an upload nor an object
@@ -243,7 +323,7 @@ func (l *Library) DirectURL(ctx context.Context, id, method string, ttl time.Dur
 		return "", err
 	}
 	if store, ok := l.store.(storage.DirectReader); ok {
-		return store.DirectURL(ctx, item.StorageKey, method, item.ContentType, "inline", ttl)
+		return store.DirectURL(StorageContext(ctx, item), item.StorageKey, method, item.ContentType, "inline", ttl)
 	}
 	return "", nil
 }

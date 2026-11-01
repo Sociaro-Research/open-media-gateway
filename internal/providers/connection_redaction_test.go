@@ -76,3 +76,21 @@ func TestConnectionRedactionPreservesValidationClassification(t *testing.T) {
 		t.Fatalf("classification/redaction contract lost: %v", sanitized)
 	}
 }
+
+type warningCheckProvider struct {
+	core.MediaProvider
+	check providerkit.CredentialCheck
+}
+
+func (p warningCheckProvider) CredentialStatus() providerkit.CredentialCheck { return p.check }
+
+func TestCredentialCheckWarningsRedactConfiguredSecrets(t *testing.T) {
+	wrapper := &connectionAdapter{
+		MediaProvider: warningCheckProvider{check: providerkit.CredentialCheck{Warning: "Optional details unavailable: synthetic-key synthetic-header-secret"}},
+		credentials:   Credentials{APIKey: "synthetic-key", Connection: &providerkit.Connection{Headers: []providerkit.Header{{Name: "X-Private", Value: pointer("synthetic-header-secret")}}}},
+	}
+	check := wrapper.CredentialStatus()
+	if check.Err != nil || strings.Contains(check.Warning, "synthetic-key") || strings.Contains(check.Warning, "synthetic-header-secret") || check.Warning != "Optional details unavailable: [redacted] [redacted]" {
+		t.Fatal("warning redaction failed", check)
+	}
+}

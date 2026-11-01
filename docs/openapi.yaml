@@ -2,7 +2,7 @@
 openapi: 3.1.0
 info:
   title: Media Gateway API
-  version: 1.0.1
+  version: 1.0.1-dev.20261027
   description: One asynchronous API for image, video, speech and music generation.
     Connect providers once, then access your organization through the console or your
     applications. Generation endpoints use OpenAI vocabulary with asynchronous Gateway
@@ -20,6 +20,7 @@ security:
 - bearerAuth: []
 tags:
 - name: Generations
+- name: Templates
 - name: Catalog
 - name: Media
 - name: References
@@ -34,6 +35,281 @@ tags:
 - name: Organizations
 - name: Payments
 paths:
+  /auth/workspace/start:
+    post:
+      operationId: startInstallationAuthorization
+      summary: Start an explicit device-style installation request
+      security: []
+      description: Requires host customer_workspaces and shared_resources opt-in. The installation backend generates a 32-byte random device_code; it never places it in a browser or URL. Starts are idempotent for the same device code and metadata. Rate limited. No identity, company, key or credit is created here. This bounded protocol is not an OAuth compatibility claim.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [device_code, client_name, client_origin]
+              properties:
+                device_code: {type: string, minLength: 43, maxLength: 43, writeOnly: true}
+                client_name: {type: string, minLength: 1, maxLength: 80}
+                client_origin: {type: string, format: uri, maxLength: 300, description: 'Display-only installation origin, including private HTTP origins; never a callback destination.'}
+                replace_key_id: {type: string, format: uuid, description: 'Optional prior installation key; replacement still requires explicit consent by its owner.'}
+      responses:
+        '200': {description: 'user_code, expires_at (10 minutes) and polling interval (5 seconds). No customer credential.'}
+        '403': {description: Host onboarding or shared resources disabled}
+        '429': {description: Start rate limit}
+  /auth/workspace/poll:
+    post:
+      operationId: pollInstallationAuthorization
+      summary: Redeem browser consent using the installation device secret
+      security: []
+      description: Only the holder of the random device secret can redeem. Rechecks host policy, company Supermanager membership and account role. Issues one company-bound shared generation-only key for 30 days using existing API-key limits; repeated replies return the same encrypted credential until authorization expiry. No refresh token or payment authority. Slow polling returns Retry-After.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {'$ref': '#/components/schemas/WorkspaceDeviceProof'}
+      responses:
+        '200': {description: 'Backend-only token, organization_id and key_id; never forwarded by the local browser API.'}
+        '403': {description: Host policy or membership no longer permits issuance}
+        '410': {description: Expired, denied, cancelled or revoked authorization}
+        '428': {description: Browser authorization pending}
+        '429': {description: Slow down or rate limit}
+  /auth/workspace/cancel:
+    post:
+      operationId: cancelInstallationAuthorization
+      summary: Cancel a device request and revoke any key it issued
+      security: []
+      description: Requires the high-entropy device secret. Cancellation and issuance serialize; an issued key is revoked and transient ciphertext cleared even after the short authorization request expired. Expiry still forbids consent and token redemption. Repeating confirmed cancellation is safe. Does not remove a company, credit, jobs or files. Cancellation remains available when host onboarding is disabled.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {'$ref': '#/components/schemas/WorkspaceDeviceProof'}
+      responses:
+        '200': {description: Cancelled}
+        '410': {description: Authorization expired or missing}
+  /v1/workspace-authorizations/inspect:
+    post:
+      operationId: inspectInstallationConsent
+      summary: Review an installation request and the signed-in customer's owned companies
+      security: [{sessionAuth: []}]
+      description: Browser session only; API and deployment keys are rejected. Returns only companies with actual current Supermanager membership, never global administrator visibility. Code inspection does not approve or create anything. The client origin/name are unverified display data and must be checked against the initiating installation.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, required: [user_code], properties: {user_code: {type: string}}}
+      responses:
+        '200': {description: 'request metadata, companies and can_create (one self-service company per account)'}
+        '401': {description: Sign in or register through existing host identity flows}
+        '403': {description: Key authentication, sales account or disabled host}
+        '410': {description: Missing or expired user code}
+  /v1/workspace-authorizations/approve:
+    post:
+      operationId: approveInstallationConsent
+      summary: Explicitly authorize or deny one installation for an owned company
+      security: [{sessionAuth: []}]
+      description: Browser session and cross-origin protection. Requires explicit consent plus existing actual Supermanager membership, or explicit creation of one own company with the existing name/website rules. Never accepts another recipient, billing credit, management scopes or provider keys. Company creation and approval are atomic/idempotent; keys are issued only on successful device proof. Optional rotation may revoke only the same approving customer's earlier installation key.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [user_code]
+              properties:
+                user_code: {type: string}
+                organization_id: {type: string, description: 'Choose an actually owned company; omit to create one.'}
+                company_name: {type: string, maxLength: 160}
+                company_website: {type: string}
+                consent: {type: boolean}
+                deny: {type: boolean}
+                replace_previous: {type: boolean, default: false}
+      responses:
+        '200': {description: Approved or denied metadata; no credential}
+        '403': {description: Missing consent, wrong origin, role or company ownership}
+        '409': {description: Changed request or self-service company already created}
+        '410': {description: Expired or unavailable authorization}
+  /v1/workspace-installations:
+    get:
+      operationId: listMyInstallationGrants
+      summary: List the signed-in customer's own installation grants
+      security: [{sessionAuth: []}]
+      description: Lists up to 100 own grants with company, client origin, expiry and revocation state. No tokens. Existing grants remain manageable when new onboarding is disabled.
+      responses:
+        '200': {description: Own grants}
+        '403': {description: Browser account required; API keys rejected}
+  /v1/workspace-installations/{id}:
+    parameters:
+    - {in: path, name: id, required: true, schema: {type: string, format: uuid}}
+    delete:
+      operationId: revokeMyInstallationGrant
+      summary: Revoke only the signed-in customer's own installation key
+      security: [{sessionAuth: []}]
+      description: Repeated revocation is safe; membership/key authority is checked on subsequent generation requests. Keeps remote companies, jobs, files and charges. Clears retained delivery ciphertext.
+      responses:
+        '200': {description: Revoked}
+        '410': {description: No matching own installation grant}
+  /v1/system/remote-workspace/authorization:
+    get:
+      operationId: readLocalInstallationAuthorization
+      summary: Read this local administrator's pending connection request
+      description: Local read only. No remote request or device secret is returned.
+      responses:
+        '200': {description: 'Pending id/origin/user_code/verification_uri/expiry, or pending false'}
+    post:
+      operationId: beginLocalInstallationAuthorization
+      summary: Request trusted-host signup/login and company consent
+      description: Current local Administrator plus explicit metadata-transfer consent. Preserves the current connection until the new company/key is verified. The backend stores an encrypted device secret and makes checked outbound HTTPS calls only; no local management credential is forwarded. Retries resume the same pending request.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [origin, client_name, client_origin, version, consent]
+              properties:
+                origin: {type: string, format: uri}
+                client_name: {type: string, maxLength: 80}
+                client_origin: {type: string, format: uri}
+                version: {type: integer, minimum: 0}
+                consent: {type: boolean, const: true}
+      responses:
+        '200': {description: Safe authorization view with trusted-host URI and user code}
+        '403': {description: Consent/role/host onboarding unavailable}
+        '409': {description: Connection or pending request changed}
+    delete:
+      operationId: cancelLocalInstallationAuthorization
+      summary: Cancel this administrator's pending request at the remote host
+      description: Retains pending state when remote cancellation has uncertain outcome (including ambiguous host 410 or missing positive confirmation), allowing identical retry. Expiry never permits overwriting the local proof before confirmed cancellation. A confirmed cancellation removes the encrypted device secret; remote issued grants are revoked atomically by the host.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, required: [id], properties: {id: {type: string, format: uuid}}}
+      responses:
+        '200': {description: Cancelled}
+        '502': {description: Remote cancellation could not be confirmed}
+  /v1/system/remote-workspace/authorization/poll:
+    post:
+      operationId: completeLocalInstallationAuthorization
+      summary: Poll consent and atomically connect the verified remote company
+      description: Uses only this local Administrator's encrypted device secret. Does not expose the resulting remote credential to the browser. Version checks reject replies after disconnect or replacement.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, required: [id], properties: {id: {type: string, format: uuid}}}
+      responses:
+        '200': {description: Verified connection metadata}
+        '410': {description: Expired/denied authorization}
+        '428': {description: Awaiting browser consent}
+        '429': {description: Retry after the requested interval}
+        '502': {description: Remote response uncertain; retry the same request}
+  /v1/system/setup-profile:
+    post:
+      operationId: applySetupProfile
+      summary: Apply a confirmed local setup profile without migrating data
+      description: Administrator plus system:manage for API keys. Preserves unrelated settings, clears setup_pending and rejects disabling access with active jobs. Skip does not call this endpoint.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [profile, version]
+              properties:
+                profile: {type: string, enum: [personal, operator]}
+                allow_personal: {type: boolean}
+                version: {type: integer, minimum: 1}
+      responses:
+        '200':
+          description: Persisted settings
+          content:
+            application/json:
+              schema: {'$ref': '#/components/schemas/SystemSettings'}
+        '409': {description: Stale version or active work prevents disabling access}
+  /v1/system/remote-workspace:
+    get:
+      operationId: getRemoteWorkspace
+      summary: Read this administrator's saved remote-company connection
+      description: No remote request. Credentials and remote grants are never returned. Connected describes a saved verified connection, not current remote availability.
+      responses:
+        '200': {description: Saved connection metadata including opaque context (revision/destination/account) and stable operation_scope, or connected false}
+    post:
+      operationId: connectRemoteWorkspace
+      summary: Verify and save one existing remote company using its generation-only key
+      description: Explicit consent required. HTTPS public server origin only. Does not create accounts, companies, grants or credit. Retries with identical target and credential retain the accepted connection version.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [origin, organization_id, token, consent, version]
+              properties:
+                origin: {type: string, format: uri}
+                organization_id: {type: string, format: uuid}
+                token: {type: string, writeOnly: true}
+                consent: {type: boolean, const: true}
+                version: {type: integer, minimum: 0}
+      responses:
+        '200': {description: Verified connection metadata without secrets}
+        '409': {description: Connection changed; reload and review}
+        '502': {description: Remote verification failed}
+    delete:
+      operationId: disconnectRemoteWorkspace
+      summary: Remove this administrator's encrypted remote credential
+      description: Keeps remote jobs, files and charges. Revoke the customer key remotely to revoke its remote authority. A stale in-flight connection cannot resurrect this record.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [version]
+              properties:
+                version: {type: integer, minimum: 1}
+      responses:
+        '200': {description: Disconnected metadata with incremented version}
+        '409': {description: Stale connection version}
+  /v1/system/remote-workspace/proxy/{path}:
+    parameters:
+    - {in: path, name: path, required: true, schema: {type: string}, description: 'Allowlisted remote v1 media path; may contain slashes.'}
+    get:
+      parameters:
+      - {in: header, name: X-Workspace-Context, schema: {type: string}, description: 'Opaque context returned when the connection was reviewed. Required unless workspace_context query is supplied.'}
+      - {in: query, name: workspace_context, schema: {type: string}, description: 'GET/HEAD download-link alternative to the context header; do not supply both.'}
+      operationId: readRemoteWorkspaceOperation
+      summary: Read remote catalogue, current key/balance, generation history/status or authorized content
+      description: Uses only the calling administrator's saved connection. Never proxies arbitrary hosts, organizations, payments, credentials or management. No remote token is returned to the browser. Every call requires its reviewed context; stale revision, destination or account returns 409 before outbound dispatch. Already admitted requests use their original captured connection.
+      responses:
+        '200': {description: Remote customer JSON or authorized media download}
+        '409': {description: Reviewed connection changed; no remote dispatch}
+        '428': {description: Reviewed context required}
+        '502': {description: Remote unavailable or invalid response}
+    post:
+      operationId: submitRemoteWorkspaceOperation
+      summary: Estimate or submit a remote generation
+      description: Only v1/generations/estimate and v1/generations are allowed. Generation requires Idempotency-Key and X-Workspace-Context. Its remote operation identity is stable for the local owner/remote origin/company across key renewal, with distinct namespaces for other hosts/companies. No local task or balance debit is created. Requests are bounded to 4 MiB.
+      parameters:
+      - {in: header, name: X-Workspace-Context, required: true, schema: {type: string}, description: 'Reviewed context from connection metadata; rejects changed revision/destination/account before dispatch.'}
+      - {in: header, name: Idempotency-Key, schema: {type: string, maxLength: 200}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object}
+      responses:
+        '200': {description: Estimate}
+        '202': {description: Remote job accepted}
+        '402': {description: Remote balance or allowance exhausted}
+        '409': {description: Remote quote or idempotency conflict}
+        '429': {description: Remote quota; honor Retry-After}
   /legal/{kind}:
     get:
       operationId: get_legal_kind
@@ -957,11 +1233,159 @@ paths:
       tags:
       - Generations
       x-required-scope: generation
+  /v1/projects:
+    get:
+      summary: List workspace generation projects
+      description: Company generation labels shared within the data owner, independent of creator or key recipient. Profile labels remain personal. Requires a generation API key. Does not change history or storage retention.
+      operationId: list_projects
+      tags: [Generations]
+      x-required-scope: generation
+      responses:
+        '200':
+          description: Projects ordered by name
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  can_manage_projects: {type: boolean, description: Whether the current role can create/rename/delete projects.}
+                  scope: {type: string, enum: [company, personal]}
+                  data:
+                    type: array
+                    items: {$ref: '#/components/schemas/GenerationProject'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+    post:
+      summary: Create a workspace generation project
+      description: Trims the name; rejects empty names, control characters and names longer than 80 Unicode characters. A case-insensitive same-name retry returns the oldest existing project (created_at, then ID). Company labels are shared; Profile labels remain personal. Existing duplicate names/IDs are preserved. JSON limit 4 KiB.
+      operationId: create_project
+      tags: [Generations]
+      x-required-scope: generation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [name]
+              properties:
+                name: {type: string, minLength: 1, maxLength: 80}
+      responses:
+        '201':
+          description: Created or existing project
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/GenerationProject'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /v1/projects/{project}:
+    patch:
+      summary: Rename a workspace project
+      description: Requires the current version. Conflicts require reading the current project before another write.
+      operationId: patch_project
+      tags: [Generations]
+      x-required-scope: generation
+      parameters:
+      - {in: path, name: project, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [name, version]
+              properties:
+                version: {type: integer, format: int64, minimum: 1}
+                name: {type: string, minLength: 1, maxLength: 80}
+      responses:
+        '200':
+          description: Updated project
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/GenerationProject'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+        '409': {description: Version or name conflict; review current project before retrying}
+    delete:
+      summary: Delete a workspace project
+      description: Requires confirmation and the current version. Clears project tags atomically; never deletes generation rows, request content, result records or media files. Concurrent submissions either retain their generation with no project or fail validation.
+      operationId: delete_project
+      tags: [Generations]
+      x-required-scope: generation
+      parameters:
+      - {in: path, name: project, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [version]
+              properties:
+                version: {type: integer, format: int64, minimum: 1}
+      responses:
+        '204': {description: Project deleted; generation and media records preserved}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+        '409': {description: Version or name conflict; review current project before retrying}
+  /v1/generations/{id}/project:
+    patch:
+      summary: Change a generation's project
+      description: Any generation within the authenticated company may be assigned, independently of author or key recipient. Profile generations remain limited to their owner. Requires a writable content role; does not grant new content, financial or media-deletion permissions. Send the generation's project_version as version. Empty or null project_id removes the tag. Does not change the request, execution status, timestamps, result records, media or retention settings.
+      operationId: assign_generation_project
+      tags: [Generations]
+      x-required-scope: generation
+      parameters:
+      - {in: path, name: id, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [version]
+              properties:
+                version: {type: integer, format: int64, minimum: 0}
+                project_id: {type: [string, "null"], description: Owned project ID or empty/null for no project.}
+      responses:
+        '200':
+          description: New project assignment
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  project_id: {type: string}
+                  version: {type: integer, format: int64, minimum: 0}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {description: Generation unavailable to this actor}
+        '409': {description: Assignment changed; retrieve the generation and review before retrying}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
   /v1/generations:
     get:
-      description: Gateway extension. Role-filtered jobs ordered by creation time and ID. Supports limit and offset; author filtering happens before pagination.
+      description: Gateway extension. Role-filtered jobs ordered by creation time and ID. Supports limit, offset and optional project_id; ownership, author and project filtering happen before pagination. Omitting project_id includes older ungrouped generations; project_id=none selects only unassigned generations, including older entries, before pagination. Unknown or foreign projects return the same validation error.
       operationId: list_generations
       parameters:
+      - in: query
+        name: project_id
+        schema:
+          oneOf:
+          - {type: string, format: uuid}
+          - {type: string, enum: [none]}
+        description: Optional workspace project UUID or none for unassigned generations only. Omit for all generations. The none sentinel is a read-only filter and cannot be assigned or managed as a project.
       - {in: query, name: offset, schema: {type: integer, minimum: 0, maximum: 1000000, default: 0}}
       - in: query
         name: limit
@@ -2671,7 +3095,7 @@ paths:
                       properties:
                         id: {type: string}
                         name: {type: string}
-                        icon_url: {type: string, description: Content-versioned module artwork URL}
+                        icon_url: {type: string, description: Authenticated content-versioned uploaded PNG logo URL; absent until uploaded}
                         icon_monochrome: {type: boolean}
                         fields: {type: array, items: {$ref: '#/components/schemas/ProviderField'}}
                         profiles: {type: array, items: {type: object, additionalProperties: true}}
@@ -3252,7 +3676,7 @@ paths:
                       properties:
                         id: {type: string}
                         name: {type: string}
-                        icon_url: {type: string, description: Content-versioned module artwork URL}
+                        icon_url: {type: string, description: Authenticated content-versioned uploaded PNG logo URL; absent until uploaded}
                         icon_monochrome: {type: boolean}
                         models:
                           type: array
@@ -4409,6 +4833,66 @@ paths:
         '404': {description: No authorized stored artifact}
         '503': {$ref: '#/components/responses/ServiceUnavailable'}
 
+  /v1/references/validate:
+    post:
+      operationId: validateReferenceSelection
+      tags: [References]
+      summary: Check owned stored references against the selected model
+      description: Read-only byte inspection using the same owner, organization, author and model-access restrictions as reference use. Never fetches supplied URLs, changes library entries, estimates or creates a task. Missing inputs are permitted; known files must satisfy the current model's constraints.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                validation: {$ref: '#/components/schemas/ReferenceValidationTarget'}
+                reference_ids: {type: array, maxItems: 64, items: {type: string, format: uuid}}
+      responses:
+        '200': {description: References are valid, body contains valid=true}
+        '400': {description: Invalid reference with the affected file, actual value, allowed bound and corrective action}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {description: Reference is unavailable to this owner or content author}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+  /v1/system/templates/{template}/validate-media:
+    parameters:
+    - {in: path, name: template, required: true, schema: {type: string, format: uuid}}
+    post:
+      operationId: validateTemplateDraftMedia
+      tags: [Templates]
+      summary: Check draft fixed media without saving or publishing
+      description: Administrator-only read using the same template and asset membership checks as publication. Incomplete grammar and missing slots are allowed. Model settings, present fixed files and workflow maxima are checked immediately.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, additionalProperties: false, properties: {draft: {$ref: '#/components/schemas/TemplateDefinition'}}}
+      responses:
+        '200': {description: Present fixed references are valid}
+        '400': {description: Incompatible media with actual and allowed values}
+        '403': {description: Administrator permission required}
+        '404': {description: Template or its fixed asset is unavailable}
+  /v1/templates/{template}/validate-media:
+    parameters:
+    - {in: path, name: template, required: true, schema: {type: string, format: uuid}}
+    post:
+      operationId: validateTemplateInputMedia
+      tags: [Templates]
+      summary: Check partial owned inputs for a published recipe
+      description: Requires generation scope. Fixed slots cannot be replaced; only declared variable slots accept owned reference IDs. Uses published settings and authorized model capabilities. Does not change the recipe, estimate, or create work.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/TemplateGenerationRequest'}
+      responses:
+        '200': {description: Present references are valid}
+        '400': {description: Invalid or incompatible input}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {description: Template or owned input unavailable}
+        '409': {description: Published revision changed}
   "/v1/references/uploads":
     post:
       operationId: post_v1_references_uploads
@@ -4437,6 +4921,7 @@ paths:
                 content_type: {type: string, example: image/png}
                 size_bytes: {type: integer, minimum: 1, maximum: 209715200}
                 sha256: {type: string, pattern: '^[0-9a-f]{64}$'}
+                validation: {$ref: '#/components/schemas/ReferenceValidationTarget'}
       responses:
         '200':
           description: Existing file; mode=existing and reference contains its library entry
@@ -4473,8 +4958,8 @@ paths:
       tags: [References]
       summary: Verify and finish a direct reference upload
       description: >-
-        Requires the same owner and generation scope as preparation. Exchanges only S3
-        metadata, verifies the single part size and pinned ETag after storage has validated
+        Requires the same owner and generation scope as preparation. Verifies S3
+        metadata and bounded actual bytes before retaining a selectable reference. Uses the model context pinned at preparation and current authorized model limits. A rejected upload is marked durably before temporary-object cleanup; transient cleanup failures retain the receipt for worker recovery. Verifies the single part size and pinned ETag after storage has validated
         the signed SHA-256 payload header, consumes the multipart
         upload ID and adds the file to the library. Retry this endpoint if the response
         is lost; successful completions return the same file while the upload receipt
@@ -4535,7 +5020,7 @@ paths:
       operationId: post_v1_references
       tags: [References]
       summary: Upload one reference file to local storage
-      description: Local storage only; S3 returns 409 direct_upload_required before reading the body. Use POST /v1/references/uploads for S3. Saves a PNG, JPEG, WebP or GIF (30 MiB), MP4, MOV or WebM (200 MiB), or MP3, WAV, OGG or FLAC (50 MiB) in the organization's selected local storage, under <organization-id>/references/. Non-administrators must use shared storage or personal S3 storage. Requires generation scope. Uploading does not create a generation task. The server detects the media type from the uploaded bytes. Identical content (SHA-256) is reused within the same organization, regardless of uploader or filename. Returns 200 and duplicate=true for an existing file; no additional file is saved.
+      description: Local storage only; S3 returns 409 direct_upload_required before reading the body. Use POST /v1/references/uploads for S3. Saves a PNG, JPEG, WebP or GIF (30 MiB), MP4, MOV or WebM (200 MiB), or MP3, WAV, OGG or FLAC (50 MiB) in the organization's selected local storage, under <organization-id>/references/. Non-administrators must use shared storage or personal S3 storage. Requires generation scope. Uploading does not create a generation task. The server inspects type, metadata and common size limits before persistence. Optional multipart validation contains a JSON ReferenceValidationTarget; its current model constraints apply before retention. No model means common requirements only, with no universal FPS minimum. Identical content (SHA-256) is reused within the same organization, regardless of uploader or filename. Returns 200 and duplicate=true for an existing file; no additional file is saved.
       requestBody:
         required: true
         content:
@@ -4545,6 +5030,7 @@ paths:
               required: [file]
               properties:
                 file: {type: string, format: binary}
+                validation: {type: string, description: JSON-encoded ReferenceValidationTarget}
       responses:
         '200':
           description: Identical file already exists; the existing file is returned with duplicate=true
@@ -5044,7 +5530,7 @@ paths:
                       properties:
                         id: {type: string}
                         name: {type: string}
-                        icon_url: {type: string, description: Content-versioned module artwork URL}
+                        icon_url: {type: string, description: Authenticated content-versioned uploaded PNG logo URL; absent until uploaded}
                         icon_monochrome: {type: boolean}
                         fields: {type: array, items: {$ref: '#/components/schemas/ProviderField'}}
                         profiles: {type: array, items: {type: object, additionalProperties: true}}
@@ -5295,6 +5781,97 @@ paths:
         '401': {description: Sign-in required}
         '403': {description: Browser session required}
 
+  "/v1/playground-key/create":
+    post:
+      operationId: createManagedPlaygroundKey
+      tags: [API keys]
+      security:
+      - sessionAuth: []
+      summary: Explicitly create an account-managed Playground and Templates key
+      description: >-
+        Owner-only browser session operation protected against cross-origin mutations.
+        Creates an ordinary generation-only bearer API key named Playground & Templates
+        with immutable purpose playground_templates. Only this explicit purpose stores
+        an encrypted secret per account and personal/organization workspace; ordinary
+        keys remain hash-only. Concurrent creates converge on the current active key.
+        Retry the same request_id after an uncertain response. Revoked/expired replays
+        fail; a new explicit request is required for replacement. Never creates on login.
+        Responses contain the secret for the authenticated browser and are no-store;
+        use HTTPS. Bearer credentials cannot retrieve this account vault.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [request_id]
+              properties:
+                organization_id: {type: string, format: uuid, description: Omit for personal workspace.}
+                request_id: {type: string, format: uuid, description: Stable ID retained across retries of this explicit creation.}
+      responses:
+        "200":
+          description: Current owned managed key and secret. Generation still requires this ordinary bearer key.
+          headers:
+            Cache-Control: {schema: {type: string}, description: "no-store, private"}
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [key, secret]
+                properties:
+                  key: {$ref: "#/components/schemas/APIKey"}
+                  secret: {type: string, format: password, description: Sensitive bearer credential returned only to its authenticated owner.}
+        "400": {description: Invalid workspace or request ID.}
+        "401": {description: Sign-in required.}
+        "403": {description: Session/ownership/issuance policy or cross-origin denial.}
+        "409": {description: Superseded request or active-key limit.}
+        "410": {description: This creation request refers to a revoked or expired key.}
+        "429": {description: Key creation request limit.}
+        "503": {description: Encryption, authentication or storage unavailable; no automatic replacement.}
+  "/v1/playground-key/restore":
+    post:
+      operationId: restoreManagedPlaygroundKey
+      tags: [API keys]
+      security:
+      - sessionAuth: []
+      summary: Restore only this account's saved Playground key for one workspace
+      description: >-
+        Owner-only authenticated browser session operation. Does not mint a key or
+        vault a manually pasted key. Returns the encrypted account association's secret
+        into the browser after verifying the ordinary key's current ownership, purpose,
+        generation-only scope, expiry, revocation and membership. Organization managers
+        cannot restore another member's secret. Logout clears local state without deleting
+        the association. Generation APIs still require normal bearer authentication.
+        No secrets occur in the URL; HTTPS is required outside loopback development.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                organization_id: {type: string, format: uuid, description: Omit for personal workspace.}
+      responses:
+        "200":
+          description: Saved owned key and secret; never cached.
+          headers:
+            Cache-Control: {schema: {type: string}, description: "no-store, private"}
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [key, secret]
+                properties:
+                  key: {$ref: "#/components/schemas/APIKey"}
+                  secret: {type: string, format: password, description: Sensitive bearer credential returned only to its authenticated owner.}
+        "400": {description: Invalid workspace.}
+        "401": {description: Sign-in required.}
+        "403": {description: Owner/session/current access or cross-origin denial.}
+        "404": {description: No account-managed key exists.}
+        "410": {description: Saved key expired or was revoked; no automatic replacement.}
+        "503": {description: Saved key cannot be decrypted or verified.}
   "/v1/api-keys/billing":
     get:
       security:
@@ -5540,8 +6117,8 @@ paths:
                 properties:
                   setup_required: {type: boolean, description: Fresh installation requires its one-time owner setup before ordinary sign-in. No setup code is exposed.}
                   google: {type: boolean}
-                  email: {type: boolean, description: Email sign-in is enabled and supported; password login does not require email delivery.}
-                  email_delivery: {type: boolean}
+                  email: {type: boolean, description: Browser email sign-in is enabled, supported and has ready local delivery configuration. A false value does not revoke sessions or disable the configured password API endpoint.}
+                  email_delivery: {type: boolean, description: Local delivery configuration is usable; no provider health probe is performed.}
                   email_confirmation: {type: boolean, description: Email authentication is enabled and supported; existing verification grants do not require current delivery availability.}
   "/auth/setup":
     post:
@@ -6718,6 +7295,416 @@ paths:
       tags:
       - System
       x-required-scope: system:manage
+  /v1/templates:
+    get:
+      tags: [Templates]
+      operationId: listTemplates
+      summary: Browse the instance-wide published gallery
+      responses:
+        '200':
+          description: Published cover cards for recipes in References mode with reviewed slots. Legacy incompatible recipes remain stored and are omitted. No private drafts, user inputs or history.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: {type: string, format: uuid}
+                        revision: {type: integer}
+                        title: {type: string}
+                        description: {type: string}
+                        cover_url: {type: string}
+                        cover_type: {type: string}
+  /v1/templates/{template}:
+    parameters:
+    - {in: path, name: template, required: true, schema: {type: string, format: uuid}}
+    get:
+      tags: [Templates]
+      operationId: getPublishedTemplate
+      summary: Read the immutable published revision and current compatible models
+      responses:
+        '200':
+          description: Default unavailability is explicit; a replacement is never silently selected. Models are selected by their complete returned contracts and current key access, never a model-name allowlist. Templates require explicit references mode and at least one reviewed slot. Legacy incompatible revisions are retained but have no compatible models and return workflow_error; they are not mapped to empty or frame workflows.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: {type: string, format: uuid}
+                  revision: {type: integer}
+                  template: {$ref: '#/components/schemas/TemplateDefinition'}
+                  catalog: {type: array, items: {$ref: '#/components/schemas/ProviderDescriptor'}}
+                  fixed_references:
+                    type: array
+                    description: Read-only previews of fixed assets in this published revision only. Draft replacements are excluded.
+                    items:
+                      type: object
+                      properties:
+                        slot_id: {type: string}
+                        asset_id: {type: string, format: uuid}
+                        name: {type: string}
+                        content_type: {type: string}
+                        url: {type: string}
+                  default_available: {type: boolean}
+                  workflow_error: {type: string, description: Incompatible saved workflow or missing reference slots; explicit Administrator revision and republication required}
+                  asset_error: {type: string}
+        '404': {description: Unpublished, removed or unavailable template}
+  /v1/templates/{template}/estimate:
+    parameters:
+    - {in: path, name: template, required: true, schema: {type: string, format: uuid}}
+    post:
+      tags: [Templates]
+      operationId: estimateTemplateGeneration
+      summary: Resolve typed inputs and estimate through the existing generation pipeline
+      description: Requires the same explicit bearer key as Playground. Rechecks live revision, key model access, fixed media and actual uploaded file limits. Unknown fields including prompt, options and fixed-reference overrides are rejected.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/TemplateGenerationRequest'}
+      responses:
+        '200': {description: Existing generation cost estimate and budget response}
+        '400': {description: Invalid binding, actual file, model or unsupported override}
+        '409': {description: Published revision changed; review again}
+  /v1/templates/{template}/generations:
+    parameters:
+    - {in: path, name: template, required: true, schema: {type: string, format: uuid}}
+    post:
+      tags: [Templates]
+      operationId: createTemplateGeneration
+      summary: Submit a confirmed template generation using the caller's existing billing and storage
+      parameters:
+      - {in: header, name: Idempotency-Key, required: true, schema: {type: string, maxLength: 200}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - {$ref: '#/components/schemas/TemplateGenerationRequest'}
+              - {required: [max_expected_cost_usd]}
+      responses:
+        '202':
+          description: Queued generation with an immutable template snapshot, using normal ownership/project/history rules
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Generation'}
+        '400': {description: Invalid input, override, model or missing confirmation/idempotency key}
+        '401': {description: An explicit active generation bearer key is required}
+        '402': {description: Existing generation budget exhausted}
+        '409': {description: Revision, estimate or idempotency conflict}
+  /v1/system/templates:
+    get:
+      tags: [Templates]
+      operationId: listTemplateDrafts
+      summary: Administrator-only draft catalog and shared provider models
+      responses:
+        '200': {description: Versioned draft and separate published definitions}
+        '403': {description: System Administrator role and system scope required}
+    post:
+      tags: [Templates]
+      operationId: createTemplateDraft
+      summary: Create an incomplete template draft
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                id: {type: string, format: uuid, description: Reuse the same ID to recover an uncertain create response.}
+                version: {type: integer, const: 0}
+                draft: {$ref: '#/components/schemas/TemplateDefinition'}
+      responses:
+        '201': {description: Created versioned draft in an available model's References workflow}
+        '400': {description: Missing or unsupported default model, output or reference workflow}
+        '200': {description: Existing draft recovered by the same create ID}
+        '403': {description: Administrator required; company roles do not grant publishing}
+  /v1/system/template-references:
+    get:
+      tags: [Templates]
+      operationId: listSharedTemplateReferences
+      summary: List the instance-wide shared template asset collection
+      description: Authenticated users may read and select shared files for permitted generation inputs. Mutation requires a system Administrator and system:manage for bearer credentials. Fixed template inputs cannot be overridden. Pending-deletion entries are unavailable for selection.
+      parameters:
+      - {in: query, name: offset, schema: {type: integer, minimum: 0, maximum: 1000000}}
+      responses:
+        '200': {description: data with id, name, content_type, size_bytes, created_at, sha256 and authenticated url; has_more and next_offset}
+        '403': {description: Template creator permission required}
+    post:
+      tags: [Templates]
+      operationId: uploadSharedTemplateReference
+      summary: Upload a reusable source independently of any template slot
+      description: Uses configured instance storage in a distinct namespace, retains creator audit identity, validates supported media bytes and global limits, and does not assign any slot. No model-specific minimum is invented for generic library uploads. Private uploads are not moved or exposed.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema: {type: object, required: [file], properties: {file: {type: string, format: binary}}}
+      responses:
+        '201': {description: Shared source metadata and authenticated content URL}
+        '200': {description: Existing identical shared source; no private source is adopted}
+        '400': {description: Unsupported, malformed, empty or oversized media}
+        '403': {description: Creator permission or shared storage quota restriction}
+        '429': {description: Multipart upload admission busy; retry later}
+  /v1/system/template-references/{id}:
+    parameters:
+    - {in: path, name: id, required: true, schema: {type: string, format: uuid}}
+    patch:
+      tags: [Templates]
+      operationId: renameSharedTemplateAsset
+      summary: Rename shared asset display metadata as an Administrator
+      description: Edits the filename only. Bytes, asset identity and every reference/cover binding are preserved. Upload new content under a new identity rather than replacing dependent bytes.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, required: [name], additionalProperties: false, properties: {name: {type: string, minLength: 1, maxLength: 255}}}
+      responses:
+        '200': {description: Current shared asset metadata}
+        '400': {description: Invalid filename}
+        '403': {description: Administrator with management scope required}
+        '404': {description: Shared asset unavailable or pending deletion}
+    delete:
+      tags: [Templates]
+      operationId: deleteSharedTemplateReference
+      summary: Delete an unused shared source as a template creator
+      description: Active draft and published reference/cover bindings protect an asset under the same transaction lock as binding writes. A reference_in_use error includes every blocking template name, stable id and navigation URL. Unpublishing preserves draft uses; removed templates cannot be restored by the current lifecycle. Failed physical deletion remains retryable and cannot be selected or rebound.
+      responses:
+        '204': {description: Shared asset deleted}
+        '403': {description: Creator permission required}
+        '404': {description: Shared source unavailable; private source IDs are not accepted}
+        '409': {description: 'reference_in_use; error.templates lists all blocking templates with id, name and url'}
+  /v1/system/template-references/{id}/content:
+    parameters:
+    - {in: path, name: id, required: true, schema: {type: string, format: uuid}}
+    get:
+      tags: [Templates]
+      operationId: readSharedTemplateReference
+      summary: Read shared asset content with authentication
+      description: Authenticated read-only access for instance users. Shared assets can be selected for permitted generation inputs; fixed template inputs remain immutable. Returned generation capabilities identify the reserved shared namespace.
+      responses:
+        '200': {description: Validated source bytes; Cache-Control private no-store and nosniff}
+        '403': {description: Creator permission required}
+        '404': {description: Shared source unavailable}
+  /v1/system/templates/library:
+    get:
+      tags: [Templates]
+      operationId: listTemplateSourceLibrary
+      summary: List the instance-wide template reference library (compatibility route)
+      parameters:
+      - {in: query, name: offset, schema: {type: integer, minimum: 0, maximum: 1000000}}
+      responses:
+        '200': {description: Creator-only shared library pagination; private personal and company references are excluded}
+  /v1/system/templates/{template}:
+    parameters:
+    - {in: path, name: template, required: true, schema: {type: string, format: uuid}}
+    get:
+      tags: [Templates]
+      operationId: getTemplateDraft
+      summary: Read an Administrator's versioned draft and publication state
+      responses:
+        '200': {description: Template record with draft, published, version and revision}
+    put:
+      tags: [Templates]
+      operationId: saveTemplateDraft
+      summary: Save, publish or unpublish a template with optimistic concurrency
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [version, draft]
+              properties:
+                version: {type: integer, minimum: 1}
+                action: {type: string, enum: ['', publish, unpublish]}
+                draft: {$ref: '#/components/schemas/TemplateDefinition'}
+      responses:
+        '200': {description: Updated draft; only publish replaces the live revision}
+        '400': {description: Draft or publication violates the References-only workflow, or publication failed slot, model, media or cover validation}
+        '403': {description: Administrator required}
+        '409': {description: Concurrent edit; retain and review the draft}
+    delete:
+      tags: [Templates]
+      operationId: removeTemplate
+      summary: Soft-remove and unpublish without deleting shared assets or historical results
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, additionalProperties: false, required: [version], properties: {version: {type: integer, minimum: 1}}}
+      responses:
+        '200': {description: Retained versioned record; new use is unavailable}
+        '409': {description: Concurrent edit}
+  /v1/system/templates/{template}/infer:
+    parameters:
+    - {in: path, name: template, required: true, schema: {type: string, format: uuid}}
+    post:
+      tags: [Templates]
+      operationId: inferTemplateSlots
+      summary: Infer stable typed slots using the draft reference syntax and native workflow limits
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/TemplateDefinition'}
+      responses:
+        '200': {description: syntax and ordered slots for Administrator review; repeated mentions bind once}
+        '400': {description: Unsupported workflow, missing references, or invalid, unsafe or gapped numeric marker}
+  /v1/system/templates/{template}/assets:
+    parameters:
+    - {in: path, name: template, required: true, schema: {type: string, format: uuid}}
+    post:
+      tags: [Templates]
+      operationId: copyTemplateMedia
+      summary: Upload or select a shared asset for a template
+      description: Direct uploads enter the instance-wide library. Selecting library_reference_id returns that same asset identity after validation. A cover is display media only. Shared storage quota and protected deletion apply; private reference_id imports are rejected.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [library_reference_id]
+              properties:
+                library_reference_id: {type: string, format: uuid, description: Existing shared asset; retains its identity without copying bytes.}
+                validation: {$ref: '#/components/schemas/ReferenceValidationTarget'}
+          multipart/form-data:
+            schema: {type: object, required: [file], properties: {file: {type: string, format: binary}, validation: {type: string, description: JSON-encoded ReferenceValidationTarget}}}
+      responses:
+        '201': {description: Uploaded or selected shared asset metadata}
+        '400': {description: Unsupported or uninspectable media}
+        '403': {description: Administrator or storage quota restriction}
+  /v1/system/templates/{template}/assets/{asset}/metadata:
+    parameters:
+    - {in: path, name: template, required: true, schema: {type: string, format: uuid}}
+    - {in: path, name: asset, required: true, schema: {type: string, format: uuid}}
+    get:
+      tags: [Templates]
+      operationId: readTemplateAssetMetadata
+      summary: Read fixed media filenames and provenance with creator authorization
+      responses:
+        '200': {description: Immutable template asset metadata; original names are empty for legacy copies}
+        '403': {description: Creator permission required}
+        '404': {description: Asset unavailable or belongs to another template}
+  /v1/system/templates/{template}/assets/{asset}:
+    parameters:
+    - {in: path, name: template, required: true, schema: {type: string, format: uuid}}
+    - {in: path, name: asset, required: true, schema: {type: string, format: uuid}}
+    get:
+      parameters:
+      - {in: query, name: preview, schema: {type: integer, enum: [1]}, description: Explicit same-origin authenticated editor preview; streams bounded media with range support instead of redirecting.}
+      tags: [Templates]
+      operationId: previewTemplateDraftMedia
+      summary: Administrator preview of a shared template asset
+      responses:
+        '200': {description: Sandboxed image/video/audio bytes}
+        '307': {description: Short-lived direct storage delivery from a separate origin}
+  /template-media/{asset}:
+    parameters:
+    - {in: path, name: asset, required: true, schema: {type: string, format: uuid}}
+    get:
+      tags: [Templates]
+      operationId: readPublishedTemplateMedia
+      security: []
+      summary: Read a deliberately published template media capability
+      parameters:
+      - {in: query, name: signature, required: true, schema: {type: string}}
+      responses:
+        '200': {description: Sandboxed media; capability remains valid for queued/history inputs after unpublish}
+        '307': {description: Short-lived direct storage delivery}
+        '404': {description: Missing, invalid or never-published capability}
+  "/v1/admin/providers/{providerId}/logo":
+    parameters:
+    - "$ref": "#/components/parameters/ProviderID"
+    put:
+      tags: [Providers admin]
+      summary: Personal — Upload or replace a provider logo
+      description: Administrator only. Atomically replace this connection's logo without changing settings or credentials. PNG signature and full decoding are checked. At least one pixel must have alpha below full opacity, including palette tRNS and 16-bit alpha. SVG, other formats and opaque PNG are rejected. Failures preserve the previous upload. No remote URL import is supported.
+      security:
+      - bearerAuth: []
+      - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          image/png:
+            schema: {type: string, format: binary, maxLength: 1048576, description: PNG with actual transparency; maximum 2048 pixels per side}
+      responses:
+        '200':
+          description: Logo saved; refresh images using the new content-versioned URL
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  icon_url: {type: string}
+        '400': {description: Unsupported content type, malformed/opaque PNG, exceeded byte/dimension limit or incomplete upload; previous logo retained}
+        '401': {description: Authentication required}
+        '403': {description: Administrator permission and applicable API-key scopes required}
+        '404': {description: Provider not found}
+        '503': {description: Logo storage unavailable}
+
+  "/v1/system/providers/{providerId}/logo":
+    parameters:
+    - "$ref": "#/components/parameters/ProviderID"
+    put:
+      tags: [Providers admin]
+      summary: Shared — Upload or replace a provider logo
+      description: Administrator only. Atomically replace this connection's logo without changing settings or credentials. PNG signature and full decoding are checked. At least one pixel must have alpha below full opacity, including palette tRNS and 16-bit alpha. SVG, other formats and opaque PNG are rejected. Failures preserve the previous upload. No remote URL import is supported.
+      security:
+      - bearerAuth: []
+      - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          image/png:
+            schema: {type: string, format: binary, maxLength: 1048576, description: PNG with actual transparency; maximum 2048 pixels per side}
+      responses:
+        '200':
+          description: Logo saved; refresh images using the new content-versioned URL
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  icon_url: {type: string}
+        '400': {description: Unsupported content type, malformed/opaque PNG, exceeded byte/dimension limit or incomplete upload; previous logo retained}
+        '401': {description: Authentication required}
+        '403': {description: Administrator permission and applicable API-key scopes required}
+        '404': {description: Provider not found}
+        '503': {description: Logo storage unavailable}
+
+  "/provider-assets/{owner}/{providerId}/icon.png":
+    get:
+      tags: [Providers admin]
+      summary: Read an uploaded provider logo
+      description: Authenticated PNG read under the provider's existing visibility and resource scope. Private no-store, nosniff and sandbox headers. Legacy embedded PNG/SVG routes return 404. In dark theme render unchanged; in light theme set RGB to black while preserving alpha.
+      security:
+      - bearerAuth: []
+      - sessionAuth: []
+      parameters:
+      - {in: path, name: owner, required: true, schema: {type: string, format: uuid}}
+      - {in: path, name: providerId, required: true, schema: {type: string}}
+      - {in: query, name: v, schema: {type: string}, description: Content digest for cache refresh}
+      - {in: query, name: organization, schema: {type: string, format: uuid}, description: Current commercial model/pricing grant is independently checked for scoped administrative pickers}
+      responses:
+        '200':
+          description: Original validated PNG bytes
+          content:
+            image/png:
+              schema: {type: string, format: binary}
+        '401': {description: Authentication required}
+        '403': {description: Required API-key scope is absent}
+        '404': {description: Logo missing or not visible to this reader}
+
 components:
   securitySchemes:
     paymentIntegrationAuth:
@@ -6803,6 +7790,104 @@ components:
           schema:
             "$ref": "#/components/schemas/ErrorResponse"
   schemas:
+    WorkspaceDeviceProof:
+      type: object
+      additionalProperties: false
+      required: [device_code]
+      properties:
+        device_code: {type: string, minLength: 43, maxLength: 43, writeOnly: true}
+
+    ReferenceValidationTarget:
+      type: object
+      additionalProperties: false
+      required: [provider, model]
+      description: Model identity and selected generation settings, not client-provided limits. The server resolves current authorized capabilities. Input URLs are ignored. reference_ids are existing owned inputs for aggregate checks during another upload. No context means common library checks only. Average FPS follows inspected container timing; nominal FPS and upstream provider acceptance are not inferred.
+      properties:
+        provider: {type: string}
+        model: {type: string}
+        options: {$ref: '#/components/schemas/MediaOptions'}
+        reference_ids: {type: array, maxItems: 64, items: {type: string, format: uuid}}
+        role: {type: string, enum: ['', reference_voice], description: Per-visual voice intent is checked against the native workflow and its separate voice file contract; it never consumes a free audio slot.}
+
+    TemplateDefinition:
+      type: object
+      additionalProperties: false
+      description: Drafts may be incomplete but creation and saves require an available image/video model with the explicit references workflow. Known fixed-media incompatibilities are rejected on save and binding. Publication requires at least one reviewed reference slot and validates every binding and the native request contract before freezing admission defaults. Availability uses the same native validation without quoting or admitting a task. No generation reference URLs are allowed in options.
+      properties:
+        title: {type: string, maxLength: 120}
+        description: {type: string, maxLength: 500}
+        media_type: {type: string, enum: [image, video]}
+        provider: {type: string}
+        model: {type: string}
+        prompt: {type: string, maxLength: 10000}
+        syntax: {type: string, enum: ['', numbered, picture, bracket, kling-id, ui-reference-v1]}
+        reference_counts:
+          type: object
+          description: Publisher-declared ordered input counts for native workflows without prompt markers. Omitted counts use workflow minima.
+          additionalProperties: false
+          properties:
+            image: {type: integer, minimum: 0, maximum: 64}
+            video: {type: integer, minimum: 0, maximum: 64}
+            audio: {type: integer, minimum: 0, maximum: 64}
+        options: {$ref: '#/components/schemas/MediaOptions'}
+        cover_id: {type: string, description: Template-owned fixed image/video or separately uploaded cover ID}
+        slots:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, type, index, role, label]
+            properties:
+              id: {type: string, description: Stable typed identity such as image:1 or video:1}
+              type: {type: string, enum: [image, video, audio]}
+              index: {type: integer, minimum: 1, maximum: 64}
+              role: {type: string}
+              label: {type: string, maxLength: 120}
+              asset_id: {type: string, description: Shared fixed asset; omitted for a user-supplied slot}
+    TemplateGenerationRequest:
+      type: object
+      additionalProperties: false
+      required: [revision, provider, model, inputs]
+      properties:
+        revision: {type: integer, minimum: 1}
+        provider: {type: string}
+        model: {type: string}
+        inputs:
+          type: object
+          additionalProperties: {type: string, format: uuid}
+          description: Exactly the missing stable slot IDs mapped to the calling owner's completed library file IDs. Fixed slots and extra references are forbidden. External URLs and provider asset IDs are excluded.
+        project_id: {type: string, format: uuid}
+        max_expected_cost_usd: {type: number, minimum: 0}
+    ReferenceMediaLimits:
+      type: object
+      description: Optional provider-specific media constraints applied in addition to shared upload and inspection checks. Missing metadata is not an unsupported capability declaration.
+      properties:
+        max_video_and_output_duration: {type: number, description: Maximum inspected input-video seconds plus output seconds when video input is present. Zero or absent means unspecified. Applies to server-inspected template media; arbitrary URL inputs have no inspected duration.}
+        max_files: {type: integer}
+        image: {$ref: '#/components/schemas/MediaFileLimits'}
+        video: {$ref: '#/components/schemas/MediaFileLimits'}
+        audio: {$ref: '#/components/schemas/MediaFileLimits'}
+        reference_voice: {$ref: '#/components/schemas/MediaFileLimits'}
+    MediaFileLimits:
+      type: object
+      properties:
+        no_alpha: {type: boolean, description: Reject an image carrying an alpha channel}
+        content_types: {type: array, items: {type: string}}
+        codecs: {type: array, items: {type: string}}
+        max_bytes: {type: integer, description: Exclusive upper file size bound}
+        max_total_bytes: {type: integer, description: Exclusive combined size bound for this media type}
+        min_dimension: {type: integer}
+        max_dimension: {type: integer}
+        min_pixels: {type: integer}
+        max_pixels: {type: integer}
+        min_ratio: {type: number}
+        max_ratio: {type: number}
+        min_duration: {type: number}
+        max_duration: {type: number}
+        min_total_duration: {type: number}
+        max_total_duration: {type: number}
+        min_fps: {type: number}
+        max_fps: {type: number}
     LegalDocument:
       type: object
       additionalProperties: false
@@ -6824,7 +7909,7 @@ components:
             - {type: string, maxLength: 0}
         site_max_width: {type: integer, nullable: true, minimum: 960, maximum: 7680, default: 1280, description: Desktop site maximum in CSS pixels. Null removes the width limit while retaining safe outer gutters. Missing legacy values retain 1280.}
         content_max_width: {type: integer, nullable: true, minimum: 640, maximum: 7680, description: Desktop content maximum in CSS pixels. Null uses all available content space.}
-        sidebar_subsections: {type: boolean, default: false, description: Expand navigation subsections in the left menu on desktop. Mobile retains horizontal tabs.}
+        sidebar_subsections: {type: boolean, default: true, description: Expand navigation subsections in the left menu on desktop. Mobile retains horizontal tabs.}
         dark: {$ref: '#/components/schemas/BrandPalette'}
         light: {$ref: '#/components/schemas/BrandPalette'}
         presets:
@@ -7013,8 +8098,8 @@ components:
         enabled_by_default: {type: boolean}
         granted: {type: boolean, description: Explicit grant for the organization being read}
         provider_name: {type: string, description: Provider display name in administrative catalog responses}
-        provider_icon_url: {type: string, description: Content-versioned provider artwork URL for administrative model pickers}
-        provider_icon_monochrome: {type: boolean, description: Whether the provider artwork should follow the active theme}
+        provider_icon_url: {type: string, description: Authenticated uploaded PNG logo URL for administrative model pickers}
+        provider_icon_monochrome: {type: boolean, description: Legacy compatibility field; all provider logos follow the same theme rule}
         capabilities: {$ref: '#/components/schemas/MediaModel'}
         version: {type: integer}
     OrganizationModelAccess:
@@ -7548,12 +8633,24 @@ components:
               type: array
               items: {"$ref": "#/components/schemas/MarkupRule"}
             version: {type: integer, format: int64, minimum: 0}
+    GenerationProject:
+      type: object
+      required: [id, name, created_at, version]
+      properties:
+        version: {type: integer, format: int64, minimum: 1}
+        id: {type: string, format: uuid}
+        name: {type: string, minLength: 1, maxLength: 80}
+        created_at: {type: string, format: date-time}
     Generation:
       description: Always asynchronous. Keeps task extensions (options, cost, usage, storage
         and webhook metadata). Statuses and Unix timestamps match the OpenAI video vocabulary. Costs pass through the same customer/admin financial projection. content_url
         requires the same Gateway API key. No progress percentage is invented. Managers receive
         operational metadata only, with content_access false and without prompt, input, output links or provider errors.
       properties:
+        template_snapshot: {type: object, description: Server-resolved template ID/revision and immutable prompt/reference/model/options snapshot. Subject to existing content permissions and logging minimization.}
+        project_version: {type: integer, format: int64, minimum: 0, default: 0, description: Optimistic version for changing the workspace project assignment.}
+        can_change_project: {type: boolean, description: Whether the current role/workspace allows changing this generation's project, independently of company generation authorship.}
+        project_id: {type: string, format: uuid, description: Optional company-shared project metadata. Profile metadata remains private; omitted for ungrouped or content-restricted generations.}
         timeout_seconds: {type: integer, format: int64, description: "Explicit generation HTTP timeout override, when supplied."}
         content_access: {type: boolean, description: Whether this viewer can inspect retained content.}
         can_delete: {type: boolean, description: Whether this viewer may delete stored result files.}
@@ -7688,6 +8785,7 @@ components:
         for the media type. Standard fields are accepted only at the top level; only advertised options.parameters
         keys are accepted. JSON limit 64 KiB. Null prompt, webhook_url and max_expected_cost_usd behave as omission; model-specific prompt requirements still apply.
       properties:
+        project_id: {type: string, format: uuid, description: Optional project shared within the current company, or owned by the authenticated actor in Profile. Omit to leave a generation ungrouped. Part of idempotency matching; does not affect prompt or result retention.}
         timeout_seconds:
           type: integer
           format: int64
@@ -7980,16 +9078,18 @@ components:
     SystemSettings:
       type: object
       additionalProperties: false
-      required: [generation_ui, personal_providers, version]
+      required: [generation_ui, version]
       properties:
         markup_percent:
           allOf: [{"$ref": "#/components/schemas/MarkupPercent"}]
           description: Administrator setting; omitted from public console policy. Defaults to zero. Omission on update preserves the current rate. Applies only to new shared-provider tasks.
+        customer_workspaces: {type: boolean, default: false, description: "Explicit host opt-in to customer installation authorization and bounded self-service own-company creation; also requires shared_resources. Existing credentials/billing remain independent."}
+        setup_pending: {type: boolean, readOnly: true, description: Administrator-only first-owner guide state; upgrades default false and Skip never writes settings.}
         shared_storage_limit_bytes: {type: [integer, 'null'], description: Set through /v1/system/storage/quota; preserved by ordinary settings updates.}
-        shared_resources: {type: boolean, default: false, description: "Enable shared providers and storage. Disabling blocks new shared work; accepted tasks and existing files remain available."}
+        shared_resources: {type: boolean, default: false, description: "Enable shared providers and storage. Omission on update preserves the current policy. The console changes this only through the setup scenario. Disabling blocks new shared work; accepted tasks and existing files remain available."}
         generation_ui: {type: boolean, description: "Show the Generation screen; does not disable API generation."}
         allow_inline_references: {type: boolean, default: true, description: "Allow reference contents in provider requests. When false, HTTP(S) URLs and model-supported asset:// references are accepted and library images are not inlined. Applies at admission and dispatch to shared and personal connections. Omission on update preserves the current value."}
-        personal_providers: {type: boolean, description: "Let non-administrators manage personal provider connections. Personal keys cannot start new generations while this is disabled; saved connections and history are preserved."}
+        personal_providers: {type: boolean, description: "Let non-administrators manage personal provider connections. Omission on update preserves the current policy. The console changes this only through the setup scenario. Personal keys cannot start new generations while this is disabled; saved connections and history are preserved."}
         version: {type: integer, minimum: 1, description: "Send the current version when updating settings."}
     SalesRole:
       type: string
@@ -8353,8 +9453,8 @@ components:
       - default_model
       - models
       properties:
-        icon_url: {type: string, description: Content-versioned module artwork URL}
-        icon_monochrome: {type: boolean, description: Whether the artwork should follow the active theme}
+        icon_url: {type: string, description: Authenticated content-versioned uploaded PNG logo URL; absent until uploaded}
+        icon_monochrome: {type: boolean, description: Legacy compatibility field; all provider logos follow the same theme rule}
         id:
           type: string
         name:
@@ -8405,8 +9505,23 @@ components:
           description: The model operates on media inputs without a text prompt. Omit prompt or use an empty string.
         reference_prompt_syntax:
           type: string
-          enum: [numbered, picture]
-          description: UI hint for ordered Image N or Agnes <Picture N> prompt previews. Does not rewrite the prompt or enable provider asset management. Wan first_frame_references numbers reference images after the first frame.
+          enum: [numbered, picture, bracket, kling-id]
+          description: Legacy recipe grammar retained for existing saved templates. The current UI uses the common UI reference syntax independently of this value and informational provider recommendations. Ordinary API prompts remain opaque and unchanged. Wan first_frame_references numbers reference images after the first frame.
+        reference_prompt_recommendation:
+          type: object
+          readOnly: true
+          description: Optional reviewed provider API advice. Informational only; it never selects UI grammar, enforces spelling, rewrites prompts or grants capabilities. Absent when no explicit recommendation/example is verified.
+          required: [text, kind, source_url]
+          properties:
+            text: {type: string}
+            kind: {type: string, enum: [example, instruction]}
+            source_url: {type: string, format: uri}
+            modes: {type: array, items: {type: string}}
+        reference_media_limits: {$ref: '#/components/schemas/ReferenceMediaLimits'}
+        reference_prompt_types:
+          type: array
+          items: {type: string, enum: [image, video, audio]}
+          description: Legacy recipe media namespaces. Current UI reference validation follows the selected reference mode and input capabilities. Existing saved recipes, connection identities and credentials are unchanged.
         supports_asset_references:
           type: boolean
           description: Accepts registered provider asset://ID references for image, video and audio inputs allowed by reference_modes. Assets must be ready and accessible to the configured provider account and project.
@@ -8427,7 +9542,10 @@ components:
               max_visuals: {type: integer, description: "Combined image/video limit, if set."}
               requires_visual: {type: boolean, description: "Audio requires at least one image or video."}
               supports_reference_voice: {type: boolean}
-              image_roles: {type: array, items: {type: string}, description: "Labels assigned to images by position; remaining images are ordinary references."}
+              image_roles: {type: array, items: {type: string}, description: "Roles assigned to images by position."}
+              ratios: {type: array, items: {type: string}, description: Optional workflow-specific aspect ratio choices}
+              default_image_role: {type: string, description: Role of remaining images; defaults to reference}
+              last_image_role: {type: string, description: Role of the final image after any explicitly positioned roles}
 
         duration_step:
           type: integer
@@ -8620,7 +9738,7 @@ components:
           items: {$ref: '#/components/schemas/ProviderField'}
         values: {type: object, additionalProperties: {type: string}, description: Non-secret saved settings.}
         hints: {type: object, additionalProperties: {type: string}, description: Masked hints only for secret fields.}
-        icon_url: {type: string, description: Module-owned raster or original vector asset URL.}
+        icon_url: {type: string, description: Authenticated uploaded transparent PNG logo URL.}
         icon_monochrome: {type: boolean}
         billing_help: {type: string}
         supports_billing_credentials: {type: boolean, description: Whether separate billing credentials are supported.}
@@ -8657,6 +9775,7 @@ components:
           type: string
         status:
           type: string
+          description: Connection result; authenticated verifies only a non-generating account query, not model entitlement, funding or generation readiness. Availability remains controlled by enabled.
         status_message:
           type: string
         last_checked_at:
@@ -8679,7 +9798,9 @@ components:
           type: string
           format: date-time
       description: Configuration belongs to the authenticated account. Secret fields
-        are masked. Connection checks can contact the provider to verify inference access.
+        are masked. Explicit connection checks can contact the provider. A non-generating
+        authentication check does not prove model access or funded generation; inspect
+        status_message for its scope. Cached checks can expire or reset on restart.
         Separate billing credentials are used to retrieve actual generation charges.
     MediaAccess:
       type: object
@@ -8721,6 +9842,21 @@ components:
       type: object
       description: Reviewed metadata plus account API metadata. Provider financial facts and source links are included only for administrators. Dates may have day or month precision; API object creation is not a release date. Provider capabilities can exceed those exposed by this gateway.
       properties:
+        operational:
+          type: object
+          description: Last-confirmed typed public facts and snapshot provenance. Current verification/freshness is in catalogue run coverage; these values never override native options or tariffs.
+          additionalProperties:
+            type: object
+            required: [value, source, snapshot, checked_at]
+            properties:
+              value: {}
+              source:
+                type: object
+                properties:
+                  title: {type: string}
+                  url: {type: string}
+              snapshot: {type: string}
+              checked_at: {type: string, format: date-time}
         description: {type: string}
         release_date: {type: string, example: '2026-09-08'}
         version_date: {type: string, example: '2026-09-08'}
@@ -8820,6 +9956,7 @@ components:
       - name
       properties:
         user_id: {type: string, format: uuid, description: Immutable key recipient; organization membership and issuer permissions are required. Defaults to the issuer.}
+        purpose: {type: string, readOnly: true, enum: [playground_templates], description: Present only for explicitly account-managed Playground and Templates keys; immutable and independent of the name.}
         created_by: {type: string, format: uuid, readOnly: true, description: User who issued the key.}
         organization_id: {type: string, format: uuid, description: Omit for a personal key. Organization keys require current membership and use shared providers.}
         resource_mode: {type: string, enum: [personal, shared], description: "Personal without organization_id; shared with organization_id. The provider source must match the key ownership."}
@@ -9011,6 +10148,7 @@ components:
       - created_at
       properties:
         user_id: {type: string, format: uuid, description: Immutable key recipient; organization membership and issuer permissions are required. Defaults to the issuer.}
+        purpose: {type: string, readOnly: true, enum: [playground_templates], description: Present only for explicitly account-managed Playground and Templates keys; immutable and independent of the name.}
         created_by: {type: string, format: uuid, readOnly: true, description: User who issued the key.}
         organization_id: {type: string, format: uuid, description: Omit for a personal key. Organization keys require current membership and use shared providers.}
         resource_mode: {type: string, enum: [personal, shared], description: "Personal without organization_id; shared with organization_id. The provider source must match the key ownership."}
@@ -9058,6 +10196,7 @@ components:
       - secret
       properties:
         user_id: {type: string, format: uuid, description: Immutable key recipient; organization membership and issuer permissions are required. Defaults to the issuer.}
+        purpose: {type: string, readOnly: true, enum: [playground_templates], description: Present only for explicitly account-managed Playground and Templates keys; immutable and independent of the name.}
         created_by: {type: string, format: uuid, readOnly: true, description: User who issued the key.}
         organization_id: {type: string, format: uuid, description: Omit for a personal key. Organization keys require current membership and use shared providers.}
         resource_mode: {type: string, enum: [personal, shared], description: "Personal without organization_id; shared with organization_id. The provider source must match the key ownership."}
@@ -9164,6 +10303,10 @@ components:
       type: object
     CatalogEntry:
       properties:
+        operational_fields:
+          type: object
+          description: Typed public operational evidence from a provider-owned interpreter. Informational evidence cannot activate models or change native admission.
+          additionalProperties: {}
         inactive:
           description: Reviewed deactivated model retained for history, without an executable contract.
           type: boolean
@@ -9183,6 +10326,14 @@ components:
       type: object
     CatalogObservation:
       properties:
+        operational_history:
+          description: Read-only last-confirmed typed facts by exact model and field, retaining each source snapshot when a later observation omits that field. Historical values never establish current verification.
+          readOnly: true
+          type: object
+          additionalProperties:
+            type: object
+            additionalProperties:
+              $ref: '#/components/schemas/CatalogCoverageSource'
         review:
           description: Code-reviewed acknowledgement of this exact successful document snapshot; later hashes require a new review.
           readOnly: true
@@ -9287,8 +10438,78 @@ components:
           readOnly: true
           type: string
       type: object
+    CatalogCompleteness:
+      type: object
+      description: Operational-v1 coverage of this connection's supported active models. Independent of publication changes. Missing on historical runs means not assessed, never complete. Prose, document acknowledgments and unchanged hashes do not verify executable fields.
+      additionalProperties: false
+      required: [requirements, status, models, sources, reasons]
+      properties:
+        requirements: {type: string, enum: [operational-v1]}
+        status: {type: string, enum: [complete, partial, incomplete]}
+        reasons:
+          type: array
+          items: {type: string}
+        sources:
+          type: array
+          items: {$ref: '#/components/schemas/CatalogCoverageSource'}
+        models:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [model, status, contract, fields]
+            properties:
+              model: {type: string}
+              status: {type: string, enum: [complete, partial, incomplete]}
+              declared_sources:
+                description: Adapter source references only; these do not establish field verification.
+                type: array
+                items:
+                  type: object
+                  properties:
+                    title: {type: string}
+                    url: {type: string}
+              contract:
+                description: Current adapter protocol fields. Tariffs and display metadata are omitted rather than represented as zero prices.
+                type: object
+                additionalProperties: true
+              fields:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  required: [field, required, status, reason]
+                  properties:
+                    field: {type: string}
+                    required: {type: boolean, description: Whether missing verification prevents required native-contract coverage. Optional provider details do not imply unsupported capabilities.}
+                    status: {type: string, enum: [verified, unknown, not_applicable, unsupported, stale, preserved]}
+                    reason: {type: string}
+                    value: {}
+                    sources:
+                      type: array
+                      items: {$ref: '#/components/schemas/CatalogCoverageSource'}
+    CatalogCoverageSource:
+      type: object
+      additionalProperties: false
+      required: [source, status]
+      properties:
+        value: {}
+        source:
+          description: Scheduled public document source or reserved internal API discovery source.
+          type: object
+          additionalProperties: false
+          required: [id, url, parser]
+          properties:
+            id: {type: string}
+            url: {type: string}
+            parser: {type: string}
+        status: {type: string, enum: [retrieved, retrieval_failed, stale, preserved, not_checked]}
+        hash: {type: string, description: "Current normalized snapshot, or failed fetched snapshot when available."}
+        previous_hash: {type: string, description: Last confirmed normalized snapshot retained for comparison and restoration of evidence.}
     CatalogRun:
       properties:
+        completeness:
+          $ref: '#/components/schemas/CatalogCompleteness'
         changes:
           items:
             $ref: '#/components/schemas/CatalogChange'
@@ -9334,6 +10555,8 @@ components:
           type: string
         status:
           enum:
+          - partial
+          - incomplete
           - unchanged
           - applied
           - warning

@@ -97,7 +97,7 @@
       if(!keys.length) {paragraph('No keys yet.',keyList);return;}
       table(['Key',...(organizationID?['User','Issued by']:[]),'Spending','Permissions','Activity','Status',''],keys.map(key=>{
         const revoked=!!key.revoked_at, expired=key.expires_at && Date.parse(key.expires_at)<=Date.now();
-        const identity=node('div');identity.append(node('strong',key.name),node('code',key.prefix+'…'),node('small',key.id));
+        const identity=node('div');identity.append(node('strong',key.name),node('code',key.prefix+'…'),node('small',key.id));if(key.purpose==='playground_templates')identity.append(node('small','Created by Playground · Templates'));
         const activity=node('div');activity.append(node('small','Created '+new Date(key.created_at).toLocaleDateString()),node('small',key.last_used_at ? 'Used '+new Date(key.last_used_at).toLocaleString() : 'Not used yet'),node('small',key.expires_at ? 'Expires '+new Date(key.expires_at).toLocaleDateString() : 'No expiration'));
         const revoke=node('button',revoked?'Revoked':'Revoke','secondary');revoke.type='button';revoke.disabled=revoked;
         revoke.addEventListener('click',()=>confirmRevoke(key,revoke));

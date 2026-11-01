@@ -15,7 +15,7 @@ func (r *APIKeyRepository) OrganizationKeys(ctx context.Context, actor, organiza
 	if err != nil {
 		return nil, apikey.ErrForbidden
 	}
-	rows, err := r.db.QueryContext(ctx, `SELECT k.id,k.name,k.prefix,k.scopes,k.created_at,k.expires_at,k.last_used_at,k.revoked_at,k.resource_mode,k.storage_mode,k.organization_id,k.user_id,k.created_by,u.email,c.email,m.role FROM user_api_keys k JOIN users u ON u.id=k.user_id JOIN users c ON c.id=k.created_by JOIN organization_members m ON m.organization_id=k.organization_id AND m.user_id=k.user_id WHERE k.organization_id=$1 ORDER BY k.created_at DESC,k.id`, organization)
+	rows, err := r.db.QueryContext(ctx, `SELECT k.id,k.name,k.prefix,k.scopes,k.created_at,k.expires_at,k.last_used_at,k.revoked_at,k.resource_mode,k.storage_mode,k.organization_id,k.user_id,k.created_by,u.email,c.email,m.role,k.purpose FROM user_api_keys k JOIN users u ON u.id=k.user_id JOIN users c ON c.id=k.created_by JOIN organization_members m ON m.organization_id=k.organization_id AND m.user_id=k.user_id WHERE k.organization_id=$1 ORDER BY k.created_at DESC,k.id`, organization)
 	if err != nil {
 		return nil, err
 	}
@@ -25,7 +25,7 @@ func (r *APIKeyRepository) OrganizationKeys(ctx context.Context, actor, organiza
 		var k apikey.Key
 		var scopes []byte
 		var recipientRole string
-		if err = rows.Scan(&k.ID, &k.Name, &k.Prefix, &scopes, &k.CreatedAt, &k.ExpiresAt, &k.LastUsedAt, &k.RevokedAt, &k.ResourceMode, &k.StorageMode, &k.OrganizationID, &k.UserID, &k.CreatedBy, &k.UserEmail, &k.CreatorEmail, &recipientRole); err != nil {
+		if err = rows.Scan(&k.ID, &k.Name, &k.Prefix, &scopes, &k.CreatedAt, &k.ExpiresAt, &k.LastUsedAt, &k.RevokedAt, &k.ResourceMode, &k.StorageMode, &k.OrganizationID, &k.UserID, &k.CreatedBy, &k.UserEmail, &k.CreatorEmail, &recipientRole, &k.Purpose); err != nil {
 			return nil, err
 		}
 		if !org.Statistics(role) && k.UserID != actor && !org.IssueKey(role, actor, recipientRole, k.UserID) {

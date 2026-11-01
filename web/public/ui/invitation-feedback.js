@@ -11,7 +11,8 @@
    if(!response.ok)throw Error('Sign-in configuration unavailable');
    const methods=await response.json();
    if(typeof methods.email!=='boolean'||typeof methods.google!=='boolean')throw Error('Invalid sign-in configuration');
-   if(!methods.email&&!methods.google){text+=' No sign-in method is enabled. An Administrator must enable one so recipients can sign in.';warning=true;}
+   if(methods.email&&!methods.google&&typeof methods.email_delivery!=='boolean')throw Error('Invalid email availability');
+   if(!(methods.email&&methods.email_delivery)&&!methods.google){text+=' No sign-in method is currently available. An Administrator must configure one so recipients can sign in.';warning=true;}
   }catch{
    text+=' Could not check sign-in availability. Ask an Administrator to check the site’s Login methods settings.';warning=true;
   }finally{clearTimeout(timer);}

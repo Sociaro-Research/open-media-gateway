@@ -1,3 +1,4 @@
+const {useFixtureKey}=require('./fixture-key.cjs');
 const {evidencePath} = require('./evidence.cjs');
 // Real browser controls; every API/file response is a synthetic localhost fixture.
 const {chromium,webkit}=require('playwright');
@@ -93,8 +94,8 @@ const server=http.createServer((req,res)=>{
   async function referenceMode(label){await page.getByRole('combobox',{name:'Reference mode',exact:true}).click();await page.getByRole('listbox',{name:'Reference mode',exact:true}).getByRole('option',{name:label,exact:true}).click();}
   const libraryReady=()=>page.waitForFunction(()=>!document.querySelector('#audioReferenceLibrary [data-status]').textContent.includes('Loading library'));
   async function voice(visual='first.png',ready=true){await page.getByRole('button',{name:'Voice reference for '+visual,exact:true}).click();await dialog.waitFor();if(ready){await dialog.locator('.reference-card').first().waitFor();await libraryReady();}}
-  async function dismiss(action){if(action==='Escape')await page.keyboard.press('Escape');else await dialog.getByRole('button',{name:action==='Close'?'Close library':'Done',exact:true}).click();await page.waitForFunction(()=>!document.querySelector('#audioReferenceLibrary').open);}
-  async function choose(){await page.locator('#audioChooseReferences').click();await dialog.getByRole('button',{name:'Use voice.mp3 in generation',exact:true}).click();if(await dialog.isVisible())await dismiss('Done');}
+  async function dismiss(action){if(action==='Escape')await page.keyboard.press('Escape');else await dialog.getByRole('button',{name:'Close library',exact:true}).click();await page.waitForFunction(()=>!document.querySelector('#audioReferenceLibrary').open);}
+  async function choose(){await page.locator('#audioChooseReferences').click();await dialog.getByRole('button',{name:'Use voice.mp3 in generation',exact:true}).click();if(await dialog.isVisible())await dismiss('Close');}
   async function openChooser(inLibrary=false,activation='click'){
    const button=inLibrary?dialog.locator('[data-upload]'):page.locator('#audioUploadReference');
    const [chooser]=await Promise.all([page.waitForEvent('filechooser'),activation==='click'?button.click():button.press(activation)]);
@@ -117,12 +118,12 @@ const server=http.createServer((req,res)=>{
    try{await Promise.all([page.waitForRequest(req=>new URL(req.url()).pathname==='/v1/references'&&req.method()==='POST'),dialog.locator('#libraryDropzone').dispatchEvent('drop',{dataTransfer})]);}finally{await dataTransfer.dispose();}
   }
   const waitUpload=(text='saved to your library.')=>page.waitForFunction(text=>!document.querySelector('#audioReferenceFiles').value&&document.querySelector('#audioReferenceStatus').textContent.includes(text),text);
-  async function upload(inLibrary=false){if(inLibrary){await page.locator('#audioChooseReferences').click();await dialog.locator('.reference-card').first().waitFor();await libraryReady();}await startUpload(inLibrary);await waitUpload();if(inLibrary&&await dialog.isVisible())await dismiss('Done');}
+  async function upload(inLibrary=false){if(inLibrary){await page.locator('#audioChooseReferences').click();await dialog.locator('.reference-card').first().waitFor();await libraryReady();}await startUpload(inLibrary);await waitUpload();if(inLibrary&&await dialog.isVisible())await dismiss('Close');}
   function holdUpload(){const gate={arrived:deferred(),release:deferred(),finished:deferred()};uploadGate=gate;gates.push(gate);return gate;}
   const read=()=>page.evaluate(()=>({audio:document.querySelector('#audioURL').value,images:document.querySelector('#imageURLs').value,voices:referencePicker.voices()}));
   try{
-   await page.goto(origin);await page.waitForFunction(()=>consoleInitialized&&window.Workspace?.ready());await page.locator('#createGenerationKey').click();await page.waitForFunction(()=>selectedModel()?.id==='wan2.7-r2v');
-   await page.locator('#chooseReferences').click();await page.getByRole('button',{name:'Use first.png in generation',exact:true}).click();await page.getByRole('button',{name:'Use last.png in generation',exact:true}).click();await page.locator('#referenceLibrary').getByRole('button',{name:'Done',exact:true}).click();
+   await page.goto(origin);await page.waitForFunction(()=>consoleInitialized&&window.Workspace?.ready());await useFixtureKey(page,'fixture-key');await page.waitForFunction(()=>selectedModel()?.id==='wan2.7-r2v');
+   await page.locator('#chooseReferences').click();await page.getByRole('button',{name:'Use first.png in generation',exact:true}).click();await page.getByRole('button',{name:'Use last.png in generation',exact:true}).click();await page.locator('#referenceLibrary').getByRole('button',{name:'Close library',exact:true}).click();
    await test({page,dialog,model,referenceMode,voice,dismiss,choose,upload,openChooser,startUpload,startVoiceUpload,waitUpload,holdUpload,read,origin,operations:()=>({preparations,uploads,choosers:chooserEvents.length}),useExisting:()=>{existingPlan=true;},failPreparation:()=>{preparationFailures=1;}});
    assert.deepEqual(errors,[],'no application errors');assert.deepEqual(external,[],'no external requests');
    results.push({name,status:'pass',browser_notices:browserNotices,chooser_events:chooserEvents});console.log('PASS: '+name);
@@ -164,7 +165,7 @@ const server=http.createServer((req,res)=>{
     assert.equal(await page.locator('#audioReferenceFiles').isDisabled(),true);
     await referenceMode('First frame and references');
     assert.equal(await page.getByRole('button',{name:'Voice reference for first.png',exact:true}).count(),0);
-    for(const action of ['Escape','Close','Done']){
+    for(const action of ['Escape','Close']){
      await voice('last.png');assert.equal(await page.locator('#audioReferenceFiles').isDisabled(),false);assert.equal(await page.locator('#audioURL').isDisabled(),true);
      await dismiss(action);assert.equal(await page.locator('#audioReferenceFiles').isDisabled(),true,'dismiss restores the hidden input');
     }
@@ -198,13 +199,13 @@ const server=http.createServer((req,res)=>{
     await startVoiceUpload();await waitUpload();assert.deepEqual(operations(),{preparations:2,uploads:1,choosers:2});assert.deepEqual((await read()).voices,{[origin+'/references/test/i1']:origin+'/references/test/upload1'});assert.equal((await read()).audio,'');
    });
   }
-  for(const action of ['Escape','Close','Done'])for(const operation of ['selection','library upload','direct upload'])await run(action+' then normal '+operation,async({model,voice,dismiss,choose,upload,read,origin})=>{
+  for(const action of ['Escape','Close'])for(const operation of ['selection','library upload','direct upload'])await run(action+' then normal '+operation,async({model,voice,dismiss,choose,upload,read,origin})=>{
    await voice();await dismiss(action);await model('Seedance 2.0');
    if(operation==='selection')await choose();else await upload(operation==='library upload');
    const state=await read();await model('Wan 2.7');const returned=await read();
    assert.deepEqual({audio:state.audio,voices:returned.voices},{audio:origin+'/references/test/'+(operation==='selection'?'a1':'upload1'),voices:{}},'cancelled voice intent must not steal normal audio');
   });
-  for(const action of ['Escape','Close','Done'])await run(action+' interrupts voice upload',async({page,model,voice,dismiss,choose,startVoiceUpload,waitUpload,holdUpload,read,origin})=>{
+  for(const action of ['Escape','Close'])await run(action+' interrupts voice upload',async({page,model,voice,dismiss,choose,startVoiceUpload,waitUpload,holdUpload,read,origin})=>{
    const gate=holdUpload();await voice();await startVoiceUpload();await gate.arrived.promise;await dismiss(action);await model('Seedance 2.0');
    gate.release.resolve();await gate.finished.promise;await waitUpload();
    assert.equal((await read()).audio,'','cancelled voice upload must not become ordinary audio');
@@ -220,7 +221,7 @@ const server=http.createServer((req,res)=>{
    assert.deepEqual((await read()).voices,{[origin+'/references/test/i1']:origin+'/references/test/a1'});
   });
   await run('reopen different visual during old upload',async({dialog,voice,dismiss,startVoiceUpload,waitUpload,holdUpload,read,origin})=>{
-   const gate=holdUpload();await voice();await startVoiceUpload();await gate.arrived.promise;await dismiss('Done');await voice('last.png');
+   const gate=holdUpload();await voice();await startVoiceUpload();await gate.arrived.promise;await dismiss('Close');await voice('last.png');
    gate.release.resolve();await gate.finished.promise;await waitUpload();
    assert.equal(await dialog.isVisible(),true);assert.deepEqual((await read()).voices,{});
    await dialog.getByRole('button',{name:'Use voice.mp3 in generation',exact:true}).click();
@@ -249,7 +250,7 @@ const server=http.createServer((req,res)=>{
    const gate=holdUpload();await voice();await startVoiceUpload();await gate.arrived.promise;await dismiss('Escape');
    await page.locator('#forgetGenerationKey').click();await page.waitForFunction(()=>!GenerationKey.value());
    gate.release.resolve();await gate.finished.promise;
-   await page.locator('#createGenerationKey').click();await page.waitForFunction(()=>selectedModel()?.id==='wan2.7-r2v');
+   await useFixtureKey(page,'fixture-key');await page.waitForFunction(()=>selectedModel()?.id==='wan2.7-r2v');
    await model('Seedance 2.0');await upload();await model('Wan 2.7');
    assert.deepEqual(await read(),{audio:origin+'/references/test/upload2',images:'',voices:{}},'reset invalidates old upload and new key has clean references');
   });
@@ -265,7 +266,7 @@ const server=http.createServer((req,res)=>{
      assert.deepEqual(Object.keys((await read()).voices),[origin+'/references/test/i1']);assert.equal((await read()).audio,'');
      await page.getByRole('button',{name:'Clear voice for first.png',exact:true}).click();await voice();
     }
-    await dismiss('Escape');await voice('last.png');await dismiss('Done');await voice();await dismiss('Close');
+    await dismiss('Escape');await voice('last.png');await dismiss('Close');await voice();await dismiss('Close');
     await model('Seedance 2.0');await choose();
     assert.equal((await read()).audio,origin+'/references/test/a1');
     await page.locator('#audioSelectedReferences').getByRole('button',{name:'Remove voice.mp3 from generation',exact:true}).click();

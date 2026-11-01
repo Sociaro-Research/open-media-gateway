@@ -68,8 +68,8 @@ func TestLoginMethodSwitchesGateNewAuthAndPreserveSessions(t *testing.T) {
 	}
 	policy.settings.Google = true
 	policy.settings.Email = true
-	if got := methods(); !got["google"] || !got["email"] || got["email_delivery"] {
-		t.Fatal("password login must remain available without delivery", got)
+	if got := methods(); !got["google"] || got["email"] || got["email_delivery"] || !got["email_confirmation"] {
+		t.Fatal("unconfigured delivery must hide the email choice without disabling existing links", got)
 	}
 	w := httptest.NewRecorder()
 	request := httptest.NewRequest("POST", "/auth/email/register", strings.NewReader(`{"email":"test@example.test"}`))
@@ -90,5 +90,71 @@ func TestLoginMethodSwitchesGateNewAuthAndPreserveSessions(t *testing.T) {
 	}
 	if _, err := m.Authenticate(r); err != nil {
 		t.Fatal("settings outage invalidated existing session", err)
+	}
+}
+
+type methodDeliveryFixture struct {
+	ready bool
+	err   error
+	sends int
+}
+
+func (f *methodDeliveryFixture) Configured(context.Context) (bool, error) { return f.ready, f.err }
+func (f *methodDeliveryFixture) Send(context.Context, string, string, string, string) error {
+	f.sends++
+	return errors.New("synthetic provider outage")
+}
+
+func TestEmailBrowserAvailabilityPreservesConfiguredMethods(t *testing.T) {
+	for _, tc := range []struct {
+		name                 string
+		email, google, ready bool
+		readError            bool
+	}{
+		{"email enabled without delivery", true, false, false, false},
+		{"email disabled with delivery", false, false, true, false},
+		{"email available", true, false, true, false},
+		{"Google independent without delivery", true, true, false, false},
+		{"both available", true, true, true, false},
+		{"delivery lookup unavailable", true, true, false, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			policy := &methodsFixture{settings: LoginMethods{Email: tc.email, Google: tc.google, Version: 7}}
+			delivery := &methodDeliveryFixture{ready: tc.ready}
+			if tc.readError {
+				delivery.err = errors.New("synthetic configuration read failure")
+			}
+			manager := &Manager{methods: policy, email: &emailAuth{sender: delivery}}
+			read := func() map[string]bool {
+				t.Helper()
+				response := httptest.NewRecorder()
+				manager.Methods(response, httptest.NewRequest("GET", "/auth/methods", nil))
+				var methods map[string]bool
+				if response.Code != 200 || json.Unmarshal(response.Body.Bytes(), &methods) != nil {
+					t.Fatal("method availability response", response.Code)
+				}
+				return methods
+			}
+			before := policy.settings
+			methods := read()
+			if methods["email"] != (tc.email && tc.ready) || methods["google"] != tc.google || methods["email_confirmation"] != tc.email {
+				t.Fatal("wrong effective method availability", methods)
+			}
+			if policy.settings != before || delivery.sends != 0 {
+				t.Fatal("reading availability changed preferences or probed delivery")
+			}
+			if tc.ready {
+				_ = delivery.Send(context.Background(), "fixture@example.test", "verify", "fixture", "fixture")
+				if read()["email"] != tc.email || !read()["email_delivery"] {
+					t.Fatal("a provider send failure must not change local configuration readiness")
+				}
+			}
+			if tc.email && !tc.ready {
+				delivery.ready, delivery.err = true, nil
+				if !read()["email"] || policy.settings != before {
+					t.Fatal("valid delivery did not restore email availability without changing preference")
+				}
+			}
+		})
 	}
 }

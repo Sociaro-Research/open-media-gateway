@@ -21,6 +21,7 @@ func sameJSON(a, b json.RawMessage) bool {
 }
 func contract(m core.MediaModel) core.MediaModel {
 	m.Metadata = nil
+	m.ReferencePromptRecommendation = nil
 	m.Pricing = core.MediaModelPricing{}
 	m.DisplayName = ""
 	m.PublicID = ""
@@ -126,7 +127,8 @@ func Reconcile(previous State, native Capture, observations []Observation, now t
 		}
 	}
 	known := map[string]core.MediaModel{}
-	checkedSources := map[string]bool{}
+	checkedSources := map[string]bool{"_operational": true}
+	operationalCandidates := collectOperationalCandidates(previous, observations)
 	apiFailed := false
 	// Resolve field conflicts before mutating the catalogue, preventing an
 	// alternating pair of sources from producing daily false changes.
@@ -265,14 +267,14 @@ func Reconcile(previous State, native Capture, observations []Observation, now t
 			next.Models[m.ID] = entry
 		}
 		// A code-reviewed lifecycle date must also reach an existing catalogue.
-		// Fill only missing dates; current structured evidence and previously
-		// confirmed dates take precedence over the compiled baseline.
+		// Explicit reviewed retirements may correct an inherited date; other
+		// baseline dates only fill gaps, preserving current structured evidence.
 		entry := next.Models[m.ID]
-		if metadata := reviewedMetadata[m.ID]; metadata != nil && len(metadata.ShutdownDate) == 10 && ValidDate(metadata.ShutdownDate) && values[m.ID+"/shutdown_date"].value == "" && (entry.Metadata == nil || entry.Metadata.ShutdownDate == "") {
+		if metadata := reviewedMetadata[m.ID]; metadata != nil && len(metadata.ShutdownDate) == 10 && ValidDate(metadata.ShutdownDate) && values[m.ID+"/shutdown_date"].value == "" && (entry.Metadata == nil || entry.Metadata.ShutdownDate == "" || inactive[m.ID]) {
 			if entry.Metadata == nil {
 				entry.Metadata = &core.ModelMetadata{}
 			}
-			change(m.ID, "shutdown_date", "adapter", "", metadata.ShutdownDate)
+			change(m.ID, "shutdown_date", "adapter", entry.Metadata.ShutdownDate, metadata.ShutdownDate)
 			entry.Metadata.ShutdownDate = metadata.ShutdownDate
 			for _, source := range metadata.Sources {
 				found := false
@@ -331,6 +333,44 @@ func Reconcile(previous State, native Capture, observations []Observation, now t
 			}
 		}
 	}
+	// Conflict keys and evidence are independent of observation order. An old
+	// conflict resolves only when every known source supplies current agreement.
+	operationalModels := []string{}
+	for id := range operationalCandidates {
+		operationalModels = append(operationalModels, id)
+	}
+	sort.Strings(operationalModels)
+	for _, id := range operationalModels {
+		if _, supported := known[id]; !supported || next.Models[id].Inactive || next.Models[id].ExcludedReason != "" {
+			continue
+		}
+		fields := []string{}
+		for field := range operationalCandidates[id] {
+			fields = append(fields, field)
+		}
+		sort.Strings(fields)
+		for _, field := range fields {
+			candidate := operationalCandidates[id][field]
+			if candidate.conflict {
+				warn(id, "_operational", "Official sources disagree on operational field", core.ModelFact{Label: field, Value: string(encoded(candidate.refs))})
+			}
+		}
+	}
+	for _, warning := range oldWarnings {
+		if warning.Source != "_operational" || warning.Reason != "Official sources disagree on operational field" {
+			continue
+		}
+		if _, supported := known[warning.Model]; !supported || next.Models[warning.Model].Inactive || next.Models[warning.Model].ExcludedReason != "" {
+			continue
+		}
+		var fact core.ModelFact
+		if json.Unmarshal(warning.Evidence, &fact) == nil {
+			candidate := operationalCandidates[warning.Model][fact.Label]
+			if !candidate.current && !candidate.conflict {
+				warn(warning.Model, warning.Source, warning.Reason, fact)
+			}
+		}
+	}
 	// Preserve candidates from temporarily failed sources. A failure must not
 	// silently resolve an outstanding model/protocol warning.
 	for i, ob := range observations {
@@ -353,9 +393,9 @@ func Reconcile(previous State, native Capture, observations []Observation, now t
 				ob.Hash = old.Hash
 			}
 		}
-		if !reviewed && ob.Error == "" && old.Hash != "" && old.Hash != ob.Hash && (len(ob.Entries) == 0 || ob.Source.Parser == "openai-model") && ob.Source.ID != "_api" {
+		if !reviewed && ob.Error == "" && old.Hash != "" && old.Hash != ob.Hash && (len(ob.Entries) == 0 || ob.Source.Parser == "openai-model" || ob.Source.Parser == "document") && ob.Source.ID != "_api" {
 			warn("", ob.Source.ID, "Documentation changed without a supported structured interpretation", map[string]string{"url": ob.Source.URL, "previous_hash": old.Hash, "hash": ob.Hash})
-		} else if !reviewed && (ob.Error != "" || len(ob.Entries) == 0 || ob.Source.Parser == "openai-model") {
+		} else if !reviewed && (ob.Error != "" || len(ob.Entries) == 0 || ob.Source.Parser == "openai-model" || ob.Source.Parser == "document") {
 			// A failed fetch cannot review an earlier document change. Retain
 			// its original evidence through failures and quiet recovery days.
 			for _, w := range oldWarnings {
@@ -364,6 +404,31 @@ func Reconcile(previous State, native Capture, observations []Observation, now t
 				}
 			}
 		}
+		// Reused entries after a failed fetch are last-confirmed evidence, not
+		// a fresh operational verification. Keep unresolved field evidence intact.
+		for _, oldWarning := range oldWarnings {
+			if oldWarning.Source != ob.Source.ID || oldWarning.Reason != "Published operational field requires adapter review" {
+				continue
+			}
+			var fact core.ModelFact
+			if json.Unmarshal(oldWarning.Evidence, &fact) != nil {
+				continue
+			}
+			observed := false
+			if ob.Error == "" {
+				for _, entry := range ob.Entries {
+					if entry.ID == oldWarning.Model {
+						value, present := entry.OperationalFields[fact.Label]
+						candidate := operationalCandidates[entry.ID][fact.Label]
+						observed = present && usableOperationalValue(value) && candidate.current && !candidate.conflict
+					}
+				}
+			}
+			if !observed {
+				warn(oldWarning.Model, oldWarning.Source, oldWarning.Reason, fact)
+			}
+		}
+		ob.OperationalHistory = rememberOperationalHistory(old, ob)
 		next.Observations[ob.Source.ID] = ob
 		for _, entry := range ob.Entries {
 			model, ok := known[entry.ID]
@@ -374,6 +439,55 @@ func Reconcile(previous State, native Capture, observations []Observation, now t
 			current := next.Models[entry.ID]
 			if current.ExcludedReason != "" {
 				continue
+			}
+			if len(entry.OperationalFields) > 0 && ob.Error == "" {
+				projection := nativeOperationalFields(model)
+				keys := make([]string, 0, len(entry.OperationalFields))
+				for key := range entry.OperationalFields {
+					keys = append(keys, key)
+				}
+				sort.Strings(keys)
+				for _, key := range keys {
+					selected := operationalCandidates[entry.ID][key]
+					if selected.conflict || !selected.current || len(selected.refs) == 0 || selected.refs[0].Source.ID != ob.Source.ID {
+						continue
+					}
+					value := selected.value
+					if envelope, applies := videoDurationEnvelopeFor(model, key); applies {
+						projection[key] = encoded(envelope)
+					}
+					nativeValue, exists := projection[key]
+					compatible := exists && compatibleOperationalField(key, nativeValue, value)
+					if key == "reference_prompt_recommendation" {
+						compatible = compatible && model.ReferencePromptRecommendation != nil && ob.Source.URL == model.ReferencePromptRecommendation.SourceURL
+					}
+					// A typed provider relation can be published as informational evidence
+					// while native compatibility remains unverified and is separately warned.
+					publishKnownRelation := exists && validVideoDurationSum(key, value)
+					if compatible || publishKnownRelation {
+						if current.Metadata == nil {
+							current.Metadata = &core.ModelMetadata{}
+						}
+						if current.Metadata.Operational == nil {
+							current.Metadata.Operational = map[string]core.OperationalFact{}
+						}
+						before := current.Metadata.Operational[key]
+						if !sameOperationalValue(key, before.Value, value) {
+							change(entry.ID, "operational."+key, ob.Source.URL, before.Value, value)
+						}
+						current.Metadata.Operational[key] = core.OperationalFact{Value: append(json.RawMessage(nil), value...), Source: core.ModelSource{Title: ob.Source.ID, URL: ob.Source.URL}, Snapshot: ob.Hash, CheckedAt: now.UTC().Format(time.RFC3339)}
+						sourceFound := false
+						for _, source := range current.Metadata.Sources {
+							sourceFound = sourceFound || source.URL == ob.Source.URL
+						}
+						if !sourceFound {
+							current.Metadata.Sources = append(current.Metadata.Sources, core.ModelSource{Title: ob.Source.ID, URL: ob.Source.URL})
+						}
+					}
+					if exists && !compatible {
+						warn(entry.ID, ob.Source.ID, "Published operational field requires adapter review", core.ModelFact{Label: key, Value: string(encoded(map[string]json.RawMessage{"native": nativeValue, "published": value}))})
+					}
+				}
 			}
 			if entry.Contract != nil && !reflect.DeepEqual(contract(*entry.Contract), contract(model)) {
 				warn(entry.ID, ob.Source.ID, "Capabilities or reference requirements differ from the adapter contract", entry.Contract)
@@ -545,6 +659,10 @@ func Reconcile(previous State, native Capture, observations []Observation, now t
 		if ob.Error != "" {
 			run.Status = "error"
 		}
+	}
+	run.Completeness = AssessCompleteness(previous, native, observations, run.OpenWarnings)
+	if run.Completeness.Status != "complete" && (run.Status == "applied" || run.Status == "unchanged") {
+		run.Status = run.Completeness.Status
 	}
 	run.Version = next.Version
 	if len(run.Changes) > 0 || len(run.NewWarnings) > 0 || len(run.ResolvedWarnings) > 0 {

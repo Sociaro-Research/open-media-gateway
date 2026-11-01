@@ -22,6 +22,7 @@
   new MutationObserver(layoutHeader).observe(nav,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['hidden']});
   [wordmark,symbol].forEach(image=>image.addEventListener('load',layoutHeader));
   document.fonts.ready.then(layoutHeader);
+  window.addEventListener('resize',layoutHeader);
 }
 
 const expandedTaskParameters = new Set();
@@ -125,7 +126,11 @@ let providerAdminCatalog = [];
 let selectedAdminProviderID = '';
 let renderedTasksFingerprint = '';
 let taskListRequest = null;
+let generationKeyVersion = 0;
 let authMode = 'pending';
+const authAbsent = Symbol('absent session');
+let authState = 'checking';
+let initializationPending = false;
 let latestTasks = [];
 const taskCompletionUntil = new Map();
 let pendingSubmission = null;
@@ -140,12 +145,13 @@ const promptHistory = JSON.parse(localStorage.getItem('media-gateway-prompts') |
 // Remove the legacy persistent credential; API keys now stay in page memory.
 localStorage.removeItem('media-gateway-api-key');
 let consoleAuthenticated = false;
-let currentConsoleSection = location.pathname === '/profile' ? 'profile' : location.pathname === '/system' ? 'system' : location.pathname === '/docs' || location.hash.startsWith('#docs/') ? 'docs' : location.pathname === '/api-keys' ? 'keys' : 'generation';
+let currentConsoleSection = location.pathname === '/templates' ? 'templates' : location.pathname === '/profile' ? 'profile' : location.pathname === '/system' ? 'system' : location.pathname === '/docs' || location.hash.startsWith('#docs/') ? 'docs' : location.pathname === '/api-keys' ? 'keys' : 'generation';
 let consoleNavigation=0;
 let systemAdministrator=false;
 let clientManager=false;
 let clientManagerRole='';
 let sharedConfiguration=false;
+let providerLogoSession=0;
 let consoleInitialized=false;
 let consolePolicy={generation_ui:true,personal_providers:true};
 window.applySystemAccess=function(settings,admin=systemAdministrator){
@@ -153,7 +159,7 @@ window.applySystemAccess=function(settings,admin=systemAdministrator){
  document.querySelector('#systemNav').hidden=!admin;
  document.querySelector('#createGenerationKey').disabled=!admin&&!consolePolicy.personal_providers&&!consolePolicy.shared_resources;
  if(window.Workspace?.ready())Workspace.refresh().catch(()=>{});
- elements.generationNav.hidden=clientManager||!consolePolicy.generation_ui;elements.providersNav.hidden=clientManager||(!consolePolicy.personal_providers&&!admin);
+ elements.generationNav.hidden=clientManager||!consolePolicy.generation_ui;document.querySelector('#templatesNav').hidden=clientManager||!consolePolicy.generation_ui;elements.providersNav.hidden=clientManager||(!consolePolicy.personal_providers&&!admin);
  document.querySelector('#storageNav').hidden=clientManager||(!consolePolicy.personal_providers&&!admin);
  document.querySelector('#keysNav').hidden=clientManager;
  if(clientManager){document.querySelector('#createGenerationKey').disabled=true;lastConfigurationSection='organizations';}
@@ -254,32 +260,73 @@ async function attachStoredMedia(article, task) {
   actions.textContent = 'Preparing preview…';
   result.append(player, note, actions);
 
+  const keyVersion = generationKeyVersion;
+  const current = () => article.isConnected && !controller.signal.aborted && keyVersion === generationKeyVersion;
+  const status = document.createElement('span');
+  status.setAttribute('role', 'status');
+  note.append(status);
+  const buttons = [];
+  let pending = false;
+  const feedback = text => { status.textContent = text ? ` · ${text}` : ''; };
+  const failure = error => feedback(error.status === 404 ? 'Saved media is no longer available.' : 'Could not open saved media. Try again.');
+  const access = () => api(`/v1/generations/${task.id}/media-access`, {signal: controller.signal, cache: 'no-store'});
+  actions.replaceChildren();
+  function addAction(label, field, download = false) {
+    const button = document.createElement('button');
+    button.type = 'button'; button.className = 'secondary'; button.textContent = label;
+    buttons.push(button); actions.append(button);
+    button.addEventListener('click', async () => {
+      if (pending || !current()) return;
+      // Reserve the tab during the user gesture so asynchronous authorization
+      // works with popup blockers. Never give the new document an opener.
+      const tab = download ? null : window.open('about:blank', '_blank');
+      if (!download && !tab) { feedback('Allow pop-ups to open saved media.'); return; }
+      if (tab) {
+        tab.opener = null;
+        const policy = tab.document.createElement('meta');
+        policy.name = 'referrer'; policy.content = 'no-referrer'; tab.document.head.append(policy);
+      }
+      pending = true; buttons.forEach(item => { item.disabled = true; }); feedback('');
+      try {
+        // Refresh on every activation, including after tab sleep. Do not reset
+        // the existing player or extend the server's signed-link lifetime.
+        const fresh = await access();
+        if (!current()) { tab?.close(); return; }
+        if (!fresh[field]) throw new Error('Saved artifact is unavailable');
+        if (tab) {
+          if (!tab.closed) {
+            const link = tab.document.createElement('a');
+            link.href = fresh[field]; link.rel = 'noopener noreferrer';
+            tab.document.body.append(link); link.click();
+          }
+        } else {
+          const link = document.createElement('a');
+          link.href = fresh[field]; link.download = task.id; link.rel = 'noopener noreferrer';
+          document.body.append(link); link.click(); link.remove();
+        }
+      } catch (error) {
+        tab?.close();
+        if (current() && error.name !== 'AbortError') failure(error);
+      } finally {
+        pending = false;
+        if (current()) buttons.forEach(item => { item.disabled = false; });
+      }
+    });
+  }
+  addAction('Open ↗', 'preview_url');
+  addAction('Download ↓', 'download_url', true);
+  pending = true; buttons.forEach(item => { item.disabled = true; });
   try {
-    const access = await api(`/v1/generations/${task.id}/media-access`, {signal: controller.signal});
-    if (!article.isConnected || controller.signal.aborted) return;
-    player.src = access.preview_url;
-    if (player.tagName === 'VIDEO' && (access.last_frame_url || task.last_frame_url)) player.poster = access.last_frame_url || task.last_frame_url;
-    actions.replaceChildren();
-    const open = document.createElement('a');
-    open.href = access.preview_url;
-    open.target = '_blank';
-    open.rel = 'noopener noreferrer';
-    open.textContent = 'Open ↗';
-    const download = document.createElement('a');
-    download.href = access.download_url;
-    download.download = task.id;
-    download.textContent = 'Download ↓';
-    actions.append(open, download);
-    if (access.last_frame_url) {
-      const frame = document.createElement('a');
-      frame.href = access.last_frame_url; frame.target = '_blank'; frame.rel = 'noopener noreferrer'; frame.textContent = 'Last frame ↗';
-      actions.append(frame);
-    }
+    const initial = await access();
+    if (!current()) return;
+    player.src = initial.preview_url;
+    if (player.tagName === 'VIDEO' && (initial.last_frame_url || task.last_frame_url)) player.poster = initial.last_frame_url || task.last_frame_url;
+    if (initial.last_frame_url) addAction('Last frame ↗', 'last_frame_url');
   } catch (error) {
-    if (error.name === 'AbortError') return;
-    player.remove();
-    actions.textContent = `Could not open saved media: ${error.message}`;
-    actions.classList.add('error');
+    if (current() && error.name !== 'AbortError') { player.remove(); failure(error); }
+  } finally {
+    pending = false;
+    if (current()) buttons.forEach(item => { item.disabled = false; });
   }
 }
 
@@ -308,6 +355,17 @@ function displayGeneration(task) {
  return {...task, model:task.provider_model || task.model.slice(task.provider.length+1), prompt:task.media_type==='speech'?task.input:task.prompt, options};
 }
 function renderTasks(tasks) {
+  const restoreProjectAssignment=window.GatewayProjects?.preserveAssignment();
+  const focusedCard = document.activeElement?.closest('#taskList .task');
+  const restoreRemovedFocus = () => {
+    if (focusedCard && !visibleIDs.has(focusedCard.dataset.taskId))
+      document.querySelector('#journalProject')?.closest('.floating-field')?.querySelector('.select-trigger')?.focus({preventScroll:true});
+  };
+  // Preserve the first surviving visible card when membership changes above it.
+  const listTop = elements.taskList.getBoundingClientRect().top;
+  const anchors = (elements.taskList.scrollTop > 0 ? [...elements.taskList.querySelectorAll('.task')] : [])
+    .map(card => ({id:card.dataset.taskId, top:card.getBoundingClientRect().top-listTop, bottom:card.getBoundingClientRect().bottom-listTop}))
+    .filter(anchor => anchor.bottom > 0);
   const previous = new Map(latestTasks.map(task => [task.id, task.status]));
   const existing = new Map([...elements.taskList.querySelectorAll('.task')].map(article => [article.dataset.taskId, article]));
   const fingerprints = new Map(tasks.map(task => [task.id, JSON.stringify(task)]));
@@ -319,6 +377,10 @@ function renderTasks(tasks) {
   if (!tasks.length) {
     existing.forEach(disposeTaskCard);
     elements.taskList.innerHTML = '<div class="empty-state"><span>◎</span><strong>No tasks yet</strong><p>Your generations will appear here.</p></div>';
+    if(window.GatewayProjects?.filter()==='none') elements.taskList.querySelector('.empty-state p').textContent='Generations without a project will appear here.';
+    else if(window.GatewayProjects?.selected()) elements.taskList.querySelector('.empty-state p').textContent='New generations in this project will appear here.';
+    restoreProjectAssignment?.([]);
+    restoreRemovedFocus();
     return;
   }
   const storedMedia = [];
@@ -326,8 +388,19 @@ function renderTasks(tasks) {
   const articles = tasks.map(task => {
 	const saved = existing.get(task.id);
 	if (saved?.taskFingerprint === fingerprints.get(task.id)) return saved;
+	// Only project membership/version may bypass rendering. Content, result and
+	// permission changes must still dispose the old card and its media access.
+	const {project_id, project_version, ...content} = task;
+	const contentFingerprint = JSON.stringify(content);
+	if (saved?.contentFingerprint === contentFingerprint) {
+	  saved.taskFingerprint = fingerprints.get(task.id);
+	  saved.taskData = task;
+	  return saved;
+	}
 	const article = elements.template.content.firstElementChild.cloneNode(true);
 	article.taskFingerprint = fingerprints.get(task.id);
+	article.contentFingerprint = contentFingerprint;
+	article.taskData = task;
 	article.dataset.status = task.status;
     const progress = article.querySelector('.progress');
     if (['completed','failed'].includes(task.status)) {
@@ -348,8 +421,14 @@ function renderTasks(tasks) {
     } else taskCompletionUntil.delete(task.id);
 	article.querySelector('.task-title').textContent = taskName(task);
 	article.dataset.taskId = task.id;
-    const remove=article.querySelector('.delete-result');remove.hidden=task.can_delete===false||!(task.stored_at||task.has_stored_result)||!!task.result_deleted_at||!['completed','failed'].includes(task.status);remove.addEventListener('click',()=>confirmResultDeletion(task));
-    article.querySelector('.reuse-task').addEventListener('click', () => reuseTask(task));
+    const remove=article.querySelector('.delete-result');remove.hidden=task.can_delete===false||!(task.stored_at||task.has_stored_result)||!!task.result_deleted_at||!['completed','failed'].includes(task.status);remove.addEventListener('click',()=>confirmResultDeletion(article.taskData));
+    const changeProject=article.querySelector('.change-project');changeProject.disabled=task.can_change_project===false||task.content_access===false;changeProject.title=changeProject.disabled?'Project changes are unavailable for this generation in the current workspace or role.':'';
+    changeProject.addEventListener('click',event=>window.GatewayProjects?.assign(article.taskData,event.currentTarget));
+    changeProject.addEventListener('pointerenter',event=>{if(event.pointerType==='mouse'&&changeProject.closest('.task-menu').open)window.GatewayProjects?.assign(article.taskData,changeProject,{focus:false});});
+    changeProject.addEventListener('keydown',event=>{if(event.key==='ArrowRight'){event.preventDefault();window.GatewayProjects?.assign(article.taskData,changeProject);}});
+    article.querySelector('.task-menu').addEventListener('toggle',event=>{if(!event.currentTarget.open)window.ControlPickers?.dismiss(changeProject);});
+    article.querySelector('.reuse-task').addEventListener('click', () => reuseTask(article.taskData));
+    article.querySelector('.retry-task').addEventListener('click', event => retryTask(article.taskData, event.currentTarget));
     article.querySelector('.task-id').value=task.id;
     const parameters = [['Media type', mediaTypeLabel(task.media_type)], ['Provider', task.provider], ['Model', task.model], ...taskParameterRows(task.options || {})];
     if (task.api_key_id) parameters.push(['Gateway API key', task.api_key_id]);
@@ -405,11 +484,19 @@ function renderTasks(tasks) {
   // Keep unchanged cards attached: moving/recreating media elements interrupts
   // playback and repeats storage authorization on every unrelated task update.
   const retained = new Set(articles);
-  for (const child of [...elements.taskList.children]) if (!retained.has(child)) disposeTaskCard(child);
+  let changedCards = false;
+  for (const child of [...elements.taskList.children]) if (!retained.has(child)) { disposeTaskCard(child); changedCards = true; }
   articles.forEach((article, index) => {
     const current = elements.taskList.children[index];
-    if (current !== article) elements.taskList.insertBefore(article, current || null);
+    if (current !== article) { elements.taskList.insertBefore(article, current || null); changedCards = true; }
   });
+  const anchor = anchors.find(anchor => visibleIDs.has(anchor.id));
+  if (changedCards && anchor) {
+    const card = articles.find(article => article.dataset.taskId === anchor.id);
+    elements.taskList.scrollTop += card.getBoundingClientRect().top-listTop-anchor.top;
+  }
+  restoreProjectAssignment?.(tasks);
+  restoreRemovedFocus();
   for (const bar of finishingProgress) {
     bar.getBoundingClientRect();
     bar.style.removeProperty('width');
@@ -420,10 +507,11 @@ function renderTasks(tasks) {
 async function api(path, options = {}) {
  if(sharedConfiguration){path=path.replace(/^\/v1\/admin\/(providers|storage)(?=[/?]|$)/,'/v1/system/$1');}
 
-  const management = path.startsWith('/v1/sales/') || /^\/v1\/(client-onboardings(?:[/?]|$)|organizations(?:[/?]|$)|invitations\/|audit\/|shared\/|system\/|admin\/|api-keys(?:[/?]|$)|me(?:[/?]|$))/.test(path);
-  const useKey = !management || authMode === 'api_key';
+  const management = path.startsWith('/provider-assets/') || path.startsWith('/v1/workspace-authorizations/') || path.startsWith('/v1/workspace-installations') || path.startsWith('/v1/sales/') || /^\/v1\/(client-onboardings(?:[/?]|$)|organizations(?:[/?]|$)|invitations\/|audit\/|shared\/|system\/|admin\/|api-keys(?:[/?]|$)|me(?:[/?]|$))/.test(path);
+  const useKey = options.providerLogoGeneration || !management || authMode === 'api_key';
   if (useKey) await window.GenerationKey.ensureSession(options.method === 'POST');
   const key = useKey ? window.GenerationKey.value() : '';
+  const keyVersion = generationKeyVersion;
   if (useKey && !key) {
     const error = new Error('Enter a Gateway API key in the budget section below.'); error.status = 401; throw error;
   }
@@ -433,17 +521,23 @@ async function api(path, options = {}) {
     ...options, credentials: useKey ? 'omit' : 'same-origin',
     headers: {...(useKey ? {Authorization: 'Bearer ' + key} : {}), ...(options.body && !(options.body instanceof FormData) ? {'Content-Type':'application/json'} : {}), ...(options.headers || {})}
   });
-  if (useKey && key !== window.GenerationKey.value()) throw new DOMException('API key changed', 'AbortError');
+  if (useKey && (key !== window.GenerationKey.value() || keyVersion !== generationKeyVersion)) throw new DOMException('API key changed', 'AbortError');
   if (useKey && response.status === 401) window.GenerationKey.forget('This key is invalid, expired or revoked. Paste a valid key or generate a new one.');
   const body = options.responseType==='blob'&&response.ok ? await response.blob() : await response.json().catch(() => ({}));
+  // Body downloads can outlive key changes, including a return to the same key.
+  if (useKey && (key !== window.GenerationKey.value() || keyVersion !== generationKeyVersion)) throw new DOMException('API key changed', 'AbortError');
+  options.signal?.throwIfAborted();
   if (!response.ok) {
     const error = new Error(body.error?.message || `HTTP ${response.status}`);
     error.status = response.status;
     error.code = body.error?.code;
+    error.templates = body.error?.templates;
     throw error;
   }
   return body;
 }
+
+ProviderLogos.configure({request:api});
 
 function setProviderMessage(text = '', type = '') {
   elements.providerMessage.textContent = text;
@@ -460,6 +554,7 @@ function providerStatusLabel(provider) {
   if (provider.status === 'error') return 'Failed';
   if (provider.status === 'unverified') return 'Not verified';
   if (!provider.enabled) return 'Disabled';
+  if (provider.status === 'authenticated') return 'Authentication verified';
   return 'Connected';
 }
 
@@ -473,16 +568,7 @@ function renderProviderAdminList() {
     const mark = document.createElement('span');
     mark.className = `provider-list-mark ${provider.status === 'error' ? 'error' : provider.enabled && provider.configured ? 'ok' : ''}`;
     mark.setAttribute('aria-hidden', 'true');
-    const iconSource = provider.icon_url;
-    if (iconSource) {
-      const icon = document.createElement('img');
-      icon.src = iconSource;
-      icon.alt = '';
-      icon.classList.toggle('monochrome',!!provider.icon_monochrome);
-      mark.append(icon);
-    } else {
-      mark.textContent = provider.name.slice(0, 1).toUpperCase();
-    }
+    ProviderLogos.image(mark, provider);
     const copy = document.createElement('span');
     const name = document.createElement('strong');
     name.textContent = provider.name;
@@ -513,6 +599,25 @@ function renderProviderDetail(provider) {
   elements.adminCredentialSource.textContent = ({environment: 'Environment → Postgres', console: 'Console → Postgres', none: 'Not set'})[provider.credential_source] || provider.credential_source;
   elements.adminRegion.textContent = provider.region || 'Local';
   elements.adminModelCount.textContent = provider.model_count || 0;
+  const logoHost = document.querySelector('#providerLogoEditor');
+  logoHost.hidden = !systemAdministrator;
+  const logoScope = sharedConfiguration, logoID = provider.id, logoSession=providerLogoSession;
+  if (systemAdministrator) ProviderLogos.editor(logoHost, provider, {api, identity:logoSession+'/'+logoScope+'/'+logoID,
+    current:()=>selectedAdminProviderID===logoID && sharedConfiguration===logoScope && providerLogoSession===logoSession,
+    saved:iconURL=>{
+      if (sharedConfiguration!==logoScope || providerLogoSession!==logoSession) return;
+      // Connection dialogs retain this metadata object beside their own drafts.
+      for (const p of providerAdminCatalog) if (p.id===logoID) p.icon_url=iconURL;
+      renderProviderAdminList();
+      ProviderLogos.refresh(iconURL);
+      // Reconcile icons through the active generation key's actual resource scope.
+      if (GenerationKey.value()) api('/v1/providers').then(response=>{
+        const icons = new Map((response.data||[]).map(p=>[p.id,p.icon_url]));
+        providerCatalog = providerCatalog.map(p=>({...p,icon_url:icons.get(p.id)}));
+        ModelPicker.populate(elements.model,providerCatalog,{value:elements.model.value,label:modelOptionLabel});
+      }).catch(()=>{});
+    }
+  });
   renderProviderFields(provider);
   delete elements.providerForm.connectionDraft;
   window.ProviderConnections?.render(provider);
@@ -619,13 +724,13 @@ function showConsoleSection(name) {
   if(name==='configuration'||configurationSections.includes(name))name='organizations';
   if(clientManager&&!['organizations','docs','profile'].includes(name))name='organizations';
   if(name==='system'&&consoleInitialized&&!systemAdministrator)name='organizations';
-  if(name==='generation'&&!consolePolicy.generation_ui)name='organizations';
+  if(['generation','templates'].includes(name)&&!consolePolicy.generation_ui)name='organizations';
   GatewayLayout.clear(document.querySelector('#configurationView'));
   currentConsoleSection=name;
-  const allowed=authMode==='api_key'||consoleAuthenticated;
-  elements.authGate.hidden=name==='docs'||allowed;
+  const allowed=authState==='authenticated'&&(authMode==='api_key'||consoleAuthenticated);
+  elements.authGate.hidden=name==='docs'||authState!=='anonymous';
   document.querySelector('#configurationView').hidden=!['organizations','profile'].includes(name)||!allowed;
-  for(const section of ['generation','providers','storage','keys','reports','docs','system','organizations','profile']){
+  for(const section of ['generation','templates','providers','storage','keys','reports','docs','system','organizations','profile']){
     document.querySelector('#'+section+'View').hidden=section!==name||(section!=='docs'&&!allowed);
     const nav=document.querySelector('#'+section+'Nav');if(!nav)continue;nav.classList.toggle('active',section===name);if(section===name)nav.setAttribute('aria-current','page');else nav.removeAttribute('aria-current');
   }
@@ -639,9 +744,13 @@ function showConsoleSection(name) {
     if(window.Workspace?.ready())window.Workspace.open(Workspace.current()?.personal&&page==='Billing'?'Reports':page).catch(e=>{if(navigation!==consoleNavigation)return;document.querySelector('#organizationsContent').replaceChildren(Object.assign(document.createElement('p'),{className:'operation-error',textContent:e.message}))});
     else window.GatewayOrganizations?.open();
   }
+  if(authState==='checking'||authState==='error'||!allowed)return;
   if(name!=='generation') taskListRequest?.controller.abort();
+ window.GatewayTemplates?.section(name,allowed);
+ if(name==='templates'&&allowed)window.GatewayTemplates.open();
   if(name==='generation'&&allowed&&window.GenerationKey.value()){refreshGenerationBudget();updatePrice();loadTasks();}
   if(name==='docs'){if(!location.hash.startsWith('#docs/'))history.replaceState(null,'','/docs');window.GatewayDocs?.open();}
+  else if(name==='templates')history.replaceState(null,'','/templates');
   else if(name==='system')history.replaceState(null,'','/system');
   else if(name==='profile')history.replaceState(null,'','/profile');
   else if(name==='organizations')history.replaceState(null,'','/organizations');
@@ -654,7 +763,9 @@ async function loadTasks(showErrors = false) {
   const request = {controller: new AbortController(), promise: null};
   taskListRequest = request;
   request.promise = (async () => { try {
-    const response = await api('/v1/generations?limit=50', {signal: request.controller.signal});
+    const project = window.GatewayProjects?.filter() || '';
+    window.GatewayProjects?.load();
+    const response = await api('/v1/generations?limit=50' + (project ? '&project_id='+encodeURIComponent(project) : ''), {signal: request.controller.signal});
     if (request.controller.signal.aborted) return;
     if (submitting) return;
     const tasks = response.data || [];
@@ -672,14 +783,31 @@ async function loadTasks(showErrors = false) {
   return request.promise;
 }
 
-async function loadInfo() {
+// Bound both the response and its body. A failed check never implies sign-out.
+async function authRequest(path) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
   try {
-    const response = await fetch('/v1/info');
-    if (!response.ok) throw new Error();
-    serviceInfo = await response.json();
-  } catch {
-    setMessage('Configuration unavailable.', 'error');
-  }
+    const response = await fetch(path, {credentials:'same-origin', cache:'no-store', signal:controller.signal});
+    if (response.status === 401) return authAbsent;
+    if (!response.ok) throw new Error('Session check unavailable');
+    return await response.json();
+  } finally { clearTimeout(timeout); }
+}
+
+function setAuthState(state) {
+  authState = state;
+  const checking = state === 'checking', failed = state === 'error';
+  document.querySelector('#authCheck').hidden = !checking && !failed;
+  document.querySelector('#authCheckStatus').textContent = failed
+    ? 'Could not check your session. Please try again.' : 'Checking your session…';
+  document.querySelector('#authCheckStatus').setAttribute('aria-busy', String(checking));
+  document.querySelector('#authRetry').hidden = !failed;
+  elements.sectionNav.hidden = checking || failed;
+  elements.generationNav.hidden = state !== 'authenticated' || clientManager || !consolePolicy.generation_ui;
+  document.querySelector('#systemNav').hidden = state !== 'authenticated' || !systemAdministrator;
+  elements.userMenu.hidden = state !== 'authenticated' || !consoleAuthenticated;
+  showConsoleSection(currentConsoleSection);
 }
 
 function modelOptionLabel(model) {
@@ -823,13 +951,14 @@ function generationRequest(request) {
   }
  delete options.image_urls;
  for(const [singular,plural] of [['video_url','video_urls'],['audio_url','audio_urls']]) {
-  if(options[singular]) options[plural]=[options[singular]];
+  if(options[singular] && !options[plural]?.length) options[plural]=[options[singular]];
   delete options[singular];
  }
  return body;
 }
+function templateRequest(request){return {revision:request.template.revision,inputs:request.template.inputs,provider:request.provider,model:request.model,...(request.project_id?{project_id:request.project_id}:{}),...(request.max_expected_cost_usd!==undefined?{max_expected_cost_usd:request.max_expected_cost_usd}:{})};}
 async function fetchEstimate(request) {
- return api('/v1/generations/estimate',{method:'POST',body:JSON.stringify(generationRequest(request))});
+ return api(request.template ? `/v1/templates/${encodeURIComponent(request.template.id)}/estimate` : '/v1/generations/estimate',{method:'POST',body:JSON.stringify(request.template ? templateRequest(request) : generationRequest(request))});
 }
 
 function formatUSD(value) {
@@ -843,6 +972,7 @@ function formatPrice(value) {
 }
 
 function updatePrice() {
+ if(currentConsoleSection==='templates'){elements.priceCard.hidden=true;return;}
  clearTimeout(quoteTimer);
  const sequence=++quoteSequence;
  const request=estimateRequest(); if(!request) return;
@@ -881,7 +1011,7 @@ async function refreshGenerationBudget() {
   if (!result.key) { panel.append(node('p', 'Service key')); return; }
   panel.append(node('strong', result.key.name, 'generation-key-name'));
   const o=result.organization;
-  panel.append(node('p',`${o?.name || (result.key.organization_id?'Organization unavailable':'Profile')} · ${result.key.resource_mode==='shared'?'Shared':'Personal'} providers · ${result.key.resource_mode==='shared'?'Organization':'Personal'} storage`));
+  panel.append(node('p',`${o?.name || (result.key.organization_id?'Organization unavailable':'Profile')} · ${result.key.resource_mode==='shared'?'Shared':'Personal'} providers and storage`));
   if (result.key.resource_mode!=='shared') {panel.append(node('p','Generation is billed to your provider account.'));return;}
   if (!o) {panel.append(node('p','Organization allowance unavailable.'));return;}
   const stats=node('dl','','generation-budget-stats');
@@ -950,11 +1080,19 @@ function requestOptions(model) {
 elements.prompt.addEventListener('input', () => {
   elements.promptCount.textContent = `${elements.prompt.value.length.toLocaleString('en-US')} / 10,000`;
 });
+window.addEventListener('gateway-project-change', event => {
+  taskListRequest?.controller.abort();
+  renderedTasksFingerprint='';
+  if (!event.detail?.metadata) renderTasks([]);
+  loadTasks(true);
+});
 window.addEventListener('gateway-key-change', () => {
+  generationKeyVersion++;
   taskListRequest?.controller.abort();
   elements.taskList.querySelectorAll('.task').forEach(disposeTaskCard);
   providerCatalog = []; latestTasks = []; taskCompletionUntil.clear(); renderedTasksFingerprint = ''; pendingSubmission = null;
   window.referencePicker?.reset();
+  if(dialog.open&&!submitting)dialog.close();
   elements.taskList.replaceChildren(); elements.model.replaceChildren(new Option('Enter an API key first', ''));
   elements.model.disabled = true;
   clearTimeout(quoteTimer); ++quoteSequence;
@@ -967,6 +1105,7 @@ window.addEventListener('gateway-key-change', () => {
   refreshGenerationBudget();
   if (ready) { setMessage(''); loadProviders(); loadTasks(true); }
 });
+document.querySelector('#templatesNav').addEventListener('click',()=>showConsoleSection('templates'));
 elements.generationNav.addEventListener('click', () => showConsoleSection('generation'));
 document.querySelector('#systemNav').addEventListener('click',()=>showConsoleSection('system'));
 document.querySelector('#organizationsNav').addEventListener('click',()=>showConsoleSection('organizations'));
@@ -1023,7 +1162,7 @@ elements.checkProvider.addEventListener('click', async () => {
     renderProviderAdminList();
     if (selectedAdminProviderID === id) {
       renderProviderDetail(provider);
-      setProviderCheckFeedback(provider.status_message || (provider.status === 'connected' ? 'Connection verified.' : 'Connection status updated.'), provider.status === 'error' ? 'error' : provider.status === 'connected' ? 'success' : '');
+      setProviderCheckFeedback(provider.status_message || (provider.status === 'connected' ? 'Connection verified.' : 'Connection status updated.'), provider.status === 'error' ? 'error' : ['connected','authenticated'].includes(provider.status) ? 'success' : '');
     }
   } catch (error) {
     if (selectedAdminProviderID === id) setProviderCheckFeedback(`Connection check failed: ${error.message}`, 'error');
@@ -1125,16 +1264,17 @@ function reuseTask(task) {
 function closeConfirmation() {
   if (submitting) return;
   dialog.close(); pendingSubmission = null;
-  elements.submit.focus();
+  (confirmationTrigger?.isConnected ? confirmationTrigger : elements.submit).focus();
 }
+let confirmationTrigger;
 closeButton.addEventListener('click', closeConfirmation);
 cancelButton.addEventListener('click', closeConfirmation);
 dialog.addEventListener('cancel', event => { event.preventDefault(); closeConfirmation(); });
 document.addEventListener('click', event => {
-  document.querySelectorAll('.task-menu[open]').forEach(menu => { if (!menu.contains(event.target)) menu.open = false; });
+  document.querySelectorAll('.task-menu[open]').forEach(menu => { if (!menu.contains(event.target)&&!window.ControlPickers?.contains(event.target)) menu.open = false; });
 });
 document.addEventListener('keydown', event => {
-  if (event.key === 'Escape') document.querySelectorAll('.task-menu[open]').forEach(menu => { menu.open = false; menu.querySelector('summary').focus(); });
+  if (event.key === 'Escape'&&!event.defaultPrevented) document.querySelectorAll('.task-menu[open]').forEach(menu => { menu.open = false; menu.querySelector('summary').focus(); });
 });
 elements.form.addEventListener('input', updatePrice);
 elements.form.addEventListener('change', updatePrice);
@@ -1150,7 +1290,34 @@ elements.form.addEventListener('submit', async event => {
   if ((!prompt && !lyricsOnly && !model?.prompt_optional && !model?.no_prompt) || !provider || !model) {
     setMessage('Enter a prompt and select a model.', 'error'); return;
   }
-  const request = {prompt, provider: provider.id, model: model.id, media_type: model.media_type, options: requestOptions(model)};
+  const request={prompt, provider: provider.id, model: model.id, media_type: model.media_type, options: requestOptions(model)};
+  const projectID=window.GatewayProjects?.selected();
+  if(projectID)request.project_id=projectID;
+  openGenerationConfirmation(request, elements.submit);
+});
+function retryTask(task, trigger) {
+  if (submitting || dialog.open) return;
+  document.querySelectorAll('.task-menu[open]').forEach(menu => { menu.open = false; });
+  // Use the saved request without copying into or reading from the current draft.
+  openGenerationConfirmation({prompt: task.prompt ?? promptHistory[task.id] ?? '', provider: task.provider, model: task.model, media_type: task.media_type, options: task.options || {}, ...(task.project_id ? {project_id:task.project_id} : {})}, trigger.closest('.task-menu').querySelector('summary'));
+}
+async function openGenerationConfirmation(source, trigger) {
+  if (submitting || dialog.open) return;
+  if (!window.GenerationKey.value()) { setMessage('Enter a valid Gateway API key above.', 'error'); return; }
+  const provider = (source.template ? source.template_catalog || providerCatalog : providerCatalog).find(item => item.id === source.provider);
+  const model = provider?.models.find(item => item.id === source.model);
+  if (!model || model.media_type !== source.media_type) {
+    setMessage('This provider or model is unavailable. Choose an available model before generating.', 'error'); return;
+  }
+  const request = structuredClone(source);
+  delete request.template_catalog;
+  const prompt = request.prompt;
+  if (!prompt.trim() && !model.prompt_optional && !model.no_prompt && !(model.supports_lyrics && model.media_type === 'music' && request.options.lyrics?.trim())) {
+    setMessage('This generation is missing its prompt. Copy it to the form and complete the required inputs.', 'error'); return;
+  }
+  const referenceError = request.template ? '' : window.PromptReferences?.requestError(request, model);
+  if (referenceError) { setMessage(referenceError, 'error'); return; }
+  confirmationTrigger = trigger;
   pendingSubmission = {request, key: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`};
   const rows = [['Provider', provider.name], ['Model', model.display_name], ['Media type', mediaTypeLabel(model.media_type)]];
   if (prompt) rows.push(['Prompt', prompt]);
@@ -1167,7 +1334,8 @@ elements.form.addEventListener('submit', async event => {
    if(pendingSubmission!==submission || !dialog.open) return;
    document.querySelector('#confirmPrice').textContent=formatPrice((quote.cost.customer_expected_usd ?? quote.cost.expected_usd));
    submission.request.max_expected_cost_usd=(quote.cost.customer_expected_usd ?? quote.cost.expected_usd);
-   confirmButton.disabled=!quote.can_generate;
+   submission.canGenerate = quote.can_generate === true;
+   confirmButton.disabled=!submission.canGenerate;
    confirmStatus.hidden=false;
    confirmStatus.className=quote.can_generate ? '' : 'error';
    confirmStatus.textContent=quote.can_generate ? ((quote.cost.customer_expected_usd ?? quote.cost.expected_usd)===0 ? 'This test generation is free.' : 'Cost is recorded after generation.') : `Your budget is exhausted (${formatUSD(quote.remaining_usd)} remaining).`;
@@ -1176,8 +1344,13 @@ elements.form.addEventListener('submit', async event => {
    document.querySelector('#confirmPrice').textContent='Estimate unavailable';
    confirmStatus.hidden=false;confirmStatus.className='error';confirmStatus.textContent=error.message;
   }
-});
+}
 async function moveRequestToJournal(task) {
+  if(window.GatewayProjects && !window.GatewayProjects.matches(task)) {
+    dialog.close();
+    document.querySelector('#journalAnnouncement').textContent='Generation added to its project.';
+    return;
+  }
   renderedTasksFingerprint = '';
   renderTasks([task, ...latestTasks.filter(item => item.id !== task.id)]);
   const article = elements.taskList.firstElementChild;
@@ -1199,7 +1372,7 @@ async function moveRequestToJournal(task) {
   document.querySelector('#journalAnnouncement').textContent = 'Generation added to the journal.';
 }
 confirmButton.addEventListener('click', async () => {
-  if (submitting || !pendingSubmission || pendingSubmission.request.max_expected_cost_usd === undefined) return;
+  if (submitting || !dialog.open || !pendingSubmission?.canGenerate || pendingSubmission.request.max_expected_cost_usd === undefined) return;
   submitting = true;
   const submission = pendingSubmission;
   confirmButton.disabled = true; cancelButton.disabled = true; closeButton.disabled = true;
@@ -1212,13 +1385,14 @@ confirmButton.addEventListener('click', async () => {
   try {
     // Keep the same idempotency key for retries after uncertain network failures.
     const [result] = await Promise.allSettled([
-      api('/v1/generations', {method: 'POST', headers: {'Idempotency-Key': submission.key}, body: JSON.stringify(generationRequest(submission.request))}),
+      api(submission.request.template ? `/v1/templates/${encodeURIComponent(submission.request.template.id)}/generations` : '/v1/generations', {method: 'POST', headers: {'Idempotency-Key': submission.key}, body: JSON.stringify(submission.request.template ? templateRequest(submission.request) : generationRequest(submission.request))}),
       new Promise(resolve => setTimeout(resolve, 2000))
     ]);
+    if(pendingSubmission!==submission)return;
     if (result.status === 'rejected') throw result.reason;
     const task = {...submission.request, ...result.value};
     accepted = true; pendingSubmission = null;
-    elements.prompt.value = ''; elements.prompt.dispatchEvent(new Event('input'));
+    if(submission.request.template)showConsoleSection('generation');
     await moveRequestToJournal(task);
   } catch (error) {
     if (accepted) {
@@ -1241,52 +1415,83 @@ confirmButton.addEventListener('click', async () => {
 });
 
 async function initialize() {
-  await loadInfo();
-	authMode = serviceInfo.auth_mode || 'api_key';
-  consolePolicy={...consolePolicy,...(serviceInfo.console||{})};elements.generationNav.hidden=!consolePolicy.generation_ui;elements.providersNav.hidden=!consolePolicy.personal_providers;
-	if (authMode === 'google') {
-    await window.EmailLogin?.initialize();
-    if(window.EmailLogin?.hasAction()){consoleInitialized=true;showConsoleSection(currentConsoleSection);return;}
-		elements.connectionPanel.hidden = false;
-		try {
-			const response = await fetch('/v1/me', {credentials: 'same-origin'});
-			if (!response.ok) throw new Error('unauthenticated');
-			const user = await response.json();
-      window.GatewayProfile?.identify(user);
-			elements.userName.textContent = user.name || user.email;
-			elements.userEmail.textContent = user.email;
-			const initials = document.querySelector('#userInitials');
-			initials.textContent = (user.name || user.email || '?').trim().split(/\s+/).map(part => Array.from(part)[0]).slice(0, 2).join('').toUpperCase();
-			elements.userPicture.addEventListener('load', () => { elements.userPicture.hidden = false; initials.hidden = true; });
-			elements.userPicture.addEventListener('error', () => { elements.userPicture.hidden = true; initials.hidden = false; });
-			if (user.picture) elements.userPicture.src = user.picture;
-			elements.userMenu.hidden = false;
-			elements.sectionNav.hidden = false;
-			elements.authGate.hidden = true;
-			consoleAuthenticated = true;
-      consoleInitialized=true;
-      clientManager=!!user.is_client_manager;clientManagerRole=user.sales_role||(clientManager?'client_manager':'');
-      window.GatewaySystem?.identify(user);window.applySystemAccess(serviceInfo.console||{},!!user.is_system_admin);
-      await window.Workspace.initialize(user);
-			showConsoleSection(currentConsoleSection);
-			if(clientManager)window.GenerationKey.forget();else window.GenerationKey.initialize(user);
-		} catch {
-      consoleInitialized=true;
-			window.GenerationKey.forget('Sign in again and enter your generation key.');
-			showConsoleSection(currentConsoleSection);
-			elements.authError.hidden = !new URLSearchParams(window.location.search).has('auth_error');
-		}
-		return;
-	}
-  consoleInitialized=true;
-	elements.authGate.hidden = true;
-	elements.sectionNav.hidden = false;
-  showConsoleSection(currentConsoleSection);
-  window.GenerationKey.initialize(null);
+  if (initializationPending) return;
+  initializationPending = true;
+  providerLogoSession++;
+  const retryFocused = document.activeElement === document.querySelector('#authRetry');
+  setAuthState('checking');
+  let user;
+  try {
+    const info = await authRequest('/v1/info');
+    serviceInfo = info === authAbsent ? {auth_mode:'google'} : info;
+    if (!['google','api_key'].includes(serviceInfo?.auth_mode)) throw new Error('Invalid authentication configuration');
+    authMode = serviceInfo.auth_mode;
+    consolePolicy = {...consolePolicy,...(serviceInfo.console||{})};
+    if (authMode === 'google' && info !== authAbsent) {
+      const session = await authRequest('/v1/me');
+      if (session !== authAbsent) {
+        if (!session || typeof session.id !== 'string' || !session.id) throw new Error('Invalid session response');
+        user = session;
+      }
+    }
+  } catch {
+    setAuthState('error');
+    initializationPending = false;
+    return;
+  }
+  consoleInitialized = true;
+  if (authMode === 'google' && (!user || window.EmailLogin?.hasAction())) {
+    window.GenerationKey.forget('Sign in again and enter your generation key.');
+    // Keep the destination for OAuth, using the sign-in shell's safe allowlist.
+    if (['/system','/templates','/organizations','/api-keys','/configuration','/profile'].includes(location.pathname)) {
+      const query = new URLSearchParams(location.search), safe = new URLSearchParams();
+      for (const key of ['payment','organization','canceled']) if (query.has(key)) safe.set(key,query.get(key));
+      const fragment = ['#providers','#storage','#keys','#reports'].includes(location.hash) ? location.hash : '';
+      try { sessionStorage.setItem('gateway-login-return',JSON.stringify({path:location.pathname+(safe.size?'?'+safe:'')+fragment,time:Date.now()})); } catch {}
+    }
+    setAuthState('anonymous');
+    elements.authError.hidden = !new URLSearchParams(location.search).has('auth_error');
+    // Sign-in method failures have their own visible feedback and must not hold
+    // an authenticated session behind an unrelated request.
+    void window.EmailLogin?.initialize();
+    initializationPending = false;
+    if (retryFocused) {
+      const title = document.querySelector('#authTitle');
+      title.setAttribute('tabindex','-1'); title.focus();
+    }
+    return;
+  }
+  if (user) {
+    window.GatewayProfile?.identify(user);
+    elements.userName.textContent = user.name || user.email;
+    elements.userEmail.textContent = user.email;
+    const initials = document.querySelector('#userInitials');
+    initials.textContent = (user.name || user.email || '?').trim().split(/\s+/).map(part => Array.from(part)[0]).slice(0,2).join('').toUpperCase();
+    elements.userPicture.addEventListener('load', () => { elements.userPicture.hidden=false; initials.hidden=true; });
+    elements.userPicture.addEventListener('error', () => { elements.userPicture.hidden=true; initials.hidden=false; });
+    if (user.picture) elements.userPicture.src=user.picture;
+    consoleAuthenticated = true;
+    clientManager = !!user.is_client_manager;
+    clientManagerRole = user.sales_role || (clientManager?'client_manager':'');
+    window.GatewaySystem?.identify(user);
+  }
+  window.applySystemAccess(serviceInfo.console||{},!!user?.is_system_admin);
+  setAuthState('authenticated');
+  initializationPending = false;
+  if (retryFocused) document.querySelector(user?'#userMenuToggle':'#generationNav').focus();
+  if (user) {
+    // A workspace read failure is not an authentication failure.
+    try { await window.Workspace.initialize(user); showConsoleSection(currentConsoleSection); }
+    catch { FormUI.message(elements.sessionMessage,'Could not load workspaces. Open your workspace to try again.','error'); elements.sessionMessage.hidden=false; }
+  }
+  if (clientManager) window.GenerationKey.forget(); else window.GenerationKey.initialize(user || null);
+  window.RemoteWorkspace?.setActor(user);
+  if(!await window.WorkspaceAuthorization?.initialize(user))void window.SetupSelector?.initialize(user);
 }
 
+document.querySelector('#authRetry').addEventListener('click', initialize);
 showConsoleSection(currentConsoleSection);
-initialize();
+void initialize();
 setInterval(() => {
   if (!document.hidden && currentConsoleSection === 'generation' && window.GenerationKey.value()) loadTasks();
 }, 2000);

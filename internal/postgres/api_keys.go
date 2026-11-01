@@ -87,8 +87,8 @@ func createAPIKey(ctx context.Context, tx *sql.Tx, owner string, key apikey.Key,
 		return err
 	}
 	_, err = tx.ExecContext(ctx, `INSERT INTO user_api_keys
-		(id, user_id, name, prefix, token_hash, scopes, created_at, expires_at, resource_mode,storage_mode,organization_id,created_by)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`, key.ID, owner, key.Name, key.Prefix, hash, scopes, key.CreatedAt, key.ExpiresAt, resourceMode(key.ResourceMode), resourceMode(key.StorageMode), nullableString(key.OrganizationID), issuer)
+		(id, user_id, name, prefix, token_hash, scopes, created_at, expires_at, resource_mode,storage_mode,organization_id,created_by,purpose)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`, key.ID, owner, key.Name, key.Prefix, hash, scopes, key.CreatedAt, key.ExpiresAt, resourceMode(key.ResourceMode), resourceMode(key.StorageMode), nullableString(key.OrganizationID), issuer, key.Purpose)
 	if err != nil {
 		return err
 	}
@@ -96,7 +96,7 @@ func createAPIKey(ctx context.Context, tx *sql.Tx, owner string, key apikey.Key,
 }
 
 func (r *APIKeyRepository) List(ctx context.Context, owner string) ([]apikey.Key, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT id, name, prefix, scopes, created_at, expires_at, last_used_at, revoked_at, resource_mode,storage_mode,COALESCE(organization_id::text,''),user_id,created_by,(SELECT email FROM users WHERE id=user_id),(SELECT email FROM users WHERE id=created_by)
+	rows, err := r.db.QueryContext(ctx, `SELECT id, name, prefix, scopes, created_at, expires_at, last_used_at, revoked_at, resource_mode,storage_mode,COALESCE(organization_id::text,''),user_id,created_by,(SELECT email FROM users WHERE id=user_id),(SELECT email FROM users WHERE id=created_by),purpose
 		FROM user_api_keys WHERE user_id = $1 ORDER BY created_at DESC, id`, owner)
 	if err != nil {
 		return nil, err
@@ -106,7 +106,7 @@ func (r *APIKeyRepository) List(ctx context.Context, owner string) ([]apikey.Key
 	for rows.Next() {
 		var key apikey.Key
 		var scopes []byte
-		if err := rows.Scan(&key.ID, &key.Name, &key.Prefix, &scopes, &key.CreatedAt, &key.ExpiresAt, &key.LastUsedAt, &key.RevokedAt, &key.ResourceMode, &key.StorageMode, &key.OrganizationID, &key.UserID, &key.CreatedBy, &key.UserEmail, &key.CreatorEmail); err != nil {
+		if err := rows.Scan(&key.ID, &key.Name, &key.Prefix, &scopes, &key.CreatedAt, &key.ExpiresAt, &key.LastUsedAt, &key.RevokedAt, &key.ResourceMode, &key.StorageMode, &key.OrganizationID, &key.UserID, &key.CreatedBy, &key.UserEmail, &key.CreatorEmail, &key.Purpose); err != nil {
 			return nil, err
 		}
 		if err := json.Unmarshal(scopes, &key.Scopes); err != nil {
@@ -134,10 +134,10 @@ func (r *APIKeyRepository) Authenticate(ctx context.Context, hash []byte) (ident
 	var key apikey.Key
 	var scopes []byte
 	// Check revocation and expiration on every request; no authentication cache.
-	err := r.db.QueryRowContext(ctx, `SELECT u.id, u.email, u.display_name, COALESCE(u.picture_url, ''), k.id, k.scopes,k.resource_mode,k.storage_mode,COALESCE(k.organization_id::text,''),COALESCE(m.role IN ('admin','supermanager','content_officer'),false),COALESCE(m.role,'')
+	err := r.db.QueryRowContext(ctx, `SELECT u.id, u.email, u.display_name, COALESCE(u.picture_url, ''), k.id, k.scopes,k.resource_mode,k.storage_mode,COALESCE(k.organization_id::text,''),COALESCE(m.role IN ('admin','supermanager','content_officer'),false),COALESCE(m.role,''),k.purpose
 		FROM user_api_keys k JOIN users u ON u.id = k.user_id LEFT JOIN organization_members m ON m.organization_id=k.organization_id AND m.user_id=k.user_id AND m.removed_at IS NULL
 		WHERE NOT u.is_client_manager AND (k.organization_id IS NULL OR m.user_id IS NOT NULL) AND k.token_hash = $1 AND k.revoked_at IS NULL AND (k.expires_at IS NULL OR k.expires_at > NOW())`, hash).
-		Scan(&user.ID, &user.Email, &user.Name, &user.Picture, &key.ID, &scopes, &key.ResourceMode, &key.StorageMode, &key.OrganizationID, &key.OrganizationAdmin, &key.OrganizationRole)
+		Scan(&user.ID, &user.Email, &user.Name, &user.Picture, &key.ID, &scopes, &key.ResourceMode, &key.StorageMode, &key.OrganizationID, &key.OrganizationAdmin, &key.OrganizationRole, &key.Purpose)
 	if errors.Is(err, sql.ErrNoRows) {
 		return user, key, apikey.ErrNotFound
 	}

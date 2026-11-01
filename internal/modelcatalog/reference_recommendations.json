@@ -1,0 +1,102 @@
+{
+  "bytedance": {
+    "dreamina-seedance-2-5-260628": {
+      "text": "The endpoint examples use @Image1 and @Video1. The API does not specify an exclusive spelling.",
+      "kind": "example",
+      "source_url": "https://ai.byteplus.com/ark/region:ap-southeast-1/docs/create-video-generation-task-api.md",
+      "modes": [
+        "references"
+      ]
+    }
+  },
+  "alibaba": {
+    "wan3.0-video": {
+      "text": "API examples use Image 1, Video 1 and Audio 1, numbered separately by media type. This is not an exclusive grammar.",
+      "kind": "example",
+      "source_url": "https://www.alibabacloud.com/help/en/model-studio/wan3-video-generation-api-reference",
+      "modes": [
+        "references"
+      ]
+    },
+    "wan3.0-video-prime": {
+      "text": "API examples use Image 1, Video 1 and Audio 1, numbered separately by media type. This is not an exclusive grammar.",
+      "kind": "example",
+      "source_url": "https://www.alibabacloud.com/help/en/model-studio/wan3-video-generation-api-reference",
+      "modes": [
+        "references"
+      ]
+    },
+    "wan2.7-r2v": {
+      "text": "The API describes Image 1 and Video 1, numbered separately; a first-frame image is outside that numbering.",
+      "kind": "instruction",
+      "source_url": "https://www.alibabacloud.com/help/en/model-studio/wan-video-to-video-api-reference",
+      "modes": [
+        "references",
+        "first_frame_references"
+      ]
+    },
+    "wan2.7-r2v-2026-06-12": {
+      "text": "The API describes Image 1 and Video 1, numbered separately; a first-frame image is outside that numbering.",
+      "kind": "instruction",
+      "source_url": "https://www.alibabacloud.com/help/en/model-studio/wan-video-to-video-api-reference",
+      "modes": [
+        "references",
+        "first_frame_references"
+      ]
+    },
+    "happyhorse-1.1-r2v": {
+      "text": "The API describes ordered image references as [Image 1], [Image 2] and so on.",
+      "kind": "instruction",
+      "source_url": "https://www.alibabacloud.com/help/en/model-studio/happyhorse-reference-to-video-api-reference",
+      "modes": [
+        "references"
+      ]
+    },
+    "wan2.6-r2v": {
+      "text": "Use character1, character2 and so on in the combined reference URL order. These native names are plain text in this UI.",
+      "kind": "instruction",
+      "source_url": "https://www.alibabacloud.com/help/en/model-studio/legacy-wan-reference-to-video-api-reference",
+      "modes": [
+        "references"
+      ]
+    },
+    "wan2.6-r2v-flash": {
+      "text": "Use character1, character2 and so on in the combined reference URL order. These native names are plain text in this UI.",
+      "kind": "instruction",
+      "source_url": "https://www.alibabacloud.com/help/en/model-studio/legacy-wan-reference-to-video-api-reference",
+      "modes": [
+        "references"
+      ]
+    }
+  },
+  "agnes": {
+    "agnes-video-2.5": {
+      "text": "The API describes <Picture 1>, <Audio 1>, <Video 1>, numbered separately in each reference array.",
+      "kind": "instruction",
+      "source_url": "https://wiki.agnes-ai.com/en/docs/agnes-video-25",
+      "modes": [
+        "references"
+      ]
+    },
+    "agnes-video-2.5-flash": {
+      "text": "The API describes <Picture 1>, <Audio 1>, numbered separately in each reference array.",
+      "kind": "instruction",
+      "source_url": "https://wiki.agnes-ai.com/en/docs/agnes-video-25-flash",
+      "modes": [
+        "references"
+      ]
+    }
+  },
+  "kling": {
+    "kling-4.0-image-to-video": {
+      "text": "The API uses @id, for example @image_1. This adapter assigns image_1, image_2 and so on.",
+      "kind": "example",
+      "source_url": "https://kling.ai/document-api/api/video/4-0/image-to-video",
+      "modes": [
+        "first_frame",
+        "first_last_frame",
+        "keyframes"
+      ]
+    }
+  }
+}

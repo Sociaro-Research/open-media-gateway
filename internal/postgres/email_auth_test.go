@@ -278,6 +278,34 @@ func TestEmailAuthenticationLifecycle(t *testing.T) {
 	w := httptest.NewRecorder()
 	disabled.Email(w, r)
 	expect(w, 503)
+	// Hiding the browser choice must not revoke accounts/sessions or change the
+	// existing password endpoint's configured-method policy.
+	methods := httptest.NewRecorder()
+	disabled.Methods(methods, httptest.NewRequest("GET", "https://example.test/auth/methods", nil))
+	var availability map[string]bool
+	if err = json.Unmarshal(methods.Body.Bytes(), &availability); err != nil || availability["email"] || !availability["email_confirmation"] {
+		t.Fatal("unconfigured delivery advertised browser email login", err)
+	}
+	loginRequest := httptest.NewRequest("POST", "https://example.test/auth/email/login", strings.NewReader(`{"email":"`+googleEmail+`","password":"`+password+`"}`))
+	loginRequest.SetPathValue("action", "login")
+	loginRequest.Header.Set("Content-Type", "application/json")
+	loginResponse := httptest.NewRecorder()
+	disabled.Email(loginResponse, loginRequest)
+	expect(loginResponse, 200)
+	retainedSession := false
+	for _, cookie := range loginResponse.Result().Cookies() {
+		if cookie.Name == "media_gateway_session" {
+			retainedSession = true
+			request := httptest.NewRequest("GET", "https://example.test/v1/me", nil)
+			request.AddCookie(cookie)
+			if signedIn, err := disabled.Authenticate(request); err != nil || signedIn.ID != google.ID {
+				t.Fatal("existing password API session did not survive hidden browser choice", err)
+			}
+		}
+	}
+	if !retainedSession {
+		t.Fatal("password API login did not create its normal session")
+	}
 	unknown := call("forgot", map[string]string{"email": uuid.NewString() + "@example.test"})
 	expect(unknown, 202)
 	if strings.Contains(unknown.Body.String(), "token") {

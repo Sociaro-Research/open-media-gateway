@@ -78,12 +78,17 @@
   const all=node('details',null,'detail-record');all.append(node('summary','All retained data'),node('pre',JSON.stringify(data,null,2)));parent.append(all);
  }
  function open(endpoint,trigger){
-  close();const dialog=node('dialog',null,'keys-revoke-dialog detail-dialog'),title=FormUI.sectionHeading(dialog,'Generation details'),header=title.parentElement,actions=node('div',null,'detail-actions'),refresh=node('button','Refresh','secondary'),dismiss=node('button','Close','secondary'),status=node('p'),body=node('div');
-  header.classList.add('detail-heading');dialog.setAttribute('aria-label','Generation details');refresh.type=dismiss.type='button';actions.append(refresh,dismiss);header.append(actions);dialog.append(status,body);status.setAttribute('role','status');
-  const state={dialog,serial:0};active=state;
-  async function load(){const serial=++state.serial;refresh.disabled=true;FormUI.message(status,'Loading generation…');body.replaceChildren();try{const data=await api(endpoint);if(active!==state||!dialog.open||serial!==state.serial)return;render(body,data);FormUI.message(status,'');}catch(error){if(active===state&&dialog.open)FormUI.message(status,'Could not load generation: '+error.message,'error');}finally{if(active===state)refresh.disabled=false;}}
-  refresh.onclick=load;dismiss.onclick=()=>dialog.close();dialog.onclose=()=>{state.serial++;const restore=active===state;if(restore)active=null;dialog.remove();if(restore&&trigger?.isConnected)trigger.focus();};
-  document.body.append(dialog);dialog.showModal();dismiss.focus();load();
+  close();const dialog=node('dialog',null,'keys-revoke-dialog detail-dialog'),status=node('p'),body=node('div');
+  const {heading,close:dismiss}=FormUI.dialogHeading(dialog,'Generation details',()=>dialog.close());heading.parentElement.classList.add('detail-heading');dialog.setAttribute('aria-label','Generation details');dialog.append(status,body);status.setAttribute('role','status');
+  const state={dialog};active=state;let fingerprint='';
+  document.body.append(dialog);dialog.showModal();
+  const updates=GatewayAutoUpdate.watch({root:dialog,active:()=>active===state,load:async({signal,current,quiet})=>{
+   if(!quiet)FormUI.message(status,'Loading generation…');
+   try{const data=await api(endpoint,{signal});if(!current())return;const signature=JSON.stringify(data);if(signature===fingerprint){FormUI.message(status,'');return;}fingerprint=signature;const next=node('div');render(next,data);GatewayAutoUpdate.reconcile(body,next);FormUI.message(status,'');}
+   catch(error){if(current()&&error.name!=='AbortError'){if([401,403,404].includes(error.status)){body.replaceChildren();fingerprint='';}FormUI.message(status,'Could not load generation: '+error.message,'error');}}
+  }});
+  dismiss.onclick=()=>dialog.close();dialog.onclose=()=>{updates.stop();const restore=active===state;if(restore)active=null;dialog.remove();if(restore&&trigger?.isConnected)trigger.focus();};
+  dismiss.focus();updates.refresh({quiet:false});
  }
  window.ReportDetails={open,close};
 })();

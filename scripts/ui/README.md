@@ -1,5 +1,32 @@
 # UI smoke checks
 
+Run `node scripts/ui/reference-validation.cjs` in Chromium and with
+`UI_BROWSER_ENGINE=webkit` for early reference errors, model changes, library
+binding, rejected replacements, cancellation and stale uploads, plus template
+Save/Publish gating, voice-role selection, concurrent manual edits, variable-slot replacement and Unpublish. It uses synthetic transfers and dummy localhost APIs, checks
+keyboard navigation and both themes at 1440/390/320px, and makes no live calls.
+It also gates simultaneous variable-slot bindings against aggregate limits and
+ignores delayed model-check errors after valid replacements. Creator upload
+fixtures distinguish model-context uploads from generic shared source uploads.
+`UI_EVIDENCE_DIR` selects evidence output. API/PostgreSQL regressions separately
+exercise actual byte inspection and rejected-file persistence/cleanup.
+
+Run `node scripts/ui/managed-generation-key.cjs` with Chromium and
+`UI_BROWSER_ENGINE=webkit` for explicit account-key creation, restoration in a
+second browser, local Forget, manual entry, revocation, session/workspace races
+and validation failure. Local synthetic fixtures assert bearer-only generation
+and capture both themes at 1440/390/320px. `UI_EVIDENCE_DIR` selects output.
+Generation-focused fixtures use `fixture-key.cjs` for manual synthetic entry;
+the dedicated managed-key fixture covers account creation and restoration.
+
+Run `node scripts/ui/generation-key-panel.cjs` (also with
+`UI_BROWSER_ENGINE=webkit`) for the shared Playground/Templates key panel:
+session restoration, paired key actions, keyboard focus after Forget, invalid
+keys, long names, personal billing and API-key mode. It captures both themes at
+1440/390/320px with synthetic keys and blocks external requests and API writes.
+WebKit uses Option+Tab for full control navigation. `UI_EVIDENCE_DIR` selects the
+output directory; `UI_SOURCE_DIR` with `UI_BASELINE=1` captures an older layout.
+
 Run the real persisted display-name navigation regression with fresh services:
 
 ```sh
@@ -27,11 +54,34 @@ creation, key-name readiness and required storage fields.
 
 Run `node scripts/ui/installation-setup.cjs` (also with
 `UI_BROWSER_ENGINE=webkit`) for the first-owner setup screen, desktop/mobile
-layouts, keyboard controls, invalid-code retry and subsequent password sign-in
-without delivery. It uses local fixtures and creates no live account.
+layouts, keyboard controls, invalid-code retry, the owner session without delivery,
+and hidden ordinary email login without delivery, with independent Google availability. It uses local fixtures and creates no live account.
+
+Run `node scripts/ui/setup-settings.cjs` (also with
+`UI_BROWSER_ENGINE=webkit`) for setup Apply/Advanced Save reconciliation,
+unsaved drafts, real version-conflict controls, cancellation, retries and
+interrupted navigation. It uses synthetic loopback API fixtures and covers both
+themes at 1440/390/320 px.
 
 For reliability/load commands and browser request budgets, see
 [performance testing](../../docs/performance-testing.md).
+
+Run `node scripts/ui/playground-repeat.cjs` (also with
+`UI_BROWSER_ENGINE=webkit`) for retained generation drafts, identical repeat
+submissions, history Try again across media types, fresh confirmation estimates,
+cancellation, late responses, validation/permission/budget failures, idempotent
+error retry and duplicate-click safety. It also checks keyboard focus and both
+themes at 1440/390/320 px. All API responses are localhost fixtures; external
+requests are blocked. `UI_SOURCE_DIR` selects an archived UI for baseline checks.
+Evidence uses `UI_SCREENSHOT_DIR` (default system temporary directory).
+
+Run `node scripts/ui/response-context.cjs` (also with
+`UI_BROWSER_ENGINE=webkit`) for key changes after response headers arrive but
+before the body finishes. A localhost HTTP server gates actual JSON and media
+bodies, checking late success/failure, A→B→A, model catalog preservation,
+body-read cancellation and Forget key.
+`UI_SOURCE_DIR` selects a baseline UI; `UI_EVIDENCE_DIR` stores results. No live
+account or provider calls run.
 
 Run `node scripts/ui/smoke.cjs` with Playwright available in Node's module path.
 The script starts a temporary localhost server and uses mocked API responses;
@@ -132,7 +182,7 @@ cancellation, failure without proxy fallback, library
 operations and mobile layout. All storage requests are intercepted fixtures.
 
 Run `node scripts/ui/reference-intent.cjs` (also with `UI_BROWSER_ENGINE=webkit`)
-for voice-picker Escape/Close/Done cancellation followed by ordinary audio
+for voice-picker Escape/Close cancellation followed by ordinary audio
 selection or upload, gated interrupted uploads, repeated opens, successful voice
 assignment, clear/reset and model return at 1440/390/320 px. It uses actual model,
 library and file-chooser controls, synthetic file-drop events and isolated API
@@ -396,3 +446,208 @@ rewriting the preference, legacy palette fallback, saved Clear Lime preservation
 and custom theme creation/editing/deletion, independent saves and keyboard controls
 at 1440/390/320px. The alternate palette is a test fixture for existing catalogs;
 it is not bundled in new installations. All writes stay in localhost fixtures.
+
+
+Run `node scripts/ui/auth-session.cjs` and repeat with
+`UI_BROWSER_ENGINE=webkit` for console session restoration. Gated localhost
+fixtures verify safe HTML before the application script runs, delayed valid
+sessions and reloads without a visible login frame, absent/expired sessions,
+configuration and transport failures, forbidden/malformed responses, a real
+15-second timeout, keyboard retry, late-response rejection, repeated navigation,
+email sign-in, failed/successful logout, sanitized return paths, workspace read
+failures and API-key mode. Dark, Light and System modes run at 1440/390/320px,
+including a live System theme change while checking. `UI_SOURCE_DIR` selects an
+archived UI for baseline reproduction; `UI_EVIDENCE_DIR` selects screenshots and
+JSON results. No live account, identity provider or paid service is called.
+
+Run `node scripts/ui/playground-projects.cjs` and repeat with
+`UI_BROWSER_ENGINE=webkit` for Projects plus the repeat-generation integration.
+Local fixtures cover project creation/retry/cancel, empty/All/project history,
+older ungrouped generations, reload, stale reads, key changes during writes,
+submission-time assignment, history retry project preservation and unchanged
+form drafts. Shared dropdown keyboard/Escape behavior and both themes run at
+1440/390/320px. Evidence uses `UI_EVIDENCE_DIR`; no provider is called.
+Run `playground-repeat.cjs` against the same checkout for its complete retry matrix.
+
+The Projects matrix also covers the separate +/management actions, checked Project
+submenus (hover/touch/keyboard), disabled workspace/content-role permissions, long names,
+viewport bounds, assignment failure and key changes during pending writes. It
+also covers versioned rename/delete/reassignment, duplicate
+names, stale drafts, ungrouping old history, confirmed populated deletion and
+project-management dialogs in both themes at desktop/mobile widths. Database
+fixtures preserve queued/running/completed/failed rows, private request metadata,
+result indexes and actual temporary media files while racing delete with submit
+and assignment. Project deletion never invokes media deletion.
+
+Run `node scripts/ui/playground-project-polling.cjs` in Chromium and WebKit for
+natural 2000ms polling regressions. Do not replace application timers or call
+`loadTasks` directly in the measured cases. The fixture verifies unchanged,
+unrelated and target-card refreshes, focused anchor/item restoration, 409
+review/retry, independent background errors, and closing on task removal,
+permission loss or key change.
+
+`node scripts/ui/playground-controls.cjs` checks compact bottom placement and
+keyboard operation of Forget key, preserved 24-hour tab/session restoration,
+reference selection without Done, X/Escape and focus return. Local fixtures run
+both themes at 1440/390/320px; repeat with `UI_BROWSER_ENGINE=webkit`.
+Reference-intent, references and provider-assets suites use the retained Close
+library action; no fixture depends on a removed Done action.
+
+
+Run `node scripts/ui/reference-prompts-test.cjs` for the shared recognition fixture
+matrix (also consumed by Go template tests), provider-independent parsing,
+selected-mode types, missing files and immutable options. Run
+`prompt-reference-contracts.cjs` in Chromium/WebKit for exact transmitted prompts,
+hover/keyboard previews, informational model hints and model changes. Run
+`templates.cjs` for the same editor in authoring, explicit ordered counts and
+unchanged consumer requests. Existing saved recipe grammars remain compatible.
+
+Run `node scripts/ui/stored-media.cjs` and repeat with
+`UI_BROWSER_ENGINE=webkit` for Journal Open, Download and Last frame renewal.
+The localhost fixture advances its signing clock across two-hour idle periods,
+checks repeated/duplicate clicks, retained image/audio/video players, missing
+media and authorization failures, late responses after key changes/Forget/card
+removal, keyboard activation, both themes and 1440/390/320px layouts.
+`UI_SOURCE_DIR` selects a baseline; `UI_EVIDENCE_DIR` stores results and screenshots.
+All authorization and media requests stay local; no provider is called.
+
+Run `node scripts/ui/setup-remote.cjs` and repeat with
+`UI_BROWSER_ENGINE=webkit` for the three setup scenarios, no-write Skip and
+reload, failed/reversible preset changes, honest mixed settings, explicit remote
+consent, catalogue/estimate/job/history/download, interrupted submission recovery
+with the same idempotency key, and disconnect. It checks both themes at
+1440/390/320 px using localhost fixtures and blocks all external requests.
+`UI_SCREENSHOT_DIR` selects retained images. It does not exercise real account
+registration, company creation, credential grants, payments or provider calls.
+
+Run `node scripts/ui/setup-selector.cjs` in Chromium and WebKit for saved setup
+selection across reopen/reload, shared plus personal policy, custom legacy
+combinations, unchanged Apply, native radio keyboard navigation, no-write
+Skip/Close/Escape, failed and interrupted saves, pending locks and version
+conflicts. Synthetic localhost fixtures capture both themes at 1440/390/320px
+and measure footer text centering, equal button sizes, padding and legend gaps.
+`UI_EVIDENCE_DIR` selects evidence; `UI_SOURCE_DIR` with `UI_BASELINE=1` records
+the same layout against an archived UI. Backend persistence remains covered by
+the setup-profile API and PostgreSQL setup tests.
+
+Run `node scripts/ui/system-scenarios.cjs` in Chromium and WebKit for the
+Settings scenario/Advanced settings boundary: no duplicate resource switches,
+retained customer-onboarding gate, version propagation, preserved Advanced
+drafts across scenario changes, and unrelated saves that omit resource policy.
+All four legacy policy combinations survive those saves. Reopen/reload and
+1440/390/320px screenshots use synthetic localhost data. `UI_EVIDENCE_DIR`
+selects output; `UI_SOURCE_DIR` with `UI_BASELINE=1` captures an archived layout.
+
+Run `node scripts/ui/remote-navigation.cjs` in Chromium and WebKit for the real
+console header and scenario-only outbound connection entry. It preserves the
+local company selector, checks keyboard navigation/focus return, no-write
+cancellation and closing, connected reopen/reload, ordinary-role visibility and
+the independent onboarding gate. Synthetic localhost APIs block all writes and
+external requests. Both themes at 1440/390/320px use `UI_EVIDENCE_DIR`; archived
+`app.js`/`setup-selector.js` via `UI_SOURCE_DIR` and `UI_BASELINE=1` capture before.
+
+Run `node scripts/ui/workspace-authorization.cjs` and repeat with
+`UI_BROWSER_ENGINE=webkit` for explicit connection consent, trusted existing
+login return, company creation/selection consent, renewal, cancellation,
+revocation, uncertain-response recovery, keyboard and both themes at
+1440/390/320 px. It uses only localhost fixtures. The real signup/login,
+company/grant SQL transactions, delivery failures and isolation run in
+`TestWorkspaceSignupCompanyAndInstallationEndToEnd` and the PostgreSQL
+`TestWorkspaceAuthorization*` suites on disposable services; no real account,
+email, payment or provider service is used.
+
+Run `node scripts/ui/remote-context.cjs` with Chromium and
+`UI_BROWSER_ENGINE=webkit` for reviewed destination rejection, retained uncertain
+submissions across same-company key/login renewal, cross-context isolation and
+explicit legacy history reconciliation. It uses localhost fixtures only, with
+both themes and 1440/390/320 px screenshots. Backend regressions additionally
+prove one actual TaskRepository admission after key rotation and actual issued-key
+revocation before an expired local cancellation proof is cleared.
+
+Run `node scripts/ui/templates.cjs` (also with `UI_BROWSER_ENGINE=webkit`) for
+instance Templates: immutable collapsed/literal prompts, missing typed slots,
+fully fixed templates, exact slot-ID payloads, shared key/reset and late responses,
+existing estimate/confirmation/journal transfer, duplicate-click protection,
+unavailable models, administrator draft/publication/conflict states, keyboard
+expansion and both themes at 1440/390/320 px. The localhost fixture blocks all
+external requests. Evidence goes to `.local/gw172/ui-<engine>` by default;
+`UI_EVIDENCE_DIR` overrides it. Run the affected Playground, response-context,
+reference-parser and storage fixtures alongside it.
+
+Run `node scripts/ui/project-journal-state.cjs` in Chromium and WebKit for
+metadata-only Journal updates with 30 synthetic company generations and actively
+playing native video/audio. Requires `ffmpeg` on PATH to generate disposable media
+under `UI_EVIDENCE_DIR`. Assignment, reassignment, removal and rename retain
+cards, scroll anchors, focus and playback; natural polling, delayed/repeated
+writes, 503 recovery, stale versions/history, filters and permission/key loss
+exercise the reconciliation boundaries. Explicit filter changes and cards that
+leave the selected project still clear their corresponding context/media. The
+fixture uses unchanged application timers and blocks external requests.
+`UI_SOURCE_DIR` optionally selects a baseline UI source directory.
+Run `node scripts/ui/templates.cjs` with Chromium and `UI_BROWSER_ENGINE=webkit`
+for Templates authoring file drops, keyboard file selection, typed validation,
+duplicate prevention, pending/cancel/retry and failed-replacement preservation,
+fixed binding/filename/preview feedback, prompt markers/IME/caret/scroll geometry,
+and heading/action typography at 2048/1440/390/320px in both themes. These fixtures
+use synthetic local files, reject external requests, and never contact providers.
+`UI_EVIDENCE_DIR` selects logs/screenshots; `UI_SOURCE_DIR` with `UI_BASELINE=1`
+captures the approved pre-repair UI for comparison. The existing
+`prompt-reference-contracts.cjs` suite checks the shared editor in Playground.
+
+`template-upload-errors.cjs` verifies that the shared API parser and upload card
+retain complete long/multiple error reasons, visible line breaks and retry behavior
+for template-library and direct-slot uploads in both themes at1440/390/320px.
+It uses synthetic local responses and supports `UI_BROWSER_ENGINE` and
+`UI_EVIDENCE_DIR`; no provider calls or real user files are used.
+
+Generate disposable clips with `python3 scripts/ui/template-video-fixtures.py
+.local/video-workflow/clips`, then run `node scripts/ui/template-video-workflow.cjs`
+in Chromium and WebKit. The real console fixture verifies three distinct file
+attempts, cancellation, preserved failed replacements, playable previews, exact
+draft/publication identities and independent covers. `GATEWAY_TEMPLATE_CLIP_DIR`
+selects these files for `TestTemplateThreeVideoIdentityAndPublication` as well;
+that API test compares hashes and consumer bytes using actual local storage.
+No provider call or user media is involved.
+
+Run `node scripts/ui/template-gallery.cjs` in Chromium and WebKit for the shared
+gallery/selection screen, inline authoring permission changes, own-library missing
+inputs, exact estimate payloads, editor return, polling, hover/keyboard previews,
+blocked-playback retries and reduced motion. Generate the synthetic video fixtures
+above first and set `GATEWAY_TEMPLATE_CLIP_DIR` to that directory. Screenshots cover
+both themes at 1920/1440/1150/900/390/320px, natural portrait covers and three/two/one
+columns. `UI_SOURCE_DIR` and `UI_BASELINE=1` capture the previous gallery layout.
+All requests remain on loopback; the fixture submits no generation.
+
+Run `node scripts/ui/kling-connection.cjs` (also with
+`UI_BROWSER_ENGINE=webkit`) for explicit connection authentication, cached status
+after navigation, permission failures and optional empty price overrides. It
+checks keyboard activation, both themes and 1440/390/320 px, blocks external
+requests and uses synthetic localhost APIs only. `UI_EVIDENCE_DIR` selects output.
+
+Run `node scripts/ui/playground-project-filter.cjs` in Chromium and WebKit for
+All / No project / concrete project membership, old unassigned history beyond the
+loaded All page, empty results, natural polling, delayed reads, reload/Back, key
+resets and unchanged generation drafts/submission assignment. It measures actual
+selector width and full accessible labels for short, 20-character and long
+Latin/Cyrillic names in both themes at 1440/390/320px, checks keyboard/Escape and
+rejects filter-triggered writes and external calls. Evidence uses
+`UI_EVIDENCE_DIR`; `UI_SOURCE_DIR` can select an archived UI. PostgreSQL regressions
+separately verify full-set filtering before pagination and workspace/role isolation.
+
+Run the real provider-logo regression with disposable services:
+
+```sh
+GATEWAY_LOGO_BROWSER_NODE=node CADDY_BIN=/path/to/pinned/caddy \
+  python3 scripts/with-test-services.py -- \
+  go test -race -count=1 -timeout=10m -v -run '^TestProviderLogoBrowserPersistence$' ./internal/api
+```
+
+Repeat with `UI_BROWSER_ENGINE=webkit`. Node needs Playwright and pngjs on its
+module path. `UI_EVIDENCE_DIR` selects screenshots/results. The fixture uses real
+synthetic administrator sessions, uploads and PostgreSQL, then kills/restarts its
+owned API subprocess against the same database and verifies persisted associations
+and unchanged credentials/settings. Both engines check decoded PNG transparency,
+validation failures, retries/interruptions, live theme changes, exact rendered RGB
+and alpha, keyboard access and 1440/390/320px layouts. With `CADDY_BIN`, it runs the
+production proxy configuration and verifies bearer-only image reads. All traffic
+is loopback; no provider, payment or identity service is contacted.

@@ -24,6 +24,9 @@ func isModelCatalogPath(path string) bool {
 }
 
 func isGenerationPath(path string) bool {
+	if strings.HasPrefix(path, "/v1/templates/") && (strings.HasSuffix(path, "/generations") || strings.HasSuffix(path, "/estimate")) {
+		return true
+	}
 	switch path {
 	case "/v1/videos", "/v1/images/generations", "/v1/images/edits", "/v1/audio/speech", "/v1/audio/generations", "/v1/generations", "/v1/generations/estimate":
 		return true
@@ -32,6 +35,11 @@ func isGenerationPath(path string) bool {
 }
 
 func (s *Server) registerOpenAIRoutes(mux *http.ServeMux) {
+	mux.Handle("PATCH /v1/projects/{project}", s.projectRoute(s.manageProject))
+	mux.Handle("DELETE /v1/projects/{project}", s.projectRoute(s.manageProject))
+	mux.Handle("PATCH /v1/generations/{id}/project", s.projectRoute(s.assignProject))
+	mux.Handle("GET /v1/projects", s.projectRoute(s.projects))
+	mux.Handle("POST /v1/projects", s.projectRoute(s.projects))
 	mux.Handle("POST /v1/videos", s.authenticate(http.HandlerFunc(s.createOpenAIGeneration)))
 	mux.Handle("POST /v1/images/generations", s.authenticate(http.HandlerFunc(s.createOpenAIGeneration)))
 	mux.Handle("POST /v1/images/edits", s.authenticate(http.HandlerFunc(s.createOpenAIGeneration)))
@@ -172,8 +180,8 @@ func (s *Server) listGenerations(w http.ResponseWriter, r *http.Request) {
 		offset = value
 	}
 	for key := range r.URL.Query() {
-		if key != "limit" && key != "offset" {
-			invalidParameter(w, key, "only limit and offset are supported; cursor pagination is not available")
+		if key != "limit" && key != "offset" && key != "project_id" {
+			invalidParameter(w, key, "only limit, offset and project_id are supported; cursor pagination is not available")
 			return
 		}
 	}
@@ -188,7 +196,22 @@ func (s *Server) listGenerations(w http.ResponseWriter, r *http.Request) {
 	var tasks []core.Task
 	var err error
 	more := false
-	if reader, ok := s.service.(interface {
+	if project := r.URL.Query().Get("project_id"); project != "" {
+		reader, ok := s.service.(core.ProjectRepository)
+		if !ok {
+			projectError(w, core.ErrProjectInvalid)
+			return
+		}
+		tasks, err = reader.ListProjectTasks(r.Context(), project, limit+1, offset)
+		if errors.Is(err, core.ErrProjectInvalid) {
+			projectError(w, err)
+			return
+		}
+		if len(tasks) > limit {
+			more = true
+			tasks = tasks[:limit]
+		}
+	} else if reader, ok := s.service.(interface {
 		ListTasksPage(context.Context, int, int) ([]core.Task, error)
 	}); ok {
 		tasks, err = reader.ListTasksPage(r.Context(), limit+1, offset)
@@ -252,7 +275,7 @@ func (s *Server) openAIInput(r *http.Request, fields map[string]json.RawMessage)
 	// Decode provider extensions separately from the public standard fields.
 	// The internal task representation is not an alternative request format.
 	base := map[string]json.RawMessage{}
-	for _, k := range []string{"model", "prompt", "options", "webhook_url", "max_expected_cost_usd"} {
+	for _, k := range []string{"model", "prompt", "options", "webhook_url", "max_expected_cost_usd", "project_id"} {
 		if raw, ok := fields[k]; ok {
 			base[k] = raw
 			delete(fields, k)

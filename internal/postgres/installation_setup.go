@@ -70,6 +70,9 @@ func (r *AuthRepository) CompleteInstallationSetup(ctx context.Context, in auth.
 	if _, err = tx.ExecContext(ctx, `UPDATE installation_setup SET completed_at=NOW(),code_hash=NULL,code_ciphertext=NULL WHERE id=TRUE`); err != nil {
 		return err
 	}
+	if _, err = tx.ExecContext(ctx, `UPDATE system_settings SET setup_pending=TRUE WHERE id=TRUE`); err != nil {
+		return err
+	}
 	if err = setAuditActor(ctx, tx, id); err != nil {
 		return err
 	}

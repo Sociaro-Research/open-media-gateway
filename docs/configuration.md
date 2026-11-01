@@ -373,7 +373,7 @@ for configuration, account identity rules and the delivery-disabled rollout.
 
 Both Resend fields must be configured together. Leave both empty until delivery
 is approved and ready. No messages are queued, sent or written to logs in that
-state; registration/recovery return `503` before creating pending records.
+state; email login is hidden while preserving its enabled preference, and registration/recovery return `503` before creating pending records. Existing sessions and password API behavior are unchanged. Configure Google or delivery before signing out of the initial owner session; see the existing administrator recovery procedure if no browser method is available.
 
 ## Request limits and task scheduling
 

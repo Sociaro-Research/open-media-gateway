@@ -1,5 +1,6 @@
 // Package apikey defines personal Gateway credentials. Only a SHA-256 digest
-// of a cryptographically random secret is persisted, never the secret itself.
+// of a cryptographically random secret is used for authentication. Only explicitly
+// managed Playground keys additionally have an encrypted account vault record.
 package apikey
 
 import (
@@ -33,6 +34,7 @@ var ErrForbidden = errors.New("API key management is not allowed for this role o
 var ErrNotFound = errors.New("API key not found")
 
 type Key struct {
+	Purpose           string     `json:"purpose,omitempty"`
 	UserID            string     `json:"user_id"`
 	UserEmail         string     `json:"user_email,omitempty"`
 	CreatedBy         string     `json:"created_by"`

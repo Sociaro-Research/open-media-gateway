@@ -321,6 +321,14 @@ func Parse(source Source, body []byte) ([]Entry, string, error) {
 	if e != nil {
 		return nil, "", e
 	}
+	if source.Parser == "byteplus-pricing" {
+		if entries, handled := bytePlusMediaTables(text); handled {
+			if len(entries) == 0 {
+				return nil, "", errors.New("Source format changed or no model records were recognized")
+			}
+			return entries, text, nil
+		}
+	}
 	if source.Parser == "document" {
 		if len(strings.TrimSpace(text)) < 80 {
 			return nil, "", errors.New("Source document is empty or incomplete")
@@ -331,20 +339,49 @@ func Parse(source Source, body []byte) ([]Entry, string, error) {
 	month := ""
 	pricingUnit := ""
 	var modelColumns []string
+	var modelGroups []string
+	groupedModelColumns := false
 	for _, line := range strings.Split(text, "\n") {
 		trim := strings.TrimSpace(line)
 		if m := regexp.MustCompile(`^#+\s*(20\d{2})[-/]?(\d{2})\s*$`).FindStringSubmatch(trim); m != nil {
 			month = m[1] + "-" + m[2]
 		}
 		if !strings.HasPrefix(trim, "|") {
+			if source.Parser == "byteplus-models" && trim != "" {
+				modelColumns, modelGroups = nil, nil
+				groupedModelColumns = false
+			}
 			continue
 		}
-		cells := strings.Split(strings.Trim(trim, "|"), "|")
+		row := strings.Trim(trim, "|")
+		if source.Parser == "byteplus-models" {
+			// Empty edge cells belong to grouped headers, not delimiters.
+			row = strings.TrimSuffix(strings.TrimPrefix(trim, "|"), "|")
+		}
+		cells := strings.Split(row, "|")
 		for i := range cells {
 			cells[i] = clean(cells[i])
 		}
+		if source.Parser == "byteplus-models" && len(modelGroups) > 0 && bytePlusModelChildHeader(modelGroups, cells) {
+			if len(cells) == len(modelGroups) {
+				modelColumns = bytePlusGroupedModelColumns(modelGroups, cells)
+			}
+			modelGroups = nil
+			continue
+		}
 		if source.Parser == "byteplus-models" && len(cells) >= 2 && cells[0] == "Model ID" {
 			modelColumns = append([]string(nil), cells...)
+			modelGroups = nil
+			groupedModelColumns = false
+			for i, column := range cells[1:] {
+				if column == "" || i > 0 && column == cells[i] {
+					groupedModelColumns = true
+				}
+			}
+			if groupedModelColumns {
+				modelGroups = append([]string(nil), cells...)
+				modelColumns = bytePlusGroupedModelColumns(modelGroups, nil)
+			}
 			continue
 		}
 		if source.Parser == "byteplus-pricing" && len(cells) >= 3 && cells[0] == "Model ID" {
@@ -388,19 +425,22 @@ func Parse(source Source, body []byte) ([]Entry, string, error) {
 			if id == "" {
 				continue
 			}
+			modelGroups = nil
 			facts := []core.ModelFact{}
 			for i, column := range modelColumns[1:] {
 				label := "Provider: " + column
-				switch column {
-				case "Capabilities":
-					label = "Provider: reference workflows"
-				case "Output video format":
-					label = "Provider: output specifications / limits"
-				case "Rate limits (Max IPM)":
-					label = "Provider: default max images/minute (account-specific limits may differ)"
-				default:
-					if strings.HasPrefix(column, "Rate limits") {
-						label = "Provider: default rate limits (account-specific limits may differ)"
+				if !groupedModelColumns {
+					switch column {
+					case "Capabilities":
+						label = "Provider: reference workflows"
+					case "Output video format":
+						label = "Provider: output specifications / limits"
+					case "Rate limits (Max IPM)":
+						label = "Provider: default max images/minute (account-specific limits may differ)"
+					default:
+						if strings.HasPrefix(column, "Rate limits") {
+							label = "Provider: default rate limits (account-specific limits may differ)"
+						}
 					}
 				}
 				facts = append(facts, core.ModelFact{Label: label, Value: cells[i+1]})

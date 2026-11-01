@@ -22,6 +22,9 @@ func (r *memoryRepository) CreateOrGet(_ context.Context, task Task, key, hash s
 		}
 		return r.task, false, nil
 	}
+	if task.AdmissionError != nil {
+		return Task{}, false, task.AdmissionError
+	}
 	r.task, r.key, r.hash = task, key, hash
 	r.createCount++
 	return task, true, nil
@@ -307,6 +310,30 @@ func TestProviderContractCheckedBeforeQuoteAndAdmission(t *testing.T) {
 	}
 	if provider.quotes != 0 || repo.createCount != 0 || queue.id != "" {
 		t.Fatal("invalid provider request reached pricing/admission")
+	}
+}
+
+type preflightProvider struct{ rejectingContractProvider }
+
+func (p *preflightProvider) ValidateRequest(context.Context, MediaRequest) error { return nil }
+
+func TestValidateMediaRequestSkipsPricingAndAdmission(t *testing.T) {
+	repo, queue := &memoryRepository{}, &memoryQueue{}
+	provider := &preflightProvider{rejectingContractProvider{catalogProvider: catalogProvider{models: []MediaModel{{ID: "model", MediaType: "image", Resolutions: []string{"1024*1024"}}}}}}
+	service := NewTaskServiceWithProviders(repo, queue, map[string]MediaProvider{"catalog": provider}, map[string]string{"catalog": "model"}, "catalog")
+	service.EnableAccounting()
+	input := CreateMediaInput{Prompt: "test", Model: "model", MediaType: "image"}
+	if err := service.ValidateMediaRequest(context.Background(), input); err != nil {
+		t.Fatal(err)
+	}
+	if provider.quotes != 0 || repo.createCount != 0 || queue.id != "" || !service.accounting {
+		t.Fatal("preflight changed accounting or performed admission", provider.quotes, repo.createCount, queue.id)
+	}
+	if _, err := service.CreateMediaRequest(context.Background(), input, ""); err != nil {
+		t.Fatal(err)
+	}
+	if provider.quotes != 1 || repo.createCount != 1 || queue.id == "" {
+		t.Fatal("preflight disabled subsequent normal admission")
 	}
 }
 

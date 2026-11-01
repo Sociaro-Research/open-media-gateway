@@ -100,8 +100,16 @@ func referenceRequest(m core.MediaModel) (core.MediaRequest, string) {
 			r.Options.Duration = m.MinDuration
 		}
 		audio := m.AudioAlwaysOn
-		r.Options.GenerateAudio = &audio
-		details = append(details, fmt.Sprintf("%d seconds, %s, audio %t", r.Options.Duration, r.Options.Ratio, audio))
+		if m.SupportsAudio {
+			r.Options.GenerateAudio = &audio
+		}
+		details = append(details, fmt.Sprintf("%d seconds", r.Options.Duration))
+		if r.Options.Ratio != "" {
+			details = append(details, r.Options.Ratio)
+		}
+		if m.SupportsAudio {
+			details = append(details, fmt.Sprintf("audio %t", audio))
+		}
 	}
 	if m.MediaType == "speech" {
 		r.Prompt = strings.Repeat("a", 1000)

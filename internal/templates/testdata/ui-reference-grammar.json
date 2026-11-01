@@ -1,0 +1,1013 @@
+[
+  {
+    "prompt": "<Image1>",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "<Image 1>",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "<Image_1>",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "[Image1]",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "[Image 1]",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "[Image_1]",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "{Image1}",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "{Image 1}",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "{Image_1}",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "@Image1",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "@Image_1",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "<image1>",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "<image 1>",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "<image_1>",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "[image1]",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "[image 1]",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "[image_1]",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "{image1}",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "{image 1}",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "{image_1}",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "@image1",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "@image_1",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "<IMAGE1>",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "<IMAGE 1>",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "<IMAGE_1>",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "[IMAGE1]",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "[IMAGE 1]",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "[IMAGE_1]",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "{IMAGE1}",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "{IMAGE 1}",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "{IMAGE_1}",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "@IMAGE1",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "@IMAGE_1",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "<Picture1>",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "<Picture 1>",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "<Picture_1>",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "[Picture1]",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "[Picture 1]",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "[Picture_1]",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "{Picture1}",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "{Picture 1}",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "{Picture_1}",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "@Picture1",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "@Picture_1",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "<picture1>",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "<picture 1>",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "<picture_1>",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "[picture1]",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "[picture 1]",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "[picture_1]",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "{picture1}",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "{picture 1}",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "{picture_1}",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "@picture1",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "@picture_1",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "<PICTURE1>",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "<PICTURE 1>",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "<PICTURE_1>",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "[PICTURE1]",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "[PICTURE 1]",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "[PICTURE_1]",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "{PICTURE1}",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "{PICTURE 1}",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "{PICTURE_1}",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "@PICTURE1",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "@PICTURE_1",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "<Video1>",
+    "kinds": [
+      "video"
+    ]
+  },
+  {
+    "prompt": "<Video 1>",
+    "kinds": [
+      "video"
+    ]
+  },
+  {
+    "prompt": "<Video_1>",
+    "kinds": [
+      "video"
+    ]
+  },
+  {
+    "prompt": "[Video1]",
+    "kinds": [
+      "video"
+    ]
+  },
+  {
+    "prompt": "[Video 1]",
+    "kinds": [
+      "video"
+    ]
+  },
+  {
+    "prompt": "[Video_1]",
+    "kinds": [
+      "video"
+    ]
+  },
+  {
+    "prompt": "{Video1}",
+    "kinds": [
+      "video"
+    ]
+  },
+  {
+    "prompt": "{Video 1}",
+    "kinds": [
+      "video"
+    ]
+  },
+  {
+    "prompt": "{Video_1}",
+    "kinds": [
+      "video"
+    ]
+  },
+  {
+    "prompt": "@Video1",
+    "kinds": [
+      "video"
+    ]
+  },
+  {
+    "prompt": "@Video_1",
+    "kinds": [
+      "video"
+    ]
+  },
+  {
+    "prompt": "<video1>",
+    "kinds": [
+      "video"
+    ]
+  },
+  {
+    "prompt": "<video 1>",
+    "kinds": [
+      "video"
+    ]
+  },
+  {
+    "prompt": "<video_1>",
+    "kinds": [
+      "video"
+    ]
+  },
+  {
+    "prompt": "[video1]",
+    "kinds": [
+      "video"
+    ]
+  },
+  {
+    "prompt": "[video 1]",
+    "kinds": [
+      "video"
+    ]
+  },
+  {
+    "prompt": "[video_1]",
+    "kinds": [
+      "video"
+    ]
+  },
+  {
+    "prompt": "{video1}",
+    "kinds": [
+      "video"
+    ]
+  },
+  {
+    "prompt": "{video 1}",
+    "kinds": [
+      "video"
+    ]
+  },
+  {
+    "prompt": "{video_1}",
+    "kinds": [
+      "video"
+    ]
+  },
+  {
+    "prompt": "@video1",
+    "kinds": [
+      "video"
+    ]
+  },
+  {
+    "prompt": "@video_1",
+    "kinds": [
+      "video"
+    ]
+  },
+  {
+    "prompt": "<VIDEO1>",
+    "kinds": [
+      "video"
+    ]
+  },
+  {
+    "prompt": "<VIDEO 1>",
+    "kinds": [
+      "video"
+    ]
+  },
+  {
+    "prompt": "<VIDEO_1>",
+    "kinds": [
+      "video"
+    ]
+  },
+  {
+    "prompt": "[VIDEO1]",
+    "kinds": [
+      "video"
+    ]
+  },
+  {
+    "prompt": "[VIDEO 1]",
+    "kinds": [
+      "video"
+    ]
+  },
+  {
+    "prompt": "[VIDEO_1]",
+    "kinds": [
+      "video"
+    ]
+  },
+  {
+    "prompt": "{VIDEO1}",
+    "kinds": [
+      "video"
+    ]
+  },
+  {
+    "prompt": "{VIDEO 1}",
+    "kinds": [
+      "video"
+    ]
+  },
+  {
+    "prompt": "{VIDEO_1}",
+    "kinds": [
+      "video"
+    ]
+  },
+  {
+    "prompt": "@VIDEO1",
+    "kinds": [
+      "video"
+    ]
+  },
+  {
+    "prompt": "@VIDEO_1",
+    "kinds": [
+      "video"
+    ]
+  },
+  {
+    "prompt": "<Audio1>",
+    "kinds": [
+      "audio"
+    ]
+  },
+  {
+    "prompt": "<Audio 1>",
+    "kinds": [
+      "audio"
+    ]
+  },
+  {
+    "prompt": "<Audio_1>",
+    "kinds": [
+      "audio"
+    ]
+  },
+  {
+    "prompt": "[Audio1]",
+    "kinds": [
+      "audio"
+    ]
+  },
+  {
+    "prompt": "[Audio 1]",
+    "kinds": [
+      "audio"
+    ]
+  },
+  {
+    "prompt": "[Audio_1]",
+    "kinds": [
+      "audio"
+    ]
+  },
+  {
+    "prompt": "{Audio1}",
+    "kinds": [
+      "audio"
+    ]
+  },
+  {
+    "prompt": "{Audio 1}",
+    "kinds": [
+      "audio"
+    ]
+  },
+  {
+    "prompt": "{Audio_1}",
+    "kinds": [
+      "audio"
+    ]
+  },
+  {
+    "prompt": "@Audio1",
+    "kinds": [
+      "audio"
+    ]
+  },
+  {
+    "prompt": "@Audio_1",
+    "kinds": [
+      "audio"
+    ]
+  },
+  {
+    "prompt": "<audio1>",
+    "kinds": [
+      "audio"
+    ]
+  },
+  {
+    "prompt": "<audio 1>",
+    "kinds": [
+      "audio"
+    ]
+  },
+  {
+    "prompt": "<audio_1>",
+    "kinds": [
+      "audio"
+    ]
+  },
+  {
+    "prompt": "[audio1]",
+    "kinds": [
+      "audio"
+    ]
+  },
+  {
+    "prompt": "[audio 1]",
+    "kinds": [
+      "audio"
+    ]
+  },
+  {
+    "prompt": "[audio_1]",
+    "kinds": [
+      "audio"
+    ]
+  },
+  {
+    "prompt": "{audio1}",
+    "kinds": [
+      "audio"
+    ]
+  },
+  {
+    "prompt": "{audio 1}",
+    "kinds": [
+      "audio"
+    ]
+  },
+  {
+    "prompt": "{audio_1}",
+    "kinds": [
+      "audio"
+    ]
+  },
+  {
+    "prompt": "@audio1",
+    "kinds": [
+      "audio"
+    ]
+  },
+  {
+    "prompt": "@audio_1",
+    "kinds": [
+      "audio"
+    ]
+  },
+  {
+    "prompt": "<AUDIO1>",
+    "kinds": [
+      "audio"
+    ]
+  },
+  {
+    "prompt": "<AUDIO 1>",
+    "kinds": [
+      "audio"
+    ]
+  },
+  {
+    "prompt": "<AUDIO_1>",
+    "kinds": [
+      "audio"
+    ]
+  },
+  {
+    "prompt": "[AUDIO1]",
+    "kinds": [
+      "audio"
+    ]
+  },
+  {
+    "prompt": "[AUDIO 1]",
+    "kinds": [
+      "audio"
+    ]
+  },
+  {
+    "prompt": "[AUDIO_1]",
+    "kinds": [
+      "audio"
+    ]
+  },
+  {
+    "prompt": "{AUDIO1}",
+    "kinds": [
+      "audio"
+    ]
+  },
+  {
+    "prompt": "{AUDIO 1}",
+    "kinds": [
+      "audio"
+    ]
+  },
+  {
+    "prompt": "{AUDIO_1}",
+    "kinds": [
+      "audio"
+    ]
+  },
+  {
+    "prompt": "@AUDIO1",
+    "kinds": [
+      "audio"
+    ]
+  },
+  {
+    "prompt": "@AUDIO_1",
+    "kinds": [
+      "audio"
+    ]
+  },
+  {
+    "prompt": "@Image 1",
+    "kinds": []
+  },
+  {
+    "prompt": "@Picture 1",
+    "kinds": []
+  },
+  {
+    "prompt": "@Video 1",
+    "kinds": []
+  },
+  {
+    "prompt": "@Audio 1",
+    "kinds": []
+  },
+  {
+    "prompt": "@Image\t1",
+    "kinds": []
+  },
+  {
+    "prompt": "Image1",
+    "kinds": []
+  },
+  {
+    "prompt": "Image 1",
+    "kinds": []
+  },
+  {
+    "prompt": "Picture1",
+    "kinds": []
+  },
+  {
+    "prompt": "Video_1",
+    "kinds": []
+  },
+  {
+    "prompt": "Audio 1",
+    "kinds": []
+  },
+  {
+    "prompt": "(Image1)",
+    "kinds": []
+  },
+  {
+    "prompt": "(Picture 1)",
+    "kinds": []
+  },
+  {
+    "prompt": "character1",
+    "kinds": []
+  },
+  {
+    "prompt": "<Image1]",
+    "kinds": []
+  },
+  {
+    "prompt": "[Image1>",
+    "kinds": []
+  },
+  {
+    "prompt": "{Audio1]",
+    "kinds": []
+  },
+  {
+    "prompt": "<Image  1>",
+    "kinds": []
+  },
+  {
+    "prompt": "<Image\t1>",
+    "kinds": []
+  },
+  {
+    "prompt": "@Image__1",
+    "kinds": []
+  },
+  {
+    "prompt": "prefix@Image1",
+    "kinds": []
+  },
+  {
+    "prompt": "prefix[Image1]",
+    "kinds": []
+  },
+  {
+    "prompt": "@Image1suffix",
+    "kinds": []
+  },
+  {
+    "prompt": "[Image1]suffix",
+    "kinds": []
+  },
+  {
+    "prompt": "[[Image1]]",
+    "kinds": []
+  },
+  {
+    "prompt": "<@Image1>",
+    "kinds": []
+  },
+  {
+    "prompt": "<img src=x>",
+    "kinds": []
+  },
+  {
+    "prompt": "<Image1><Image2>",
+    "kinds": [
+      "image",
+      "image"
+    ]
+  },
+  {
+    "prompt": "(@Image1), {Video_1}; [Audio 1]",
+    "kinds": [
+      "image",
+      "video",
+      "audio"
+    ]
+  },
+  {
+    "prompt": "@Image 1 and @Image1",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "@Image0",
+    "kinds": [
+      "image"
+    ],
+    "invalid": true
+  },
+  {
+    "prompt": "<Picture-1>",
+    "kinds": [
+      "image"
+    ],
+    "invalid": true
+  },
+  {
+    "prompt": "[Video_01]",
+    "kinds": [
+      "video"
+    ],
+    "invalid": true
+  },
+  {
+    "prompt": "{Audio+1}",
+    "kinds": [
+      "audio"
+    ],
+    "invalid": true
+  },
+  {
+    "prompt": "@Image1.5",
+    "kinds": [
+      "image"
+    ],
+    "invalid": true
+  },
+  {
+    "prompt": "@Image999999999999999999999999",
+    "kinds": [
+      "image"
+    ],
+    "invalid": true
+  },
+  {
+    "prompt": "scene\u00a0@Image1",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "scene\u0085@Image1",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "scene\u202f@Image1",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "scene\u3000@Image1",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "scene\u000b@Image1",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "scene\f@Image1",
+    "kinds": [
+      "image"
+    ]
+  },
+  {
+    "prompt": "\\@Image1",
+    "kinds": []
+  },
+  {
+    "prompt": "\ufeff@Image1",
+    "kinds": []
+  },
+  {
+    "prompt": "@Image1\u00b2",
+    "kinds": []
+  },
+  {
+    "prompt": "@Image1\u2163",
+    "kinds": []
+  }
+]

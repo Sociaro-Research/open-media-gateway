@@ -1,0 +1,13 @@
+{
+  "name": "wan27",
+  "url": "https://help.aliyun.com/en/model-studio/wan-video-to-video-api-reference",
+  "final_url": "https://help.aliyun.com/en/model-studio/wan-video-to-video-api-reference",
+  "checked_at": "2026-10-26T19:07:00.318058+00:00",
+  "status": 200,
+  "content_type": "text/html;charset=UTF-8",
+  "sha256": "1b476cf72f89d8142472650dd43a911ccf07c17525ac39adeed3c090db4e9496",
+  "bytes": 164049,
+  "normalized_sha256": "4a3d32925da925318d79c1ac927fe491f6b8b9bcc55f2413a3552ba2b35f4f0e",
+  "fixture_type": "Normalized factual parameter fixture; not a verbatim or complete source snapshot",
+  "fixture_sha256": "d7d14fb39161632a65edbe6f5237111a94d2f5de3c8b7c94a70dfc4fa98d958e"
+}

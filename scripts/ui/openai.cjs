@@ -1,11 +1,12 @@
+const {useFixtureKey}=require('./fixture-key.cjs');
 const {evidencePath} = require('./evidence.cjs');
-// OpenAI capability UI and source-SVG contract. All API calls use local fixtures.
-const {chromium}=require('playwright');
+// OpenAI capability UI and uploaded-PNG contract. All API calls use local fixtures.
+const {chromium,webkit}=require('playwright'),browserType=process.env.UI_BROWSER_ENGINE==='webkit'?webkit:chromium;
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const root=path.resolve(__dirname,'../../web/public/ui');
-const logo=fs.readFileSync(path.resolve(__dirname,'../../plugins/provider/openai/icon.svg'));
+const logo=require('./provider-logo-fixtures.cjs').valid;
 const server=http.createServer((req,res)=>{
- if(req.url==='/provider-assets/openai/icon.svg'){res.setHeader('Content-Type','image/svg+xml');return res.end(logo);}
+ if(req.url==='/provider-assets/fixture/openai/icon.png'){res.setHeader('Content-Type','image/png');return res.end(logo);}
  const name=path.basename(req.url.split('?')[0]);const file=path.join(root,name.includes('.')?name:'index.html');
  if(!fs.existsSync(file))return res.writeHead(404).end();
  res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':file.endsWith('.svg')?'image/svg+xml':'text/html');res.end(fs.readFileSync(file));
@@ -13,10 +14,10 @@ const server=http.createServer((req,res)=>{
 const image={parameters:[{key:'style_strength',label:'Style strength',type:'number',min:0,max:1,default:0.5}],id:'gpt-image-2.5-flare',display_name:'GPT Image 2.5 Flare',media_type:'image',resolutions:['1024x1024','1536x1024'],qualities:['medium','low','high','xhigh','max'],backgrounds:['opaque','transparent','auto'],formats:['png','jpeg','webp'],supports_image_input:true,max_image_inputs:16,no_seed:true,no_watermark:true,pricing:{known:true,reference_price_usd:0.01317}};
 const speech={id:'gpt-4o-mini-tts',display_name:'GPT-4o mini TTS',media_type:'speech',no_seed:true,no_watermark:true,no_language:true,supports_voice:true,requires_voice:true,voices:['alloy','coral'],formats:['mp3','wav'],pricing:{known:true}};
 const legacy={...speech,id:'tts-1',display_name:'TTS-1',no_instructions:true};
-const provider={fields:[{key:'api_key',label:'API key',secret:true,required:true},{key:'base_url',label:'API endpoint'}],values:{base_url:'https://api.openai.com/v1'},hints:{api_key:'••••test'},icon_url:'/provider-assets/openai/icon.svg',icon_monochrome:true,id:'openai',name:'OpenAI',live:true,configured:true,credentials_configured:true,enabled:true,status:'connected',status_message:'Key verified.',default_model:image.id,models:[image,speech,legacy],model_count:3,media_counts:{image:1,speech:2},supports_billing_credentials:false,base_url:'https://api.openai.com/v1',region:'api.openai.com',credential_source:'console',credential_hint:'••••test'};
+const provider={fields:[{key:'api_key',label:'API key',secret:true,required:true},{key:'base_url',label:'API endpoint'}],values:{base_url:'https://api.openai.com/v1'},hints:{api_key:'••••test'},icon_url:'/provider-assets/fixture/openai/icon.png',icon_monochrome:true,id:'openai',name:'OpenAI',live:true,configured:true,credentials_configured:true,enabled:true,status:'connected',status_message:'Key verified.',default_model:image.id,models:[image,speech,legacy],model_count:3,media_counts:{image:1,speech:2},supports_billing_credentials:false,base_url:'https://api.openai.com/v1',region:'api.openai.com',credential_source:'console',credential_hint:'••••test'};
 (async()=>{
  await new Promise(r=>server.listen(0,'127.0.0.1',r));
- const browser=await chromium.launch({headless:true,...(process.env.UI_BROWSER_PATH?{executablePath:process.env.UI_BROWSER_PATH}:{})});
+ const browser=await browserType.launch({headless:true,...(process.env.UI_BROWSER_PATH?{executablePath:process.env.UI_BROWSER_PATH}:{})});
  const page=await browser.newPage({viewport:{width:1440,height:1100}}),errors=[],estimates=[];
  page.on('pageerror',e=>{errors.push(e.message);console.error(e.message);});
  await page.route('**/v1/**',async route=>{
@@ -33,7 +34,7 @@ const provider={fields:[{key:'api_key',label:'API key',secret:true,required:true
  });
  try{
   await page.goto(`http://127.0.0.1:${server.address().port}`);
-  await page.locator('#createGenerationKey').click();
+  await useFixtureKey(page,'fixture-generation-key');
   await page.waitForFunction(()=>selectedModel()?.id==='gpt-image-2.5-flare');
   await page.locator('#prompt').fill('A painted lake.');
   await page.locator('.advanced-settings summary').click();
@@ -72,7 +73,7 @@ const provider={fields:[{key:'api_key',label:'API key',secret:true,required:true
   await key.fill('replacement-key');
   assert.equal(await page.evaluate(()=>FormUI.credentials.replacement(document.querySelector('[data-provider-field=api_key]'))),'replacement-key');
   const img=page.locator('[data-provider-id="openai"] .provider-list-mark img');
-  assert.equal(await img.getAttribute('src'),'/provider-assets/openai/icon.svg');
+  assert.equal(await img.getAttribute('data-logo-url'),'/provider-assets/fixture/openai/icon.png');
   await img.evaluate(i=>i.decode());
   const dims=await img.boundingBox();assert.equal(dims.width,38);assert.equal(dims.height,38);assert.equal(await page.locator('[data-provider-id="openai"] strong').innerText(),'OpenAI');
   await page.screenshot({path:evidencePath('/tmp/gateway-openai-ui/connection.png'),fullPage:true});
@@ -80,6 +81,6 @@ const provider={fields:[{key:'api_key',label:'API key',secret:true,required:true
   await page.screenshot({path:evidencePath('/tmp/gateway-openai-ui/mobile.png'),fullPage:true});
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'mobile overflow');
   assert.deepEqual(errors,[]);
-  console.log('PASS: OpenAI image controls, TTS capabilities, credential form, original vector logo, desktop and mobile.');
+  console.log('PASS: OpenAI image controls, TTS capabilities, credential form, uploaded transparent logo, desktop and mobile.');
  }finally{await browser.close();server.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;server.close();});

@@ -62,6 +62,16 @@ func NewTaskServiceWithProviders(repo TaskRepository, queue TaskQueue, available
 // EnableAccounting requires a server quote for every new generation.
 func (s *TaskService) EnableAccounting() { s.accounting = true }
 
+// ValidateMediaRequest uses the admission contract without quoting, reserving,
+// persisting or enqueueing a task. Templates use it before publishing and when
+// advertising compatible models, including connection-specific native rules.
+func (s *TaskService) ValidateMediaRequest(ctx context.Context, input CreateMediaInput) error {
+	validation := *s
+	validation.accounting = false
+	_, err := validation.prepare(ctx, input, "")
+	return err
+}
+
 func (s *TaskService) CreateMediaRequest(ctx context.Context, input CreateMediaInput, idempotencyKey string) (Task, error) {
 	task, err := s.prepare(ctx, input, idempotencyKey)
 	if err != nil {
@@ -74,6 +84,13 @@ func (s *TaskService) CreateMediaRequest(ctx context.Context, input CreateMediaI
 	}
 	hash := requestHash(task.Provider, task.Model, task.MediaType, task.Prompt, webhookURL, string(encodedOptions))
 	hash = requestHash(hash, identity.ActorID(ctx))
+	if len(input.TemplateSnapshot) > 0 {
+		hash = requestHash(hash, string(input.TemplateSnapshot))
+	}
+	// Preserve existing request hashes when optional project metadata is absent.
+	if task.ProjectID != "" {
+		hash = requestHash(hash, task.ProjectID)
+	}
 	if task.ProviderOwnerID != task.OwnerID || task.StorageOwnerID != task.OwnerID {
 		hash = requestHash(hash, task.ProviderOwnerID, task.StorageOwnerID)
 	}
@@ -90,6 +107,11 @@ func (s *TaskService) CreateMediaRequest(ctx context.Context, input CreateMediaI
 }
 
 func (s *TaskService) prepare(ctx context.Context, input CreateMediaInput, idempotencyKey string) (Task, error) {
+	if input.ProjectID != "" {
+		if _, err := uuid.Parse(input.ProjectID); err != nil {
+			return Task{}, ErrProjectInvalid
+		}
+	}
 	if input.MaxExpectedUSD != nil && *input.MaxExpectedUSD < 0 {
 		return Task{}, ErrCostLimitInvalid
 	}
@@ -159,12 +181,15 @@ func (s *TaskService) prepare(ctx context.Context, input CreateMediaInput, idemp
 
 	now := s.now().UTC()
 	task := Task{
-		PublicModel:     input.PublicModel,
-		ID:              uuid.NewString(),
-		OwnerID:         identity.OwnerID(ctx),
-		ActorID:         identity.ActorID(ctx),
-		OrganizationID:  identity.OrganizationFromContext(ctx).ID,
-		ProviderOwnerID: identity.ProviderOwnerID(ctx), StorageOwnerID: identity.StorageOwnerID(ctx),
+		AdmissionError:   input.AdmissionError,
+		TemplateSnapshot: append(json.RawMessage(nil), input.TemplateSnapshot...),
+		ProjectID:        input.ProjectID,
+		PublicModel:      input.PublicModel,
+		ID:               uuid.NewString(),
+		OwnerID:          identity.OwnerID(ctx),
+		ActorID:          identity.ActorID(ctx),
+		OrganizationID:   identity.OrganizationFromContext(ctx).ID,
+		ProviderOwnerID:  identity.ProviderOwnerID(ctx), StorageOwnerID: identity.StorageOwnerID(ctx),
 		APIKeyID:  identity.APIKeyID(ctx),
 		Status:    TaskQueued,
 		Provider:  provider,
@@ -178,7 +203,8 @@ func (s *TaskService) prepare(ctx context.Context, input CreateMediaInput, idemp
 	if webhookURL != "" {
 		task.WebhookURL = &webhookURL
 	}
-	if s.accounting {
+	task.RequireCost = s.accounting
+	if s.accounting && input.AdmissionError == nil {
 		if quoter, ok := providerAdapter.(CostQuoter); ok {
 			cost, fingerprint, err := quoter.Quote(ctx, descriptor, MediaRequest{TaskID: task.ID, Prompt: prompt, Model: model, Options: options})
 			// A missing quote is rejected transactionally only for a NEW task, so an
@@ -226,6 +252,31 @@ func (s *TaskService) Estimate(ctx context.Context, input CreateMediaInput) (Cos
 }
 
 func (s *TaskService) normalizeOptions(descriptor MediaModel, options MediaOptions) (MediaOptions, error) {
+	return NormalizeModelOptions(descriptor, options)
+}
+
+// NormalizeModelOptions shares admission defaults and validation with Templates.
+// NormalizeReferenceOptions reuses those settings checks while references are
+// still being assembled. Only input minima are deferred; capability, maxima,
+// settings and video-dependent output constraints remain enforced.
+func NormalizeReferenceOptions(descriptor MediaModel, options MediaOptions) (MediaOptions, error) {
+	descriptor.RequiresImageInput = false
+	descriptor.RequiresVideoInput = false
+	descriptor.RequiresAudioInput = false
+	descriptor.MinImageInputs = 0
+	modes := append([]ReferenceMode(nil), ReferenceModesFor(descriptor)...)
+	for i := range modes {
+		modes[i].MinImages = 0
+		modes[i].MinVideos = 0
+		modes[i].MinAudios = 0
+		modes[i].MinVisuals = 0
+		modes[i].RequiresVisual = false
+	}
+	descriptor.ReferenceModes = modes
+	return NormalizeModelOptions(descriptor, options)
+}
+
+func NormalizeModelOptions(descriptor MediaModel, options MediaOptions) (MediaOptions, error) {
 	if err := ValidateTimeoutSeconds(options.TimeoutSeconds); err != nil {
 		return MediaOptions{}, fmt.Errorf("%w: %v", ErrOptionsInvalid, err)
 	}
@@ -359,7 +410,7 @@ func (s *TaskService) normalizeOptions(descriptor MediaModel, options MediaOptio
 			}
 		}
 	default:
-		options, err = s.normalizeVideoOptions(descriptor, options)
+		options, err = normalizeVideoOptions(descriptor, options)
 		if err != nil {
 			return MediaOptions{}, err
 		}
@@ -376,7 +427,13 @@ func (s *TaskService) normalizeOptions(descriptor MediaModel, options MediaOptio
 	return options, nil
 }
 
-func (s *TaskService) normalizeVideoOptions(descriptor MediaModel, options MediaOptions) (MediaOptions, error) {
+func normalizeVideoOptions(descriptor MediaModel, options MediaOptions) (MediaOptions, error) {
+	for _, mode := range ReferenceModesFor(descriptor) {
+		if mode.ID == options.ReferenceMode && len(mode.Ratios) > 0 {
+			descriptor.Ratios = mode.Ratios
+			break
+		}
+	}
 	if options.Resolution == "" {
 		if len(descriptor.Resolutions) > 0 {
 			options.Resolution = descriptor.Resolutions[0]
@@ -530,8 +587,10 @@ func (s *TaskService) ListProviders(ctx context.Context) []ProviderDescriptor {
 			ID: id, Name: name, Live: !ProviderIsFree(available[id]), CredentialsConfigured: configured,
 			DefaultModel: defaultModel, Models: models,
 		}
-		if artwork, ok := available[id].(interface{ ProviderIcon() (string, bool) }); ok {
-			descriptor.IconURL, descriptor.IconMonochrome = artwork.ProviderIcon()
+		if artwork, ok := available[id].(interface {
+			ProviderIcon(context.Context) (string, bool)
+		}); ok {
+			descriptor.IconURL, descriptor.IconMonochrome = artwork.ProviderIcon(ctx)
 		}
 		result = append(result, descriptor)
 	}

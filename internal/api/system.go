@@ -42,7 +42,7 @@ func (s *Server) systemPolicy(next http.Handler) http.Handler {
 			return
 		}
 		path := r.URL.Path
-		if (identity.ProviderOwnerID(r.Context()) == identity.SharedOwnerID || identity.StorageOwnerID(r.Context()) == identity.SharedOwnerID) && !settings.SharedResources && (r.Method == "POST" || isModelCatalogPath(path)) && !strings.HasPrefix(path, "/v1/system/") {
+		if (identity.ProviderOwnerID(r.Context()) == identity.SharedOwnerID || identity.StorageOwnerID(r.Context()) == identity.SharedOwnerID) && !settings.SharedResources && ((r.Method == "POST" && r.Pattern != "POST /v1/references/uploads/{id}/complete") || isModelCatalogPath(path)) && !strings.HasPrefix(path, "/v1/system/") {
 			writeError(w, 403, "shared_resources_disabled", "shared providers and storage are disabled")
 			return
 		}
@@ -79,7 +79,7 @@ func (s *Server) systemPolicy(next http.Handler) http.Handler {
 		}
 		personalStorageConfiguration := strings.HasPrefix(path, "/v1/admin/storage")
 		providerConfiguration := path == "/v1/admin/providers" || strings.HasPrefix(path, "/v1/admin/providers/")
-		if strings.HasPrefix(path, "/v1/system/") || providerConfiguration || personalStorageConfiguration {
+		if (strings.HasPrefix(path, "/v1/system/") && !sharedTemplateRead(r)) || providerConfiguration || personalStorageConfiguration {
 			admin, err := s.systemAdmin(r.Context())
 			if err != nil {
 				systemError(w, err)
@@ -90,14 +90,16 @@ func (s *Server) systemPolicy(next http.Handler) http.Handler {
 				return
 			}
 		}
-		if strings.HasPrefix(path, "/v1/system/providers") || strings.HasPrefix(path, "/v1/system/storage") {
+		if strings.HasPrefix(path, "/v1/system/providers") || strings.HasPrefix(path, "/v1/system/storage") || strings.HasPrefix(path, "/v1/system/templates") || strings.HasPrefix(path, "/v1/system/template-references") {
 			r = r.WithContext(identity.WithResourceOwners(r.Context(), identity.SharedOwnerID, identity.SharedOwnerID))
 		}
-		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), systemSettingsKey{}, settings)))
+		next.ServeHTTP(w, r.WithContext(context.WithValue(system.WithAdmissionCheck(r.Context()), systemSettingsKey{}, settings)))
 	})
 }
 func systemError(w http.ResponseWriter, err error) {
 	switch {
+	case errors.Is(err, system.ErrSetupBusy):
+		writeError(w, 409, "setup_busy", err.Error())
 	case errors.Is(err, system.ErrForbidden):
 		writeError(w, 403, "forbidden", err.Error())
 	case errors.Is(err, system.ErrRoleConflict), errors.Is(err, system.ErrSalesPlacement), errors.Is(err, system.ErrLastAdmin), errors.Is(err, system.ErrConflict), errors.Is(err, system.ErrBootstrapped):
@@ -123,7 +125,7 @@ func decodeSystemLimit(w http.ResponseWriter, r *http.Request, v any, limit int6
 	return true
 }
 func (s *Server) systemSettings(w http.ResponseWriter, r *http.Request) {
-	if r.Method == "GET" {
+	if readMethod(r.Method) {
 		settings, err := s.system.Settings(r.Context())
 		if err != nil {
 			systemError(w, err)
@@ -133,6 +135,7 @@ func (s *Server) systemSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var input struct {
+		CustomerWorkspaces    *bool          `json:"customer_workspaces"`
 		MarkupPercent         *money.Percent `json:"markup_percent"`
 		AllowInlineReferences *bool          `json:"allow_inline_references"`
 		SharedResources       *bool          `json:"shared_resources"`
@@ -143,8 +146,8 @@ func (s *Server) systemSettings(w http.ResponseWriter, r *http.Request) {
 	if !decodeSystem(w, r, &input) {
 		return
 	}
-	if input.GenerationUI == nil || input.PersonalProviders == nil {
-		writeError(w, 400, "invalid_request", "all settings fields are required")
+	if input.GenerationUI == nil {
+		writeError(w, 400, "invalid_request", "generation_ui is required")
 		return
 	}
 	current, err := s.system.Settings(r.Context())
@@ -152,7 +155,15 @@ func (s *Server) systemSettings(w http.ResponseWriter, r *http.Request) {
 		systemError(w, err)
 		return
 	}
-	next := system.Settings{MarkupPercent: current.MarkupPercent, AllowInlineReferences: current.AllowInlineReferences, SharedStorageLimitBytes: current.SharedStorageLimitBytes, SharedResources: current.SharedResources, GenerationUI: *input.GenerationUI, PersonalProviders: *input.PersonalProviders, Version: input.Version}
+	next := current
+	next.GenerationUI = *input.GenerationUI
+	next.Version = input.Version
+	if input.PersonalProviders != nil {
+		next.PersonalProviders = *input.PersonalProviders
+	}
+	if input.CustomerWorkspaces != nil {
+		next.CustomerWorkspaces = *input.CustomerWorkspaces
+	}
 	if input.MarkupPercent != nil {
 		next.MarkupPercent = *input.MarkupPercent
 	}

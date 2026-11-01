@@ -7,6 +7,7 @@ import (
 	"github.com/Sociaro-Research/open-media-gateway/plugins/provider/agnes"
 	"github.com/Sociaro-Research/open-media-gateway/plugins/provider/alibaba"
 	"github.com/Sociaro-Research/open-media-gateway/plugins/provider/bytedance"
+	"github.com/Sociaro-Research/open-media-gateway/plugins/provider/kling"
 	"github.com/Sociaro-Research/open-media-gateway/plugins/provider/mock"
 	"github.com/Sociaro-Research/open-media-gateway/plugins/provider/openai"
 	"github.com/Sociaro-Research/open-media-gateway/plugins/provider/sonilo"
@@ -14,7 +15,7 @@ import (
 )
 
 // This is the only host file edited when adding or removing a module.
-var builtins = MustRegistry(openai.Definition(), mock.Definition(), bytedance.Definition(), alibaba.Definition(), agnes.Definition(), sonilo.Definition())
+var builtins = MustRegistry(openai.Definition(), mock.Definition(), bytedance.Definition(), alibaba.Definition(), agnes.Definition(), sonilo.Definition(), kling.Definition())
 
 type Registry struct {
 	definitions []providerkit.Definition

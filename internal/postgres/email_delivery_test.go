@@ -105,8 +105,8 @@ func TestEmailRegistrationConfiguredBySystemAdministrator(t *testing.T) {
 		return v
 	}
 	credentials := map[string]string{"email": "new-user@example.test", "password": "A long secret passphrase 123!"}
-	if !methods()["email"] || methods()["email_delivery"] {
-		t.Fatal("password login should be available independently of registration")
+	if methods()["email"] || methods()["email_delivery"] || !methods()["email_confirmation"] {
+		t.Fatal("unconfigured delivery must hide browser email login while preserving existing links")
 	}
 	if w := call("register", map[string]string{"email": credentials["email"]}); w.Code != 503 {
 		t.Fatal("unconfigured registration accepted", w.Code)

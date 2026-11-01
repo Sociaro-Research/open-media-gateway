@@ -1,3 +1,4 @@
+const {useFixtureKey}=require('./fixture-key.cjs');
 const {evidencePath} = require('./evidence.cjs');
 // Cross-contract UI checks use Sonilo's actual Go catalog and local API fixtures.
 const {chromium}=require('playwright');
@@ -39,7 +40,7 @@ const server=http.createServer((req,res)=>{
  });
  try{
   await page.goto(`http://127.0.0.1:${server.address().port}`);
-  await page.locator('#createGenerationKey').click();
+  await useFixtureKey(page,'fixture-generation-key');
   await page.waitForFunction(()=>selectedModel()?.id==='text-to-music');
   await page.locator('#prompt').fill('Piano and strings');
   await page.locator('.advanced-settings summary').click();

@@ -101,3 +101,17 @@ sources. `Definition.CatalogRegions` may declare reviewed endpoint contexts for
 pure local price validation; it must never turn a source URL into a generation
 endpoint. Existing administrators' source lists are preserved on code upgrades;
 document any source additions they need to apply. See [catalogue synchronization](catalog-sync.md).
+
+Adapters with a reviewed free authentication probe may opt into
+`AuthenticatedCheck` and implement `CheckCredentials` plus `CredentialStatus`.
+Only an explicit connection check invokes the probe; ordinary catalogue reads
+remain non-generating. Use `providerkit.WithCredentialCheck` so account requests
+do not inherit polling endpoint/header overrides. Report only the scope verified,
+cache safe metadata briefly and invalidate it when credentials change. Optional
+account-detail warnings belong in `CredentialCheck.Warning`, separate from
+authentication errors; use fixed safe text and never retain raw provider data.
+
+`CatalogSourceAliases` maps exact reviewed old public URLs to their canonical
+exports at fetch time. It preserves saved schedules and custom sources while
+recording the actual fetched URL in observations. `PricingSnapshot.AccountSpecific`
+protects explicit account tariffs from replacement by synchronized public rates.

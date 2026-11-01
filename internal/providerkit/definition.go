@@ -61,35 +61,40 @@ type Field struct {
 	Env      string `json:"-"`
 }
 type Definition struct {
-	AssetLibrary    func(Credentials, *http.Client) (providerassets.Client, error)
-	CatalogSources  []catalogsync.Source
-	CatalogReviews  map[string]catalogsync.DocumentReview
-	CatalogAliases  map[string]string // Exact reviewed snapshots sharing a published model tariff.
-	CatalogRegions  map[string]string // Reviewed endpoint contexts for pure local tariff validation.
-	PublicCatalog   bool              // Discovery does not authenticate credentials or verify model access.
-	LegacyIdentity  bool              // Preserve pre-registry task fingerprints for existing modules.
-	ID              string
-	Name            string
-	Description     string
-	Aliases         []string
-	Free            bool
-	Default         bool
-	DefaultModel    string
-	ModelEnv        string
-	Fields          []Field
-	RuntimeEnv      map[string]string
-	RuntimeDefaults Settings
-	BillingHelp     string
-	Icon            []byte
-	IconType        string
-	IconMonochrome  bool
-	Profiles        func() []core.MediaModel
-	Factory         func(Credentials, Settings, *http.Client) (core.MediaProvider, error)
-	Quote           func(string, core.MediaModel, core.MediaRequest, time.Time) (core.TaskCost, error)
-	Bills           func(context.Context, Credentials, string, *http.Client) ([]map[string]any, error)
-	NormalizeBill   func(string, map[string]any) (core.BillRecord, error)
-	Region          func(string) string
-	FailureNoCharge bool
+	AssetLibrary   func(Credentials, *http.Client) (providerassets.Client, error)
+	CatalogSources []catalogsync.Source
+	// Exact public source aliases preserve existing schedules while recording the actual fetched URL.
+	CatalogSourceAliases       map[string]string
+	CatalogInterpret           func(catalogsync.Source, string) ([]catalogsync.Entry, error)
+	CatalogVerificationSources map[string][]catalogsync.Source
+	CatalogReviews             map[string]catalogsync.DocumentReview
+	CatalogAliases             map[string]string // Exact reviewed snapshots sharing a published model tariff.
+	CatalogRegions             map[string]string // Reviewed endpoint contexts for pure local tariff validation.
+	PublicCatalog              bool              // Discovery does not authenticate credentials or verify model access.
+	AuthenticatedCheck         bool              // Explicit connection checks authenticate using a reviewed, non-generating API.
+	LegacyIdentity             bool              // Preserve pre-registry task fingerprints for existing modules.
+	ID                         string
+	Name                       string
+	Description                string
+	Aliases                    []string
+	Free                       bool
+	Default                    bool
+	DefaultModel               string
+	ModelEnv                   string
+	Fields                     []Field
+	RuntimeEnv                 map[string]string
+	RuntimeDefaults            Settings
+	BillingHelp                string
+	Icon                       []byte
+	IconType                   string
+	IconMonochrome             bool
+	Profiles                   func() []core.MediaModel
+	Factory                    func(Credentials, Settings, *http.Client) (core.MediaProvider, error)
+	Quote                      func(string, core.MediaModel, core.MediaRequest, time.Time) (core.TaskCost, error)
+	Bills                      func(context.Context, Credentials, string, *http.Client) ([]map[string]any, error)
+	NormalizeBill              func(string, map[string]any) (core.BillRecord, error)
+	Region                     func(string) string
+	FailureNoCharge            bool
 }
 
 func (d Definition) Defaults(c Credentials) Credentials {

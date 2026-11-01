@@ -175,7 +175,7 @@ func (s *Server) organizations(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if id == "" {
-		if r.Method == "GET" {
+		if readMethod(r.Method) {
 			all := r.URL.Query().Get("all") == "true"
 			if all && !systemAdmin {
 				orgError(w, org.ErrForbidden)
@@ -232,7 +232,7 @@ func (s *Server) organizations(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	case strings.Contains(path, "/members"):
-		if r.Method == "GET" {
+		if readMethod(r.Method) {
 			m, e := repo.OrganizationMembers(r.Context(), actor, id)
 			if e != nil {
 				orgError(w, e)
@@ -280,7 +280,7 @@ func (s *Server) organizations(w http.ResponseWriter, r *http.Request) {
 		s.writeViewerJSON(w, r, 200, map[string]any{"data": entries, "has_more": more})
 		return
 	case strings.HasSuffix(path, "/credits"):
-		if r.Method == "GET" {
+		if readMethod(r.Method) {
 			offset, ok := systemPage(w, r)
 			if !ok {
 				return
@@ -317,7 +317,7 @@ func (s *Server) organizations(w http.ResponseWriter, r *http.Request) {
 		s.writeViewerJSON(w, r, 201, c)
 		return
 	case strings.Contains(path, "/invitations"):
-		if r.Method == "GET" {
+		if readMethod(r.Method) {
 			items, e := repo.OrganizationInvites(r.Context(), actor, id)
 			if e != nil {
 				orgError(w, e)
@@ -356,7 +356,7 @@ func (s *Server) organizations(w http.ResponseWriter, r *http.Request) {
 		}
 		e = repo.RevokeOrganizationInvite(r.Context(), actor, id, invite)
 	default:
-		if r.Method == "GET" {
+		if readMethod(r.Method) {
 			items, e := repo.Organizations(r.Context(), actor, systemAdmin)
 			if e != nil {
 				orgError(w, e)

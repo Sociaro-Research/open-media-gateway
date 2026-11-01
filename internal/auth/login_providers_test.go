@@ -55,6 +55,30 @@ func loginFixture(t *testing.T) (*LoginProviderManager, *loginProviderFixture) {
 	repo := &loginProviderFixture{rows: []LoginProviderRecord{{Provider: "google", Enabled: true, Version: 1}, {Provider: "email", Connected: true, Enabled: true, Version: 1}}}
 	return NewLoginProviderManager(repo, c, "https://gateway.test"), repo
 }
+
+func TestConfiguredGoogleRemainsAvailableWithoutEmailDelivery(t *testing.T) {
+	providers, _ := loginFixture(t)
+	manager := &Manager{methods: providers, email: &emailAuth{}}
+	read := func() map[string]bool {
+		t.Helper()
+		response := httptest.NewRecorder()
+		manager.Methods(response, httptest.NewRequest("GET", "/auth/methods", nil))
+		var methods map[string]bool
+		if response.Code != 200 || json.Unmarshal(response.Body.Bytes(), &methods) != nil {
+			t.Fatal("method availability response", response.Code)
+		}
+		return methods
+	}
+	if got := read(); got["google"] || got["email"] {
+		t.Fatal("enabled but unconfigured methods must not be advertised", got)
+	}
+	if err := providers.Bootstrap(context.Background(), "fixture.apps.googleusercontent.com", "synthetic-secret", "https://gateway.test/auth/google/callback"); err != nil {
+		t.Fatal(err)
+	}
+	if got := read(); !got["google"] || got["email"] || got["email_delivery"] {
+		t.Fatal("configured Google must remain independent of email delivery", got)
+	}
+}
 func TestLoginProviderSecretsBootstrapAndRotation(t *testing.T) {
 	ctx := context.Background()
 	m, repo := loginFixture(t)

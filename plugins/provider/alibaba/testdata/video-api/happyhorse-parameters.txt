@@ -1,0 +1,20 @@
+POST https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis
+Request body
+happyhorse-1.1-r2v
+prompt string (Required)
+[Image 1]
+reference_image
+Number of reference images: 1 to 9.
+Image requirements:
+Formats: JPEG, JPG, PNG, WEBP.
+The shortest side must be at least 400 pixels.
+Maximum file size: 20 MB.
+Supported input formats:
+resolution string
+480P 720P 1080P
+ratio string
+16:9 : Default value. 9:16 3:4 4:3 4:5 5:4 1:1 9:21 21:9
+duration integer
+An integer from 3 to 15
+Default value: 5
+watermark boolean

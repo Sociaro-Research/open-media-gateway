@@ -122,6 +122,27 @@ func TestLayoutSettingsHTTPAndPublicRendering(t *testing.T) {
 	f := &brandingFixture{systemFixture: &systemFixture{settings: system.Defaults(), admins: map[string]bool{"alice": true}}, brand: branding.Defaults()}
 	s.system = f
 	h := s.handler()
+	for _, enabled := range []bool{true, false} {
+		f.brand.SidebarSubsections = enabled
+		for _, endpoint := range []struct{ path, user string }{{"/site.json", ""}, {"/v1/system/branding", "alice"}} {
+			w := sendTest(h, "GET", endpoint.path, "", endpoint.user, "")
+			var response struct {
+				Branding branding.Settings `json:"branding"`
+				Settings branding.Settings `json:"settings"`
+				Defaults branding.Settings `json:"defaults"`
+			}
+			if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &response) != nil {
+				t.Fatal(endpoint.path, w.Code, w.Body.String())
+			}
+			if endpoint.path == "/site.json" {
+				if response.Branding.SidebarSubsections != enabled {
+					t.Fatal("public navigation choice changed", w.Body.String())
+				}
+			} else if response.Settings.SidebarSubsections != enabled || !response.Defaults.SidebarSubsections {
+				t.Fatal("editor navigation choice or default changed", w.Body.String())
+			}
+		}
+	}
 	next := branding.Defaults()
 	width := 1000
 	next.SiteMaxWidth, next.ContentMaxWidth, next.SidebarSubsections = nil, &width, true
@@ -136,7 +157,7 @@ func TestLayoutSettingsHTTPAndPublicRendering(t *testing.T) {
 	if !strings.Contains(w.Body.String(), `"content_max_width":1000`) || !strings.Contains(w.Body.String(), `"sidebar_subsections":true`) {
 		t.Fatal(w.Body.String())
 	}
-	// Old clients omit layout fields; absent fields retain the original defaults.
+	// Old clients omit layout fields; absent fields inherit the current defaults.
 	var legacy map[string]any
 	json.Unmarshal(raw, &legacy)
 	for _, field := range []string{"site_max_width", "content_max_width", "sidebar_subsections"} {
@@ -144,7 +165,7 @@ func TestLayoutSettingsHTTPAndPublicRendering(t *testing.T) {
 	}
 	legacy["version"] = f.brand.Version
 	raw, _ = json.Marshal(legacy)
-	if w := sendTest(h, "PUT", "/v1/system/branding", string(raw), "alice", ""); w.Code != 200 || f.brand.SiteMaxWidth == nil || *f.brand.SiteMaxWidth != 1280 {
+	if w := sendTest(h, "PUT", "/v1/system/branding", string(raw), "alice", ""); w.Code != 200 || f.brand.SiteMaxWidth == nil || *f.brand.SiteMaxWidth != 1280 || !f.brand.SidebarSubsections {
 		t.Fatal("legacy request", w.Code, w.Body.String())
 	}
 	for _, invalid := range []any{-1, 959, 7681, 1200.5, "100%; color:red"} {

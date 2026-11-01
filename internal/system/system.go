@@ -14,6 +14,8 @@ var ErrRoleConflict = errors.New("remove administrator and manager roles before 
 
 var ErrLastAdmin = errors.New("the last administrator cannot be removed")
 var ErrNotFound = errors.New("user not found")
+var ErrSetupBusy = errors.New("finish active generations before disabling their provider access")
+
 var ErrConflict = errors.New("settings changed; reload before saving")
 var ErrBootstrapped = errors.New("an administrator already exists; use admin grant for server-side recovery")
 
@@ -22,6 +24,8 @@ type SettingsReader interface {
 }
 
 type Settings struct {
+	CustomerWorkspaces      bool          `json:"customer_workspaces"`
+	SetupPending            bool          `json:"setup_pending,omitempty"`
 	MarkupPercent           money.Percent `json:"markup_percent"`
 	AllowInlineReferences   bool          `json:"allow_inline_references"`
 	SharedStorageLimitBytes *int64        `json:"shared_storage_limit_bytes"`
@@ -79,5 +83,17 @@ func (s Settings) Public() map[string]any {
 	var result map[string]any
 	_ = json.Unmarshal(b, &result)
 	delete(result, "markup_percent")
+	delete(result, "setup_pending")
 	return result
+}
+
+// Admission checks are repeated transactionally for HTTP-authorized work.
+type admissionKey struct{}
+
+func WithAdmissionCheck(ctx context.Context) context.Context {
+	return context.WithValue(ctx, admissionKey{}, true)
+}
+func RequiresAdmissionCheck(ctx context.Context) bool {
+	v, _ := ctx.Value(admissionKey{}).(bool)
+	return v
 }

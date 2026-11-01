@@ -11,7 +11,7 @@ import (
 
 func TestLayoutValidationAndLegacyDefaults(t *testing.T) {
 	s := Defaults()
-	if err := json.Unmarshal([]byte(`{"name":"Existing brand"}`), &s); err != nil || s.SiteMaxWidth == nil || *s.SiteMaxWidth != 1280 || s.ContentMaxWidth != nil || s.SidebarSubsections {
+	if err := json.Unmarshal([]byte(`{"name":"Existing brand"}`), &s); err != nil || s.SiteMaxWidth == nil || *s.SiteMaxWidth != 1280 || s.ContentMaxWidth != nil || !s.SidebarSubsections {
 		t.Fatal("legacy layout changed", s, err)
 	}
 	for _, tc := range []struct {
@@ -26,6 +26,32 @@ func TestLayoutValidationAndLegacyDefaults(t *testing.T) {
 	s.SiteMaxWidth, s.ContentMaxWidth = nil, nil
 	if err := s.Validate(); err != nil {
 		t.Fatal("full width rejected", err)
+	}
+}
+
+func TestSidebarSubsectionsDefaultsAndSavedChoices(t *testing.T) {
+	if !Defaults().SidebarSubsections {
+		t.Fatal("sidebar subsections must be enabled by default")
+	}
+	for _, tc := range []struct {
+		name, raw string
+		want      bool
+	}{
+		{"unconfigured", `{}`, true},
+		{"legacy", `{"name":"Existing brand"}`, true},
+		{"saved disabled", `{"sidebar_subsections":false}`, false},
+		{"saved enabled", `{"sidebar_subsections":true}`, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s := Defaults()
+			if err := json.Unmarshal([]byte(tc.raw), &s); err != nil {
+				t.Fatal(err)
+			}
+			s = s.Normalize()
+			if s.SidebarSubsections != tc.want {
+				t.Fatalf("sidebar_subsections = %v, want %v", s.SidebarSubsections, tc.want)
+			}
+		})
 	}
 }
 

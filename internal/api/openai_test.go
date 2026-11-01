@@ -33,6 +33,9 @@ func (r *admissionRepository) CreateOrGet(_ context.Context, t core.Task, key, h
 		}
 		return r.task, false, nil
 	}
+	if t.AdmissionError != nil {
+		return core.Task{}, false, t.AdmissionError
+	}
 	r.task = t
 	r.hash = hash
 	r.creates++
@@ -192,7 +195,7 @@ func (s *openAIServiceFixture) CreateMediaRequest(_ context.Context, input core.
 }
 func openAIFixture() *openAIServiceFixture {
 	return &openAIServiceFixture{catalog: []core.ProviderDescriptor{{ID: "mock", Models: []core.MediaModel{
-		{ID: "image", MediaType: "image", Resolutions: []string{"1024*1024"}},
+		{ID: "image", MediaType: "image", SupportsImageInput: true, Resolutions: []string{"1024*1024"}},
 		{ID: "video", MediaType: "video", Resolutions: []string{"720p"}, Ratios: []string{"16:9", "9:16"}},
 		{ID: "speech", MediaType: "speech"}, {ID: "music", MediaType: "music"},
 	}}}}

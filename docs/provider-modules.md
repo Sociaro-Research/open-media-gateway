@@ -37,8 +37,8 @@ same composition file later; it would still require rebuilding.
 - Optional `CatalogAliases`: exact reviewed snapshot-to-parent tariff mappings.
   This permits source-price updates for known snapshots after checking their own
   estimators. It never enables future model IDs or overrides manual contracts.
-- Billing documentation, region labels and embedded PNG/SVG assets. SVG remains
-  vector; OpenAI's supplied SVG is embedded unchanged.
+- Billing documentation and region labels. Provider artwork is uploaded per
+  connection; see [Provider logos](#provider-logos).
 
 The host owns encryption, owner isolation, configuration persistence, connection
 validation, adapter caching, reference resolution, task processing and generic
@@ -163,7 +163,7 @@ be removed with `go mod tidy`.
 - Isolated PostgreSQL tests cover accounting plus migration of legacy free and
   paid records; no live provider credentials are used by tests.
 - Browser fixture verifies image/TTS controls, additional schema controls,
-  replacement of a saved secret, and original SVG at desktop/mobile sizes.
+  replacement of a saved secret, and uploaded PNG at desktop/mobile sizes.
 - Release preflight checks tracked files and whitespace. Production verification
   uses the explicitly free mock provider and downloads the generated result.
 
@@ -171,13 +171,30 @@ Real OpenAI paid generation still requires an operator-supplied API key and is
 not claimed as tested by fixture calls. See [OpenAI setup](openai-provider.md) for
 supported model families, retirements and pricing limitations.
 
-### Provider logo assets
+### Provider logos
 
-When adding a provider logo, supply it on a square canvas with minimal internal padding. Wide wordmarks are not supported. The console uses one 38 × 38 px icon slot with `object-fit: contain` and renders the provider name beside it. Set `IconMonochrome` only for black monochrome artwork that needs inversion on the dark background. Flag non-square artwork before integrating it; request a square source rather than adding provider-specific layouts.
+Administrators upload or replace each connection's logo in its provider settings.
+Only PNG images with at least one partially or fully transparent pixel are accepted,
+including palette transparency and 16-bit PNG. The upload limit is 1 MiB, with
+1–2048 pixels per side (at most 4,194,304 decoded pixels). SVG, other formats,
+malformed files and fully opaque PNG are rejected; no source-color check is applied.
 
-Record the original asset URL, upstream version/date and applicable permission or
-usage terms when adding artwork. The project license does not establish rights
-to third-party branding. Provider names and the model picker's text fallback
-remain available without an icon; check registry/API and browser tests before
-removing or replacing an embedded asset. Keep third-party notices with distributed
-assets and record provenance for upstream-derived catalogue test fixtures too.
+The original image is displayed unchanged in dark theme. Light theme sets RGB to
+black while preserving every alpha value. The same shared renderer covers the
+provider list, settings preview and all model-picker groups: Playground, Templates,
+organization model grants, markup rules and connection API request profiles.
+Live display-mode changes update existing images. Rectangular logos preserve
+their aspect ratio inside the shared icon slot.
+
+There are no bundled provider logos or legacy asset fallbacks. Missing/failed logos
+show an initial; settings explicitly show **No logo** until an upload succeeds.
+Old artwork remains recoverable in Git history. Uploads are associated with both
+the resource owner and concrete provider connection, stored atomically in PostgreSQL
+separately from credentials, and use content-versioned authenticated URLs. Failed
+replacement keeps the previous logo. Serving uses private no-store caching and
+nosniff/sandbox headers. Ordinary users cannot replace logos; display follows the
+existing provider/model and commercial-access permissions.
+
+Uploaded artwork remains subject to its owner's branding permissions; the project
+license does not establish rights to third-party marks. Keep provenance and notices
+with any independently distributed artwork or upstream-derived catalogue fixtures.

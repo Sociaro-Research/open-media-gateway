@@ -128,20 +128,23 @@ type ImageInputTariff struct {
 	Price money.USD `json:"price"`
 }
 type Entry struct {
-	ID              string              `json:"id"`
-	Inactive        bool                `json:"inactive,omitempty"`
-	ExcludedReason  string              `json:"excluded_reason,omitempty"`
-	DiscoveryStatus string              `json:"discovery_status,omitempty"`
-	Metadata        *core.ModelMetadata `json:"metadata,omitempty"`
-	Contract        *core.MediaModel    `json:"contract,omitempty"`
-	Rates           []Rate              `json:"rates,omitempty"`
+	OperationalFields map[string]json.RawMessage `json:"operational_fields,omitempty"`
+	ID                string                     `json:"id"`
+	Inactive          bool                       `json:"inactive,omitempty"`
+	ExcludedReason    string                     `json:"excluded_reason,omitempty"`
+	DiscoveryStatus   string                     `json:"discovery_status,omitempty"`
+	Metadata          *core.ModelMetadata        `json:"metadata,omitempty"`
+	Contract          *core.MediaModel           `json:"contract,omitempty"`
+	Rates             []Rate                     `json:"rates,omitempty"`
 }
 type Observation struct {
-	Source      Source          `json:"source"`
-	Hash        string          `json:"hash"`
-	FetchedHash string          `json:"fetched_hash,omitempty"`
-	Entries     []Entry         `json:"entries"`
-	Review      *DocumentReview `json:"review,omitempty"`
+	// Per-source facts retain exact provenance when a later document omits a field.
+	OperationalHistory map[string]map[string]CoverageSource `json:"operational_history,omitempty"`
+	Source             Source                               `json:"source"`
+	Hash               string                               `json:"hash"`
+	FetchedHash        string                               `json:"fetched_hash,omitempty"`
+	Entries            []Entry                              `json:"entries"`
+	Review             *DocumentReview                      `json:"review,omitempty"`
 	// Text evidence is kept even when no safe structured interpretation exists.
 	Text  string `json:"text,omitempty"`
 	Error string `json:"error,omitempty"`
@@ -179,6 +182,7 @@ type State struct {
 	Warnings     []Warning              `json:"warnings"`
 }
 type Run struct {
+	Completeness     *Completeness `json:"completeness,omitempty"`
 	ID               string        `json:"id"`
 	Provider         string        `json:"provider"`
 	StartedAt        time.Time     `json:"started_at"`
@@ -193,9 +197,10 @@ type Run struct {
 	EmailStatus      string        `json:"email_status"`
 }
 type Capture struct {
-	Models          []core.MediaModel
-	DocumentReviews map[string]DocumentReview // Exact source URL -> reviewed content hash.
-	TariffAliases   map[string]string         // Reviewed exact IDs only; never inferred from source names.
+	VerificationSources map[string][]Source // Exact supported model IDs -> authoritative operational sources.
+	Models              []core.MediaModel
+	DocumentReviews     map[string]DocumentReview // Exact source URL -> reviewed content hash.
+	TariffAliases       map[string]string         // Reviewed exact IDs only; never inferred from source names.
 	// Reviewed protocols can be documented in other regions without being
 	// available through the currently configured account's discovery API.
 	Reviewed []core.MediaModel

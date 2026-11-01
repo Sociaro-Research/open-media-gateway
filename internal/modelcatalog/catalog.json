@@ -221,7 +221,7 @@
       "release_date": "2025-10-06"
     },
     "gpt-image-1": {
-      "checked_at": "2026-09-13",
+      "checked_at": "2026-10-24",
       "facts": [
         {
           "label": "Provider: Input modalities",
@@ -238,6 +238,10 @@
         {
           "label": "Provider: Supported features",
           "value": "inpainting"
+        },
+        {
+          "label": "Lifecycle status",
+          "value": "Retired by provider"
         }
       ],
       "sources": [
@@ -894,7 +898,7 @@
       "release_date": "2025-08-28"
     },
     "gpt-audio-mini-2025-10-06": {
-      "checked_at": "2026-10-12",
+      "checked_at": "2026-10-24",
       "facts": [
         {
           "label": "Provider: Context window",
@@ -923,6 +927,10 @@
         {
           "label": "Provider: Supported features",
           "value": "function_calling, prompt_caching"
+        },
+        {
+          "label": "Lifecycle status",
+          "value": "Retired by provider"
         }
       ],
       "sources": [
@@ -946,7 +954,7 @@
       "description": "A cost-efficient version of GPT Audio",
       "snapshot": "gpt-audio-mini-2025-10-06",
       "version_date": "2025-10-06",
-      "shutdown_date": "2027-01-20",
+      "shutdown_date": "2026-07-23",
       "release_date": "2025-10-06"
     },
     "gpt-audio-mini-2025-12-15": {

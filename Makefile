@@ -1,4 +1,4 @@
-.PHONY: help build build-ui test test-race test-isolated test-recovery performance benchmark vet mod-check vulncheck fmt fmt-check verify verify-ci release-check up down logs
+.PHONY: help build build-ui ui-update-check test test-race test-isolated test-recovery performance benchmark vet mod-check vulncheck fmt fmt-check verify verify-ci release-check up down logs
 
 help:
 	@echo "Media Gateway development commands:"
@@ -44,7 +44,11 @@ fmt-check:
 	@test -z "$$(gofmt -l cmd docs internal plugins)" || \
 		(echo "Go files need formatting. Run: make fmt"; gofmt -l cmd docs internal plugins; exit 1)
 
-verify: mod-check fmt-check vet vulncheck test-race build
+ui-update-check:
+	python3 scripts/check-ui-updates.py
+	python3 -m unittest discover -s scripts/tests -p 'test_ui_updates.py' -v
+
+verify: ui-update-check mod-check fmt-check vet vulncheck test-race build
 
 verify-ci:
 	@test -n "$$GATEWAY_TEST_DATABASE_URL" -a -n "$$GATEWAY_TEST_REDIS_URL" || \

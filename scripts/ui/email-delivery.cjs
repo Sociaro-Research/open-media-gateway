@@ -32,9 +32,9 @@ const server=http.createServer((req,res)=>{const name=path.basename(req.url.spli
   }
   return route.fulfill({json:{data:[]}});
  });
- await page.route('**/auth/methods',route=>route.fulfill({json:{google:methods.google,email:methods.email,email_delivery:mail.enabled,email_confirmation:methods.email}}));
+ await page.route('**/auth/methods',route=>route.fulfill({json:{google:methods.google,email:methods.email&&mail.enabled,email_delivery:mail.enabled,email_confirmation:methods.email}}));
  const base='http://127.0.0.1:'+server.address().port,form=page.locator('.email-delivery-settings');
- async function navigate(url){await page.goto(url);if(!url.endsWith('/login.html'))await page.waitForFunction(()=>consoleInitialized&&(!consoleAuthenticated||window.Workspace?.ready()));}
+ async function navigate(url){await page.goto(url);if(!new URL(url).pathname.endsWith('/login.html'))await page.waitForFunction(()=>consoleInitialized&&(!consoleAuthenticated||window.Workspace?.ready()));}
  const save=()=>form.getByRole('button',{name:'Save',exact:true});
  const key=()=>form.locator('input[name=key]');
  async function saved(){await form.getByRole('button',{name:'Saved',exact:true}).waitFor();assert.equal(await key().inputValue(),mail.key_configured?'************':'');}
@@ -91,8 +91,14 @@ const server=http.createServer((req,res)=>{const name=path.basename(req.url.spli
   await page.reload();await page.locator('[data-system-page=sharedStorage]').click();await secret.waitFor();await credential(secret);await page.locator('#storageBucket').fill('next-files');await page.locator('#saveStorage').click();await page.locator('#saveStorage').filter({hasText:'Saved'}).waitFor();assert.equal(storagePosts.at(-1).secret_access_key,'');
   admin=false;await navigate(base);await page.locator('#emailLogin').waitFor();assert.equal(await page.locator('#googleLogin').isVisible(),true);
   admin=true;await navigate(base+'/system');await page.getByRole('tab',{name:'Email delivery',exact:true}).click();await form.locator('input[name=sender]').waitFor();await form.locator('select').selectOption('',{force:true});await save().click();await saved();assert.equal(mail.enabled,false);
-  await page.getByRole('tab',{name:'Login methods',exact:true}).click();await email.getByText('Configure Email delivery to enable registration and password recovery. Existing accounts can sign in.',{exact:true}).waitFor();
-  admin=false;await navigate(base);await page.locator('#googleLogin').waitFor();assert.equal(await page.locator('#emailLogin').isVisible(),true);
+  await page.getByRole('tab',{name:'Login methods',exact:true}).click();await email.getByText('Email login is enabled, but it will not be shown to users until Email delivery is configured. The enabled preference is preserved.',{exact:true}).waitFor();
+  assert.equal(await email.getByRole('switch').isChecked(),true);assert.equal(methods.email,true);
+  for(const theme of ['dark','light']){await page.evaluate(theme=>GatewayTheme.apply(theme),theme);for(const width of [1440,390,320]){await page.setViewportSize({width,height:1000});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await email.screenshot({path:evidencePath(`/tmp/gateway-email-login-warning-${theme}-${width}.png`)});}}
+  admin=false;for(const path of ['/?auth_error=denied','/login.html?auth_error=denied']){await navigate(base+path);await page.locator('#googleLogin').waitFor();assert.equal(await page.locator('#emailLogin').isVisible(),false);await page.getByText('Could not sign in. Please try again or contact your administrator.',{exact:true}).waitFor();}
+  methods.google=false;await navigate(base);await page.locator('#authUnavailable').waitFor();assert.equal(await page.locator('#emailLogin').isVisible(),false);assert.equal(await page.locator('#googleLogin').isVisible(),false);assert.equal(await page.locator('.email-auth-form:visible').count(),0);
+  const methodWrites=loginWrites.length;admin=true;await navigate(base+'/system');await page.getByRole('tab',{name:'Email delivery',exact:true}).click();await form.locator('select').selectOption('resend',{force:true});await form.locator('input[name=sender]').fill('Restored <restored@example.test>');await key().fill('fixture-restored-mail-key');await save().click();await saved();
+  await page.getByRole('tab',{name:'Login methods',exact:true}).click();assert.equal(await email.getByRole('switch').isChecked(),true);assert.equal(await email.locator('.settings-warning').isVisible(),false);assert.equal(loginWrites.length,methodWrites,'restoring delivery must not rewrite login preferences');
+  admin=false;await navigate(base);await page.locator('#emailLogin').waitFor();assert.equal(await page.locator('#googleLogin').isVisible(),false);
   assert.deepEqual(errors,[]);console.log('PASS: Resend and storage saved masks, key replacement/retry/preservation, non-password fields, login visibility, disable, Saved feedback and responsive layout.');
  }finally{await browser.close();server.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;server.close()});

@@ -267,15 +267,13 @@ func TestSalesPermissionLimitRemovalMigration(t *testing.T) {
 		}
 		users[name] = u.ID
 	}
-	if e := r.SetAdmin(ctx, "", users["admin"], true, true); e != nil {
+	if _, e := db.Exec(`UPDATE users SET is_system_admin=TRUE WHERE id=$1`, users["admin"]); e != nil {
 		t.Fatal(e)
 	}
+	// Seed the historical hierarchy directly: current placement code reads the
+	// latest settings schema. The migration below is the behavior under test.
 	for _, v := range [][3]string{{"lead", system.LeadClientManager, ""}, {"manager", system.ClientManager, "lead"}} {
-		s, e := r.SalesStructure(ctx, users["admin"])
-		if e != nil {
-			t.Fatal(e)
-		}
-		if _, e = r.PlaceSalesMember(ctx, users["admin"], users[v[0]], system.SalesPlacement{Role: v[1], SupervisorID: users[v[2]], Version: s.Version}); e != nil {
+		if _, e := db.Exec(`UPDATE users SET is_client_manager=TRUE,sales_role=$2,sales_supervisor_id=NULLIF($3,'')::uuid WHERE id=$1`, users[v[0]], v[1], users[v[2]]); e != nil {
 			t.Fatal(e)
 		}
 	}

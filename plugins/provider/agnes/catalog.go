@@ -38,7 +38,16 @@ func describeModel(id string) core.MediaModel {
 	}
 	m.MediaType = "video"
 	if id == "agnes-video-2.5" || id == "agnes-video-2.5-flash" {
+		// Reviewed reference limits: https://wiki.agnes-ai.com/en/docs/agnes-video-25
+		m.ReferenceMediaLimits = &core.ReferenceMediaLimits{MaxFiles: 12,
+			Image: core.MediaFileLimits{ContentTypes: []string{"image/png", "image/jpeg", "image/gif", "image/webp"}, MaxBytes: 15_000_000, MaxTotalBytes: 50_000_000, MinDimension: 256, MaxDimension: 5760},
+			Video: core.MediaFileLimits{ContentTypes: []string{"video/mp4", "video/quicktime"}, MaxBytes: 50_000_000, MinTotalDuration: 2, MaxTotalDuration: 12, MinFPS: 24, MaxFPS: 60},
+			Audio: core.MediaFileLimits{ContentTypes: []string{"audio/mpeg", "audio/wave", "audio/wav", "audio/x-wav"}, MaxBytes: 15_000_000, MaxTotalBytes: 64_000_000, MinTotalDuration: 2, MaxTotalDuration: 12}}
 		m.ReferencePromptSyntax = "picture"
+		m.ReferencePromptTypes = []string{"image", "audio"}
+		if id == "agnes-video-2.5" {
+			m.ReferencePromptTypes = append(m.ReferencePromptTypes, "video")
+		}
 	}
 	m.SupportsAudio, m.AudioAlwaysOn = true, true
 	m.Resolutions = []string{"720P", "1080P", "1K", "2K"}

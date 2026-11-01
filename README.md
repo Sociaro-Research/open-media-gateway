@@ -13,7 +13,18 @@ media across providers.
   receive signed webhooks. Gateway handles provider requests, polling, and result
   retrieval behind the scenes.
 - **Give your team a workspace.** Try models in the Playground, reuse reference
-  files, and share providers and generation history within organizations.
+  files, and share providers and generation history within organizations. Use the
+  Journal project selector to filter history and assign new submissions, or choose
+  All projects to include ungrouped generations. The adjacent **+** creates a shared
+  company project; **⋯** renames or deletes the selected project. Deletion clears tags and
+  preserves generations and files. A generation’s **⋯ → Project** submenu marks
+  its current project; choosing the marked project again removes its tag. Try again
+  keeps its current project. Company projects are shared across users and keys;
+  assignment does not depend on the generation author. Existing role/content
+  permissions still apply. Profile projects remain private. Projects require
+  a key for the matching workspace.
+- **Use administrator-prepared prompts.** The instance-wide [Templates gallery](docs/templates.md) shares published image/video covers and immutable prompts. Supply missing references, choose a compatible model and confirm the existing estimate with your Playground key.
+- **Keep Playground access across browsers.** Explicitly create an [account-managed Playground key](docs/playground-keys.md), encrypted for your selected workspace and shared with Templates. Ordinary generation API authentication and permissions still apply.
 - **Keep results in your storage.** Archive generated files locally or in
   S3-compatible storage, with authenticated downloads and signed preview URLs.
 - **See usage and costs.** Review generation history, provider usage, and cost
@@ -23,8 +34,13 @@ media across providers.
 
 Included adapters: [OpenAI](docs/openai-provider.md),
 [BytePlus ModelArk and Alibaba Cloud Model Studio](docs/configuration.md#provider-bootstrap),
-[Agnes AI](docs/agnes-provider.md), and [Sonilo](docs/sonilo-provider.md), plus `mock`.
-Media types and controls depend on the selected provider and model. Real generation
+[Agnes AI](docs/agnes-provider.md), [Sonilo](docs/sonilo-provider.md), and
+[direct Kling AI](docs/kling-provider.md), plus `mock`.
+Media types and controls depend on the selected provider and model. Administrators
+can upload [transparent PNG provider logos](docs/provider-modules.md#provider-logos)
+from provider settings; logos follow the active light/dark display mode.
+The Playground highlights [supported prompt references](docs/prompt-reference-syntax.md)
+and previews their selected files without rewriting submitted text. Real generation
 uses your provider credentials and may incur charges. The API uses OpenAI-style
 endpoints with an [asynchronous job lifecycle](docs/openai-api.md); clients must
 poll or handle webhooks before downloading results.

@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"slices"
+	"strings"
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
 	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
@@ -27,7 +28,7 @@ type modelSettingView struct {
 // All consumption catalogs and admission resolve the same filtered snapshot.
 func (s *Server) modelCatalogPolicy(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if s.modelAccess == nil || !(isModelCatalogPath(r.URL.Path) || r.Method == "POST" && isGenerationPath(r.URL.Path)) {
+		if s.modelAccess == nil || !(isModelCatalogPath(r.URL.Path) || strings.HasPrefix(r.URL.Path, "/v1/templates") || strings.HasPrefix(r.URL.Path, "/v1/system/templates") || r.Method == "POST" && (isGenerationPath(r.URL.Path) || strings.HasPrefix(r.URL.Path, "/v1/references") || strings.HasPrefix(r.URL.Path, "/v1/system/template-references"))) {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -64,7 +65,7 @@ func (s *Server) modelSettings(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if r.Method == "GET" {
+	if readMethod(r.Method) {
 		capabilities := map[string]core.MediaModel{}
 		providerNames := map[string]string{}
 		providerIcons := map[string]string{}
@@ -80,7 +81,7 @@ func (s *Server) modelSettings(w http.ResponseWriter, r *http.Request) {
 			refs := []modelaccess.Ref{}
 			for _, p := range providers {
 				providerNames[p.ID] = p.Name
-				providerIcons[p.ID] = p.IconURL
+				providerIcons[p.ID] = providerLogoForViewer(p.IconURL, r)
 				providerMonochrome[p.ID] = p.IconMonochrome
 				for _, m := range p.Models {
 					capabilities[modelaccess.Key(p.ID, m.ID)] = m

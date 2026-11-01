@@ -121,6 +121,12 @@ type dataOwnerKey struct{}
 func PersonalOwnerID(user string) string {
 	return uuid.NewSHA1(uuid.NameSpaceOID, []byte("media-gateway/personal/"+user)).String()
 }
+
+// WithDataOwnerID selects a deliberate storage namespace without replacing the actor.
+func WithDataOwnerID(ctx context.Context, id string) context.Context {
+	return context.WithValue(ctx, dataOwnerKey{}, id)
+}
+
 func WithPersonalData(ctx context.Context) context.Context {
 	return context.WithValue(ctx, dataOwnerKey{}, PersonalOwnerID(ActorID(ctx)))
 }

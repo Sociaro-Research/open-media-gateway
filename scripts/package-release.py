@@ -22,6 +22,7 @@ FILES = {
     "deploy/ghcr/Caddyfile.https": "Caddyfile.https",
     "deploy/ghcr/initialize.py": "initialize.py",
     "deploy/ghcr/README.md": "README.md",
+    "deploy/ghcr/backup-restore.md": "backup-restore.md",
     "scripts/stop-worker-for-release.py": "stop-worker-for-release.py",
     "LICENSE": "LICENSE",
     "NOTICE": "NOTICE",
@@ -61,11 +62,20 @@ def rewrite_bundle_documentation(directory, version):
             parsed = urlsplit(target)
             if not target or target.startswith(('#', '/')) or parsed.scheme or parsed.netloc:
                 return match.group(0)
-            path = posixpath.normpath(posixpath.join(posixpath.dirname(relative), unquote(parsed.path)))
+            # A bundle can relocate a guide (for example deploy/ghcr/README.md
+            # becomes README.md). Resolve links against the original source,
+            # then map shipped files back to their bundle-relative destinations.
+            original = next((source for source, target in FILES.items()
+                             if target == relative), relative)
+            path = posixpath.normpath(posixpath.join(posixpath.dirname(original), unquote(parsed.path)))
             if path == '..' or path.startswith('../'):
                 raise ValueError('Bundled documentation target escapes its source root')
-            if (directory / path).exists():
-                return match.group(0)
+            shipped = FILES.get(path, path)
+            if (directory / shipped).exists():
+                local = posixpath.relpath(shipped, posixpath.dirname(relative) or '.')
+                local = urlunsplit(('', '', quote(local, safe='/'), parsed.query, parsed.fragment))
+                suffix = separator + title if separator else ''
+                return match.group(1) + local + suffix + match.group(3)
             if not (ROOT / path).is_file():
                 raise ValueError('Bundled documentation target is missing from source: ' + path)
             address = SOURCE_URL + '/blob/' + version + '/' + quote(path, safe='/')

@@ -1,7 +1,9 @@
 package api
 
 import (
+	"context"
 	"crypto/hmac"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -11,6 +13,7 @@ import (
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
 	"github.com/Sociaro-Research/open-media-gateway/internal/references"
+	"github.com/Sociaro-Research/open-media-gateway/internal/referencevalidation"
 	"github.com/Sociaro-Research/open-media-gateway/internal/storage"
 	"github.com/google/uuid"
 )
@@ -23,6 +26,7 @@ func (s *Server) registerReferenceRoutes(mux *http.ServeMux) {
 	mux.Handle("DELETE /v1/organizations/{org}/references/{id}", s.authenticate(http.HandlerFunc(s.deleteReference)))
 	mux.Handle("GET /v1/references", s.authenticate(http.HandlerFunc(s.listReferences)))
 	mux.Handle("POST /v1/references/uploads", s.authenticate(http.HandlerFunc(s.beginReferenceUpload)))
+	mux.Handle("POST /v1/references/validate", s.authenticate(http.HandlerFunc(s.validateReferences)))
 	mux.Handle("POST /v1/references/uploads/{id}/complete", s.authenticate(http.HandlerFunc(s.completeReferenceUpload)))
 	mux.Handle("POST /v1/references", s.authenticate(http.HandlerFunc(s.uploadReference)))
 	mux.Handle("DELETE /v1/references/{id}", s.authenticate(http.HandlerFunc(s.deleteReference)))
@@ -46,7 +50,16 @@ func (s *Server) referenceView(r *http.Request, item references.Image) reference
 	return referenceResponse{Image: item, URL: fmt.Sprintf("/references/%s/%s?signature=%s", url.PathEscape(owner), item.ID, s.referenceSignature(owner, item.ID))}
 }
 func (s *Server) referenceError(w http.ResponseWriter, err error) {
+	var used *references.InUseError
+	if errors.As(err, &used) {
+		writeJSON(w, 409, map[string]any{"error": map[string]any{"code": "reference_in_use", "message": used.Error(), "templates": used.Templates}})
+		return
+	}
 	switch {
+	case errors.Is(err, references.ErrReadForbidden):
+		writeError(w, 403, "forbidden", err.Error())
+	case errors.Is(err, referencevalidation.ErrInvalid):
+		writeError(w, 400, "invalid_reference", err.Error())
 	case errors.Is(err, references.ErrInUse):
 		writeError(w, 409, "reference_in_use", err.Error())
 	case errors.Is(err, references.ErrUploadBusy):
@@ -99,7 +112,11 @@ func (s *Server) beginReferenceUpload(w http.ResponseWriter, r *http.Request) {
 	if !decodeSystem(w, r, &input) {
 		return
 	}
-	plan, err := s.references.BeginUpload(r.Context(), input)
+	if err := s.referenceValidator(r)(r.Context(), input.Validation, nil, false); err != nil {
+		s.referenceError(w, err)
+		return
+	}
+	plan, err := s.references.BeginUploadWithValidation(r.Context(), input, s.referenceValidator(r))
 	if err != nil {
 		s.referenceError(w, err)
 		return
@@ -111,7 +128,8 @@ func (s *Server) beginReferenceUpload(w http.ResponseWriter, r *http.Request) {
 	s.writeViewerJSON(w, r, 201, plan)
 }
 func (s *Server) completeReferenceUpload(w http.ResponseWriter, r *http.Request) {
-	item, err := s.references.FinishUpload(r.Context(), r.PathValue("id"))
+	_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(3 * time.Minute))
+	item, err := s.references.FinishUploadWithValidation(r.Context(), r.PathValue("id"), s.referenceValidator(r))
 	if err != nil {
 		s.referenceError(w, err)
 		return
@@ -119,15 +137,18 @@ func (s *Server) completeReferenceUpload(w http.ResponseWriter, r *http.Request)
 	s.writeViewerJSON(w, r, 200, s.referenceView(r, item))
 }
 func (s *Server) uploadReference(w http.ResponseWriter, r *http.Request) {
+	s.uploadReferenceLibrary(w, r, s.references, s.referenceView)
+}
+func (s *Server) uploadReferenceLibrary(w http.ResponseWriter, r *http.Request, library *references.Library, view func(*http.Request, references.Image) referenceResponse) {
 	// Reject S3 uploads before parsing or spooling a multipart request body.
-	if direct, err := s.references.RequiresDirectUpload(r.Context()); err != nil {
+	if direct, err := library.RequiresDirectUpload(r.Context()); err != nil {
 		s.referenceError(w, err)
 		return
 	} else if direct {
 		s.referenceError(w, references.ErrDirectUploadRequired)
 		return
 	}
-	release, err := s.references.AdmitMultipart()
+	release, err := library.AdmitMultipart()
 	if err != nil {
 		s.referenceError(w, err)
 		return
@@ -153,7 +174,14 @@ func (s *Server) uploadReference(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer file.Close()
-	item, err := s.references.Upload(r.Context(), header.Filename, file)
+	var target *referencevalidation.Target
+	if raw := r.FormValue("validation"); raw != "" {
+		if err = json.Unmarshal([]byte(raw), &target); err != nil {
+			writeError(w, 400, "invalid_reference", "Invalid reference validation context.")
+			return
+		}
+	}
+	item, err := library.UploadWithValidation(r.Context(), header.Filename, file, target, s.referenceValidator(r))
 	if err != nil {
 		s.referenceError(w, err)
 		return
@@ -162,7 +190,7 @@ func (s *Server) uploadReference(w http.ResponseWriter, r *http.Request) {
 	if item.Duplicate {
 		status = http.StatusOK
 	}
-	s.writeViewerJSON(w, r, status, s.referenceView(r, item))
+	s.writeViewerJSON(w, r, status, view(r, item))
 }
 func (s *Server) deleteReference(w http.ResponseWriter, r *http.Request) {
 	if err := s.references.Delete(r.Context(), r.PathValue("id")); err != nil {
@@ -210,4 +238,12 @@ func (s *Server) serveReference(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Referrer-Policy", "no-referrer")
 	_ = http.NewResponseController(w).SetWriteDeadline(time.Time{})
 	http.ServeContent(w, r, item.ID, object.ModTime, object.Reader)
+}
+
+// Stored-media validation may read and hash large objects; preserve a bounded
+// response budget instead of the short ordinary JSON write deadline.
+func referenceInspectionRequest(w http.ResponseWriter, r *http.Request) (*http.Request, context.CancelFunc) {
+	_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(3 * time.Minute))
+	ctx, cancel := context.WithTimeout(r.Context(), 150*time.Second)
+	return r.WithContext(ctx), cancel
 }

@@ -71,7 +71,7 @@ func requestOperation(r *http.Request) string {
 	if r.Method == "POST" && isGenerationPath(r.URL.Path) && !strings.HasSuffix(r.URL.Path, "/estimate") {
 		return "generation"
 	}
-	if r.Method == "GET" || r.Method == "HEAD" {
+	if readMethod(r.Method) {
 		// Route patterns exclude content/downloads and prevent arbitrary URL suffixes
 		// from bypassing the shared status/list quota.
 		switch r.Pattern {
@@ -116,7 +116,7 @@ func (s *Server) limitSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var p limits.Policy
-	if r.Method == "GET" {
+	if readMethod(r.Method) {
 		p, err = repo.LimitSettings(r.Context(), identity.ActorID(r.Context()), org)
 	} else {
 		r.Body = http.MaxBytesReader(w, r.Body, 8192)

@@ -34,7 +34,7 @@ func (s *Server) catalogSyncAdmin(w http.ResponseWriter, r *http.Request) {
 		text, err = s.catalogSync.Document(ctx, r.PathValue("hash"))
 		result = map[string]string{"hash": r.PathValue("hash"), "text": text}
 	case path == "/v1/system/catalog/settings":
-		if r.Method == "GET" {
+		if readMethod(r.Method) {
 			result, err = s.catalogSync.Settings(ctx)
 		} else {
 			var in catalogsync.Settings

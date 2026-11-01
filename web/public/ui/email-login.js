@@ -2,7 +2,7 @@
   const get=id=>document.getElementById(id),host=get('emailAuthForms');
   let form,email,password,submit,status,verificationStarted=false;
   const fragment=new URLSearchParams(location.hash.slice(1));
-  let mode=fragment.has('email_verify')?'verify':fragment.has('email_reset')?'reset':'login',token=fragment.get('email_'+mode)||'',delivery=false,busy=false;
+  let mode=fragment.has('email_verify')?'verify':fragment.has('email_reset')?'reset':'login',token=fragment.get('email_'+mode)||'',delivery=false,loginAvailable=false,busy=false;
   // Tokens stay in memory, never in storage, requests' query strings or referrers.
   if(token)history.replaceState(null,'',location.pathname+location.search);
   let pendingAction=!!token;
@@ -41,8 +41,13 @@
     next.querySelector('[type=submit]').textContent=labels[action];
     next.addEventListener('submit',submitForm);forms[action]=next;host.append(next);
   }
+  function choices(){
+    for(const item of Object.values(forms)){item.hidden=true;const secret=item.elements.password;if(secret){secret.value='';FormUI.passwords.hide(secret);}}
+    get('emailVerification').hidden=true;host.hidden=true;get('authNavigation').hidden=true;get('authModeSwitch').hidden=true;get('authChoices').hidden=false;get('authTitle').textContent='Sign in to get started';
+  }
   function render(next=mode){
     mode=next;
+    if(mode==='login'&&!loginAvailable){choices();return;}
     get('emailVerification').hidden=true;
     const previousEmail=email?.value||'';
     for(const item of Object.values(forms)){
@@ -70,10 +75,10 @@
     const res=await fetch(action==='setup'?'/auth/setup':'/auth/email/'+action,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
     let body;try{body=await res.json();}catch{throw new Error('Could not reach the sign-in service. Please try again.');}if(!res.ok)throw new Error(body.error?.message||'Could not complete this request. Please try again.');return body;
   }
-  get('emailLogin').onclick=()=>{render('login');email.focus();};
+  get('emailLogin').onclick=()=>{if(!loginAvailable)return;render('login');email.focus();};
   get('authSwitch').onclick=()=>render(mode==='login'?'register':'login');
   get('authForgot').onclick=()=>render('forgot');
-  get('authBack').onclick=()=>{if(mode==='forgot'||mode==='verify'){token='';render('login');return;}token='';if(password){password.value='';FormUI.passwords.hide(password);}form.hidden=true;host.hidden=true;get('authNavigation').hidden=true;get('authModeSwitch').hidden=true;get('authChoices').hidden=false;get('authTitle').textContent='Sign in to get started';};
+  get('authBack').onclick=()=>{if(mode==='forgot'||mode==='verify'){token='';render('login');return;}token='';choices();};
   const navigation=()=>[get('authSwitch'),...get('authNavigation').querySelectorAll('button')];
   async function confirmEmail(){
     if(verificationStarted)return;verificationStarted=true;
@@ -101,7 +106,7 @@
     try{
       const body=await request(action,data);restoreInvitation(body);
       if(['setup','login','complete'].includes(action)){form.hidden=true;password.value='';if(form.elements.code)form.elements.code.value='';location.reload();return;}
-      if(['complete','reset'].includes(action)){token='';email.value=body.email;render('login');messages('Password saved. Sign in with your new password.','success');}
+      if(['complete','reset'].includes(action)){token='';email.value=body.email;render('login');if(loginAvailable)messages('Password saved. Sign in with your new password.','success');else{get('authUnavailable').hidden=false;get('authUnavailable').textContent='Password saved. Email sign-in is currently unavailable. Contact your administrator.';}}
       else{if(action==='register')submit.textContent='Resend confirmation';messages(body.message,'success');}
     }catch(error){messages(error.message,'error');}
     finally{busy=false;submittedForm.removeAttribute('aria-busy');submit.disabled=['register','forgot'].includes(mode)&&!delivery;navigation().forEach(b=>b.disabled=false);}
@@ -111,8 +116,9 @@
     const unavailable=get('authUnavailable');
     try{const res=await fetch('/auth/methods',{credentials:'same-origin'});if(!res.ok)throw new Error();const methods=await res.json();delivery=!!methods.email_delivery;emailAllowed=methods.email_confirmation!==false;
       if(methods.setup_required){pendingAction=true;token='';get('authError').hidden=true;render('setup');return;}
-      get('googleLogin').hidden=!methods.google;get('emailLogin').hidden=!methods.email;
-      unavailable.hidden=!!(methods.google||methods.email);unavailable.textContent='Sign-in is currently unavailable. Contact your administrator.';
+      loginAvailable=!!methods.email&&delivery;get('googleLogin').hidden=!methods.google;get('emailLogin').hidden=!loginAvailable;
+      unavailable.hidden=!!(methods.google||loginAvailable);unavailable.textContent='Sign-in is currently unavailable. Contact your administrator.';
+      if(!loginAvailable&&!pendingAction&&['login','register','forgot'].includes(mode))choices();
     }catch{get('googleLogin').hidden=get('emailLogin').hidden=true;unavailable.hidden=false;unavailable.textContent='Could not load sign-in methods. Please reload the page.';return;}
     if(!emailAllowed){if(token){unavailable.hidden=false;unavailable.textContent='Email sign-in is currently disabled.';}return;}
     // Existing links remain usable without email delivery when email sign-in is enabled.

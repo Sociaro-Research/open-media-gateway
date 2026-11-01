@@ -22,11 +22,11 @@ func (r *SystemRepository) IsAdmin(ctx context.Context, id string) (bool, error)
 }
 func readSystemSettings(ctx context.Context, q rowQuerier, lock bool) (system.Settings, error) {
 	var s system.Settings
-	query := `SELECT generation_ui,personal_providers,version,shared_resources,shared_storage_limit_bytes,allow_inline_references,markup_basis_points FROM system_settings WHERE id=TRUE`
+	query := `SELECT generation_ui,personal_providers,version,shared_resources,shared_storage_limit_bytes,allow_inline_references,markup_basis_points,setup_pending,customer_workspaces FROM system_settings WHERE id=TRUE`
 	if lock {
 		query += ` FOR UPDATE`
 	}
-	err := q.QueryRowContext(ctx, query).Scan(&s.GenerationUI, &s.PersonalProviders, &s.Version, &s.SharedResources, &s.SharedStorageLimitBytes, &s.AllowInlineReferences, &s.MarkupPercent)
+	err := q.QueryRowContext(ctx, query).Scan(&s.GenerationUI, &s.PersonalProviders, &s.Version, &s.SharedResources, &s.SharedStorageLimitBytes, &s.AllowInlineReferences, &s.MarkupPercent, &s.SetupPending, &s.CustomerWorkspaces)
 	return s, err
 }
 func (r *SystemRepository) Settings(ctx context.Context) (system.Settings, error) {
@@ -132,8 +132,17 @@ func (r *SystemRepository) SaveSettings(ctx context.Context, actor string, next 
 	if err = next.Validate(); err != nil {
 		return next, err
 	}
+	if (before.SharedResources && !next.SharedResources) || (before.PersonalProviders && !next.PersonalProviders) {
+		var busy bool
+		if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM tasks WHERE status IN ('queued','running') AND (($1 AND provider_owner_id=$3::uuid) OR ($2 AND provider_owner_id<>$3::uuid)))`, before.SharedResources && !next.SharedResources, before.PersonalProviders && !next.PersonalProviders, identity.SharedOwnerID).Scan(&busy); err != nil {
+			return next, err
+		}
+		if busy {
+			return next, system.ErrSetupBusy
+		}
+	}
 	next.Version++
-	_, err = tx.ExecContext(ctx, `UPDATE system_settings SET generation_ui=$1,personal_providers=$2,version=$3,shared_resources=$4,shared_storage_limit_bytes=$5,allow_inline_references=$6,markup_basis_points=$7 WHERE id=TRUE`, next.GenerationUI, next.PersonalProviders, next.Version, next.SharedResources, next.SharedStorageLimitBytes, next.AllowInlineReferences, next.MarkupPercent)
+	_, err = tx.ExecContext(ctx, `UPDATE system_settings SET generation_ui=$1,personal_providers=$2,version=$3,shared_resources=$4,shared_storage_limit_bytes=$5,allow_inline_references=$6,markup_basis_points=$7,setup_pending=$8,customer_workspaces=$9 WHERE id=TRUE`, next.GenerationUI, next.PersonalProviders, next.Version, next.SharedResources, next.SharedStorageLimitBytes, next.AllowInlineReferences, next.MarkupPercent, next.SetupPending, next.CustomerWorkspaces)
 	if err != nil {
 		return next, err
 	}

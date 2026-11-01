@@ -14,8 +14,7 @@ const DefaultModel = "text-to-music"
 func Definition() providerkit.Definition {
 	return providerkit.Definition{
 		CatalogSources: catalogSources(),
-		Icon:           Icon(), IconType: "image/png",
-		ID: "sonilo", Name: "Sonilo", DefaultModel: DefaultModel, ModelEnv: "SONILO_MODEL",
+		ID:             "sonilo", Name: "Sonilo", DefaultModel: DefaultModel, ModelEnv: "SONILO_MODEL",
 		Description: "Music and sound effects from text or video, scored video outputs, combined soundtracks and narration ducking.",
 		Fields: []providerkit.Field{
 			{Key: "api_key", Label: "API key", Secret: true, Required: true, Env: "SONILO_API_KEY"},

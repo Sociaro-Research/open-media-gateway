@@ -10,15 +10,16 @@ import (
 
 func Definition() providerkit.Definition {
 	return providerkit.Definition{
-		CatalogSources: catalogSources(),
-		CatalogRegions: map[string]string{"Singapore": "https://dashscope-intl.aliyuncs.com/api/v1", "Beijing": "https://dashscope.aliyuncs.com/api/v1"},
-		LegacyIdentity: true,
-		Profiles:       func() []core.MediaModel { return mediaModels(true) },
-		Region:         providerRegion,
-		ID:             "alibaba", Name: "Alibaba Cloud Model Studio", Description: "Images, video, speech and music through the native DashScope API.", DefaultModel: "wan2.7-t2v", ModelEnv: "DASHSCOPE_MODEL",
+		CatalogSources:             catalogSources(),
+		CatalogInterpret:           interpretVideoAPI,
+		CatalogVerificationSources: videoVerificationSources(),
+		CatalogRegions:             map[string]string{"Singapore": "https://dashscope-intl.aliyuncs.com/api/v1", "Beijing": "https://dashscope.aliyuncs.com/api/v1"},
+		LegacyIdentity:             true,
+		Profiles:                   func() []core.MediaModel { return mediaModels(true) },
+		Region:                     providerRegion,
+		ID:                         "alibaba", Name: "Alibaba Cloud Model Studio", Description: "Images, video, speech and music through the native DashScope API.", DefaultModel: "wan2.7-t2v", ModelEnv: "DASHSCOPE_MODEL",
 		Fields:     []providerkit.Field{{Key: "api_key", Label: "API key", Secret: true, Required: true, Env: "DASHSCOPE_API_KEY"}, {Key: "base_url", Label: "API endpoint", Default: "https://dashscope-intl.aliyuncs.com/api/v1", Env: "DASHSCOPE_BASE_URL"}, {Key: "music_api_key", Label: "Music API key", Secret: true, Env: "DASHSCOPE_MUSIC_API_KEY"}, {Key: "music_base_url", Label: "Music endpoint", Env: "DASHSCOPE_MUSIC_BASE_URL"}, {Key: "billing_access_key_id", Label: "Billing AccessKey ID", Secret: true, Group: "billing", Env: "ALIBABA_BILLING_ACCESS_KEY_ID"}, {Key: "billing_access_key_secret", Label: "Billing AccessKey Secret", Secret: true, Group: "billing", Env: "ALIBABA_BILLING_ACCESS_KEY_SECRET"}},
 		RuntimeEnv: map[string]string{}, RuntimeDefaults: providerkit.Settings{},
-		Icon: Icon(), IconType: "image/png", IconMonochrome: false,
 		Quote: quotePublic, Bills: fetchBills, NormalizeBill: normalizeBill,
 		BillingHelp: "Add a separate Alibaba RAM AccessKey with AliyunBSSReadOnlyAccess.",
 		Aliases:     []string{"dashscope"}, FailureNoCharge: true,

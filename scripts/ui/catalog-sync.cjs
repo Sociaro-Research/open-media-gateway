@@ -76,7 +76,7 @@ const server=http.createServer((req,res)=>{const name=path.basename(req.url.spli
    ['', 'Not available'],[null,'Not available'],[undefined,'Not available']
   ];
   emailRuns=emailCases.map(([email_status],i)=>({...run,id:'email-'+i,email_status}));
-  await content.getByRole('button',{name:'Refresh',exact:true}).click();
+  await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
   const emailCells=content.locator('tbody tr td:nth-child(7)');
   await page.waitForFunction(count=>document.querySelectorAll('#systemContent tbody tr').length===count,emailCases.length);
   assert.deepEqual(await emailCells.allTextContents(),emailCases.map(([,label])=>label));
@@ -89,8 +89,8 @@ const server=http.createServer((req,res)=>{const name=path.basename(req.url.spli
   await page.locator('dialog[open]').waitFor();assert.equal(JSON.parse(await page.locator('dialog[open] pre').textContent()).email_status,'not_needed');
   await page.keyboard.press('Escape');await page.locator('dialog[open]').waitFor({state:'hidden'});
   await screenshots('email-statuses');await page.setViewportSize({width:1440,height:1100});
-  runsError=true;await content.getByRole('button',{name:'Refresh',exact:true}).click();await content.getByText('Catalogue journal unavailable.',{exact:true}).waitFor();
-  runsError=false;emailRuns=null;await content.getByRole('button',{name:'Refresh',exact:true}).click();
+  runsError=true;await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await content.getByText('Catalogue journal unavailable.',{exact:true}).waitFor();
+  runsError=false;emailRuns=null;await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
   await page.waitForFunction(()=>document.querySelectorAll('#systemContent tbody tr').length===1);
   await screenshots('journal');await page.setViewportSize({width:1440,height:1100});
   await page.locator('[data-system-page=administrators]').click();await content.getByRole('heading',{name:'Users',exact:true}).waitFor();await catalogNav.click();await journalOnly();
@@ -108,6 +108,9 @@ const server=http.createServer((req,res)=>{const name=path.basename(req.url.spli
   await page.locator('dialog[open]').getByRole('button',{name:'Source snapshots',exact:true}).click();await page.getByRole('heading',{name:'Source snapshots',exact:true}).waitFor();await page.keyboard.press('Escape');await page.getByRole('heading',{name:'Source snapshots',exact:true}).waitFor({state:'hidden'});await page.keyboard.press('Escape');await page.locator('dialog[open]').waitFor({state:'hidden'});
   const download=page.waitForEvent('download');await content.getByRole('button',{name:'Export report',exact:true}).click();assert.equal((await download).suggestedFilename(),'catalog-report.json');
   await content.locator('select[aria-label=Provider]').selectOption('bytedance',{force:true});await content.locator('select[aria-label=View]').selectOption('warnings',{force:true});await content.getByText(warning.reason,{exact:true}).waitFor();assert.equal(await content.locator('script').count(),0);
+  assert.equal(await content.getByRole('button',{name:/^(Refresh|Reload)$/}).count(),0);
+  state.warnings=[warning,{...warning,key:'same-model-second',reason:'Second warning for the same model',occurrences:8}];await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await content.getByText('Second warning for the same model',{exact:true}).waitFor();assert.equal(await content.locator('tbody tr').count(),2);
+  const retainedWarning=content.getByRole('button',{name:'Details',exact:true}).last();await retainedWarning.focus();state.warnings[1]={...state.warnings[1],occurrences:9};await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await page.waitForFunction(()=>document.querySelectorAll('#systemContent tbody tr')[1]?.children[4].textContent==='9');assert.equal(await content.locator('tbody tr').count(),2);assert.equal(await retainedWarning.evaluate(n=>n===document.activeElement),true);await page.keyboard.press('Enter');await page.locator('dialog[open]').waitFor();assert.equal(JSON.parse(await page.locator('dialog[open] pre').textContent()).occurrences,9);await page.keyboard.press('Escape');await page.locator('dialog[open]').waitFor({state:'hidden'});
   await screenshots('warnings');await page.setViewportSize({width:1440,height:1100});
   await content.locator('select[aria-label=View]').selectOption('versions',{force:true});await content.locator('tbody tr').first().hover();await content.getByRole('button',{name:'Details',exact:true}).click();await page.getByRole('heading',{name:'Catalogue version 2'}).waitFor();await page.keyboard.press('Escape');
   empty=true;await content.locator('select[aria-label=View]').selectOption('runs',{force:true});await content.getByText('No records yet.',{exact:true}).waitFor();

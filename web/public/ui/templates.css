@@ -1,0 +1,96 @@
+/* Templates uses the console typography and existing reference picker tokens.
+   Keep these rules scoped while other console settings evolve independently. */
+#templatesView > .console-section-heading { margin:0 0 24px; min-height:44px; gap:16px; flex-wrap:wrap; }
+#templatesView > .console-section-heading h1 { font-size:var(--type-page); font-weight:700; line-height:1.2; letter-spacing:-.03em; }
+#templatesView :is(.primary,.secondary):not(.template-card-title,.select-trigger) { font-size:var(--type-body); font-weight:600; line-height:20px; min-height:44px; padding:10px 16px; border-radius:12px; gap:12px; justify-content:center; white-space:normal; max-width:100%; }
+.template-editor > .secondary { justify-self:start; }
+.template-editor .primary.compact { min-width:0; }
+.template-editor .form-heading h2 { font-size:var(--type-section); line-height:1.35; }
+.template-editor .template-slot { margin:0; gap:16px; }
+.template-editor .template-slots { display:grid; gap:20px; }
+.template-slot-heading { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px 16px; }
+.template-slot-heading h3 { font-size:var(--type-group); font-weight:600; line-height:1.4; margin:0; overflow-wrap:anywhere; }
+.template-slot .field-hint { margin:0; }
+.template-editor .reference-dropzone { min-width:0; padding:20px; background:var(--field); }
+.template-editor .reference-dropzone > p:first-of-type { font-size:var(--type-body); line-height:1.5; }
+.template-editor .reference-actions { gap:12px; }
+.template-editor .reference-actions button { min-width:0; }
+.template-editor .reference-status { margin:12px 0 0; min-height:18px; line-height:1.5; }
+.template-editor .reference-dropzone small { font-size:var(--type-detail); line-height:1.5; }
+.template-editor .template-reference-preview { width:160px; max-width:100%; margin:0 auto 16px; }
+.template-editor .template-reference-preview img { height:112px; }
+.template-editor .template-reference-preview .reference-name { white-space:normal; overflow-wrap:anywhere; }
+.template-editor .prompt-reference-mirror .prompt-reference-text { text-align:left; }
+.template-editor [role=status]:empty { display:none; }
+@media(max-width:600px) {
+ .template-slot-heading { align-items:flex-start; flex-direction:column; }
+ .template-editor .reference-dropzone { padding:16px; }
+ .template-editor .reference-actions > button { flex:1 1 140px; }
+}
+
+#templatesView .template-card-title { background:transparent; border:0; padding:0; min-height:44px; color:var(--text); line-height:1.4; }
+/* Explicit grid rows keep wrapped actions in flow in WebKit as well as Chromium. */
+.template-editor > .form-heading { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; }
+.template-editor > .form-heading .form-heading-actions { display:grid; grid-template-columns:repeat(3,max-content); }
+@media(max-width:600px) {
+ .template-editor > .form-heading { grid-template-columns:minmax(0,1fr); }
+ .template-editor > .form-heading .form-heading-actions { width:100%; margin-left:0; grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+
+.template-reference-library { max-width:min(960px,calc(100vw - 32px)); }
+.template-reference-library .reference-dropzone { margin-bottom:24px; }
+.template-reference-library .reference-card { display:flex; flex-direction:column; gap:12px; padding:16px; }
+.template-reference-library .reference-name { white-space:normal; overflow-wrap:anywhere; }
+.template-reference-library button { min-height:44px; font-size:var(--type-body); }
+.template-reference-library small { overflow-wrap:anywhere; }
+
+.template-reference-preview :is(video,audio) { width:100%; max-width:100%; height:auto; display:block; }
+.template-editor .template-reference-preview { width:240px; }
+.template-editor .template-reference-preview img { height:auto; max-height:240px; object-fit:contain; }
+.template-fixed-reference { display:grid; gap:12px; min-width:0; }
+.template-fixed-reference h3,.template-fixed-reference p { margin:0; }
+.template-library-preview :is(img,video,audio) { width:100%; height:auto; max-height:280px; object-fit:contain; display:block; }
+.template-reference-preview video,.template-library-preview video { aspect-ratio:auto; object-fit:contain; background:var(--bg); }
+
+/* Templates shares the Playground panel and key components; only its gallery
+   uses three responsive columns alongside the selection panel. */
+#templatesView { padding-top:32px; }
+#templatesStatus:empty { display:none; }
+.template-browser { display:grid; grid-template-columns:minmax(300px,360px) minmax(0,1fr); gap:24px; align-items:start; }
+.template-selection-panel { padding:24px; min-width:0; }
+.template-selection-panel > h2 { font-size:var(--type-section); margin:0 0 20px; }
+#templateKeyHost .generation-key { max-width:none; margin:0 0 24px; }
+#templateSelection .template-use { margin:0; max-width:none; padding:0; border:0; box-shadow:none; background:transparent; }
+#templateSelection { min-width:0; }
+#templateSelection > p { color:var(--muted); }
+.template-browse-panel { min-width:0; }
+#templatesGallery { grid-template-columns:repeat(3,minmax(0,1fr)); gap:20px; align-items:start; }
+#templatesGallery .template-card,#templatesGallery .template-create-card { padding:16px; gap:16px; min-width:0; }
+.template-create-card { display:grid; }
+#templatesGallery .template-card.selected { outline:2px solid var(--accent-text); outline-offset:2px; }
+.template-card > p { margin:0; overflow-wrap:anywhere; }
+#templatesView .template-media { aspect-ratio:auto; display:block; overflow:visible; }
+#templatesView .template-media :is(img,video) { display:block; width:100%; height:auto; aspect-ratio:auto; object-fit:contain; border-radius:12px; background:var(--field); }
+#templatesView .template-media audio { width:100%; }
+.template-media > button { margin-top:12px; width:100%; }
+.template-fixed-reference .template-media { max-width:240px; }
+@media(max-width:1200px){#templatesGallery { grid-template-columns:repeat(2,minmax(0,1fr)); }}
+@media(max-width:950px){.template-browser { grid-template-columns:minmax(280px,320px) minmax(0,1fr); }#templatesGallery { grid-template-columns:minmax(0,1fr); }}
+@media(max-width:700px){#templatesView { padding-top:20px; }.template-browser { grid-template-columns:minmax(0,1fr); }.template-selection-panel { padding:20px; }#templatesGallery { grid-template-columns:minmax(0,1fr); }}
+
+.template-variable-reference { display:grid; gap:12px; min-width:0; }
+.template-variable-reference h3 { font-size:var(--type-group); margin:0; }
+.template-variable-reference .reference-dropzone { padding:16px; }
+.template-variable-reference .reference-actions { flex-wrap:wrap; gap:12px; }
+.template-variable-reference .reference-actions button { flex:1 1 140px; }
+.template-variable-reference .template-reference-preview { max-width:240px; margin:0 auto 16px; }
+
+#templatesGallery .template-create-card { grid-column:1/-1; display:flex; flex-wrap:wrap; align-items:center; padding:0; border:0; box-shadow:none; background:transparent; }
+.template-fixed-reference .template-media { max-width:160px; }
+#templateSelection .template-use > :is(h2,p) { margin:0; }
+
+.template-reference-library .reference-status { overflow-wrap:anywhere; }
+
+#templatesGallery .template-create-card { gap:12px; }
+#templatesGallery .template-create-card > .primary.compact { width:auto; min-width:0; flex:0 0 auto; }
+.template-card video:focus-visible { outline:2px solid var(--accent-text); outline-offset:3px; }

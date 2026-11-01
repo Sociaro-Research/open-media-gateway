@@ -19,6 +19,7 @@ var (
 // PricingSnapshot is immutable once a task is accepted. The same tariff is used
 // to price the provider's reported billable units, independently of later updates.
 type PricingSnapshot struct {
+	AccountSpecific     bool               `json:"account_specific,omitempty"` // Explicit account tariff; public catalogue rates must not replace it.
 	EstimateDescription string             `json:"estimate_description,omitempty"`
 	Components          []PricingComponent `json:"components,omitempty"`
 	FixedUSD            money.USD          `json:"fixed_usd,omitempty"`

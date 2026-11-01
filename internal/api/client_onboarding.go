@@ -25,7 +25,7 @@ func (s *Server) clientOnboarding(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	actor := identity.ActorID(r.Context())
-	if r.Method == http.MethodGet {
+	if readMethod(r.Method) {
 		items, e := s.onboarding.Repo.ClientOnboardings(r.Context(), actor)
 		if e != nil {
 			onboardingError(w, e)

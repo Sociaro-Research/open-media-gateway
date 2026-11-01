@@ -23,7 +23,7 @@ Applies to every screen, dialog and popup. Reuse components; fix shared styles i
 | Spacing | Sections: `--space-section` 32px. Heading-to-content: 24/20/16px for page/section/group; shared action heading: 24px. Field groups: 12–20px; panel padding: 24px, 20px on narrow screens. |
 | Shape | Fields and popups: 12px radius, 1px border. Use existing shared classes; do not invent per-screen radii or shadows. |
 
-**Themes:** Profile offers Dark, Light and System (default). System follows live OS changes. The independent **Color theme** field chooses an administrator-published preset or **Site default**. Each preset contains both palettes; switching the display mode retains the preset. Both preferences are saved per user. The separate Color themes section creates, names, edits and deletes presets. Its Color theme dropdown initially selects the default, marks it with (default), and ends with + Create new theme. The selected preset has its name, shared Default switch and Delete in one desktop row, with the name occupying half the row and equal flexible gaps of at least 32px, distributed across the full content width, wrapping on narrow screens. The isolated preview contains its heading on the left and shared Dark/Light switch aligned to the right edge in one row. Keep these controls self-explanatory without introductory help text. One versioned Save in that section heading publishes the entire catalog independently of identity, images and layout; both sections preserve the other section's pending edits. Delete is reversible until Save, and the last preset remains the default. Fresh installations ship only **Original**, selected as the default. Legacy colors become **Original** without changing their values. Saved catalogs and user selections are preserved; administrators can create additional presets. Identity, images and layout are shared across presets. Apply the selected palette to every surface, control, table and popup. Light tokens live in `:root[data-theme="light"]`; never add screen-specific theme overrides. Media previews and third-party brand marks may preserve their original colors.
+**Themes:** Profile offers Dark, Light and System (default). System follows live OS changes. The independent **Color theme** field chooses an administrator-published preset or **Site default**. Each preset contains both palettes; switching the display mode retains the preset. Both preferences are saved per user. The separate Color themes section creates, names, edits and deletes presets. Its Color theme dropdown initially selects the default, marks it with (default), and ends with + Create new theme. The selected preset has its name, shared Default switch and Delete in one desktop row, with the name occupying half the row and equal flexible gaps of at least 32px, distributed across the full content width, wrapping on narrow screens. The isolated preview contains its heading on the left and shared Dark/Light switch aligned to the right edge in one row. Keep these controls self-explanatory without introductory help text. One versioned Save in that section heading publishes the entire catalog independently of identity, images and layout; both sections preserve the other section's pending edits. Delete is reversible until Save, and the last preset remains the default. Fresh installations ship only **Original**, selected as the default. Legacy colors become **Original** without changing their values. Saved catalogs and user selections are preserved; administrators can create additional presets. Identity, images and layout are shared across presets. Apply the selected palette to every surface, control, table and popup. Light tokens live in `:root[data-theme="light"]`; never add screen-specific theme overrides. Media previews preserve their original colors. Provider logos use their original pixels in dark mode and black RGB with unchanged alpha in light mode.
 
 Use `--accent` for filled actions and on switches, `--accent-text` for accent
 foreground text and focus/selection edges, and `--chart-1` for the first chart
@@ -65,9 +65,9 @@ validate the same 1440/390/320 px layouts and keyboard controls as email sign-in
 - **Multiple selection:** use the shared `ControlPickers` multiple selector. Keep the popup open while changing options, use the shared switches, and support arrow keys, Space, Tab and Escape.
 - **On/off switches:** every checkbox uses the shared oval switch (42×24px), with a 16px thumb: left on `--switch-off` when off, right on `--accent` when on. The thumb and on edge use the shared roles above. The same size and style apply to forms, tables, permissions and provider lists; no square ticks or Enable/Disable buttons. Keep an accessible label, Space-key activation, visible focus and disabled states. Preserve each form’s save behavior; immediate changes lock while saving and restore the confirmed state on failure. Radio buttons remain for mutually exclusive choices.
 - **Dates/months:** use the shared calendar, including its icon, navigation, selection, Clear/Today actions and keyboard controls. Never introduce a native browser calendar as an alternative.
-- **Model selection:** always use `ModelPicker`: provider groups, model names, information button; internal name search, release-date cutoff and content-type filter. Provider headings use 32px square artwork, 16px bold names, at least 64px height and 16px separation with a shared divider between groups. Preserve original artwork colors; marked monochrome logos follow the active theme. Missing or failed artwork uses an initial in the same slot. Long names wrap; distinct connections retain separate headings even with equal display names. Filters combine and never select a model automatically. Keep filters in one row on wide screens and stack them on narrow screens; keep them visible while results scroll.
+- **Model selection:** always use `ModelPicker`: provider groups, model names, information button; internal name search, release-date cutoff and content-type filter. Provider headings use 32px square artwork, 16px bold names, at least 64px height and 16px separation with a shared divider between groups. Every provider logo uses the original PNG in dark theme and `brightness(0)` in light theme, preserving transparency and antialiased edges. Missing or failed artwork uses an initial in the same slot. Long names wrap; distinct connections retain separate headings even with equal display names. Filters combine and never select a model automatically. Keep filters in one row on wide screens and stack them on narrow screens; keep them visible while results scroll.
 - **Scrollbars:** one global style: transparent track/corner; 8px width; rounded thumb mixing accent 45% with border color; accent on hover. Firefox uses the shared thin scrollbar equivalent. No local overrides.
-- **Provider settings:** show connection settings in expanded cards using the shared provider header, availability switch and field grid. Use an unlabeled header switch with an accessible provider-specific name. Payment modes are **Production** and **Test**. Place credential validation beside the relevant field in `.field-action-row.control-row`; validation of saved credentials is unavailable while that credential has unsaved changes. Put settings shared by all providers above the cards; avoid Configure buttons and repeated scope explanations.
+- **Provider settings:** show connection settings in expanded cards using the shared provider header, availability switch and field grid. Administrators can immediately upload a provider logo through the native accessible file control, separate from credential drafts. Accept only decoded transparent PNG, up to 1 MiB and 2048 pixels per side; retain the confirmed image and show local retry feedback after failure. The logo preview retains its fixed square size and stacks above its hint/control below 420px to keep the format guidance readable. Use an unlabeled header switch with an accessible provider-specific name. Payment modes are **Production** and **Test**. Place credential validation beside the relevant field in `.field-action-row.control-row`; validation of saved credentials is unavailable while that credential has unsaved changes. Put settings shared by all providers above the cards; avoid Configure buttons and repeated scope explanations.
 - **Payment provider actions:** the form includes its shared card header. Save
   and the new-provider Cancel use `.form-heading-actions` beside the immediate
   availability switch, with equal 40px heights and 12px gaps. Save remains
@@ -172,7 +172,7 @@ forms and grids to a narrow content frame even on a wide monitor. Compact contro
 readable documentation and profile forms retain their functional local limits.
 
 `layout.js` manages subsection navigation for Settings, Profile and organization
-details. The default is horizontal tabs; the optional desktop mode moves the same
+details. By default, desktop navigation moves the same
 controls into an expandable group under their parent in the left menu, preserving
 selection and form drafts. Parents remain neutral; only the selected subsection
 uses accent text and a straight 2px segment on the shared thin vertical divider
@@ -181,7 +181,8 @@ style in a vertical orientation, without a selection fill or rounded marker.
 Sections without subsections keep their existing selection
 style. Vertical tabs use Up/Down, Home/End and Left/Escape to
 collapse; Right on the parent expands and focuses the selected tab. Horizontal
-tabs use Left/Right and Home/End. Mobile always restores horizontal tabs. Code
+tabs use Left/Right and Home/End. Disabling sidebar subsections restores horizontal
+tabs on desktop. Mobile always restores horizontal tabs. Code
 example language selectors and independent lists are not navigation subsections.
 
 ## 10. Catalogue synchronization
@@ -362,12 +363,17 @@ request deadline and a separate fixed exchange-rate row for stablecoins.
 ## Prompt reference previews
 
 The prompt remains a native `FormUI` textarea for input, selection, undo, IME and
-plain-text submission. A pointer-transparent mirror paints colored image markers
+plain-text submission. A pointer-transparent mirror paints colored media markers
 beneath its transparent text, matching font, padding, wrapping and scroll. This
 small rendering exception avoids replacing the editor with editable HTML. Use
 shared color tokens and the existing model-info popover style. Hover, touch
 pinning/close, Alt+Down and Escape provide equivalent preview access; missing
 references get a red dotted state and a live message listing missing numbers.
+Use the common UI reference forms for every model; never infer syntax from
+its display name or informational provider advice. Image, video and audio
+numbers refer to their own ordered input lists. Model capabilities still
+control supported media and workflows. Video/audio previews require explicit playback and do not autoplay.
+See [supported prompt reference syntax](prompt-reference-syntax.md).
 Use native field validity and the shared validation message to block the
 Playground form until corrected; do not add this restriction to the API. The picker reuses shared floating fields and
 ControlPickers for source/group selection. Check 1440/390/320px, long scrolling
@@ -380,3 +386,96 @@ collisions and literal names resembling those qualifiers are resolved
 in stable identity order. These are presentation labels: catalog IDs, public API
 names, prices, routing and stored names remain unchanged. Provider model tables
 reuse the same naming helper; filtering does not rename the remaining choices.
+
+## Playground project actions
+
+The Journal's shared Project dropdown selects All projects, No project or a project.
+Its 240px field fits roughly 20 typical characters with the shared padding and
+indicator; the 344px action group shrinks to available space. Labels use shared
+ellipsis while retaining their full text. No project filters unassigned history
+and cannot be renamed, deleted or submitted as a project identity.
+A separate **+** creates a project; the adjacent **⋯** menu offers Rename and
+Delete for the selected project and is disabled for All projects or no key.
+Reuse `FormUI.dialogHeading`, floating fields and the shared compact actions.
+Deletion requires confirmation and clears tags only, retaining generations/media.
+
+A generation's **Project** action opens the shared `ControlPickers` action menu
+beside the parent menu on hover, click/touch or Right Arrow. The current project
+has a menu checkmark; choosing it again clears the assignment. These are ARIA
+menuitemcheckbox actions rather than form checkboxes, so their checkmarks express
+the user's explicit menu interaction. Arrow keys/Home/End navigate, Space/Enter
+select, Left/Escape return to the trigger and outside click dismisses. Menus flip
+and clamp to the viewport and use the same tokens, popup surface and focus states
+as shared pickers. No project names are shown across key/workspace changes.
+
+Unavailable generation actions remain visible but disabled with an explanation;
+company/workspace/content-role permissions are preserved. Company projects and
+assignment are shared across authors and keys; Profile projects remain private.
+Duplicate legacy names use a stable project-ID suffix in selectors (full ID on
+short-prefix collision), without renaming stored projects. Read-only roles cannot
+create, rename, delete or assign. Generation content and media-deletion permissions
+remain unchanged. Conflicts show the
+confirmed current assignment and require another explicit choice. Preserve
+Dark/Light/System themes and the generation form's pending values.
+Renaming the selected project or changing generation project tags reconciles the
+Journal in place. Metadata-only changes retain attached cards, scroll position,
+keyboard focus and playing media, including the changed generation. Keep a
+surviving visible card anchored when filtered membership changes. A reader at the
+top still sees newly arriving generations. Explicit filter/key/workspace changes
+replace the context; excluded generations and lost content permissions dispose
+their media. No manual refresh control is needed.
+The active assignment menu follows its same authorized task across per-card
+polling refreshes, preserving conflict guidance and keyboard focus while
+rebinding to the new anchor. Task removal, permission loss, explicit dismissal
+or key/workspace change closes it; polling and real load errors remain active.
+
+## Setup and remote workspace
+
+The setup guide uses a native dialog/fieldset/radios, shared FormUI heading,
+fields, switches and compact actions. Three scenario cards express onboarding
+intent while personal/shared policy remains independent. Sociaro opens a remote
+workspace dialog with the shared ModelPicker and explicit estimate confirmation.
+Remote content, balance and history remain visibly labeled as remote; never
+reuse the local company balance or silently switch paid providers. Use the
+shared theme, modal scrollbars and 1440/390/320 px layout. There is no new design
+system exception.
+
+Installation authorization uses the existing trusted sign-in card and shared
+native consent dialogs, floating fields, company dropdowns and switches. Label
+the requesting installation origin as reported data and require explicit code
+matching/consent. Preserve the remote/local workspace distinction and use the
+existing company funding controls. The new primary flow never collects a remote
+password in the local portal; the existing-key option is an advanced fallback.
+
+## Templates
+
+The shared gallery reuses cards, fields, `ModelPicker`, reference-library dialogs,
+`FormUI` heading Save, existing key/budget controls and generation confirmation.
+The left panel contains the Playground key control, selected template details,
+missing slots and generation action. The right gallery uses three, two or one
+columns as available width decreases, and stacks below the panel on narrow
+screens. All roles share this screen; existing edit permission adds inline Create
+and Edit actions. There is no management-mode switch.
+
+Cover media preserves its complete natural aspect ratio, including portrait
+video, and has a textual failure state. Mouse hover previews pause on leave;
+keyboard users focus the video and press Space/Enter; touch users tap the video. Cards have no separate Play/Pause preview button. Reduced-motion preferences
+disable hover playback. Devices without hover ignore compatibility mouse-enter events after touch. Changing or leaving media disposes the previous player. Prompt
+reading uses a native collapsed details/summary disclosure with plain text.
+Missing slots use labeled file/library controls; fixed slots have no user editor.
+Authoring reuses the shared native-textarea reference mirror and declared prompt
+syntax contract. Reviewed variable slots count as bound references even without
+fixed files; new unmatched mentions ask the author to infer/review slots. Draft
+saving does not acquire generation-time file requirements. Caret, selection, IME,
+scrolling and plain-text submission remain native.
+
+Authoring file controls reuse the Playground reference dropzone/card patterns,
+hide native file-input chrome, and provide keyboard picker buttons, drag/drop,
+filename/preview, explicit assigned state, pending/cancel/error/retry feedback.
+File choice alone does not establish a binding; only a completed, validated API upload or explicit shared-file selection does.
+Template page headings use the console page-size token, and actions use the body
+font with 44px targets and 12px gaps. These Templates rules live in templates.css;
+they do not change global headings or unrelated Settings styles.
+The Administrator uses the shared versioned Save pattern. All new surfaces use
+shared theme tokens and stack within the 320px viewport. No visual exception is
+required.

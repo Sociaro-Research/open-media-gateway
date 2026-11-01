@@ -21,6 +21,16 @@ target; do not use production credentials or customer data in fixtures.
 These suites cover encoded scenarios. They are not an independent penetration
 test, a production assessment or a guarantee against future vulnerabilities.
 
+The HTTP-method regressions discover all API route declarations and exercise
+unsupported methods (including OPTIONS) through the actual router, checking 405
+and Allow. Stateful fixtures cover read/write settings, organization management,
+payment checkout and projects: GET/HEAD must not invoke domain mutations even
+with a valid write-shaped body and a fully authorized key. Separate cases cover
+scope/role revocation, foreign organization bindings, OAuth HEAD rejection,
+headers-only errors, media HEAD aliases and real HTTP/PostgreSQL state. Read-side
+bookkeeping such as catalog metadata synchronization, expired-payment handling
+and access/rate accounting is separate from user-requested domain mutations.
+
 ## Run checks
 
 Run the full Go/integration gate on disposable services:

@@ -1,6 +1,7 @@
 package postgres
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"database/sql"
@@ -17,6 +18,7 @@ import (
 	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
 	"github.com/Sociaro-Research/open-media-gateway/internal/references"
 	"github.com/Sociaro-Research/open-media-gateway/internal/storage"
+	"github.com/Sociaro-Research/open-media-gateway/internal/testmedia"
 	"github.com/google/uuid"
 )
 
@@ -27,6 +29,8 @@ type directReferenceStore struct {
 	completed    atomic.Int32
 	aborted      atomic.Int32
 	failComplete atomic.Bool
+	failAbort    atomic.Bool
+	objects      sync.Map
 }
 
 func (s *directReferenceStore) PlanUpload(ctx context.Context, id, kind, digest string, size int64) (*storage.PendingUpload, error) {
@@ -56,11 +60,17 @@ func (s *directReferenceStore) CompleteUpload(ctx context.Context, p storage.Pen
 	if err := s.accounting.RecordObject(ctx, p.Key, "", p.Size); err != nil {
 		return core.StoredMedia{}, err
 	}
+	raw, _ := fixtureUploadBytes.Load(p.SHA256)
+	s.objects.Store(p.Key, raw.([]byte))
 	return core.StoredMedia{StorageKey: p.Key, SizeBytes: p.Size, SHA256: p.SHA256, ContentType: p.ContentType}, nil
 }
 func (s *directReferenceStore) AbortUpload(ctx context.Context, p storage.PendingUpload, remove bool) error {
 	s.aborted.Add(1)
+	if s.failAbort.Load() {
+		return errors.New("temporary cleanup failure")
+	}
 	if remove {
+		s.objects.Delete(p.Key)
 		return s.accounting.RemoveObject(ctx, p.Key)
 	}
 	return nil
@@ -69,9 +79,21 @@ func (*directReferenceStore) StoreReference(context.Context, string, []byte, str
 	panic("must not proxy bytes")
 }
 func (*directReferenceStore) DeleteReference(context.Context, string) error { return nil }
-func (*directReferenceStore) Open(context.Context, string) (storage.Object, error) {
-	panic("must not download bytes")
+func (s *directReferenceStore) Open(ctx context.Context, key string) (storage.Object, error) {
+	raw, ok := s.objects.Load(key)
+	if !ok {
+		return storage.Object{}, storage.ErrObjectNotFound
+	}
+	data := raw.([]byte)
+	return storage.Object{Reader: readSeekNoClose{bytes.NewReader(data)}, SizeBytes: int64(len(data))}, nil
 }
+
+type readSeekNoClose struct{ *bytes.Reader }
+
+func (readSeekNoClose) Close() error { return nil }
+
+var fixtureUploadBytes sync.Map
+
 func uploadFixture(t *testing.T) (*sql.DB, *references.Library, *directReferenceStore, context.Context) {
 	t.Helper()
 	dsn := os.Getenv("GATEWAY_TEST_DATABASE_URL")
@@ -96,7 +118,9 @@ func uploadFixture(t *testing.T) (*sql.DB, *references.Library, *directReference
 	return db, references.New(NewReferenceRepository(db), store), store, ctx
 }
 func uploadInput(name string) references.UploadInput {
-	sum := sha256.Sum256([]byte(name))
+	data := testmedia.PNG512(name)
+	sum := sha256.Sum256(data)
+	fixtureUploadBytes.Store(hex.EncodeToString(sum[:]), data)
 	return references.UploadInput{Name: name, ContentType: "image/png", SizeBytes: 512, SHA256: hex.EncodeToString(sum[:])}
 }
 func TestDirectUploadPersistenceRetryIsolationAndCleanup(t *testing.T) {

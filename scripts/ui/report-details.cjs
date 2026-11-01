@@ -1,6 +1,6 @@
 const {evidencePath} = require('./evidence.cjs');
 // Full generation cards: retained data, role restrictions, results, focus and responsive layout.
-const {chromium}=require('playwright'),http=require('node:http'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const {chromium,webkit}=require('playwright'),http=require('node:http'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const root=path.resolve(__dirname,'../../web/public/ui');
 const image=Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="480" height="300"><rect width="480" height="300" fill="#174bc2"/><circle cx="240" cy="150" r="90" fill="#77a3ff"/></svg>');
 // Synthetic one-second H.264 clip and PCM audio for real browser metadata checks.
@@ -9,9 +9,9 @@ const audio=Buffer.alloc(44+16000);audio.write('RIFF',0);audio.writeUInt32LE(aud
 const server=http.createServer((req,res)=>{if(req.url.includes('/reports/')&&(req.url.includes('/content')||req.url.endsWith('/last-frame'))){res.setHeader('Content-Type','image/svg+xml');if(req.url.includes('download=1'))res.setHeader('Content-Disposition','attachment; filename="result.png"');return res.end(image);}let file=path.join(root,path.basename(req.url.split('?')[0]));if(!path.extname(file))file=path.join(root,'index.html');if(!fs.existsSync(file))return res.writeHead(404).end();res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':file.endsWith('.svg')?'image/svg+xml':'text/html');res.end(fs.readFileSync(file));});
 (async()=>{
  await new Promise(r=>server.listen(0,'127.0.0.1',r));
- const browser=await chromium.launch({headless:true,executablePath:process.env.UI_BROWSER_PATH});
- const page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[],requested=[];page.on('pageerror',e=>errors.push(e.message));page.setDefaultTimeout(10000);
- await page.context().grantPermissions(['clipboard-read','clipboard-write']);
+ const browser=await(process.env.UI_BROWSER_ENGINE==='webkit'?webkit:chromium).launch({headless:true,executablePath:process.env.UI_BROWSER_PATH});
+ const page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[],notices=[],requested=[];page.on('pageerror',e=>{if(process.env.UI_BROWSER_ENGINE==='webkit'&&e.message==='ResizeObserver loop completed with undelivered notifications.')notices.push(e.message);else errors.push(e.message);});page.setDefaultTimeout(10000);
+ if(process.env.UI_BROWSER_ENGINE!=='webkit')await page.context().grantPermissions(['clipboard-read','clipboard-write']);
  const org='11111111-1111-4111-8111-111111111111',id='abcdefab-1111-4111-8111-abcdefabcdef';
  const prompt='Full prompt with every line preserved.\n<script>window.injected=true</script>\n'+('Long prompt paragraph. '.repeat(120));
  const reference='https://example.test/references/'+('long-name-'.repeat(40))+'image.png';
@@ -52,10 +52,10 @@ const server=http.createServer((req,res)=>{if(req.url.includes('/reports/')&&(re
   await open();assert.equal(requested.at(-1),'/v1/system/reports/'+id);assert.equal(await dialog().locator('.detail-text').first().textContent(),prompt);assert.equal(await page.evaluate(()=>!!window.injected),false);
   assert.match(await dialog().innerText(),/Future custom setting 1/);assert.match(await dialog().innerText(),/Exact instruction\nSecond line/);
   const referenceImage=dialog().getByRole('img',{name:'Image reference 1',exact:true});await referenceImage.scrollIntoViewIfNeeded();await referenceImage.evaluate(el=>el.decode());assert.equal(await referenceImage.getAttribute('src'),reference);assert.equal(await dialog().locator('a[href^="javascript:"]').count(),0);assert.equal(await dialog().getByRole('link',{name:reference,exact:true}).count(),0);
-  await dialog().getByRole('button',{name:'Copy image reference 1 link',exact:true}).click();assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),reference);
-  const resultImage=dialog().getByRole('img',{name:'Result',exact:true});await resultImage.scrollIntoViewIfNeeded();await resultImage.evaluate(el=>el.decode());await dialog().getByRole('button',{name:'Copy result link',exact:true}).click();assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),base+'/v1/system/reports/'+id+'/content');
+  await dialog().getByRole('button',{name:'Copy image reference 1 link',exact:true}).click();if(process.env.UI_BROWSER_ENGINE!=='webkit')assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),reference);
+  const resultImage=dialog().getByRole('img',{name:'Result',exact:true});await resultImage.scrollIntoViewIfNeeded();await resultImage.evaluate(el=>el.decode());await dialog().getByRole('button',{name:'Copy result link',exact:true}).click();if(process.env.UI_BROWSER_ENGINE!=='webkit')assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),base+'/v1/system/reports/'+id+'/content');
   const download=page.waitForEvent('download');await dialog().getByRole('link',{name:'Download result',exact:true}).click();assert.equal((await download).suggestedFilename(),'result.png');
-  version=2;await dialog().getByRole('button',{name:'Refresh',exact:true}).click();await ready();assert.match(await dialog().innerText(),/Future custom setting 2/);
+  await dialog().locator('.detail-record').evaluate(el=>el.open=true);await dialog().getByRole('button',{name:'Close generation details',exact:true}).focus();const bodyNode=await dialog().locator('.detail-text').first().elementHandle();version=2;await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await page.waitForFunction(()=>document.querySelector('.detail-record pre')?.textContent.includes('Future custom setting 2'));assert.equal(await dialog().locator('.detail-record').evaluate(el=>el.open),true);assert.equal(await dialog().getByRole('button',{name:'Close generation details',exact:true}).evaluate(el=>el===document.activeElement),true);assert.equal(await bodyNode.evaluate(el=>el.isConnected),true);assert.equal(await dialog().getByRole('button',{name:/Refresh|Reload/}).count(),0);
   fs.mkdirSync(evidencePath('/tmp/gateway-report-details-ui'),{recursive:true});
   for(const theme of ['dark','light'])for(const width of [1440,390,320]){
    await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);await page.setViewportSize({width,height:1000});await dialog().evaluate(el=>el.scrollTop=0);await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
@@ -65,7 +65,7 @@ const server=http.createServer((req,res)=>{if(req.url.includes('/reports/')&&(re
   await dialog().getByRole('heading',{name:'References',exact:true}).scrollIntoViewIfNeeded();await page.screenshot({path:evidencePath('/tmp/gateway-report-details-ui/media-mobile.png')});
   await page.setViewportSize({width:1440,height:1000});await dialog().getByRole('heading',{name:'References',exact:true}).scrollIntoViewIfNeeded();await page.screenshot({path:evidencePath('/tmp/gateway-report-details-ui/media-desktop.png')});
   await close();await page.setViewportSize({width:1440,height:1000});
-  await page.locator('#reportsContent tbody tr').first().focus();await page.keyboard.press('Enter');await ready();assert.equal(await dialog().getByRole('button',{name:'Close',exact:true}).evaluate(el=>el===document.activeElement),true);await page.keyboard.press('Tab');assert.equal(await page.evaluate(()=>document.activeElement.closest('dialog')!==null),true);await close();
+  await page.locator('#reportsContent tbody tr').first().focus();await page.keyboard.press('Enter');await ready();assert.equal(await dialog().getByRole('button',{name:'Close generation details',exact:true}).evaluate(el=>el===document.activeElement),true);await page.keyboard.press('Tab');assert.equal(await page.evaluate(()=>document.activeElement.closest('dialog')!==null),true);await close();
   await page.keyboard.press('Space');await ready();await close();
   for(const next of ['video','audio','file','broken']){
    mode=next;await open();await dialog().getByRole('heading',{name:'Results',exact:true}).scrollIntoViewIfNeeded();
@@ -82,10 +82,10 @@ const server=http.createServer((req,res)=>{if(req.url.includes('/reports/')&&(re
    if(next==='failed')assert.match(text,/The provider could not process/);
    await close();
   }
-  mode='error';await page.locator('#reportsContent tbody tr').first().click();await dialog().getByText('Could not load generation: Temporary failure',{exact:true}).waitFor();mode='full';await dialog().getByRole('button',{name:'Refresh',exact:true}).click();await ready();await close();
+  mode='error';await page.locator('#reportsContent tbody tr').first().click();await dialog().getByText('Could not load generation: Temporary failure',{exact:true}).waitFor();mode='full';await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await ready();await close();
   await page.locator('#reportOrganization').selectOption(org,{force:true});await page.waitForFunction(()=>document.querySelector('#reportsContent [role=status]')?.textContent===''&&!!document.querySelector('#reportsContent tbody tr'));await open();assert.equal(requested.at(-1),'/v1/organizations/'+org+'/reports/'+id);await close();
   delay=300;await page.locator('#reportsContent tbody tr').first().click();await page.keyboard.press('Escape');await page.waitForTimeout(400);assert.equal(await dialog().count(),0);delay=0;
-  await page.evaluate(id=>ReportDetails.open('/v1/admin/reports/'+id),id);await ready();assert.equal(requested.at(-1),'/v1/admin/reports/'+id);await dialog().getByText('All retained data',{exact:true}).click();assert.match(await dialog().locator('pre').textContent(),/Future custom setting/);await dialog().getByRole('button',{name:'Close',exact:true}).click();
-  assert.deepEqual(errors,[]);console.log('PASS: full prompt/settings/references/results, system/organization/personal routes, permissions and retention, deleted/failed/error/retry states, stale closure, keyboard/focus, dark/light desktop and 320/390px.');
+  await page.evaluate(id=>ReportDetails.open('/v1/admin/reports/'+id),id);await ready();assert.equal(requested.at(-1),'/v1/admin/reports/'+id);await dialog().getByText('All retained data',{exact:true}).click();assert.match(await dialog().locator('pre').textContent(),/Future custom setting/);await dialog().getByRole('button',{name:'Close generation details',exact:true}).click();
+  assert.deepEqual(errors,[]);if(notices.length)console.log('WebKit layout notices:',notices);console.log('PASS: full prompt/settings/references/results, system/organization/personal routes, permissions and retention, deleted/failed/error/retry states, stale closure, keyboard/focus, dark/light desktop and 320/390px.');
  }catch(error){console.error('Browser errors:',errors);await page.screenshot({path:evidencePath('/tmp/gateway-report-details-failure.png'),fullPage:true});throw error;}finally{await browser.close();server.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;server.close();});

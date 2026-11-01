@@ -37,3 +37,8 @@ func IssueKey(actorRole, actor, recipientRole, recipient string) bool {
 	}
 	return actorRole == Developer && (actor == recipient || recipientRole == MemberRole)
 }
+
+// WriteProjects permits shared grouping metadata changes, never content deletion.
+func WriteProjects(role string) bool {
+	return role == "" || FullControl(role) || role == Developer || role == MemberRole
+}

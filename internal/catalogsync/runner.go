@@ -116,13 +116,37 @@ func (r *Runner) check(parent context.Context, schedule Schedule, settings Setti
 	}
 	observations = append(observations, apiObservation)
 	for _, source := range schedule.Sources {
+		if resolver, ok := r.Providers.(interface {
+			ResolveCatalogSource(context.Context, string, Source) Source
+		}); ok {
+			source = resolver.ResolveCatalogSource(ctx, schedule.Provider, source)
+		}
 		call, cancel := context.WithTimeout(ctx, 30*time.Second)
-		observations = append(observations, Fetch(call, r.Client, source))
+		ob := Fetch(call, r.Client, source)
+		if ob.Error == "" && source.Parser == "document" {
+			if interpreter, ok := r.Providers.(interface {
+				InterpretCatalogSource(context.Context, string, Source, string) ([]Entry, error)
+			}); ok {
+				entries, err := interpreter.InterpretCatalogSource(call, schedule.Provider, source, ob.Text)
+				if err != nil {
+					ob.Error = "Operational source interpretation failed; last confirmed information was preserved"
+					ob.FetchedHash = ob.Hash
+					ob.Hash = ""
+				} else if entries != nil {
+					ob.Entries = entries
+				}
+			}
+		}
+		observations = append(observations, ob)
 		cancel()
 	}
 	next, run := Reconcile(previous, capture, observations, now, func(model core.MediaModel, rate Rate) error {
 		return r.Providers.CheckCatalogRate(ctx, schedule.Provider, model, rate)
 	})
+	// Daily incomplete or partial checks require a report even when no publication changed.
+	if run.Completeness != nil && run.Completeness.Status != "complete" {
+		run.EmailStatus = "pending"
+	}
 	if settings.Email == "" && run.EmailStatus == "pending" {
 		run.EmailStatus = "disabled"
 	}
@@ -138,6 +162,7 @@ func (r *Runner) check(parent context.Context, schedule Schedule, settings Setti
 func Report(run Run) (string, string, string) {
 	var out strings.Builder
 	fmt.Fprintf(&out, "Catalogue check: %s\nChecked: %s\nStatus: %s\nPublished version: %d\n", run.Provider, run.CompletedAt.Format(time.RFC3339), run.Status, run.Version)
+	writeCompleteness(&out, run.Completeness)
 	for _, source := range run.Sources {
 		if source.Review != nil {
 			fmt.Fprintf(&out, "\nREVIEWED DOCUMENT CHANGE\nSource: %s\nReviewed: %s\nReason: %s\nSnapshot: %s\n", source.Source.URL, source.Review.Date, source.Review.Reason, source.Review.Hash)

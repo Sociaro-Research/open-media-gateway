@@ -2,6 +2,7 @@ package providers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -52,6 +53,7 @@ func (m *Manager) CaptureCatalog(ctx context.Context, id string) (catalogsync.Ca
 	d, _ := m.findSpec(id)
 	capture := catalogsync.Capture{Models: models, Inactive: modelcatalog.Inactive(d.ID, time.Now()), IDs: []string{}}
 	capture.DocumentReviews = d.CatalogReviews
+	capture.VerificationSources = d.CatalogVerificationSources
 	if reviewed, ok := adapter.(interface {
 		CatalogExclusions() []catalogsync.Exclusion
 	}); ok {
@@ -84,6 +86,41 @@ func (m *Manager) CaptureCatalog(ctx context.Context, id string) (catalogsync.Ca
 		capture.IDs, err = discovery.DiscoverModelIDs(ctx)
 	}
 	return capture, err
+}
+
+// InterpretCatalogSource is a pure plugin mapping over already fetched public
+// source text. It does not resolve credentials, call providers or alter models.
+func (m *Manager) InterpretCatalogSource(_ context.Context, id string, source catalogsync.Source, text string) ([]catalogsync.Entry, error) {
+	definition, ok := m.findSpec(id)
+	if !ok {
+		return nil, nil
+	}
+	var entries []catalogsync.Entry
+	var err error
+	if definition.CatalogInterpret != nil {
+		entries, err = definition.CatalogInterpret(source, text)
+		if err != nil {
+			return nil, err
+		}
+	}
+	for model, hint := range modelcatalog.ParsedReferenceRecommendations(id, source.URL, text) {
+		index := -1
+		for i := range entries {
+			if entries[i].ID == model {
+				index = i
+				break
+			}
+		}
+		if index < 0 {
+			entries = append(entries, catalogsync.Entry{ID: model})
+			index = len(entries) - 1
+		}
+		if entries[index].OperationalFields == nil {
+			entries[index].OperationalFields = map[string]json.RawMessage{}
+		}
+		entries[index].OperationalFields["reference_prompt_recommendation"], _ = json.Marshal(hint)
+	}
+	return entries, nil
 }
 func (m *Manager) CheckCatalogRate(ctx context.Context, id string, model core.MediaModel, rate catalogsync.Rate) error {
 	ctx = catalogContext(ctx)
@@ -174,15 +211,29 @@ func applyCatalogModel(model core.MediaModel, state catalogsync.State) core.Medi
 		return model
 	}
 	metadata := *entry.Metadata
+	if metadata.Operational != nil {
+		detached := map[string]core.OperationalFact{}
+		for key, fact := range metadata.Operational {
+			fact.Value = append([]byte(nil), fact.Value...)
+			detached[key] = fact
+		}
+		metadata.Operational = detached
+	}
 	if model.Metadata != nil {
 		metadata.APICreated = model.Metadata.APICreated
 		metadata.OwnedBy = model.Metadata.OwnedBy
+	}
+	if fact, ok := metadata.Operational["reference_prompt_recommendation"]; ok {
+		var hint core.ReferencePromptRecommendation
+		if json.Unmarshal(fact.Value, &hint) == nil && model.ReferencePromptRecommendation.AcceptsObservation(hint) && fact.Source.URL == hint.SourceURL {
+			model.ReferencePromptRecommendation = hint.Clone()
+		}
 	}
 	model.Metadata = &metadata
 	return model
 }
 func applyCatalogQuote(base core.TaskCost, err error, model core.MediaModel, request core.MediaRequest, state catalogsync.State) (core.TaskCost, error) {
-	if err != nil || model.Manual {
+	if err != nil || model.Manual || base.Pricing.AccountSpecific {
 		return base, err
 	}
 	// Input-reference and fixed surcharges cannot inherit a no-reference tariff.
@@ -204,7 +255,11 @@ func applyCatalogQuote(base core.TaskCost, err error, model core.MediaModel, req
 		if r.Region != base.Pricing.Region || r.Unit != base.Pricing.Unit || r.Per != base.Pricing.Per {
 			continue
 		}
-		if r.Resolution != "" && r.Resolution != request.Options.Resolution {
+		resolution := request.Options.Resolution
+		if resolution == "" && len(model.Resolutions) > 0 {
+			resolution = model.Resolutions[0]
+		}
+		if r.Resolution != "" && r.Resolution != resolution {
 			continue
 		}
 		if r.Quality != "" && r.Quality != request.Options.Quality {
@@ -258,4 +313,14 @@ func applyCatalogQuote(base core.TaskCost, err error, model core.MediaModel, req
 	}
 	base.Pricing.CheckedAt = time.Now().UTC()
 	return base, nil
+}
+
+// ResolveCatalogSource maps only explicitly reviewed public aliases; custom schedules remain intact.
+func (m *Manager) ResolveCatalogSource(_ context.Context, id string, source catalogsync.Source) catalogsync.Source {
+	if definition, ok := m.findSpec(id); ok && source.Parser == "document" {
+		if url := definition.CatalogSourceAliases[source.URL]; url != "" {
+			source.URL = url
+		}
+	}
+	return source
 }

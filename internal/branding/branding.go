@@ -65,7 +65,7 @@ func Defaults() Settings {
 	dark := []string{"#0a0a0a", "#141414", "#1c1c1c", "#101010", "#1c1c1c", "#303030", "#404040", "#f5f5f5", "#a3a3a3", "#e5e5e5", "#262626", "#ffffff", "#171717", "#171717", "#6ca8ff", "#f08088", "#79d6a0", "#f3c45b", "#171717", "#24a5bf", "#9767dc", "#db9950", "#4aa881", "#d86e9a"}
 	light := []string{"#fafafa", "#ffffff", "#f0f0f0", "#ffffff", "#ffffff", "#d4d4d4", "#737373", "#171717", "#525252", "#262626", "#f0f0f0", "#444444", "#ffffff", "#ffffff", "#235dba", "#b42336", "#147844", "#916000", "#ffffff", "#24a5bf", "#9767dc", "#db9950", "#4aa881", "#d86e9a"}
 	width := 1280
-	s := Settings{SiteMaxWidth: &width, Dark: map[string]string{}, Light: map[string]string{}, Assets: map[string]Asset{}, Version: 1}
+	s := Settings{SiteMaxWidth: &width, SidebarSubsections: true, Dark: map[string]string{}, Light: map[string]string{}, Assets: map[string]Asset{}, Version: 1}
 	for i, key := range keys {
 		s.Dark[key] = dark[i]
 		s.Light[key] = light[i]

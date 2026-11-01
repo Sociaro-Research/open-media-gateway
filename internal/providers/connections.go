@@ -36,7 +36,7 @@ func (m *Manager) Types() []ProviderType {
 		if d.Free {
 			continue
 		}
-		t := ProviderType{ID: d.ID, Name: d.Name, Fields: d.Fields, IconURL: IconURL(d), IconMonochrome: d.IconMonochrome}
+		t := ProviderType{ID: d.ID, Name: d.Name, Fields: d.Fields}
 		if d.Profiles != nil {
 			t.Profiles = d.Profiles()
 		}

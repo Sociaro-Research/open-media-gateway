@@ -4,6 +4,7 @@ const {chromium,webkit}=require('playwright');
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),assert=require('node:assert/strict');
 const ui=path.resolve(__dirname,'../../web/public/ui'),engine=process.env.UI_BROWSER_ENGINE||'chromium';
 const output=process.env.UI_SCREENSHOT_DIR||evidencePath(`/tmp/gateway-email-invitations-${engine}`);fs.mkdirSync(output,{recursive:true});
+let deliveryReady=true;
 const records=new Map(),tokens=new Map(),grants=new Map(),invitations=new Map(),memberships=new Map(),requests=[];
 const random=()=>crypto.randomBytes(32).toString('base64url');
 function invite(state='active'){
@@ -20,6 +21,7 @@ const server=http.createServer(async(req,res)=>{
  if(req.method==='POST'){
   const chunks=[];for await(const c of req)chunks.push(c);const data=JSON.parse(Buffer.concat(chunks).toString()||'{}');requests.push({p,data});
   if(p==='/auth/email/register'){
+   if(!deliveryReady)return failure('Email registration is unavailable.',503);
    const record={email:data.email,invitation:data.invitation_token,verified:false,token:random()};records.set(data.email,record);tokens.set(record.token,record);return json({message:'Check your email.'},202);
   }
   if(p==='/auth/email/verify'){
@@ -45,7 +47,7 @@ const server=http.createServer(async(req,res)=>{
   }
   return json({data:[]});
  }
- if(p==='/auth/methods')return json({email:true,email_delivery:true,email_confirmation:true,google:false});
+ if(p==='/auth/methods')return json({email:deliveryReady,email_delivery:deliveryReady,email_confirmation:true,google:false});
  if(p==='/v1/info')return json({auth_mode:'google',console:{generation_ui:true,personal_providers:true}});
  if(p==='/v1/me')return account?.verified?json({id:'11111111-1111-4111-8111-111111111111',name:'Invitation tester',email:account.email,session_id:account.email}):failure('Sign in',401);
  if(p==='/v1/organizations')return json({data:[...invitations.values()].filter(i=>memberships.get(account?.email)?.has(i.organization_id)).map(org)});
@@ -87,6 +89,9 @@ const server=http.createServer(async(req,res)=>{
   const unavailableToken=invite(),unavailable=await fresh(),unavailableEmail='expired-invite@example.test';const unavailableMail=await requestSignup(unavailable,unavailableEmail,unavailableToken);invitations.get(unavailableToken).state='revoked';const unavailableConfirmation=await fresh();await confirm(unavailableConfirmation,unavailableMail);await complete(unavailableConfirmation);await unavailableConfirmation.getByText('This invitation is no longer available. Ask a manager for a new invitation.',{exact:true}).waitFor();assert.equal(await unavailableConfirmation.getByRole('button',{name:'Accept invitation',exact:true}).count(),0);assert.equal(count('/v1/invitations/accept'),1);
   // Plain signup has no continuation and stays on the ordinary landing page.
   const ordinary=await fresh(),plainEmail='ordinary@example.test',plainToken=await requestSignup(ordinary,plainEmail);const plainConfirmation=await fresh();await confirm(plainConfirmation,plainToken);await complete(plainConfirmation);assert.equal(await pending(plainConfirmation),null);assert.equal(await plainConfirmation.getByRole('button',{name:'Accept invitation',exact:true}).count(),0);
+  // Removing delivery hides anonymous email login but preserves an existing session's invitation acceptance.
+  deliveryReady=false;const sessionToken=invite(),anonymous=await fresh();await anonymous.goto(base+'/organizations#invite='+sessionToken);await anonymous.locator('#authUnavailable').waitFor();assert.equal(await anonymous.locator('#emailLogin').isVisible(),false);assert.equal(await pending(anonymous),sessionToken);
+  await confirmed.goto(base+'/organizations#invite='+sessionToken);await confirmed.getByRole('button',{name:'Accept invitation',exact:true}).waitFor();assert.equal(await confirmed.locator('#authGate').isVisible(),false);await confirmed.getByRole('button',{name:'Accept invitation',exact:true}).click();await confirmed.waitForFunction(()=>!sessionStorage.getItem('gateway-pending-invite'));assert.equal(memberships.get(email).size,2);
   assert.deepEqual(errors,[]);console.log(`${engine}: invitation continuation passed across browser contexts, original-tab closure, grant resume after clearing tab storage, keyboard acceptance, existing-user login/decline, revoked invitation and ordinary signup; layouts 1440/390/320px. No real mail sent.`);
  }finally{for(const c of contexts)await c.close();await browser.close();server.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;server.close();});

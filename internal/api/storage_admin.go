@@ -132,14 +132,14 @@ func (s *Server) organizationStorage(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	if r.Method != "GET" && !canManage {
+	if !readMethod(r.Method) && !canManage {
 		orgError(w, org.ErrForbidden)
 		return
 	}
 	ctx := identity.WithOrganization(r.Context(), id, true)
 	ctx = identity.WithResourceOwners(ctx, identity.ProviderOwnerID(ctx), id)
 	r = r.WithContext(ctx)
-	if r.Method == "GET" {
+	if readMethod(r.Method) {
 		settings, err := s.storageAdmin.Get(ctx)
 		if err != nil {
 			writeError(w, 503, "unavailable", "organization storage could not be read")

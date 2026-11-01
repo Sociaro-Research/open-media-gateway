@@ -1,3 +1,4 @@
+const {useFixtureKey}=require('./fixture-key.cjs');
 const {evidencePath}=require('./evidence.cjs');
 // Delayed synthetic API responses exercise picker continuations, never BytePlus.
 const {chromium,webkit}=require('playwright');
@@ -24,6 +25,7 @@ const server=http.createServer((req,res)=>{
   const context=await browser.newContext({viewport:{width,height:1100},colorScheme:theme}),page=await context.newPage(),errors=[],gates=[];
   page.setDefaultTimeout(6000);page.on('pageerror',e=>errors.push(e.message));
   const state={assets:[],groups:[{id:'group-existing',name:'Characters'}],imports:0,groupCreates:0,gate:null};
+  state.holdResponse=match=>{const gate={match,arrived:deferred(),release:deferred(),finished:deferred()};state.responseGate=gate;gates.push(gate);return gate;};
   state.hold=match=>{const gate={match,arrived:deferred(),release:deferred()};state.gate=gate;gates.push(gate);return gate;};
   await context.route('**/*',async route=>{
    const req=route.request(),url=new URL(req.url()),p=url.pathname;
@@ -31,7 +33,7 @@ const server=http.createServer((req,res)=>{
    if(!p.startsWith('/v1/'))return route.continue();
    const gate=state.gate;
    if(gate&&gate.match(p,req.method())){state.gate=null;gate.arrived.resolve();await gate.release.promise;}
-   const json=data=>route.fulfill({json:data}).catch(()=>{});
+   const json=async data=>{const snapshot=structuredClone(data),pending=state.responseGate;if(pending&&pending.match(p,req.method())){state.responseGate=null;pending.arrived.resolve();await pending.release.promise;await route.fulfill({json:snapshot}).catch(()=>{});pending.finished.resolve();return;}return route.fulfill({json:snapshot}).catch(()=>{});};
    if(p==='/v1/info')return json({auth_mode:'google',provider:'bytedance'});
    if(p==='/v1/me')return json({id:'synthetic-admin',session_id:'fixture',name:'Synthetic admin',is_system_admin:true});
    if(p==='/v1/organizations')return json({data:[org]});
@@ -46,17 +48,18 @@ const server=http.createServer((req,res)=>{
    }
    if(p.endsWith('/inventory'))return json({data:[asset]});
    if(p.endsWith('/import')){state.imports++;state.assets=[asset];return json(asset);}
+   if(p.includes('/assets/')&&req.method()==='DELETE'){state.assets=state.assets.filter(a=>a.id!==p.split('/').at(-1));return json({});}
    if(p.endsWith('/assets'))return json({data:state.assets});
    return json({data:[]});
   });
   const picker=page.locator('#referenceLibrary');
   async function open(){await page.locator('#chooseReferences').click();}
-  async function source(){await picker.locator('select[aria-label="image reference source"]').selectOption('provider');await picker.getByRole('button',{name:'Refresh',exact:true}).waitFor();await page.waitForFunction(()=>!document.querySelector('#referenceLibrary .provider-reference-library .reference-actions button').disabled);}
+  async function source(){await picker.locator('select[aria-label="image reference source"]').selectOption('provider');await picker.getByRole('button',{name:'Import existing assets',exact:true}).waitFor();await page.waitForFunction(()=>!document.querySelector('#referenceLibrary .provider-reference-library .reference-actions button').disabled);}
   async function inventory(){await picker.getByRole('button',{name:'Import existing assets',exact:true}).click();await picker.getByRole('button',{name:'Import Existing character into this workspace',exact:true}).waitFor();}
-  async function close(){await picker.getByRole('button',{name:'Done',exact:true}).click();}
+  async function close(){await picker.getByRole('button',{name:'Close library',exact:true}).click();}
   async function selectProvider(id){await page.locator('#model').selectOption(JSON.stringify([id,model.id]));await page.waitForFunction(id=>selectedProvider()?.id===id,id);}
   try{
-   await page.goto(origin);await page.locator('#createGenerationKey').click();await page.waitForFunction(()=>selectedModel()?.id==='seedance');
+   await page.goto(origin);await useFixtureKey(page,'synthetic-key');await page.waitForFunction(()=>selectedModel()?.id==='seedance');
    await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);
    await test({page,picker,state,open,source,inventory,close,selectProvider});
    assert.deepEqual(errors,[]);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'no horizontal page overflow');
@@ -87,7 +90,7 @@ const server=http.createServer((req,res)=>{
    await close();await page.locator('#forgetGenerationKey').click();
    gate.release.resolve();await page.waitForTimeout(250);
    assert.equal(await page.locator('#imageURLs').inputValue(),'','a completed old-key import must not repopulate the reset form');
-   await page.locator('#createGenerationKey').click();await page.waitForFunction(()=>selectedModel()?.id==='seedance');
+   await useFixtureKey(page,'synthetic-key');await page.waitForFunction(()=>selectedModel()?.id==='seedance');
    assert.equal(await page.locator('#selectedReferences .reference-card').count(),0);
   });
   await run('overlapping imports select only once',async({page,picker,state,open,source,inventory})=>{
@@ -105,7 +108,7 @@ const server=http.createServer((req,res)=>{
    await picker.getByRole('button',{name:'Create group',exact:true}).click();await gate.arrived.promise;
    await close();
    if(reset==='provider change')await selectProvider('second');
-   else{await page.locator('#forgetGenerationKey').click();await page.locator('#createGenerationKey').click();await page.waitForFunction(()=>selectedModel()?.id==='seedance');}
+   else{await page.locator('#forgetGenerationKey').click();await useFixtureKey(page,'synthetic-key');await page.waitForFunction(()=>selectedModel()?.id==='seedance');}
    gate.release.resolve();await open();await source();
    const create=picker.getByRole('button',{name:'Create group',exact:true});
    if(!await create.isVisible())await picker.getByRole('button',{name:'New group',exact:true}).click();
@@ -114,11 +117,19 @@ const server=http.createServer((req,res)=>{
    await page.waitForFunction(()=>document.querySelector('#referenceLibrary select[aria-label="image asset group"]').value.startsWith('created-'));
    await close();
   });
-  await run('refresh recovers after provider change',async({page,picker,state,open,source,close,selectProvider})=>{
+  await run('automatic read recovers after provider change',async({page,picker,state,open,source,close,selectProvider})=>{
    await open();await source();const gate=state.hold((p,m)=>p.endsWith('/groups')&&m==='GET');
-   await picker.getByRole('button',{name:'Refresh',exact:true}).click();await gate.arrived.promise;
+   await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await gate.arrived.promise;
    await close();await selectProvider('second');gate.release.resolve();await open();await source();
-   assert.equal(await picker.getByRole('button',{name:'Refresh',exact:true}).isEnabled(),true,'refresh must be usable on the new provider');
+   assert.equal(await picker.getByRole('button',{name:/Refresh|Reload/}).count(),0);await picker.getByRole('button',{name:'Import existing assets',exact:true}).waitFor();
+  });
+  for(const action of ['detach','delete'])await run('late read cannot restore '+(action==='detach'?'detached':'deleted')+' asset',async({page,picker,state,open,source})=>{
+   state.assets=[asset];await open();await source();await picker.getByRole('button',{name:'Use Existing character in generation',exact:true}).waitFor();
+   const deletion=state.hold((p,m)=>p.includes('/assets/')&&m==='DELETE');
+   if(action==='detach')await picker.getByRole('button',{name:'Remove Existing character from workspace',exact:true}).click();
+   else{await picker.getByRole('button',{name:'Delete Existing character from BytePlus',exact:true}).click();await picker.getByRole('button',{name:'Delete asset',exact:true}).click();}
+   await deletion.arrived.promise;const gate=state.holdResponse((p,m)=>p.endsWith('/assets')&&m==='GET');await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await gate.arrived.promise;deletion.release.resolve();
+   await picker.locator('[data-asset-id="asset-existing"]').waitFor({state:'detached'});gate.release.resolve();await gate.finished.promise;await page.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))));assert.equal(await picker.locator('[data-asset-id="asset-existing"]').count(),0);assert.equal(state.assets.length,0);
   });
   await run('keyboard navigation closes reference preview',async({page})=>{
    await page.locator('#imageURLs').evaluate(e=>{e.value=location.origin+'/references/image.png';e.dispatchEvent(new Event('input',{bubbles:true}));});

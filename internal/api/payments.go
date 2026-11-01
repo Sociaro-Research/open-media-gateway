@@ -110,7 +110,7 @@ func (s *Server) paymentProviders(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 12*time.Second)
 	defer cancel()
 	switch {
-	case r.Method == "GET":
+	case readMethod(r.Method):
 		ps, e := s.payments.Providers(ctx)
 		if e != nil {
 			paymentError(w, e)
@@ -287,7 +287,7 @@ func (s *Server) organizationPayments(w http.ResponseWriter, r *http.Request) {
 		s.writeViewerJSON(w, r, 200, p)
 		return
 	}
-	if r.Method == "GET" {
+	if readMethod(r.Method) {
 		offset, ok := systemPage(w, r)
 		if !ok {
 			return

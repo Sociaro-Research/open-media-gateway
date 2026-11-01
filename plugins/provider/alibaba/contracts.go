@@ -3,6 +3,7 @@ package alibaba
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
@@ -30,9 +31,21 @@ func applyModelContract(m *core.MediaModel) {
 		m.ReferenceModes = referenceModes(*m)
 		if strings.HasPrefix(m.ID, "wan3.0-") || strings.HasPrefix(m.ID, "wan2.7-") && strings.Contains(m.ID, "r2v") {
 			m.ReferencePromptSyntax = "numbered"
+			m.ReferencePromptTypes = []string{"image", "video"}
+			if strings.HasPrefix(m.ID, "wan3.0-") {
+				m.ReferencePromptTypes = append(m.ReferencePromptTypes, "audio")
+			}
 		}
+		applyReferenceFileContract(m)
 	}()
 	id := contractID(m.ID)
+	if id == "happyhorse-1.1-r2v" {
+		m.ReferencePromptSyntax = "bracket"
+		m.ReferencePromptTypes = []string{"image"}
+		// Native R2V API: omission defaults to 16:9; adaptive is not supported.
+		// https://help.aliyun.com/en/model-studio/happyhorse-reference-to-video-api-reference
+		m.Ratios = []string{"16:9", "9:16", "3:4", "4:3", "4:5", "5:4", "1:1", "9:21", "21:9"}
+	}
 	if m.MediaType == "image" {
 		m.Formats = []string{"png"}
 		if strings.HasPrefix(id, "qwen-mt-image") {
@@ -168,6 +181,32 @@ func applyModelContract(m *core.MediaModel) {
 	}
 }
 
+// Exact API reference contracts, reviewed 2026-10-26. These optional file rules
+// augment native workflow/count validation; absent rules never disable a model.
+func applyReferenceFileContract(m *core.MediaModel) {
+	image := core.MediaFileLimits{ContentTypes: []string{"image/jpeg", "image/png", "image/webp"}, MaxBytes: 20_000_001, MinDimension: 240, MaxDimension: 8000, MinRatio: 1.0 / 8, MaxRatio: 8, NoAlpha: true}
+	video := core.MediaFileLimits{ContentTypes: []string{"video/mp4", "video/quicktime"}, MaxBytes: 100_000_001, MinDimension: 240, MaxDimension: 4096, MinRatio: 1.0 / 8, MaxRatio: 8, MinDuration: 1, MaxDuration: 30}
+	switch {
+	case m.ID == "happyhorse-1.1-r2v":
+		image.MinDimension, image.MaxDimension, image.MinRatio, image.MaxRatio, image.NoAlpha = 400, 0, 0, 0, false
+		m.ReferenceMediaLimits = &core.ReferenceMediaLimits{MaxFiles: 9, Image: image}
+	case strings.HasPrefix(m.ID, "wan3.0-"):
+		// https://help.aliyun.com/en/model-studio/wan3-video-generation-api-reference
+		// Input video duration plus generated duration must not exceed 30 s.
+		video.MaxDuration, video.MaxTotalDuration, video.MinFPS = 15, 15, 16
+		m.ReferenceMediaLimits = &core.ReferenceMediaLimits{MaxVideoAndOutputDuration: 30, MaxFiles: 20, Image: image, Video: video, Audio: core.MediaFileLimits{ContentTypes: []string{"audio/mpeg", "audio/wave", "audio/wav", "audio/x-wav"}, MaxBytes: 15_000_001, MinDuration: 1, MaxDuration: 15, MaxTotalDuration: 15}}
+	case m.ID == "wan2.7-r2v" || m.ID == "wan2.7-r2v-2026-06-12":
+		// Voice references belong to an individual visual asset, not Audio N.
+		// Output may reach 15 s without a video reference. The workflow's
+		// MaxDurationWithVideo retains the documented 10 s video-input cap.
+		m.MaxDuration = 15
+		m.ReferenceMediaLimits = &core.ReferenceMediaLimits{MaxFiles: 6, Image: image, Video: video}
+		m.ReferenceMediaLimits.ReferenceVoice = &core.MediaFileLimits{ContentTypes: []string{"audio/mpeg", "audio/wave", "audio/wav", "audio/x-wav"}, MaxBytes: 15_000_001, MinDuration: 1, MaxDuration: 10}
+	case m.ID == "wan2.7-image" || m.ID == "wan2.7-image-pro":
+		m.ReferenceMediaLimits = &core.ReferenceMediaLimits{MaxFiles: 9, Image: image}
+	}
+}
+
 func (a *Adapter) ValidateRequest(ctx context.Context, r core.MediaRequest) error {
 	if core.IsManualCall(ctx) {
 		return nil
@@ -192,6 +231,9 @@ func (a *Adapter) ValidateRequest(ctx context.Context, r core.MediaRequest) erro
 	}
 	for _, m := range mediaModels(true) {
 		if m.ID == id {
+			if id == "happyhorse-1.1-r2v" && o.Ratio != "" && !slices.Contains(m.Ratios, o.Ratio) {
+				return bad("unsupported HappyHorse 1.1 reference-to-video aspect ratio")
+			}
 			if err := core.ValidateReferenceMode(m, o); err != nil {
 				return err
 			}

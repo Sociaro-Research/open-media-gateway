@@ -30,17 +30,8 @@ func TestModuleAssetsAndAliases(t *testing.T) {
 		t.Fatal("legacy alias lost")
 	}
 	for _, d := range All() {
-		if d.IconType == "image/png" {
-			b, ok := Icon(d.ID)
-			if !ok || len(b) == 0 {
-				t.Fatal("raster asset missing")
-			}
-		}
-		if d.IconType == "image/svg+xml" {
-			b, ok := SVGIcon(d.ID)
-			if !ok || len(b) == 0 {
-				t.Fatal("vector asset missing")
-			}
+		if len(d.Icon) != 0 || d.IconType != "" || d.IconMonochrome {
+			t.Fatal("legacy provider logo remains", d.ID)
 		}
 	}
 }

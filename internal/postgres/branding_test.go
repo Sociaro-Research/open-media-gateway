@@ -32,6 +32,9 @@ func TestBrandingPersistenceConflictAndAudit(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.ExecContext(ctx, `UPDATE site_branding SET configuration='{}',version=1 WHERE id=TRUE`)
+	if !before.SidebarSubsections {
+		t.Fatal("unconfigured installation must enable sidebar subsections")
+	}
 	user, err := NewAuthRepository(db).UpsertGoogleUser(ctx, uuid.NewString(), uuid.NewString()+"@example.test", "Brand admin", "")
 	if err != nil {
 		t.Fatal(err)
@@ -49,7 +52,7 @@ func TestBrandingPersistenceConflictAndAudit(t *testing.T) {
 	contentWidth := 1000
 	next.SiteMaxWidth = nil
 	next.ContentMaxWidth = &contentWidth
-	next.SidebarSubsections = true
+	next.SidebarSubsections = false
 	next.Light["accent"] = "#aa11bb"
 	next.Assets["logo"] = branding.Asset{MIME: "image/svg+xml", Data: []byte(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 20"><path d="M0 0h100v20H0z"/></svg>`)}
 	saved, err := repo.SaveBranding(ctx, user.ID, next)
@@ -60,7 +63,7 @@ func TestBrandingPersistenceConflictAndAudit(t *testing.T) {
 	if err != nil || stored.Name != next.Name || stored.Light["accent"] != "#aa11bb" || string(stored.Assets["logo"].Data) != string(next.Assets["logo"].Data) {
 		t.Fatal("roundtrip", stored, err)
 	}
-	if stored.SiteMaxWidth != nil || stored.ContentMaxWidth == nil || *stored.ContentMaxWidth != contentWidth || !stored.SidebarSubsections {
+	if stored.SiteMaxWidth != nil || stored.ContentMaxWidth == nil || *stored.ContentMaxWidth != contentWidth || stored.SidebarSubsections {
 		t.Fatal("layout roundtrip", stored)
 	}
 	if _, err = repo.SaveBranding(ctx, user.ID, next); !errors.Is(err, system.ErrConflict) {
@@ -71,7 +74,7 @@ func TestBrandingPersistenceConflictAndAudit(t *testing.T) {
 	if err != nil || !strings.Contains(details, "White Label") || strings.Contains(details, "PHN2Zy") || strings.Contains(details, `"data"`) {
 		t.Fatal("audit", details, err)
 	}
-	if !strings.Contains(details, `"sidebar_subsections": true`) || !strings.Contains(details, `"content_max_width": 1000`) {
+	if !strings.Contains(details, `"sidebar_subsections": false`) || !strings.Contains(details, `"content_max_width": 1000`) {
 		t.Fatal("layout audit missing", details)
 	}
 	next = branding.Defaults()
@@ -80,7 +83,7 @@ func TestBrandingPersistenceConflictAndAudit(t *testing.T) {
 		t.Fatal(err)
 	}
 	stored, err = repo.Branding(ctx)
-	if err != nil || stored.Name != "" || len(stored.Assets) != 0 {
+	if err != nil || stored.Name != "" || len(stored.Assets) != 0 || !stored.SidebarSubsections {
 		t.Fatal("reset", stored, err)
 	}
 }

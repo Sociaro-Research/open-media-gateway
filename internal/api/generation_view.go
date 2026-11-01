@@ -11,6 +11,13 @@ import (
 )
 
 func (s *Server) generationView(r *http.Request, task core.Task) any {
+	// Company projects are shared; personal workspace labels remain private.
+	company := identity.OrganizationFromContext(r.Context())
+	sharedProject := company.ID != "" && task.OrganizationID == company.ID && task.OwnerID == company.ID
+	if !sharedProject && task.ActorID != identity.ActorID(r.Context()) {
+		task.ProjectID = ""
+		task.ProjectVersion = 0
+	}
 	view := core.GenerationView(task)
 	// Keep the native ID intact for provider_model during JSON serialization.
 	publicModel := view.Model
@@ -24,6 +31,13 @@ func (s *Server) generationView(r *http.Request, task core.Task) any {
 	}
 	// Work on the serialized representation to keep provider extensions intact.
 	fields := generationWithPermissions(view, role)
+	if data, ok := fields.(map[string]json.RawMessage); ok {
+		if (sharedProject || company.ID == "" && task.ActorID == identity.ActorID(r.Context())) && org.WriteProjects(role) {
+			data["can_change_project"] = json.RawMessage(`true`)
+		} else {
+			data["can_change_project"] = json.RawMessage(`false`)
+		}
+	}
 	if strings.HasPrefix(r.URL.Path, "/v1/organizations/") {
 		if data, ok := fields.(map[string]json.RawMessage); ok && len(task.IdentitySnapshot) > 0 {
 			data["identity_snapshot"] = task.IdentitySnapshot

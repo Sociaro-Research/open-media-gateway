@@ -39,8 +39,8 @@ func TestSoniloEncryptedConfigurationServiceCheckAndTariffs(t *testing.T) {
 	}
 	service := core.NewTaskServiceWithProviders(nil, nil, map[string]core.MediaProvider{"sonilo": m.ManagedProviders()["sonilo"]}, map[string]string{"sonilo": "text-to-music"}, "sonilo")
 	catalog := service.ListProviders(ctx)
-	if len(catalog) != 1 || catalog[0].IconURL != p.IconURL || !strings.HasPrefix(catalog[0].IconURL, "/provider-assets/sonilo/icon.png?v=") || catalog[0].IconMonochrome {
-		t.Fatalf("generation catalog lost original provider artwork: %+v", catalog)
+	if len(catalog) != 1 || catalog[0].IconURL != "" || p.IconURL != "" {
+		t.Fatalf("generation catalog retained removed provider artwork: %+v", catalog)
 	}
 	for _, kind := range m.Types() {
 		if kind.ID == "sonilo" && kind.IconURL != catalog[0].IconURL {

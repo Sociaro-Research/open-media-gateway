@@ -8,12 +8,14 @@ import (
 	"testing"
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
+	"github.com/Sociaro-Research/open-media-gateway/internal/modelcatalog"
 	"github.com/Sociaro-Research/open-media-gateway/internal/money"
+	"time"
 )
 
 func TestReviewedSpeechSnapshotsUseExactWireIDAndTariff(t *testing.T) {
 	for id, parent := range tariffAliases() {
-		if strings.Contains(id, "image") {
+		if strings.Contains(id, "image") || modelcatalog.IsInactive("openai", id, time.Now()) {
 			continue
 		}
 		t.Run(id, func(t *testing.T) {

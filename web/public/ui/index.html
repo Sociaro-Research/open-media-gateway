@@ -6,9 +6,10 @@
   <title data-page-title="">Media gateway</title>
   <script src="/ui/theme.js"></script>
   <script src="/ui/console-entry.js?v=20260916-sites" defer></script>
-  <link rel="stylesheet" href="/ui/styles.css?v=20261019-payment-actions">
+  <link rel="stylesheet" href="/ui/styles.css?v=20261027-project-menu">
   <link rel="stylesheet" href="/ui/docs.css?v=20260911-login-spacing">
-  <link rel="stylesheet" href="/ui/references.css?v=20261019-missing">
+  <link rel="stylesheet" href="/ui/references.css?v=20261025-typed">
+  <link rel="stylesheet" href="/ui/templates.css?v=20261028-editor">
 <script src="/ui/site.js" defer></script></head>
 <body>
   <div class="shell">
@@ -17,8 +18,9 @@
         <img class="brand-mark brand-wordmark" alt="" hidden>
         <img class="brand-mark brand-symbol" alt="" hidden>
       </a>
-        <nav class="section-nav" id="sectionNav" aria-label="Main navigation">
+        <nav class="section-nav" id="sectionNav" aria-label="Main navigation" hidden>
           <button class="nav-button active" id="generationNav" type="button" aria-current="page">Playground</button>
+          <button class="nav-button" id="templatesNav" type="button">Templates</button>
           <button id="configurationNav" type="button" hidden>Workspace</button>
           <button class="nav-button" id="docsNav" type="button">Docs</button>
           <button class="nav-button" id="systemNav" type="button" hidden>Administration</button>
@@ -43,7 +45,13 @@
 
     <main>
       <div id="sessionMessage" class="message" hidden></div>
-      <section class="auth-gate" id="authGate">
+      <section class="auth-gate" id="authCheck" aria-label="Session check">
+        <div class="auth-check-content">
+          <p id="authCheckStatus" role="status" aria-live="polite" aria-busy="true">Checking your session…</p>
+          <button id="authRetry" class="secondary" type="button" hidden>Try again</button>
+        </div>
+      </section>
+      <section class="auth-gate" id="authGate" hidden>
         <div class="card auth-card">
           <div class="auth-card-heading">
             <h1 id="authTitle">Sign in to get started</h1>
@@ -69,9 +77,24 @@
             <button id="authForgot" type="button" class="auth-link">Forgot password?</button>
             <button id="authBack" type="button" class="auth-link">Back</button>
           </div>
-          <p class="auth-error" id="authError" hidden>Could not sign in. Try again, or use email if you already registered.</p>
+          <p class="auth-error" id="authError" hidden>Could not sign in. Please try again or contact your administrator.</p>
           <p class="legal-links"><a href="/privacy">Privacy Policy</a><span>·</span><a href="/terms">Terms of Service</a></p>
         </div>
+      </section>
+      <section id="templatesView" hidden>
+        <div class="form-heading console-section-heading"><h1>Templates</h1></div>
+        <p id="templatesStatus" role="status" aria-live="polite"></p>
+        <div id="templatesBrowser" class="template-browser">
+          <aside class="card template-selection-panel" aria-label="Use a template">
+            <h2>Use a template</h2>
+            <div id="templateKeyHost"></div>
+            <div id="templateSelection"><p>Select a template from the gallery.</p></div>
+          </aside>
+          <section class="template-browse-panel" aria-label="Template gallery">
+            <div id="templatesGallery" class="template-gallery"></div>
+          </section>
+        </div>
+        <div id="templatesContent" hidden></div>
       </section>
       <section id="generationView" hidden>
 
@@ -223,12 +246,16 @@
 
             </div>
             <section class="generation-key" id="connectionPanel" aria-label="Generation API key and budget">
-              <div class="generation-key-heading"><label for="apiKey">Gateway API key</label><a href="/organizations" id="manageGenerationKeys">Manage keys</a></div>
               <div class="generation-key-input">
-                <input id="apiKey" type="text" class="secret-input" data-1p-ignore data-lpignore="true" data-bwignore="true" autocapitalize="off" autocorrect="off" spellcheck="false" autocomplete="off">
-                <button class="secondary" id="forgetGenerationKey" type="button">Forget key</button>
+                <label for="apiKey">Gateway API key</label>
+                <input id="apiKey" type="text" class="secret-input" aria-describedby="generationKeyHelp" data-1p-ignore data-lpignore="true" data-bwignore="true" autocapitalize="off" autocorrect="off" spellcheck="false" autocomplete="off">
               </div>
-              <div class="generation-key-actions"><button class="secondary" id="createGenerationKey" type="button">Generate new key</button><span>Saved in this tab for 24h; cleared on sign-out.</span></div>
+              <div class="generation-key-actions form-actions">
+                <button class="secondary" id="createGenerationKey" type="button">Create Playground key</button>
+                <button class="secondary" id="forgetGenerationKey" type="button" aria-describedby="generationKeyHelp">Forget key</button>
+              </div>
+              <p id="generationKeyHelp"><span id="generationKeyPolicy">Pasted keys stay in this tab for 24h; cleared on sign-out. Forget clears this tab without revoking the key.</span> <a href="/organizations" id="manageGenerationKeys">Manage keys</a></p>
+              <p id="managedGenerationHelp" hidden>Save an encrypted key for this workspace to use Playground and Templates on any signed-in browser. <button type="button" class="secondary" id="restoreGenerationKey">Use saved key</button></p>
               <p id="connectionState" role="status" hidden></p>
               <div id="generationKeyBudget" aria-live="polite" hidden></div>
               <div class="price-card" id="priceCard" hidden>
@@ -250,7 +277,9 @@
             <div>
               <h2>Journal</h2>
             </div>
+            <div class="journal-project-controls"><label class="journal-project">Project<select id="journalProject" aria-label="Project" disabled><option value="">All projects</option></select></label><button id="manageProject" class="secondary project-icon" type="button" aria-label="Project actions" aria-haspopup="menu" aria-expanded="false" disabled>⋯</button><button id="createProject" class="secondary project-icon" type="button" aria-label="Create project" title="Create project" disabled>+</button></div>
           </div>
+          <p id="projectMessage" class="form-message" role="status" hidden></p>
 
 
           <div class="task-list" id="taskList" aria-live="polite">
@@ -328,6 +357,8 @@
                 <div><span>Models</span><strong id="adminModelCount">0</strong></div>
               </div>
 
+              <div id="providerLogoEditor" hidden></div>
+
               <form id="providerForm" class="provider-form">
                 <div class="provider-dynamic-fields"></div>
                 <div class="provider-actions">
@@ -394,6 +425,8 @@
             <summary aria-label="Task actions">⋯</summary>
             <div class="task-menu-items">
               <button type="button" class="reuse-task">Copy to new task</button>
+              <button type="button" class="retry-task">Try again</button>
+              <button type="button" class="change-project" aria-label="Project" aria-haspopup="menu" aria-expanded="false">Project <span aria-hidden="true">›</span></button>
               <button type="button" class="delete-result">Delete result files</button>
             </div>
           </details>
@@ -410,10 +443,12 @@
 
   <script src="/ui/user-ui.js?v=20261013-sales-team-ui" defer></script>
   <script src="/ui/model-info.js?v=20261002-organization-roles" defer></script>
+  <script src="/ui/provider-logos.js?v=20261030"></script>
   <script src="/ui/model-picker.js" defer></script>
-  <script src="/ui/control-pickers.js?v=20261013-sales-employee-picker" defer></script>
+  <script src="/ui/control-pickers.js?v=20261027-project-lifetime" defer></script>
   <script src="/ui/form-ui.js?v=20261013-sales-team-ui" defer></script>
   <script src="/ui/layout.js" defer></script>
+  <script src="/ui/auto-update.js" defer></script>
   <script src="/ui/contacts.js?v=20261018-contact-save" defer></script>
   <script src="/ui/profile.js?v=20261019-pending-edits" defer></script>
   <script src="/ui/workspace.js?v=20261018-navigation" defer></script>
@@ -437,7 +472,15 @@
  <script src="/ui/generation-key.js?v=20260911-provider-icons" defer></script>
   <script src="/ui/email-login.js?v=20261018-invitation-continuation" defer></script>
   <script src="/ui/provider-connections.js?v=20261019-timeouts-header-draft" defer></script>
-  <script src="/ui/app.js?v=20261019-playground-save-lock-navigation" defer></script>
+  <script src="/ui/playground-projects.js?v=20261027-project-lifetime" defer></script>
+  <script src="/ui/workspace-authorization.js" defer></script><script src="/ui/remote-authorization.js" defer></script><script src="/ui/setup-selector.js" defer></script>
+  <script src="/ui/remote-workspace.js" defer></script>
+  <script src="/ui/reference-validation.js?v=20261028" defer></script>
+  <script src="/ui/reference-prompts.js?v=20261025" defer></script>
+  <script src="/ui/prompt-reference-editor.js?v=20261028-editor" defer></script>
+  <script src="/ui/reference-upload.js?v=20261028-editor" defer></script>
+  <script src="/ui/templates.js?v=20261028-integrated" defer></script>
+  <script src="/ui/app.js?v=20261027-project-lifetime" defer></script>
   <script src="/ui/email-delivery.js?v=20260914-credential-fields" defer></script>
   <script src="/ui/login-methods.js" defer></script>
   <script src="/ui/branding.js" defer></script>
@@ -452,8 +495,8 @@
   <script src="/ui/reports.js?v=20261013-sales-team-ui"></script>
   <script src="/ui/keys.js?v=20261013-sales-team-ui"></script>
   <script src="/ui/storage-usage.js?v=20260911-provider-icons"></script>
-  <script src="/ui/prompt-references.js?v=20261019-missing" defer></script>
+  <script src="/ui/prompt-references.js?v=20261028-editor" defer></script>
   <script src="/ui/provider-reference-library.js?v=20261018-assets" defer></script>
-  <script src="/ui/references.js?v=20261019-assets-native-voice" defer></script>
+  <script src="/ui/references.js?v=20261028-validation" defer></script>
 </body>
 </html>

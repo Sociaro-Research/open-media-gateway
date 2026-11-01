@@ -19,6 +19,9 @@ func knownModel(id string) bool {
 }
 
 func (a *Adapter) ValidateRequest(ctx context.Context, r core.MediaRequest) error {
+	if r.Model == "dreamina-seedance-2-5-260628" && (r.Options.ReferenceMode == "first_frame" || r.Options.ReferenceMode == "first_last_frames") && r.Options.Ratio != "" && r.Options.Ratio != "adaptive" {
+		return core.ErrOptionsInvalid
+	}
 	if err := core.ValidateReferenceURLs(describeModel(r.Model), r.Options); err != nil {
 		return err
 	}

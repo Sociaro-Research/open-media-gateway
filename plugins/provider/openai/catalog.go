@@ -73,6 +73,9 @@ func describeModel(id string) core.MediaModel {
 		m.Formats = []string{"png", "jpeg", "webp"}
 		m.SupportsImageInput = true
 		m.MaxImageInputs = 16
+		// Images edit API: PNG/JPEG/WebP, under 50 MB per input. Shared
+		// library bounds remain an additional, more conservative upload limit.
+		m.ReferenceMediaLimits = &core.ReferenceMediaLimits{MaxFiles: 16, Image: core.MediaFileLimits{ContentTypes: []string{"image/png", "image/jpeg", "image/webp"}, MaxBytes: 50_000_000}}
 		m.ReferenceModes = core.ReferenceModesFor(m)
 	case strings.HasPrefix(id, "gpt-audio"):
 		// A bounded audio reply, not verbatim narration or an interactive session.

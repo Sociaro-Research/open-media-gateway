@@ -1,0 +1,19 @@
+POST https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis
+Request body
+wan2.7-r2v, wan2.7-r2v-2026-06-12
+prompt string (Required)
+Image 1
+Video 1
+first_frame
+reference_video
+A maximum of 1 first frame image.
+Reference images + Reference videos ≤ 5
+resolution string
+720P and 1080P
+ratio string
+16:9 (default) 9:16 1:1 4:3 3:4
+duration integer
+default value is 5
+includes a video, the value must be an integer from 2 to 10
+does not include a video, the value must be an integer from 2 to 15
+prompt_extend boolean

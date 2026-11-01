@@ -64,6 +64,6 @@
       }catch(error){if(current())FormUI.message(status,error.status===409?'Another administrator changed these settings. Reopen Settings before saving.':error.message,'error');}
       finally{busy=false;for(const control of form.querySelectorAll('input,select,button'))control.disabled=false;update();FormUI.refresh();}
     });
-    return {setSystemVersion(version){if(!company)config.version=version;}};
+    return {setSystemVersion(version,previous){if(!company&&config.version===previous)config.version=version;}};
   }};
 })();

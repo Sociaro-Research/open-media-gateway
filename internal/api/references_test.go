@@ -22,6 +22,7 @@ import (
 	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
 	"github.com/Sociaro-Research/open-media-gateway/internal/references"
 	"github.com/Sociaro-Research/open-media-gateway/internal/storage"
+	"github.com/Sociaro-Research/open-media-gateway/internal/testmedia"
 	"github.com/google/uuid"
 )
 
@@ -305,10 +306,10 @@ func TestAudioVideoLibraryContentIdentity(t *testing.T) {
 		kind string
 		data []byte
 	}{
-		{"video/mp4", append([]byte{0, 0, 0, 24, 'f', 't', 'y', 'p', 'm', 'p', '4', '2', 0, 0, 0, 0, 'm', 'p', '4', '2', 'i', 's', 'o', 'm'}, make([]byte, 64)...)},
-		{"video/quicktime", append([]byte{0, 0, 0, 24, 'f', 't', 'y', 'p', 'q', 't', ' ', ' ', 0, 0, 0, 0, 'q', 't', ' ', ' ', 0, 0, 0, 0}, make([]byte, 64)...)},
-		{"audio/mpeg", append([]byte("ID3"), make([]byte, 64)...)},
-		{"audio/wave", append([]byte("RIFF\x24\x00\x00\x00WAVEfmt "), make([]byte, 64)...)},
+		{"video/mp4", testmedia.MP4(5000, 1000, 150)},
+		{"video/quicktime", func() []byte { b := testmedia.MP4(5000, 1000, 150); copy(b[8:12], "qt  "); return b }()},
+		{"audio/mpeg", testmedia.MP3()},
+		{"audio/wave", testmedia.WAV()},
 	}
 	for _, f := range fixtures {
 		t.Run(f.kind, func(t *testing.T) {

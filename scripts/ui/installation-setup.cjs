@@ -5,7 +5,7 @@ const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),
 const root=path.resolve(__dirname,'../../web/public/ui');
 let required=true,posts=[],reject=true;
 const server=http.createServer((req,res)=>{
- if(req.url==='/auth/methods'){res.setHeader('Content-Type','application/json');return res.end(JSON.stringify({setup_required:required,email:!required,google:false,email_delivery:false,email_confirmation:!required}));}
+ if(req.url==='/auth/methods'){res.setHeader('Content-Type','application/json');return res.end(JSON.stringify({setup_required:required,email:false,google:false,email_delivery:false,email_confirmation:!required}));}
  if(req.url==='/auth/setup'){
   let raw='';req.on('data',b=>raw+=b);req.on('end',()=>{const data=JSON.parse(raw);posts.push(data);res.setHeader('Content-Type','application/json');
    if(reject){res.statusCode=403;return res.end(JSON.stringify({error:{message:'The setup code is incorrect.'}}));}
@@ -44,10 +44,9 @@ const server=http.createServer((req,res)=>{
   assert.ok(await page.evaluate(()=>![...Object.values(localStorage),...Object.values(sessionStorage)].some(v=>v.includes('passphrase')||v.includes('x'.repeat(43)))));
   reject=false;await form.getByRole('button',{name:'Create owner account',exact:true}).click();await page.getByRole('heading',{name:'Administration'}).waitFor();
   const session=(await page.context().cookies()).find(c=>c.name==='media_gateway_session');assert.ok(session?.httpOnly);assert.equal(posts.length,2);
-  // Subsequent sign-in remains possible before email delivery is configured.
-  await page.context().clearCookies();await page.goto(base);await page.getByRole('button',{name:'Continue with email'}).click();
-  await page.getByRole('heading',{name:'Sign in with email'}).waitFor();assert.equal(await page.locator('#authModeSwitch').isVisible(),false);assert.equal(await page.locator('#authForgot').isVisible(),false);
+  // Setup creates a session without mail; later ordinary sign-in needs a configured method.
+  await page.context().clearCookies();await page.goto(base);await page.locator('#authUnavailable').waitFor();assert.equal(await page.getByRole('button',{name:'Continue with email'}).isVisible(),false);assert.equal(await page.locator('#googleLogin').isVisible(),false);assert.equal(await page.locator('.email-auth-form:visible').count(),0);
   assert.equal(await page.locator('#email-setup-form').isVisible(),false);assert.deepEqual(errors,[]);
-  console.log('PASS: first-owner setup, shared responsive fields, keyboard controls, incorrect-code retry, session reload, no secret storage and password sign-in without email delivery.');
+  console.log('PASS: first-owner setup, shared responsive fields, keyboard controls, incorrect-code retry, session reload, no secret storage and a truthful unavailable-login state until delivery or Google is configured.');
  }finally{await browser.close();server.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;server.close()});
