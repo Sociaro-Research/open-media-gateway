@@ -87,25 +87,26 @@ func resourceScopeArgs(ctx context.Context) []any {
 }
 
 const resourceOwnerWhere = `owner_id=$2 AND provider_owner_id=$3 AND ($4='' OR actor_id=$4)`
+const presetBindingOwnerWhere = `owner_id=$2 AND provider_owner_id=$3 AND ($4='' OR actor_id=$4 OR is_preset)`
 
 func (r *ProviderResourceRepository) GetBinding(ctx context.Context, id string) (providerresources.Binding, error) {
 	if !validResourceUUID(id) {
 		return providerresources.Binding{}, providerresources.ErrNotFound
 	}
 	args := append([]any{id}, resourceScopeArgs(ctx)...)
-	return scanResource(r.db.QueryRowContext(ctx, `SELECT `+resourceColumns+` FROM provider_resources WHERE id=$1 AND `+resourceOwnerWhere, args...))
+	return scanResource(r.db.QueryRowContext(ctx, `SELECT `+resourceColumns+` FROM provider_resources WHERE id=$1 AND `+presetBindingOwnerWhere, args...))
 }
 func resourceBindingTx(ctx context.Context, tx *sql.Tx, id, lock string) (providerresources.Binding, error) {
 	if !validResourceUUID(id) {
 		return providerresources.Binding{}, providerresources.ErrNotFound
 	}
-	return scanResource(tx.QueryRowContext(ctx, `SELECT `+resourceColumns+` FROM provider_resources WHERE id=$1 AND `+resourceOwnerWhere+lock, append([]any{id}, resourceScopeArgs(ctx)...)...))
+	return scanResource(tx.QueryRowContext(ctx, `SELECT `+resourceColumns+` FROM provider_resources WHERE id=$1 AND `+presetBindingOwnerWhere+lock, append([]any{id}, resourceScopeArgs(ctx)...)...))
 }
 func (r *ProviderResourceRepository) ListBindings(ctx context.Context, provider string, limit, offset int) ([]providerresources.Binding, error) {
 	if limit < 1 || limit > 100 || offset < 0 {
 		return nil, providerresources.ErrInvalid
 	}
-	rows, err := r.db.QueryContext(ctx, `SELECT `+resourceColumns+` FROM provider_resources WHERE owner_id=$1 AND provider_owner_id=$2 AND ($3='' OR actor_id=$3) AND provider_id=$4 ORDER BY updated_at DESC,id LIMIT $5 OFFSET $6`, identity.OwnerID(ctx), identity.ProviderOwnerID(ctx), identity.ContentAuthorFilter(ctx), provider, limit, offset)
+	rows, err := r.db.QueryContext(ctx, `SELECT `+resourceColumns+` FROM provider_resources WHERE owner_id=$1 AND provider_owner_id=$2 AND ($3='' OR actor_id=$3 OR is_preset) AND provider_id=$4 ORDER BY updated_at DESC,id LIMIT $5 OFFSET $6`, identity.OwnerID(ctx), identity.ProviderOwnerID(ctx), identity.ContentAuthorFilter(ctx), provider, limit, offset)
 	if err != nil {
 		return nil, err
 	}

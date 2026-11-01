@@ -161,6 +161,16 @@ Multi-element editing distinguishes addition (1–2cropped JPEG/PNG images), swa
 its separate owner-bound provenance workflow; native IDs are not accepted as a
 shortcut.
 
+For media models declaring `supports_presets`, the input library offers **Saved
+inputs** and **Official presets** using the shared selector and dialog. Discovery
+requires the selected `workflow_model`; it lists official element/voice presets,
+not private account inventory. Import uses an opaque five-minute ticket bound to
+the owner, provider owner, actual connection/revision and canonical selected
+consumer. It creates or reuses a local read-only binding without generating or
+registering provider content. Native IDs, provider URLs and previews remain
+private. Video presets without inspectable evidence remain unavailable. An
+uncertain import is never automatically resubmitted; inspect saved inputs first.
+
 ## Pricing and outputs
 
 Published USD Balance prices are synchronized from the separate official

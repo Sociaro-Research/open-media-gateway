@@ -1,0 +1,19 @@
+// Isolated loopback component harness: actual shared UI, synthetic API only.
+const http=require('node:http'),fs=require('node:fs'),path=require('node:path');
+const {chromium,webkit}=require('playwright');
+async function fixture(api){
+ const root=path.resolve(process.env.UI_SOURCE_DIR||'web/public/ui'),engine=process.env.UI_BROWSER_ENGINE||'chromium',errors=[],external=[],requests=[];
+ const html=`<!doctype html><html data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/references.css"></head><body><main><section id="generationView" class="panel"><div id="host"></div></section></main><script src="/form-ui.js"></script><script src="/control-pickers.js"></script><script src="/auto-update.js"></script><script src="/reference-library.js"></script><script src="/generation-artifacts.js"></script><script src="/resource-controls.js"></script><script>
+ window.fixtureAPI=async(url,options={})=>{const response=await fetch(url,{...options,headers:{'Content-Type':'application/json',...options.headers}});const data=await response.json();if(!response.ok){const error=Error(data.error?.message||'Fixture request failed');error.status=response.status;throw error;}return data;};
+ window.mountFixture=(model,initialIntent)=>{window.editor?.dispose();document.querySelector('#host').replaceChildren();window.editor=ResourceControls.mount(document.querySelector('#host'),{api:fixtureAPI,provider:{id:'fixture'},model,initialIntent});};
+ </script></body></html>`;
+ const server=http.createServer(async(req,res)=>{try{const u=new URL(req.url,'http://fixture');let chunks=[];for await(const c of req)chunks.push(c);const raw=Buffer.concat(chunks).toString(),body=raw?JSON.parse(raw):null;
+  if(u.pathname.startsWith('/v1/')){requests.push({path:u.pathname,query:u.search,method:req.method,body});const value=await api(u,req.method,body);res.writeHead(typeof value?.status==='number'?value.status:200,{'Content-Type':'application/json'});res.end(JSON.stringify(typeof value?.status==='number' ? value.data : value));return;}
+  if(u.pathname==='/'){res.writeHead(200,{'Content-Type':'text/html'});res.end(html);return;}
+  if(u.pathname==='/fixture.wav'){const wave=Buffer.alloc(44+96000);wave.write('RIFF',0);wave.writeUInt32LE(wave.length-8,4);wave.write('WAVEfmt ',8);wave.writeUInt32LE(16,16);wave.writeUInt16LE(1,20);wave.writeUInt16LE(1,22);wave.writeUInt32LE(8000,24);wave.writeUInt32LE(16000,28);wave.writeUInt16LE(2,32);wave.writeUInt16LE(16,34);wave.write('data',36);wave.writeUInt32LE(96000,40);res.writeHead(200,{'Content-Type':'audio/wav','Content-Length':wave.length});res.end(wave);return;}
+  const file=path.resolve(root,'.'+u.pathname);if(!file.startsWith(root+path.sep)||!fs.existsSync(file)){res.writeHead(404);res.end();return;}res.writeHead(200,{'Content-Type':file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'application/octet-stream'});res.end(fs.readFileSync(file));
+ }catch(error){res.writeHead(500,{'Content-Type':'application/json'});res.end(JSON.stringify({error:{message:error.message}}));}});
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+server.address().port,browser=await({chromium,webkit}[engine]).launch({headless:true}),page=await browser.newPage({viewport:{width:1440,height:1100}});page.setDefaultTimeout(7000);page.on('pageerror',e=>errors.push(e.message));await page.route('**/*',r=>{if(new URL(r.request().url()).origin!==base){external.push(new URL(r.request().url()).origin);return r.abort();}return r.continue();});await page.goto(base);await page.waitForFunction(()=>!!window.ResourceControls);
+ return {page,engine,requests,errors,external,close:async()=>{await browser.close();server.closeAllConnections();await new Promise(r=>server.close(r));}};
+}
+module.exports={fixture};

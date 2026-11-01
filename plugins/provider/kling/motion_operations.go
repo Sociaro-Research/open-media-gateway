@@ -41,7 +41,7 @@ func motionModels() []core.MediaModel {
 			m.ReferenceModes = []core.ReferenceMode{{ID: "none", Label: "Text only"}}
 		} else {
 			m.DisplayName = "Kling 2.6 · Image to video"
-			m.ResourceInputSchemas = []core.ResourceInputSchema{{Kind: "voice", MaxCount: 2}}
+			m.ResourceInputSchemas = []core.ResourceInputSchema{{Kind: "voice", SupportsPresets: true, MaxCount: 2}}
 			m.SupportsImageInput, m.RequiresImageInput, m.MinImageInputs, m.MaxImageInputs = true, true, 1, 2
 			m.ReferenceMediaLimits = frameLimits(2, 50<<20)
 			m.ReferenceModes = []core.ReferenceMode{{ID: "first_frame", Label: "First frame", MinImages: 1, MaxImages: 1, ImageRoles: []string{"first_frame"}}, {ID: "first_last_frame", Label: "First and last frames (1080p)", MinImages: 2, MaxImages: 2, ImageRoles: []string{"first_frame", "last_frame"}}}
@@ -64,7 +64,7 @@ func motionModels() []core.MediaModel {
 		}
 		if id == MotionControl3 {
 			m.RequiresImageInput, m.MinImageInputs = false, 0
-			m.ResourceInputSchemas = []core.ResourceInputSchema{{Kind: "element", MaxCount: 1, Subtypes: []string{"multi_image", "video_character"}}}
+			m.ResourceInputSchemas = []core.ResourceInputSchema{{Kind: "element", SupportsPresets: true, MaxCount: 1, Subtypes: []string{"multi_image", "video_character"}}}
 			m.ReferenceModes = append(m.ReferenceModes, core.ReferenceMode{ID: "element_motion", Label: "Managed character element and motion video", MinVideos: 1, MaxVideos: 1})
 		}
 		models = append(models, m)

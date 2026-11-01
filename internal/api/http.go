@@ -325,6 +325,7 @@ func (s *Server) handler() http.Handler {
 	s.registerReferenceRoutes(mux)
 	s.registerProviderAssetRoutes(mux)
 	s.registerProviderResourceRoutes(mux)
+	s.registerProviderPresetRoutes(mux)
 	if s.keys != nil {
 		mux.Handle("GET /v1/key", s.authenticate(http.HandlerFunc(s.currentAPIKey)))
 		mux.Handle("GET /v1/admin/reports/{id}", s.authenticate(http.HandlerFunc(s.reportDetail)))

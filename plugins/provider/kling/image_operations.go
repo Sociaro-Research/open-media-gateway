@@ -64,7 +64,7 @@ func imageModel(op imageOperation) core.MediaModel {
 	}
 	if op.id == ImageGeneration3 || op.omni {
 		m.MaxReferenceInputs = 10
-		m.ResourceInputSchemas = []core.ResourceInputSchema{{Kind: "element", MaxCount: 10, Subtypes: []string{"multi_image"}}}
+		m.ResourceInputSchemas = []core.ResourceInputSchema{{Kind: "element", SupportsPresets: true, MaxCount: 10, Subtypes: []string{"multi_image"}}}
 	}
 	m.ReferenceModes = []core.ReferenceMode{{ID: "references", Label: "References", MinImages: op.minImages, MaxImages: op.maxImages}}
 	m.ReferenceRoleSchemas = []core.ReferenceRoleSchema{{Kind: "image", Roles: []string{"reference"}, Default: "reference"}}

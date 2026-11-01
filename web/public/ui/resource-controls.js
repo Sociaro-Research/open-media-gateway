@@ -33,7 +33,31 @@
    // dialog return target before showModal without moving the viewport.
    trigger?.focus({preventScroll:true});
    const dialog=modal(title(schema.kind)+' library'),list=node('div','','resource-list'),note=node('p','','reference-status'),more=button('Load more',()=>load());
-   note.setAttribute('role','status');dialog.append(note,list,more);let offset=0,loading=false;
+   note.setAttribute('role','status');
+   const source=schema.supports_presets&&['voice','element'].includes(schema.kind)?field(dialog,'Library source','select'):null;
+   if(source){source.append(new Option('Saved inputs','saved'),new Option('Official presets','official'));source.value='saved';}
+   dialog.append(note,list,more);let offset=0,loading=false,importing=false,importUncertain=false,readVersion=0,presetPage=1,readAbort=null;
+   const official=()=>source?.value==='official',workflow=model.public_id||model.id;
+   function presetRow(item){
+    const card=node('section','','resource-item reference-card'),name=node('h3',item.name||title(item.kind)),actions=node('div','','reference-actions');card.append(name);
+    const available=item.importable===true&&typeof item.import_ticket==='string'&&Date.parse(item.ticket_expires_at)>Date.now();
+    card.append(node('p',available?'Official preset · Saved locally when selected':title(item.unavailable_reason||'Unavailable'),'field-hint'));
+    const choose=button('Use '+(item.name||title(item.kind)),async()=>{
+     if(!current()||!dialog.open||loading||importing||!available||Date.parse(item.ticket_expires_at)<=Date.now())return;
+     importing=true;choose.disabled=true;if(source)source.disabled=true;more.disabled=true;note.textContent='Saving official preset…';
+     try{const binding=await request('/v1/provider-resource-presets/import',{method:'POST',body:JSON.stringify({provider:provider.id,workflow_model:workflow,ticket:item.import_ticket})});if(!current()||!dialog.open)return;if(!accepts(binding,schema)||!selectable(binding))throw Error('The imported input is unavailable. Check saved inputs.');const target=onSelect(binding);dialog.close();requestAnimationFrame(()=>{if(current()&&target?.isConnected&&!target.disabled)target.focus();});}
+     catch(error){if(current()&&dialog.open&&error.name!=='AbortError'){importUncertain=true;note.textContent=(!error.status||error.status>=500?'Import outcome is unconfirmed. Check saved inputs before trying again. ':'')+error.message;}}
+     finally{importing=false;if(source)source.disabled=false;more.disabled=false;}
+    });choose.disabled=!available;actions.append(choose);card.append(actions);return card;
+   }
+   async function loadPresets(append=false){
+    if(loading||importing||!current()||!dialog.open)return;loading=true;const version=++readVersion;readAbort?.abort();readAbort=new AbortController();more.disabled=true;note.textContent='Loading…';
+    try{const page=append?presetPage:1,data=await request('/v1/provider-resource-presets?provider='+encodeURIComponent(provider.id)+'&workflow_model='+encodeURIComponent(workflow)+'&kind='+encodeURIComponent(schema.kind)+'&page='+page,{signal:readAbort.signal});if(!current()||!dialog.open||!official()||version!==readVersion)return;if(!append)list.replaceChildren();for(const item of data.data||[])if(accepts(item,schema))list.append(presetRow(item));presetPage=page+1;more.hidden=!data.has_more;more.textContent='Load more';note.textContent=list.children.length?'':'No matching official presets.';FormUI.refresh();}
+    catch(error){if(current()&&dialog.open&&version===readVersion&&error.name!=='AbortError'){note.textContent=error.message;more.hidden=false;more.textContent='Retry loading';}}
+    finally{if(version===readVersion){loading=false;more.disabled=false;}}
+   }
+   if(source)source.onchange=()=>{importUncertain=false;readVersion++;readAbort?.abort();loading=false;offset=0;presetPage=1;list.replaceChildren();more.hidden=false;more.textContent='Load more';updates.invalidate();load();};
+   more.onclick=()=>official()?loadPresets(true):load();
    function row(item){
     const card=node('section','','resource-item reference-card'),name=node('h3',item.name||title(item.kind)),actions=node('div','','reference-actions');
     card.dataset.selected=String(selected.has(item.id));card.dataset.updateKey=item.id;card.resourceFingerprint=JSON.stringify(item);card.append(name);details(card,item);preview(card,item);
@@ -41,12 +65,13 @@
     card.append(actions);return card;
    }
    async function load(){
-    if(loading||!current())return;loading=true;more.disabled=true;note.textContent='Loading…';
-    try{const data=await request('/v1/provider-resources?provider='+encodeURIComponent(provider.id)+'&limit=50&offset='+offset);if(!current()||!dialog.open)return;const page=data.data||[];for(const item of page)if(accepts(item,schema))list.append(row(item));offset+=page.length;more.hidden=page.length<50;more.textContent='Load more';note.textContent=list.children.length?'':'No resources in this connection.';}
-    catch(e){if(current()&&e.name!=='AbortError'){note.textContent=e.message;more.textContent='Retry loading';more.hidden=false;}}
-    finally{loading=false;more.disabled=false;}
+    if(official()){await loadPresets();return;}if(loading||!current())return;loading=true;const version=++readVersion;more.disabled=true;note.textContent='Loading…';
+    try{const data=await request('/v1/provider-resources?provider='+encodeURIComponent(provider.id)+'&limit=50&offset='+offset);if(!current()||!dialog.open||official()||version!==readVersion)return;const page=data.data||[];for(const item of page)if(accepts(item,schema))list.append(row(item));offset+=page.length;more.hidden=page.length<50;more.textContent='Load more';note.textContent=list.children.length?'':'No resources in this connection.';}
+    catch(e){if(current()&&dialog.open&&!official()&&version===readVersion&&e.name!=='AbortError'){note.textContent=e.message;more.textContent='Retry loading';more.hidden=false;}}
+    finally{if(version===readVersion){loading=false;more.disabled=false;}}
    }
-   const updates=GatewayAutoUpdate.watch({root:dialog,active:()=>current()&&!loading,load:async({signal,current:fresh})=>{
+   const updates=GatewayAutoUpdate.watch({root:dialog,active:()=>current()&&!importing&&!importUncertain,load:async({signal,current:fresh})=>{
+    if(official()){await loadPresets();return;}
     try{
      const items=[];let position=0,page=[];
      do{const data=await request('/v1/provider-resources?provider='+encodeURIComponent(provider.id)+'&limit=50&offset='+position,{signal});if(!fresh())return;page=data.data||[];items.push(...page);position+=page.length;}while(page.length===50&&position<Math.max(offset,50));
@@ -56,7 +81,7 @@
      offset=position;more.hidden=page.length<50;note.textContent=list.children.length?'':'No resources in this connection.';
     }catch(e){if(fresh()&&e.name!=='AbortError')note.textContent='Could not update resources. Retrying automatically. '+e.message;}
    }});
-   dialog.addEventListener('close',()=>updates.stop(),{once:true});dialog.showModal();load();
+   dialog.addEventListener('close',()=>{readVersion++;readAbort?.abort();updates.stop();},{once:true});dialog.showModal();load();
   }
   function validateAliases(){const names=new Map(),blocked=new Set(reserved());for(const ref of refs)names.set(ref.reference_id,(names.get(ref.reference_id)||0)+1);for(const [ref,input]of aliasInputs)input.setCustomValidity(!alias(ref.reference_id)?'Use 1–64 letters, digits, hyphens or underscores, starting with a letter or digit.':blocked.has(ref.reference_id)?'This name is already reserved for a media reference.':names.get(ref.reference_id)>1?'Use a distinct resource reference name.':'');return refs.every(r=>alias(r.reference_id)&&!blocked.has(r.reference_id)&&names.get(r.reference_id)===1);}
   function syncChoosers(){for(const choose of content.querySelectorAll('[data-resource-choose]'))choose.disabled=locked()||metadataPending&&(choose.hasAttribute('data-resource-preparation')||refs.some(ref=>!records.has(ref.binding_id)));}

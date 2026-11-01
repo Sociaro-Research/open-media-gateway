@@ -11,9 +11,10 @@ import (
 )
 
 type ResourceInputSchema struct {
-	Kind     string   `json:"kind"`
-	MaxCount int      `json:"max_count"`
-	Subtypes []string `json:"subtypes,omitempty"`
+	SupportsPresets bool     `json:"supports_presets,omitempty"`
+	Kind            string   `json:"kind"`
+	MaxCount        int      `json:"max_count"`
+	Subtypes        []string `json:"subtypes,omitempty"`
 }
 
 // ReferenceResourceResolver resolves only locally authorized resource bindings.
@@ -87,7 +88,7 @@ func ValidateResourceReferences(model MediaModel, options MediaOptions) error {
 		counts[snapshot.Kind]++
 		allowed := false
 		for _, schema := range model.ResourceInputSchemas {
-			if schema.Kind == snapshot.Kind && counts[snapshot.Kind] <= schema.MaxCount && (len(schema.Subtypes) == 0 || slices.Contains(schema.Subtypes, snapshot.Subtype)) {
+			if schema.Kind == snapshot.Kind && (!snapshot.IsPreset || schema.SupportsPresets) && counts[snapshot.Kind] <= schema.MaxCount && (len(schema.Subtypes) == 0 || slices.Contains(schema.Subtypes, snapshot.Subtype)) {
 				allowed = true
 			}
 		}

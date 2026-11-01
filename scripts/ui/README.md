@@ -876,3 +876,9 @@ local shared-CSS/layout fixture compares top-level, sidebar and subsection activ
 indicators with deliberately distinct accent and readable-text roles, including
 all Settings tabs, both themes, 1440/761/760/390/320 px, keyboard/hover, custom
 accent changes and forced colors where supported. No configuration API is used.
+
+Run `node scripts/ui/provider-input-presets.cjs` for the selected-media-workflow
+official preset chooser: encrypted ticket import, expired/unavailable presets,
+owner-context changes, no automatic uncertain import retry, keyboard focus and
+both themes at 1440/390/320 px. Responses are synthetic and loopback-only; no
+provider request is made. Repeat with `UI_BROWSER_ENGINE=webkit`.

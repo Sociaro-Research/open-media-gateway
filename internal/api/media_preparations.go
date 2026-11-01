@@ -23,7 +23,7 @@ type preparationSchema struct {
 	Limits    *core.ReferenceMediaLimits    `json:"reference_media_limits,omitempty"`
 }
 
-func (s *Server) mediaWorkflowPreparations(r *http.Request, provider, workflow string) (core.MediaModel, []core.MediaModel, error) {
+func (s *Server) mediaWorkflowConsumer(r *http.Request, provider, workflow string) (core.MediaModel, error) {
 	var consumer core.MediaModel
 	for _, p := range s.visibleCatalog(r) {
 		if p.ID == provider {
@@ -36,7 +36,15 @@ func (s *Server) mediaWorkflowPreparations(r *http.Request, provider, workflow s
 		}
 	}
 	if consumer.ID == "" {
-		return consumer, nil, core.ErrModelUnavailable
+		return consumer, core.ErrModelUnavailable
+	}
+	return consumer, nil
+}
+
+func (s *Server) mediaWorkflowPreparations(r *http.Request, provider, workflow string) (core.MediaModel, []core.MediaModel, error) {
+	consumer, err := s.mediaWorkflowConsumer(r, provider, workflow)
+	if err != nil {
+		return consumer, nil, err
 	}
 	service, ok := s.service.(interface {
 		PreparationModelsForWorkflow(context.Context, string, string) ([]core.MediaModel, error)

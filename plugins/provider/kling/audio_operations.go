@@ -120,7 +120,7 @@ func audioModels() []core.MediaModel {
 		languages := append([]string(nil), audioPresetVoiceLanguages[voice]...)
 		tts.VoiceChoices = append(tts.VoiceChoices, core.VoiceChoice{ID: voice, Languages: languages, DefaultLanguage: languages[0], IsDefault: i == 0})
 	}
-	tts.ResourceInputSchemas = []core.ResourceInputSchema{{Kind: "voice", MaxCount: 1}}
+	tts.ResourceInputSchemas = []core.ResourceInputSchema{{Kind: "voice", SupportsPresets: true, MaxCount: 1}}
 	tts.Parameters = []core.ParameterField{number("voice_speed", "Speech rate (one decimal place)", 0.8, 2, false)}
 	tts.ReferenceModes = []core.ReferenceMode{{ID: "none", Label: "Text only"}}
 	tts.Pricing = core.MediaModelPricing{Known: true, ReferencePriceUSD: 0.007, ReferenceDescription: "Published USD balance list price per TTS request; a reviewed preset voice or one managed voice and its matching zh/en language are required."}
