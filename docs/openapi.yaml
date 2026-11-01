@@ -2143,7 +2143,7 @@ paths:
       tags: [Organizations]
       operationId: checkOrganizationStorage
       summary: Test organization S3 without saving
-      description: Managers only, including administrators who also hold this membership. Verifies write, read and delete access using a temporary object and checks PUT/GET/HEAD browser preflights for the configured frontend origin (falling back to the request Origin). Missing browser access returns storage_browser_setup_required. Does not switch storage or change CORS.
+      description: Managers only, including administrators who also hold this membership. Verifies write, read and delete access using a temporary object and checks PUT/GET/HEAD browser preflights for the configured frontend origin (falling back to the request Origin). Missing browser access returns storage_browser_setup_required. Outbound private-address policy rejection returns storage_endpoint_blocked; DNS resolution failure returns storage_endpoint_dns_failed. Other connection failures retain storage_check_failed. Diagnostic messages omit credentials, signed URLs and raw transport details. Does not switch storage or change CORS.
       x-required-scope: organizations:manage
       requestBody:
         required: true
@@ -3222,7 +3222,7 @@ paths:
       tags: [System]
       operationId: post_v1_system_storage_check
       summary: Shared — Test proposed storage settings without saving
-      description: Creates, reads and deletes a uniquely named temporary object under the configured prefix. Does not list or create buckets. Uses saved credentials if omitted. A successful check does not activate the settings. Also validates PUT/GET/HEAD browser preflights for configured UI_PUBLIC_URL (or API_PUBLIC_URL), falling back to the request Origin. Without either, retains the server-only probe. Missing browser access returns storage_browser_setup_required. No bucket CORS is changed.
+      description: Creates, reads and deletes a uniquely named temporary object under the configured prefix. Does not list or create buckets. Uses saved credentials if omitted. A successful check does not activate the settings. Also validates PUT/GET/HEAD browser preflights for configured UI_PUBLIC_URL (or API_PUBLIC_URL), falling back to the request Origin. Without either, retains the server-only probe. Missing browser access returns storage_browser_setup_required. Outbound private-address policy rejection returns storage_endpoint_blocked; DNS resolution failure returns storage_endpoint_dns_failed. Other connection failures retain storage_check_failed. Diagnostic messages omit credentials, signed URLs and raw transport details. No bucket CORS is changed.
       x-system-administrator-required: true
       x-required-scope: system:manage
       requestBody:
@@ -6355,7 +6355,7 @@ paths:
       tags: [Storage admin]
       operationId: post_v1_admin_storage_check
       summary: Test proposed storage settings without saving
-      description: Creates, reads and deletes a uniquely named temporary object under the configured prefix. Does not list or create buckets. Uses saved credentials if omitted. A successful check does not activate the settings. Also validates PUT/GET/HEAD browser preflights for configured UI_PUBLIC_URL (or API_PUBLIC_URL), falling back to the request Origin. Without either, retains the server-only probe. Missing browser access returns storage_browser_setup_required. No bucket CORS is changed.
+      description: Creates, reads and deletes a uniquely named temporary object under the configured prefix. Does not list or create buckets. Uses saved credentials if omitted. A successful check does not activate the settings. Also validates PUT/GET/HEAD browser preflights for configured UI_PUBLIC_URL (or API_PUBLIC_URL), falling back to the request Origin. Without either, retains the server-only probe. Missing browser access returns storage_browser_setup_required. Outbound private-address policy rejection returns storage_endpoint_blocked; DNS resolution failure returns storage_endpoint_dns_failed. Other connection failures retain storage_check_failed. Diagnostic messages omit credentials, signed URLs and raw transport details. No bucket CORS is changed.
       x-required-scope: storage:manage
       requestBody:
         required: true

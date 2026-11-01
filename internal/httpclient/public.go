@@ -3,6 +3,7 @@ package httpclient
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"net/netip"
@@ -13,6 +14,11 @@ import (
 )
 
 var ErrOutboundDestination = errors.New("outbound destination must use a permitted HTTP(S) network address")
+
+// Classified causes retain ErrOutboundDestination compatibility without carrying
+// resolver details, destination URLs, headers or response bodies.
+var ErrOutboundPrivateDestination = fmt.Errorf("%w: private or special-use destination blocked", ErrOutboundDestination)
+var ErrOutboundDNS = fmt.Errorf("%w: endpoint hostname could not be resolved", ErrOutboundDestination)
 
 type publicTransport struct {
 	base    *http.Transport
@@ -55,15 +61,21 @@ func newPublic(timeout time.Duration, hosts []string, lookup func(context.Contex
 		} else {
 			ips, err = lookup(ctx, "ip", host)
 			if err != nil {
-				return nil, ErrOutboundDestination
+				if ctx.Err() != nil {
+					return nil, ctx.Err()
+				}
+				return nil, ErrOutboundDNS
 			}
 		}
 		if len(ips) == 0 {
-			return nil, ErrOutboundDestination
+			return nil, ErrOutboundDNS
 		}
 		for _, ip := range ips {
-			if !ip.IsValid() || ip.Zone() != "" || (!webhookurl.PublicIP(ip) && !allowed[strings.ToLower(strings.TrimSuffix(host, "."))]) {
+			if !ip.IsValid() || ip.Zone() != "" {
 				return nil, ErrOutboundDestination
+			}
+			if !webhookurl.PublicIP(ip) && !allowed[strings.ToLower(strings.TrimSuffix(host, "."))] {
+				return nil, ErrOutboundPrivateDestination
 			}
 		}
 		for _, ip := range ips {
@@ -103,6 +115,13 @@ func (t *publicTransport) RoundTrip(request *http.Request) (*http.Response, erro
 		return nil, ErrOutboundDestination
 	}
 	if !t.private[strings.ToLower(strings.TrimSuffix(u.Hostname(), "."))] && webhookurl.Validate(u.String()) != nil {
+		host := strings.ToLower(strings.TrimSuffix(u.Hostname(), "."))
+		if host == "localhost" || strings.HasSuffix(host, ".localhost") {
+			return nil, ErrOutboundPrivateDestination
+		}
+		if ip, err := netip.ParseAddr(host); err == nil && ip.Zone() == "" && !webhookurl.PublicIP(ip) {
+			return nil, ErrOutboundPrivateDestination
+		}
 		return nil, ErrOutboundDestination
 	}
 	if u.Scheme != "https" && !t.private[strings.ToLower(strings.TrimSuffix(u.Hostname(), "."))] && carriesOutboundSecrets(request) {

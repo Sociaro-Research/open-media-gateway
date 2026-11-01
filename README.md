@@ -99,6 +99,12 @@ public use, follow [server installation and updates](deploy/ghcr/README.md) and
 the [deployment guide](docs/deployment.md). Review and replace the included
 privacy and terms operator templates for your installation. Keep development configurations private.
 
+For private MinIO or another self-hosted S3 endpoint, an operator must explicitly
+set `OUTBOUND_ALLOW_PRIVATE_HOSTS` to the exact trusted hostname or IP. Both Gateway
+and worker must resolve and reach that endpoint; allowlisting does not create
+Docker DNS records or network routes. See [private storage setup](docs/configuration.md#private-minio-and-other-internal-s3-endpoints)
+and the [outbound security policy](SECURITY.md#known-preview-limitations).
+
 ## Learn more
 
 - [Installation options, HTTPS, troubleshooting, and updates](deploy/ghcr/README.md)

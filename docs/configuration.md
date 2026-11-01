@@ -304,6 +304,39 @@ changes and becomes disabled again after saving or reverting the changes.
 Personal API keys need `storage:manage` to read, change or test storage settings.
 Generation-only keys cannot configure storage.
 
+### Private MinIO and other internal S3 endpoints
+
+Private, loopback, link-local and special-use destinations are blocked by default,
+including Docker/LAN MinIO addresses. A connection check can therefore be rejected
+before MinIO receives an HTTP request. Only the installation operator may set
+`OUTBOUND_ALLOW_PRIVATE_HOSTS` to a comma-separated list of **exact trusted endpoint
+hostnames or IP literals**, for example `minio.internal`. Use no scheme, port,
+path, wildcard or subnet. Match the hostname used in the endpoint; allowing a
+resolved IP does not allow a different hostname. Configure the intended exception
+in both Gateway and worker runtime environments and recreate/restart those services
+to apply an operator-approved change. Merely changing storage fields does not
+change outbound policy. No exception is added automatically.
+
+Both processes must resolve the hostname and reach its S3 API port. A Docker
+service name works only in the networks where that name is resolvable; an allowlist
+entry does not configure DNS, attach a container network, publish ports or add
+routes. Use the S3 API endpoint rather than the MinIO browser console, retain the
+service's signing region, and enable path-style addressing where required.
+Custom services accept explicit `http://`; use HTTPS where available. Public
+secret-bearing connections still require HTTPS. An unallowlisted HTTP hostname
+can fail this HTTPS requirement before DNS is checked; that failure retains the
+generic diagnostic. Exceptions also affect other
+provider/storage/media traffic to the same host, so choose only trusted operator
+controlled destinations. See [SECURITY.md](../SECURITY.md#known-preview-limitations).
+
+Test connection returns sanitized HTTP 400 diagnostics: `storage_endpoint_blocked`
+means the private-address policy rejected the endpoint;
+`storage_endpoint_dns_failed` means its hostname could not be resolved. Check DNS
+and routing from both Gateway and worker before investigating credentials. Other
+service/authentication/network failures retain the generic `storage_check_failed`
+response; credentials, signed URLs, raw transport details and response bodies are
+never included in these diagnostics.
+
 Each generation's result and optional video last frame use one destination selected
 when archiving begins. S3 object keys include the prefix, account ID and task ID.
 The existing `STORAGE_MAX_BYTES` limit applies separately to each artifact. Worker archival uploads

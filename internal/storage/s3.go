@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
+	"github.com/Sociaro-Research/open-media-gateway/internal/httpclient"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -34,6 +35,10 @@ type S3Config struct {
 }
 
 var ErrInvalidConfig = errors.New("invalid storage configuration")
+
+// Safe domain causes; never wrap an SDK/transport error that may contain secrets.
+var ErrPrivateEndpoint = errors.New("storage endpoint blocked by outbound private-address policy")
+var ErrEndpointDNS = errors.New("storage endpoint hostname could not be resolved")
 
 func (c *S3Config) normalize() error {
 	c.Endpoint = strings.TrimRight(strings.TrimSpace(c.Endpoint), "/")
@@ -267,6 +272,12 @@ func safeS3Error(operation string, err error) error {
 		case "AccessDenied", "InvalidAccessKeyId", "SignatureDoesNotMatch":
 			return fmt.Errorf("S3 %s denied; check credentials and bucket permissions", operation)
 		}
+	}
+	if errors.Is(err, httpclient.ErrOutboundPrivateDestination) {
+		return fmt.Errorf("S3 %s failed: %w", operation, ErrPrivateEndpoint)
+	}
+	if errors.Is(err, httpclient.ErrOutboundDNS) {
+		return fmt.Errorf("S3 %s failed: %w", operation, ErrEndpointDNS)
 	}
 	// SDK errors can contain endpoint URLs, access key IDs and remote response text.
 	return fmt.Errorf("S3 %s failed; check endpoint, region, bucket and network connectivity", operation)
