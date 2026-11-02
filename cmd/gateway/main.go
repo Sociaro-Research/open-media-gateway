@@ -34,22 +34,8 @@ import (
 )
 
 func main() {
-	if len(os.Args) > 1 && os.Args[1] == "admin" {
-		if err := adminCommand(os.Args[2:]); err != nil {
-			slog.Error("admin command failed", "error", err)
-			os.Exit(1)
-		}
-		return
-	}
-	if len(os.Args) == 2 && os.Args[1] == "healthcheck" {
-		if err := healthcheck(); err != nil {
-			slog.Error("healthcheck failed", "error", err)
-			os.Exit(1)
-		}
-		return
-	}
-	if err := run(); err != nil {
-		slog.Error("gateway stopped", "error", err)
+	if err := executeCLI(os.Args[1:], os.Stdout, cliHandlers{serve: run, admin: adminCommand, health: healthcheck}); err != nil {
+		slog.Error("gateway command failed", "error", err)
 		os.Exit(1)
 	}
 }

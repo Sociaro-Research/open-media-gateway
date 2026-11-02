@@ -447,3 +447,20 @@ authenticate their owner and local ID without expiry. Do not assume an hour
 alone makes the old hostname removable. This option does not configure DNS, TLS,
 proxies or replace stored references. Redirects are not a substitute for handling
 provider fetches and API POST requests on the original host.
+
+## Gateway command line
+
+Run `gateway` without arguments to start the server. This uses the configured
+`MIGRATE` policy; its default remains `auto`. Run only the intended server process
+against an installation database.
+
+`gateway --help` (also `-h` or `help`) and `gateway --version` (also `version`)
+return locally without loading configuration or connecting to services. Version
+output reports available Go build identity and VCS metadata; unversioned builds
+report `(devel)` rather than an assumed release number.
+
+`gateway healthcheck` checks the running server's loopback health endpoint.
+`gateway admin --help` lists administrative commands; valid administrative
+operations retain their database requirements and migration behavior. Unknown
+commands and extra arguments to help, version or healthcheck fail with nonzero
+status before service startup.

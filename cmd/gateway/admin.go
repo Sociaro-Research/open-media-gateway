@@ -15,8 +15,8 @@ import (
 )
 
 func adminCommand(args []string) error {
-	if len(args) == 0 {
-		return errors.New("usage: gateway admin setup-code | init --email EMAIL [--name NAME] | users [--search EMAIL] | bootstrap|grant|revoke|issue-key --user-id UUID | catalog-warnings [--provider ID] | catalog-document --hash SHA256")
+	if err := validateAdminCommand(args); err != nil {
+		return err
 	}
 	flags := flag.NewFlagSet("admin "+args[0], flag.ContinueOnError)
 	id := flags.String("user-id", "", "existing user ID")
