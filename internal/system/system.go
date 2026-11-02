@@ -39,7 +39,20 @@ type Settings struct {
 func Defaults() Settings {
 	return Settings{AllowInlineReferences: true, GenerationUI: true, PersonalProviders: true, Version: 1}
 }
+
+// Effective closes legacy hybrid access without mutating stored configuration.
+// Shared/company service wins; a legacy disabled installation remains fail-closed.
+func (s Settings) Effective() Settings {
+	if s.SharedResources {
+		s.PersonalProviders = false
+	}
+	return s
+}
 func (s Settings) Validate() error {
+	if s.SharedResources == s.PersonalProviders {
+		return errors.New("choose exactly one provider mode: personal or company service")
+	}
+
 	if err := s.MarkupPercent.Validate(); err != nil {
 		return err
 	}
@@ -80,7 +93,7 @@ type Repository interface {
 
 // Public omits billing controls from the unauthenticated console policy.
 func (s Settings) Public() map[string]any {
-	b, _ := json.Marshal(s)
+	b, _ := json.Marshal(s.Effective())
 	var result map[string]any
 	_ = json.Unmarshal(b, &result)
 	delete(result, "markup_percent")

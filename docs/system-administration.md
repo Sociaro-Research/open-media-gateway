@@ -68,19 +68,22 @@ open the guide automatically on upgrade.
 | Scenario | `personal_providers` | `shared_resources` |
 | --- | --- | --- |
 | For myself | true | false |
-| Service for companies | reviewed optional checkbox, initially the existing value | true |
+| Service for companies | false | true |
 | Sociaro | unchanged | unchanged |
 
-These are independent resource policies. Mixed/custom settings remain valid.
-The scenario selector is their only control in Settings; Advanced settings has
-no duplicate shared-resource or personal-provider switches. Reopening selects
-the current personal/company policy, including the optional personal access in
-company mode. A legacy configuration with both policies off remains Custom
-until an Administrator explicitly applies a scenario. Choosing Sociaro opens
-the separate remote connection flow without rewriting local resource policies.
-Unrelated Advanced settings saves omit both resource-policy fields; the API
-preserves their confirmed values when omitted. Explicit API updates remain
-supported with the usual version and authorization checks.
+The two local modes are mutually exclusive, including for Administrators and
+existing keys. There is no personal-provider override in company mode. The
+selector is their only console control. Explicit API writes must select exactly
+one local provider mode; invalid combinations are rejected.
+
+Legacy hybrid rows use company service effectively, with personal provider access
+closed, without changing stored flags at startup. Legacy disabled rows remain
+fail-closed. The read-only `mode_selection_required` settings field enables an
+explicit reviewed Apply for these rows even when the effective company option
+is already selected. A mode change retains version and active-work safeguards.
+An unrelated quota write requests explicit mode selection rather than changing
+legacy provider flags implicitly. Choosing Sociaro keeps local policy unchanged
+and opens the existing remote authorization flow.
 Presets preserve `generation_ui` (UI visibility only), inline references,
 markups, storage limits, companies, credentials, credit, jobs and files. They do
 not copy personal keys into shared resources or create a funded company.

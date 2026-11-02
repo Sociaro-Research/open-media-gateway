@@ -34,7 +34,14 @@ func TestSystemSettingsPreserveScenarioPolicyWhenOmitted(t *testing.T) {
 			t.Fatal("unauthorized partial settings update", w.Code)
 		}
 		w := sendTest(h, "PUT", "/v1/system/settings", body, "alice", "")
-		if w.Code != 200 || f.settings.SharedResources != policy.shared || f.settings.PersonalProviders != policy.personal {
+		if !policy.shared && !policy.personal {
+			if w.Code != 400 || f.writes != 0 {
+				t.Fatal("disabled legacy policy silently enabled", w.Code)
+			}
+			continue
+		}
+		expectedPersonal := policy.personal && !policy.shared
+		if w.Code != 200 || f.settings.SharedResources != policy.shared || f.settings.PersonalProviders != expectedPersonal {
 			t.Fatalf("policy %+v changed: %d %s", policy, w.Code, w.Body.String())
 		}
 		if f.settings.GenerationUI || f.settings.AllowInlineReferences || !f.settings.CustomerWorkspaces || !f.settings.SetupPending || f.settings.SharedStorageLimitBytes != &limit {
@@ -42,7 +49,7 @@ func TestSystemSettingsPreserveScenarioPolicyWhenOmitted(t *testing.T) {
 		}
 		w = sendTest(h, "GET", "/v1/system/settings", "", "alice", "")
 		var read system.Settings
-		if err := json.Unmarshal(w.Body.Bytes(), &read); err != nil || w.Code != 200 || read.SharedResources != policy.shared || read.PersonalProviders != policy.personal {
+		if err := json.Unmarshal(w.Body.Bytes(), &read); err != nil || w.Code != 200 || read.SharedResources != policy.shared || read.PersonalProviders != expectedPersonal {
 			t.Fatal("confirmed read lost scenario policy", w.Code, err, read)
 		}
 		before := f.settings
@@ -100,7 +107,11 @@ func TestSetupProfilePreservesSettingsAndAuthorization(t *testing.T) {
 	}
 	f.fail = false
 	w := sendTest(h, "POST", "/v1/system/setup-profile", `{"profile":"operator","allow_personal":true,"version":1}`, "alice", "")
-	if w.Code != 200 || !f.settings.SharedResources || !f.settings.PersonalProviders || f.settings.SetupPending {
+	if w.Code != 400 || f.settings != settings {
+		t.Fatal("hybrid override accepted", w.Code)
+	}
+	w = sendTest(h, "POST", "/v1/system/setup-profile", `{"profile":"operator","version":1}`, "alice", "")
+	if w.Code != 200 || !f.settings.SharedResources || f.settings.PersonalProviders || f.settings.SetupPending {
 		t.Fatal(w.Code, w.Body)
 	}
 	if !f.settings.CustomerWorkspaces || f.settings.GenerationUI || f.settings.AllowInlineReferences || f.settings.SharedStorageLimitBytes != &limit {

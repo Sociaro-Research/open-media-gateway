@@ -16,6 +16,10 @@ func (s *Server) setupProfile(w http.ResponseWriter, r *http.Request) {
 	if !decodeSystem(w, r, &in) {
 		return
 	}
+	if in.AllowPersonal {
+		writeError(w, 400, "invalid_profile", "Personal and company provider modes are mutually exclusive")
+		return
+	}
 	if centralInstallation(r) && (in.Profile != "operator" || in.AllowPersonal) {
 		centralModeError(w)
 		return
@@ -32,7 +36,7 @@ func (s *Server) setupProfile(w http.ResponseWriter, r *http.Request) {
 	current.Version = in.Version
 	current.SetupPending = false
 	current.SharedResources = in.Profile == "operator"
-	current.PersonalProviders = in.Profile == "personal" || in.AllowPersonal
+	current.PersonalProviders = in.Profile == "personal"
 	saved, err := s.system.SaveSettings(r.Context(), identity.ActorID(r.Context()), current)
 	if err != nil {
 		systemError(w, err)

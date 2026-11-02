@@ -320,6 +320,8 @@ func TestSystemScopeDoesNotBypassOrganizationWriteScope(t *testing.T) {
 		t.Run(path, func(t *testing.T) {
 			s, _ := newPersonalTestServer()
 			f := methodOrg()
+			f.settings.SharedResources = false
+			f.settings.PersonalProviders = true
 			s.system = f
 			h := s.handler()
 			_, limited := issueTestKey(t, h, "alice", `{"name":"No organization scope","scopes":["generation","system:manage"]}`)

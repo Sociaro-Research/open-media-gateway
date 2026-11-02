@@ -41,16 +41,11 @@ func TestConfiguredCentralReceivesDedicatedInstallation(t *testing.T) {
 	if err := localSystem.SetAdmin(ctx, "", localOwner.ID, true, true); err != nil {
 		t.Fatal(err)
 	}
-	settings, err := centralSystem.Settings(ctx)
-	if err != nil {
+	// Simulate a legacy disabled storage row without a new invalid settings write.
+	if _, err := centralDB.Exec(`UPDATE system_settings SET customer_workspaces=FALSE,shared_resources=FALSE,personal_providers=FALSE`); err != nil {
 		t.Fatal(err)
 	}
-	settings.CustomerWorkspaces = false
-	settings.SharedResources = false
-	settings.PersonalProviders = false
-	if _, err = centralSystem.SaveSettings(ctx, operator.ID, settings); err != nil {
-		t.Fatal(err)
-	}
+
 	existing, err := centralSystem.CreateOrganization(ctx, operator.ID, "Central operator company", operator.ID, "operator.fixture.test")
 	if err != nil {
 		t.Fatal(err)

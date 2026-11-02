@@ -70,6 +70,7 @@ func TestOrganizationSafeMethodsPreservePostgresState(t *testing.T) {
 		t.Fatal(err)
 	}
 	settings.SharedResources = true
+	settings.PersonalProviders = false
 	if _, err = sys.SaveSettings(ctx, admin.ID, settings); err != nil {
 		t.Fatal(err)
 	}

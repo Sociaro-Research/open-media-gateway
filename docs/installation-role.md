@@ -39,7 +39,7 @@ separate reviewed change. It is not an environment role override.
 ## Modes and existing settings
 
 The central installation supports **Service for companies** only. Its setup API
-accepts `profile: operator` with `allow_personal: false`. Personal and remote-client
+accepts `profile: operator`; the obsolete `allow_personal: true` override is rejected. Personal and remote-client
 setup choices, personal key issuance and personal provider/storage configuration
 are rejected server-side as well as hidden by the UI. New generation/catalog
 consumption requires a shared credential bound to an authenticated company; an
@@ -54,7 +54,7 @@ unavailable. This is not a manual opt-in. Legacy resource/onboarding flags do no
 deny central hosting or enable it on an ordinary origin. Existing settings version
 and active-job/drain safeguards still apply to explicit configuration writes.
 
-Ordinary installations retain all three modes: **For myself**, **Service for
+Ordinary installations offer two exclusive local modes and the unchanged remote connection entry: **For myself**, **Service for
 companies** and **Sociaro**. The Sociaro connection form defaults to the central
 origin from server metadata. An existing saved connection retains its original
 origin instead of silently moving when a release changes the default.

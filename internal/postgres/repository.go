@@ -13,6 +13,7 @@ import (
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
 	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
+	"github.com/Sociaro-Research/open-media-gateway/internal/system"
 )
 
 const taskColumns = `COALESCE((SELECT o.id::text FROM organizations o WHERE o.id=tasks.owner_id),''), COALESCE(actor_id::text,''), id, status, provider, model, media_type, prompt, request_options, webhook_url, provider_task_id, result_url, provider_result_url, last_frame_url, storage_key, result_content_type, result_size_bytes, result_sha256, stored_at, error, provider_usage, created_at, updated_at, owner_id, api_key_id, last_frame_storage_key, cost, provider_identity,provider_owner_id,storage_owner_id,result_deleted_at,(result_deleted_at IS NULL AND (storage_key IS NOT NULL OR EXISTS(SELECT 1 FROM stored_objects o WHERE o.task_id=tasks.id AND o.owner_id=tasks.owner_id AND o.deleted_at IS NULL))) AS has_stored_result,worker_started_at,worker_poll_errors,public_model,minimize_request_logging,had_image_input,identity_snapshot,COALESCE(project_id::text,''),project_version,template_snapshot,result_artifacts,COALESCE(to_jsonb(tasks)->'result_resource_bindings','[]'::jsonb)`
@@ -120,7 +121,7 @@ func (r *TaskRepository) CreateOrGet(ctx context.Context, task core.Task, idempo
 	if err := validateTaskResourceSnapshots(ctx, tx, task); err != nil {
 		return core.Task{}, false, err
 	}
-	if task.APIKeyID != nil {
+	if task.APIKeyID != nil || system.RequiresAdmissionCheck(ctx) {
 		if err := checkAdmissionPolicy(ctx, tx, policy); err != nil {
 			return core.Task{}, false, err
 		}

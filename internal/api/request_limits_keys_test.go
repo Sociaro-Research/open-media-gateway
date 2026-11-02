@@ -112,6 +112,7 @@ func TestLimitedKeysCompanyPostgres(t *testing.T) {
 		t.Fatal(e)
 	}
 	settings.SharedResources = true
+	settings.PersonalProviders = false
 	if _, e = sys.SaveSettings(ctx, users["root"].ID, settings); e != nil {
 		t.Fatal(e)
 	}

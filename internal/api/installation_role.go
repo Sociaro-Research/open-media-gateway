@@ -19,14 +19,15 @@ func effectiveInstallationSettings(r *http.Request, settings system.Settings) sy
 		settings.SharedResources = true
 		settings.PersonalProviders = false
 	}
-	return settings
+	return settings.Effective()
 }
 
 func (s *Server) writeInstallationSettings(w http.ResponseWriter, r *http.Request, settings system.Settings) {
 	value := struct {
 		system.Settings
 		installation.Metadata
-	}{effectiveInstallationSettings(r, settings), installation.FromContext(r.Context())}
+		ModeSelectionRequired bool `json:"mode_selection_required"`
+	}{effectiveInstallationSettings(r, settings), installation.FromContext(r.Context()), !centralInstallation(r) && settings.SharedResources == settings.PersonalProviders}
 	s.writeViewerJSON(w, r, 200, value)
 }
 

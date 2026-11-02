@@ -20,7 +20,7 @@ const server=http.createServer(async(req,res)=>{
    if(p==='/v1/system/setup-profile'){
     writes.push({path:p,data});if(failProfile)return json({error:{message:'Fixture apply failed'}},503);
     if(data.version!==state.version)return json({error:{message:'Settings changed'}},409);
-    state={...state,setup_pending:false,shared_resources:data.profile==='operator',personal_providers:data.profile==='personal'||data.allow_personal,version:state.version+1};
+    state={...state,setup_pending:false,shared_resources:data.profile==='operator',personal_providers:data.profile==='personal',version:state.version+1};
     const saved={...state},held=profileGate;profileGate=null;activeProfileResponses++;try{if(held){held.arrive();await held.wait;}return json(saved);}finally{activeProfileResponses--;}
    }
    if(p==='/v1/system/settings'){
@@ -62,7 +62,7 @@ const server=http.createServer(async(req,res)=>{
  const external=patch=>{state={...state,...patch,version:state.version+1};};
  async function open(){await page.goto(base+'/system');await form().waitFor();await settled();}
  async function fresh(patch={}){state={...defaults(),...patch};writes=[];failProfile=false;readGate=profileGate=saveGate=null;settingsReads=[];await open();}
- async function choose(profile='operator',personal=false){await page.getByRole('button',{name:'Change Mode',exact:true}).click();await dialog().waitFor();await dialog().locator('input[value='+profile+']').check();if(profile==='operator')await dialog().locator('input[type=checkbox]').setChecked(personal);}
+ async function choose(profile='operator',personal=false){await page.getByRole('button',{name:'Change Mode',exact:true}).click();await dialog().waitFor();await dialog().locator('input[value='+profile+']').check();}
  async function apply(){const response=page.waitForResponse(r=>r.url().endsWith('/v1/system/setup-profile')&&r.request().method()==='POST');await dialog().getByRole('button',{name:'Apply',exact:true}).click();const r=await response;assert.equal(r.status(),200);await dialog().waitFor({state:'hidden'});return r.json();}
  async function saveAdvanced(status=200){const response=page.waitForResponse(r=>r.url().endsWith('/v1/system/settings')&&r.request().method()==='PUT');await save().click();const r=await response;assert.equal(r.status(),status);if(status===200)await save().filter({hasText:'Saved'}).waitFor();return r;}
  async function check(name,run){if(process.env.UI_CASE_FILTER&&!name.includes(process.env.UI_CASE_FILTER))return;caseName=name;await fresh();await run();await settled();assert.deepEqual(errors,[]);results.push({name,version:state.version,writes:[...writes]});console.log('PASS '+engine+': '+name);}
@@ -73,9 +73,8 @@ const server=http.createServer(async(req,res)=>{
    await choose('personal');assert.equal(await dialog().getByRole('button',{name:'Skip for now',exact:true}).isVisible(),false);assert.equal(await dialog().getByRole('button',{name:'Apply',exact:true}).isVisible(),false);await dialog().locator('input[value=operator]').check();assert.equal(await dialog().getByRole('button',{name:'Apply',exact:true}).isVisible(),true);await dialog().locator('input[value=personal]').check();assert.equal(await dialog().getByRole('button',{name:'Apply',exact:true}).isVisible(),false);
    for(const theme of ['light','dark'])for(const width of [1440,390,320]){await page.setViewportSize({width,height:1000});await page.evaluate(t=>{document.documentElement.dataset.theme=t;document.documentElement.style.setProperty('--accent','#b5e21d');},theme);await page.waitForFunction(()=>getComputedStyle(document.querySelector('.setup-option input[type=radio]:checked')).borderTopColor==='rgb(181, 226, 29)');const radio=await dialog().locator('input[type=radio]:checked').evaluate(n=>{const s=getComputedStyle(n);return {border:s.borderTopWidth,color:s.borderTopColor,background:s.backgroundColor,width:n.getBoundingClientRect().width,height:n.getBoundingClientRect().height};});assert.deepEqual(radio,{border:'1px',color:'rgb(181, 226, 29)',background:'rgb(181, 226, 29)',width:16,height:16});await dialog().screenshot({path:evidencePath(`/tmp/mode-after-${engine}-${theme}-${width}.png`)});}await page.keyboard.press('Escape');assert.equal(writes.length,0);await page.setViewportSize({width:1440,height:1000});
   });
-  await check('Sociaro copy describes a dedicated installation company',async()=>{
-   await choose('sociaro');assert.match(await dialog().locator('.setup-option').filter({hasText:'Sociaro'}).textContent(),/new connection creates a dedicated company/i);const preview=await dialog().locator('[aria-live=polite]').textContent();assert.match(preview,/with you as Supermanager/);assert.match(preview,/reconnecting uses that same company/i);assert.doesNotMatch(preview,/create or select/i);assert.equal(writes.length,0);
-   for(const theme of ['light','dark'])for(const width of [1440,390,320]){await page.setViewportSize({width,height:1100});await page.evaluate(t=>document.documentElement.dataset.theme=t,theme);assert.equal(await dialog().evaluate(n=>n.scrollWidth<=n.clientWidth),true);await dialog().screenshot({path:evidencePath('/tmp/dedicated-company-'+theme+'-'+width+'.png')});}await page.keyboard.press('Escape');
+  await check('Sociaro benefit copy does not change local policy',async()=>{
+   await choose('sociaro');const text=await dialog().locator('.setup-option').filter({hasText:'Sociaro'}).textContent();assert.match(text,/ready-to-use providers/);assert.doesNotMatch(text,/dedicated company|all models|best price|free access/i);assert.equal(writes.length,0);assert.equal(await dialog().locator('input[type=checkbox]').count(),0);await page.keyboard.press('Escape');
   });
   await check('clean apply then advanced save',async()=>{
    await choose();const next=await apply();assert.equal(next.version,2);assert.equal(state.shared_resources,true);assert.equal(state.personal_providers,false);assert.equal(await save().isVisible(),false);assert.equal(await summary().innerText(),'Service for companies');
@@ -88,7 +87,7 @@ const server=http.createServer(async(req,res)=>{
   });
   await check('scenario policy has no competing advanced controls',async()=>{
    assert.equal(await form().locator('input[name=shared],input[name=providers]').count(),0);await input('generation').uncheck();await choose('operator',true);await apply();
-   assert.equal(await summary().innerText(),'Mixed: shared and personal providers');assert.equal(state.personal_providers,true);await saveAdvanced();assert.equal(state.personal_providers,true);assert.equal(state.shared_resources,true);assert.equal('shared_resources' in writes.at(-1).data,false);assert.equal('personal_providers' in writes.at(-1).data,false);
+   assert.equal(await summary().innerText(),'Service for companies');assert.equal(state.personal_providers,false);await saveAdvanced();assert.equal(state.personal_providers,false);assert.equal(state.shared_resources,true);assert.equal('shared_resources' in writes.at(-1).data,false);assert.equal('personal_providers' in writes.at(-1).data,false);
   });
   await check('cancel preserves draft and performs no write',async()=>{
    await input('generation').uncheck();await choose();await page.keyboard.press('Escape');await dialog().waitFor({state:'hidden'});assert.equal(writes.length,0);assert.equal(state.version,1);assert.equal(await input('generation').isChecked(),false);await saveAdvanced();assert.equal(writes.at(-1).data.version,1);

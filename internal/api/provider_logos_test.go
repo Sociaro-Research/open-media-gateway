@@ -40,7 +40,7 @@ func (f *logoAdminFixture) RemoveLogo(ctx context.Context, id string) error {
 func TestProviderLogoRemovalAuthorizationScopeFailureAndIdempotency(t *testing.T) {
 	s, _ := newPersonalTestServer()
 	settings := system.Defaults()
-	settings.SharedResources = true
+	settings.SharedResources = false
 	s.system = &systemFixture{settings: settings, admins: map[string]bool{"alice": true}}
 	f := &logoAdminFixture{logos: map[string][]byte{"alice:mock": {1}, "alice:openai": {2}, identity.SharedOwnerID + ":mock": {3}}}
 	s.providerAdmin = f
@@ -89,12 +89,13 @@ func TestProviderLogoRemovalAuthorizationScopeFailureAndIdempotency(t *testing.T
 func TestProviderLogoReadResourceModesAndRevokedVisibility(t *testing.T) {
 	s, keys := newPersonalTestServer()
 	settings := system.Defaults()
-	settings.SharedResources = true
+	settings.SharedResources = false
 	sys := &systemFixture{settings: settings, admins: map[string]bool{"alice": true}}
 	s.system = sys
 	s.providerAdmin = &logoAdminFixture{logos: map[string][]byte{"bob:mock": {1}, identity.SharedOwnerID + ":mock": {2}}}
 	h := s.handler()
 	_, personal := issueTestKey(t, h, "bob", `{"name":"Personal","resource_mode":"personal","scopes":["generation"]}`)
+	sys.settings.SharedResources = true
 	_, shared := issueTestKey(t, h, "bob", `{"name":"Shared","resource_mode":"shared","scopes":["generation"]}`)
 	privateURL := "/provider-assets/bob/mock/icon.png?v=one"
 	sharedURL := "/provider-assets/" + identity.SharedOwnerID + "/mock/icon.png?v=two"
@@ -102,10 +103,12 @@ func TestProviderLogoReadResourceModesAndRevokedVisibility(t *testing.T) {
 		url, key string
 		status   int
 	}{{privateURL, personal, 200}, {sharedURL, shared, 200}, {privateURL, shared, 404}, {sharedURL, personal, 404}} {
+		sys.settings.SharedResources = tc.key == shared
 		if w := sendTest(h, "GET", tc.url, "", "", tc.key); w.Code != tc.status {
 			t.Fatal(tc.url, w.Code, w.Body)
 		}
 	}
+	sys.settings.SharedResources = true
 	sys.settings.PersonalProviders = false
 	if w := sendTest(h, "GET", privateURL, "", "", personal); w.Code != 404 {
 		t.Fatal("disabled personal logo exposed", w.Code)
@@ -205,7 +208,7 @@ func TestProviderLogoAuthorizationValidationAndAtomicFailure(t *testing.T) {
 	s, _ := newPersonalTestServer()
 	settings := system.Defaults()
 	settings.PersonalProviders = true
-	settings.SharedResources = true
+	settings.SharedResources = false
 	s.system = &systemFixture{settings: settings, admins: map[string]bool{"alice": true}}
 	f := &logoAdminFixture{logos: map[string][]byte{}}
 	s.providerAdmin = f

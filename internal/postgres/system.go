@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
+	"github.com/Sociaro-Research/open-media-gateway/internal/installation"
 	"github.com/Sociaro-Research/open-media-gateway/internal/system"
 	"github.com/google/uuid"
 )
@@ -128,6 +129,9 @@ func (r *SystemRepository) SaveSettings(ctx context.Context, actor string, next 
 	}
 	if before.Version != next.Version {
 		return next, system.ErrConflict
+	}
+	if installation.FromContext(ctx).Role == "central" && (!next.SharedResources || next.PersonalProviders) {
+		return next, system.ErrForbidden
 	}
 	if err = next.Validate(); err != nil {
 		return next, err

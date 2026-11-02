@@ -34,6 +34,7 @@ func TestWorkspaceAuthorizationLifecycleAndIsolation(t *testing.T) {
 	settings, _ := repo.Settings(ctx)
 	settings.CustomerWorkspaces = true
 	settings.SharedResources = true
+	settings.PersonalProviders = false
 	if _, e := repo.SaveSettings(ctx, admin.ID, settings); e != nil {
 		t.Fatal(e)
 	}

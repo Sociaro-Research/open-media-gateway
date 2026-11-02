@@ -1562,6 +1562,8 @@ body:has(.detail-dialog[open]) { overflow:hidden; }
 .setup-dialog fieldset{display:grid;gap:12px;border:0;padding:0;margin:0;min-width:0}
 .setup-dialog legend{padding:0;margin-bottom:16px;font-size:16px;font-weight:600}
 .setup-dialog form>p:empty{display:none}
+/* A clean mode chooser has no footer actions; do not reserve an empty row. */
+.setup-dialog .dialog-actions:not(:has(>button:not([hidden]))){display:none}
 .setup-option{display:flex;gap:14px;align-items:flex-start;padding:16px;border:1px solid var(--line);border-radius:12px;cursor:pointer}
 .setup-option:has(input:checked){border-color:var(--accent-text,var(--accent));background:color-mix(in srgb,var(--accent) 5%,transparent)}
 .setup-option:hover{border-color:var(--muted)}

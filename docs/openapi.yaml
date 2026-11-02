@@ -210,7 +210,7 @@ paths:
     post:
       operationId: applySetupProfile
       summary: Apply a confirmed local setup profile without migrating data
-      description: Administrator plus system:manage for API keys. Preserves unrelated settings, clears setup_pending and rejects disabling access with active jobs. Skip does not call this endpoint. A trusted central installation accepts only operator with allow_personal false; role/origin metadata is read-only and does not enable hosting or add credit.
+      description: Administrator plus system:manage for API keys. Preserves unrelated settings, clears setup_pending and rejects disabling access with active jobs. Skip does not call this endpoint. Personal and operator are exclusive local provider modes for all roles. A trusted central installation accepts only operator. Legacy hybrid policy is effectively company-only, without automatic stored-state migration. Role/origin metadata is read-only; profile selection adds no credit.
       requestBody:
         required: true
         content:
@@ -221,7 +221,7 @@ paths:
               required: [profile, version]
               properties:
                 profile: {type: string, enum: [personal, operator]}
-                allow_personal: {type: boolean}
+                allow_personal: {type: boolean, enum: [false], deprecated: true, description: "Compatibility only; true is rejected. New clients omit this obsolete override."}
                 version: {type: integer, minimum: 1}
       responses:
         '200':
@@ -9600,10 +9600,11 @@ components:
           description: Administrator setting; omitted from public console policy. Defaults to zero. Omission on update preserves the current rate. Applies only to new shared-provider tasks.
         setup_pending: {type: boolean, readOnly: true, description: Administrator-only first-owner guide state; upgrades default false and Skip never writes settings.}
         shared_storage_limit_bytes: {type: [integer, 'null'], description: Set through /v1/system/storage/quota; preserved by ordinary settings updates.}
-        shared_resources: {type: boolean, default: false, description: "Enable shared providers and storage. Omission on update preserves the current policy. The console changes this only through the setup scenario. Disabling blocks new shared work; accepted tasks and existing files remain available."}
+        mode_selection_required: {type: boolean, readOnly: true, description: "An ordinary legacy hybrid or disabled row needs explicit mode selection; enables Apply for the effective choice without a startup write."}
+        shared_resources: {type: boolean, default: false, description: "Company mode. Writes require exactly one of shared_resources/personal_providers. Legacy hybrid reads are effective company-only. Disabling blocks new shared work; accepted work and existing files remain available."}
         generation_ui: {type: boolean, description: "Show the Generation screen; does not disable API generation."}
         allow_inline_references: {type: boolean, default: true, description: "Allow reference contents in provider requests. When false, HTTP(S) URLs and model-supported asset:// references are accepted and library images are not inlined. Applies at admission and dispatch to shared and personal connections. Omission on update preserves the current value."}
-        personal_providers: {type: boolean, description: "Let non-administrators manage personal provider connections. Omission on update preserves the current policy. The console changes this only through the setup scenario. Personal keys cannot start new generations while this is disabled; saved connections and history are preserved."}
+        personal_providers: {type: boolean, description: "Personal mode for every role, including Administrators. Cannot be combined with shared_resources. The console changes this only through the setup scenario. Stale personal keys cannot start new work or read a personal catalogue while this is disabled; saved connections and history are preserved."}
         version: {type: integer, minimum: 1, description: "Send the current version when updating settings."}
     SalesRole:
       type: string

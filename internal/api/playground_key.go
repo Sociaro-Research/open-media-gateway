@@ -80,12 +80,10 @@ func (s *Server) playgroundKey(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if in.OrganizationID == "" && !settings.PersonalProviders {
-			admin, e := s.systemAdmin(r.Context())
-			if e != nil || !admin {
-				writeError(w, 403, "personal_providers_disabled", "Personal providers are disabled")
-				return
-			}
+			writeError(w, 403, "personal_providers_disabled", "Personal providers are disabled")
+			return
 		}
+
 	}
 	var key apikey.Key
 	var secret string

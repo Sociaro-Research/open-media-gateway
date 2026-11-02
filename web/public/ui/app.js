@@ -128,9 +128,9 @@ let providerLogoSession=0;
 let consoleInitialized=false;
 let consolePolicy={generation_ui:true,personal_providers:true};
 window.applySystemAccess=function(settings,admin=systemAdministrator){
- consolePolicy={...consolePolicy,...settings};const central=consolePolicy.installation_role==='central';if(central)consolePolicy.personal_providers=false;const personalConfiguration=!central&&(admin||consolePolicy.personal_providers);serviceInfo.console=consolePolicy;systemAdministrator=admin;
+ consolePolicy={...consolePolicy,...settings};const central=consolePolicy.installation_role==='central';if(central){consolePolicy.shared_resources=true;consolePolicy.personal_providers=false;}else if(consolePolicy.shared_resources)consolePolicy.personal_providers=false;const personalConfiguration=!central&&!!consolePolicy.personal_providers;serviceInfo.console=consolePolicy;systemAdministrator=admin;
  document.querySelector('#systemNav').hidden=!admin;
- document.querySelector('#createGenerationKey').disabled=!admin&&!consolePolicy.personal_providers&&!consolePolicy.shared_resources;
+ document.querySelector('#createGenerationKey').disabled=!consolePolicy.personal_providers&&!consolePolicy.shared_resources;
  if(window.Workspace?.ready())Workspace.refresh().catch(()=>{});
  elements.generationNav.hidden=clientManager||!consolePolicy.generation_ui;document.querySelector('#templatesNav').hidden=clientManager||!consolePolicy.generation_ui;elements.providersNav.hidden=clientManager||!personalConfiguration;
  document.querySelector('#storageNav').hidden=clientManager||!personalConfiguration;

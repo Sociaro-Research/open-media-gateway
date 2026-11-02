@@ -56,6 +56,20 @@ func (s *Server) systemPolicy(next http.Handler) http.Handler {
 			writeError(w, 403, "shared_resources_disabled", "shared providers and storage are disabled")
 			return
 		}
+		providerConfiguration := path == "/v1/admin/providers" || strings.HasPrefix(path, "/v1/admin/providers/")
+		personalStorageConfiguration := strings.HasPrefix(path, "/v1/admin/storage")
+		if (providerConfiguration || personalStorageConfiguration) && !settings.PersonalProviders {
+			writeError(w, 403, "personal_providers_disabled", "Personal provider configuration is unavailable in company mode")
+			return
+		}
+		generationPolicy := (r.Method == http.MethodPost && isGenerationPath(path)) || isModelCatalogPath(path)
+		providerAssetAdmission := r.Method == http.MethodPost && (strings.HasPrefix(path, "/v1/references/providers/") || path == "/v1/provider-resources" || strings.HasPrefix(path, "/v1/provider-resources/"))
+		companyID := identity.OrganizationFromContext(r.Context()).ID
+		companyStorage := companyID != "" && identity.StorageOwnerID(r.Context()) == companyID
+		if (generationPolicy || providerAssetAdmission) && !settings.PersonalProviders && (identity.ProviderOwnerID(r.Context()) != identity.SharedOwnerID || identity.StorageOwnerID(r.Context()) != identity.SharedOwnerID && !companyStorage) {
+			writeError(w, 403, "personal_providers_disabled", "Personal provider access is disabled in company mode")
+			return
+		}
 		// Apply consumption policy to the account role, independently of management scopes.
 		generation := (r.Method == http.MethodPost && isGenerationPath(path)) || isModelCatalogPath(path)
 		upload := (path == "/v1/references" || strings.HasPrefix(path, "/v1/references/uploads")) && r.Method == "POST"
@@ -71,10 +85,7 @@ func (s *Server) systemPolicy(next http.Handler) http.Handler {
 				systemError(w, err)
 				return
 			}
-			if !admin && generation && !settings.PersonalProviders && identity.ProviderOwnerID(r.Context()) != identity.SharedOwnerID {
-				writeError(w, 403, "personal_providers_disabled", "personal provider access is disabled; use a shared key when shared access is enabled")
-				return
-			}
+
 			if !admin && r.Method == "POST" && identity.StorageOwnerID(r.Context()) != identity.SharedOwnerID && s.storageAdmin != nil {
 				current, err := s.storageAdmin.Get(r.Context())
 				if err != nil {
@@ -87,8 +98,6 @@ func (s *Server) systemPolicy(next http.Handler) http.Handler {
 				}
 			}
 		}
-		personalStorageConfiguration := strings.HasPrefix(path, "/v1/admin/storage")
-		providerConfiguration := path == "/v1/admin/providers" || strings.HasPrefix(path, "/v1/admin/providers/")
 		if (strings.HasPrefix(path, "/v1/system/") && !sharedTemplateRead(r)) || providerConfiguration || personalStorageConfiguration {
 			admin, err := s.systemAdmin(r.Context())
 			if err != nil {

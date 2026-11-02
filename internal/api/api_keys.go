@@ -213,16 +213,10 @@ func (s *Server) createAPIKey(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if input.ResourceMode == "personal" && !settings.PersonalProviders {
-			admin, err := s.system.IsAdmin(r.Context(), owner)
-			if err != nil {
-				systemError(w, err)
-				return
-			}
-			if !admin {
-				writeError(w, 403, "personal_providers_disabled", "personal provider access is disabled; use shared providers when enabled")
-				return
-			}
+			writeError(w, 403, "personal_providers_disabled", "Personal provider access is disabled in company mode")
+			return
 		}
+
 		if input.StorageMode == "" {
 			input.StorageMode = input.ResourceMode
 		}

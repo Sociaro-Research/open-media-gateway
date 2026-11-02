@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
+	"github.com/Sociaro-Research/open-media-gateway/internal/installation"
 	"github.com/Sociaro-Research/open-media-gateway/internal/storage"
 	"github.com/Sociaro-Research/open-media-gateway/internal/system"
 )
@@ -82,10 +83,19 @@ func TestOrganizationStoragePermissionsAndExistingKeyRouting(t *testing.T) {
 		if driver == "s3" {
 			want = fixtureOrg
 		}
+		central, err := WithPublicAPI(h, "", installation.DefaultCentralOrigin, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if w := sendTest(central, "GET", "/v1/providers", "", "", key); w.Code != 200 {
+			t.Fatalf("central company storage %s: %d %s", driver, w.Code, w.Body)
+		}
 		if service.storageOwner != want || service.consumer != fixtureOrg {
 			t.Fatalf("routing %s: %s %s", driver, service.storageOwner, service.consumer)
 		}
 	}
+	f.settings.SharedResources = false
+	f.settings.PersonalProviders = true
 	_, personal := issueTestKey(t, h, "bob", `{"name":"Personal","resource_mode":"personal"}`)
 	m.settings["bob"] = storage.Settings{Driver: "s3"}
 	if w := sendTest(h, "GET", "/v1/providers", "", "", personal); w.Code != 200 {

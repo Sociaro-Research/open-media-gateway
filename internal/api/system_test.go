@@ -224,8 +224,8 @@ func TestSharedRoutingKeepsConsumerAndRequiresAdministratorForConnections(t *tes
 		t.Fatal("shared management changed acting user")
 	}
 	w = sendTest(h, "GET", "/v1/admin/providers", "", "bob", "")
-	if w.Code != 200 || backend.providerOwner != "bob" {
-		t.Fatal("shared mode leaked into personal connections")
+	if w.Code != 403 {
+		t.Fatal("company mode allowed personal connections")
 	}
 	policy.settings.SharedResources = false
 	w = sendTest(h, "GET", "/v1/providers", "", "", secret)
