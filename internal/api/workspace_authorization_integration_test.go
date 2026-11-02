@@ -18,6 +18,7 @@ import (
 	"github.com/Sociaro-Research/open-media-gateway/internal/apikey"
 	"github.com/Sociaro-Research/open-media-gateway/internal/auth"
 	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
+	"github.com/Sociaro-Research/open-media-gateway/internal/installation"
 	"github.com/Sociaro-Research/open-media-gateway/internal/postgres"
 	"github.com/Sociaro-Research/open-media-gateway/internal/providerconfig"
 	remote "github.com/Sociaro-Research/open-media-gateway/internal/remoteworkspace"
@@ -173,12 +174,11 @@ func TestWorkspaceSignupCompanyAndInstallationEndToEnd(t *testing.T) {
 	}
 	begin["consent"] = true
 	expect(call(localHandler, "POST", "/v1/system/remote-workspace/authorization", begin, localCookie, "", false), 403)
-	settings, _ := hostSystem.Settings(ctx)
-	settings.CustomerWorkspaces = true
-	settings.SharedResources = true
-	if _, err = hostSystem.SaveSettings(ctx, hostAdmin.ID, settings); err != nil {
+	hostHandler, err = WithPublicAPI(hostHandler, "", installation.DefaultCentralOrigin, "")
+	if err != nil {
 		t.Fatal(err)
 	}
+	host.Config.Handler = hostHandler
 	w := call(localHandler, "POST", "/v1/system/remote-workspace/authorization", begin, localCookie, "", false)
 	expect(w, 200)
 	var view remote.AuthorizationView

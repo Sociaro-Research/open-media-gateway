@@ -1,7 +1,6 @@
 package postgres
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"strings"
@@ -17,7 +16,7 @@ import (
 
 func TestWorkspaceAuthorizationLifecycleAndIsolation(t *testing.T) {
 	db := auditDatabase(t, true)
-	ctx := context.Background()
+	ctx := centralWorkspaceTestContext(t)
 	repo := NewSystemRepository(db)
 	people := NewAuthRepository(db)
 	user := func(name string) identity.User {
@@ -199,7 +198,7 @@ func TestWorkspaceAuthorizationLifecycleAndIsolation(t *testing.T) {
 }
 func TestWorkspaceConsentCancellationAndSameInstallationRace(t *testing.T) {
 	db := auditDatabase(t, true)
-	ctx := context.Background()
+	ctx := centralWorkspaceTestContext(t)
 	repo := NewSystemRepository(db)
 	people := NewAuthRepository(db)
 	owner, e := people.UpsertGoogleUser(ctx, uuid.NewString(), uuid.NewString()+"@fixture.test", "Owner", "")

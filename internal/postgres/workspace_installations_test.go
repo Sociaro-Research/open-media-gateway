@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"bytes"
-	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -24,7 +23,7 @@ import (
 
 func TestDedicatedCompanyForEachExternalInstallation(t *testing.T) {
 	db := auditDatabase(t, true)
-	ctx := context.Background()
+	ctx := centralWorkspaceTestContext(t)
 	repo := NewSystemRepository(db)
 	customer, err := NewAuthRepository(db).UpsertGoogleUser(ctx, uuid.NewString(), uuid.NewString()+"@fixture.test", "External customer", "")
 	if err != nil {
@@ -66,7 +65,7 @@ func TestDedicatedCompanyForEachExternalInstallation(t *testing.T) {
 func dedicatedFixture(t *testing.T) (*sql.DB, *SystemRepository, *wa.Manager, identity.User) {
 	t.Helper()
 	db := auditDatabase(t, true)
-	ctx := context.Background()
+	ctx := centralWorkspaceTestContext(t)
 	repo := NewSystemRepository(db)
 	customer, err := NewAuthRepository(db).UpsertGoogleUser(ctx, uuid.NewString(), uuid.NewString()+"@fixture.test", "Customer", "")
 	if err != nil {
@@ -81,7 +80,7 @@ func dedicatedFixture(t *testing.T) (*sql.DB, *SystemRepository, *wa.Manager, id
 func dedicatedStart(t *testing.T, m *wa.Manager, proof, replacement string) (string, wa.Challenge) {
 	t.Helper()
 	device, _ := wa.DeviceCode()
-	v, err := m.Start(context.Background(), device, wa.Challenge{InstallationProof: proof, Label: "Same display label", Origin: "http://same-display.lan", ReplaceKey: replacement})
+	v, err := m.Start(centralWorkspaceTestContext(t), device, wa.Challenge{InstallationProof: proof, Label: "Same display label", Origin: "http://same-display.lan", ReplaceKey: replacement})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +88,7 @@ func dedicatedStart(t *testing.T, m *wa.Manager, proof, replacement string) (str
 }
 func dedicatedIssue(t *testing.T, db *sql.DB, repo *SystemRepository, m *wa.Manager, actor, device string, v wa.Challenge) wa.Challenge {
 	t.Helper()
-	ctx := context.Background()
+	ctx := centralWorkspaceTestContext(t)
 	approved, err := repo.Approve(ctx, actor, v.Code, wa.Approval{Consent: true})
 	if err != nil {
 		t.Fatal(err)
@@ -105,7 +104,7 @@ func dedicatedIssue(t *testing.T, db *sql.DB, repo *SystemRepository, m *wa.Mana
 }
 func TestDedicatedInstallationRetryCancellationExpiryAndSubstitution(t *testing.T) {
 	db, repo, m, customer := dedicatedFixture(t)
-	ctx := context.Background()
+	ctx := centralWorkspaceTestContext(t)
 	proof, _ := wa.DeviceCode()
 	device, v := dedicatedStart(t, m, proof, "")
 	issued := dedicatedIssue(t, db, repo, m, customer.ID, device, v)
@@ -167,7 +166,7 @@ func TestDedicatedInstallationRetryCancellationExpiryAndSubstitution(t *testing.
 }
 func TestDedicatedProvisioningRollbackBeforeBinding(t *testing.T) {
 	db, repo, m, customer := dedicatedFixture(t)
-	ctx := context.Background()
+	ctx := centralWorkspaceTestContext(t)
 	proof, _ := wa.DeviceCode()
 	_, request := dedicatedStart(t, m, proof, "")
 	// Fail after company/member inserts. The transaction must leave no partial tenant.
@@ -192,7 +191,7 @@ func TestDedicatedProvisioningRollbackBeforeBinding(t *testing.T) {
 }
 func TestDedicatedCompanyBudgetAndHistoryIsolation(t *testing.T) {
 	db, repo, m, customer := dedicatedFixture(t)
-	ctx := context.Background()
+	ctx := centralWorkspaceTestContext(t)
 	grants := []wa.Challenge{}
 	for range 2 {
 		proof, _ := wa.DeviceCode()
@@ -241,7 +240,7 @@ func TestDedicatedCompanyBudgetAndHistoryIsolation(t *testing.T) {
 }
 func TestInstallationIdentitySurvivesDisconnectAndLocalAdministratorChange(t *testing.T) {
 	db, repo, _, customer := dedicatedFixture(t)
-	ctx := context.Background()
+	ctx := centralWorkspaceTestContext(t)
 	other, err := NewAuthRepository(db).UpsertGoogleUser(ctx, uuid.NewString(), uuid.NewString()+"@fixture.test", "Second local administrator", "")
 	if err != nil {
 		t.Fatal(err)
@@ -268,7 +267,7 @@ func TestInstallationIdentitySurvivesDisconnectAndLocalAdministratorChange(t *te
 }
 func TestDedicatedMigrationPreservesLegacyCompanyAndGrant(t *testing.T) {
 	db := auditDatabase(t, false)
-	ctx := context.Background()
+	ctx := centralWorkspaceTestContext(t)
 	goose.SetBaseFS(migrations)
 	if err := goose.SetDialect("postgres"); err != nil {
 		t.Fatal(err)
@@ -374,7 +373,7 @@ func TestDedicatedMigrationPreservesLegacyCompanyAndGrant(t *testing.T) {
 
 func TestLegacyOriginSpellingRenewalPreservesOperationScope(t *testing.T) {
 	db, repo, _, customer := dedicatedFixture(t)
-	ctx := context.Background()
+	ctx := centralWorkspaceTestContext(t)
 	if _, err := db.Exec(`UPDATE users SET is_system_admin=TRUE WHERE id=$1`, customer.ID); err != nil {
 		t.Fatal(err)
 	}

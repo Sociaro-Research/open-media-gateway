@@ -148,7 +148,18 @@ func (m *Manager) BeginAuthorization(ctx context.Context, owner, origin, name, c
 		return AuthorizationView{}, ErrConflict
 	}
 	if response.StatusCode == 403 {
-		return AuthorizationView{}, wa.ErrDisabled
+		// Only a complete bounded known error identifies disabled onboarding.
+		// Never surface arbitrary upstream text or classify all authorization errors alike.
+		raw, readErr := io.ReadAll(io.LimitReader(response.Body, 4097))
+		var problem struct {
+			Error struct {
+				Code string `json:"code"`
+			} `json:"error"`
+		}
+		if readErr == nil && len(raw) <= 4096 && json.Unmarshal(raw, &problem) == nil && problem.Error.Code == "workspace_onboarding_disabled" {
+			return AuthorizationView{}, wa.ErrDisabled
+		}
+		return AuthorizationView{}, wa.ErrForbidden
 	}
 	if response.StatusCode != 200 {
 		return AuthorizationView{}, ErrUnavailable

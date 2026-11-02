@@ -15,6 +15,7 @@ import (
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/apikey"
 	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
+	"github.com/Sociaro-Research/open-media-gateway/internal/installation"
 	"github.com/Sociaro-Research/open-media-gateway/internal/modelaccess"
 	"github.com/Sociaro-Research/open-media-gateway/internal/providerconfig"
 	"github.com/Sociaro-Research/open-media-gateway/internal/system"
@@ -113,6 +114,16 @@ func TestProviderLogoReadResourceModesAndRevokedVisibility(t *testing.T) {
 	sys.settings.SharedResources = false
 	if w := sendTest(h, "GET", sharedURL, "", "", shared); w.Code != 404 {
 		t.Fatal("disabled shared logo exposed", w.Code)
+	}
+	central, err := WithPublicAPI(h, "", installation.DefaultCentralOrigin, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if w := sendTest(central, "GET", sharedURL, "", "", shared); w.Code != 200 {
+		t.Fatal("central derived shared logo policy", w.Code)
+	}
+	if w := sendTest(central, "GET", privateURL, "", "", personal); w.Code != 404 {
+		t.Fatal("central derived personal logo policy", w.Code)
 	}
 	sys.settings.SharedResources = true
 	policy := &modelAccessMemory{org: map[string]map[string]bool{}}

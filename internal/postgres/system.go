@@ -141,6 +141,8 @@ func (r *SystemRepository) SaveSettings(ctx context.Context, actor string, next 
 			return next, system.ErrSetupBusy
 		}
 	}
+	// Retain the legacy value, which no longer controls hosting.
+	next.CustomerWorkspaces = before.CustomerWorkspaces
 	next.Version++
 	_, err = tx.ExecContext(ctx, `UPDATE system_settings SET generation_ui=$1,personal_providers=$2,version=$3,shared_resources=$4,shared_storage_limit_bytes=$5,allow_inline_references=$6,markup_basis_points=$7,setup_pending=$8,customer_workspaces=$9 WHERE id=TRUE`, next.GenerationUI, next.PersonalProviders, next.Version, next.SharedResources, next.SharedStorageLimitBytes, next.AllowInlineReferences, next.MarkupPercent, next.SetupPending, next.CustomerWorkspaces)
 	if err != nil {

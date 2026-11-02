@@ -40,7 +40,7 @@ paths:
       operationId: startInstallationAuthorization
       summary: Start an explicit device-style installation request
       security: []
-      description: Requires host customer_workspaces and shared_resources opt-in. The installation backend persists a separate random 32-byte installation_proof across requests/renewal/reconnect and generates a temporary random device_code; neither enters a browser or URL. Proof digests bind one authenticated customer and one dedicated new company. Starts are idempotent for the same device code, proof and metadata. Rate limited. No identity, company, key or credit is created here. This bounded protocol is not an OAuth compatibility claim.
+      description: Requires the trusted configured canonical central installation role; legacy onboarding/resource flags cannot confer hosting on ordinary installations or disable central hosting. The installation backend persists a separate random 32-byte installation_proof across requests/renewal/reconnect and generates a temporary random device_code; neither enters a browser or URL. Proof digests bind one authenticated customer and one dedicated new company. Starts are idempotent for the same device code, proof and metadata. Rate limited. No identity, company, key or credit is created here. This bounded protocol is not an OAuth compatibility claim.
       requestBody:
         required: true
         content:
@@ -9598,7 +9598,6 @@ components:
         markup_percent:
           allOf: [{"$ref": "#/components/schemas/MarkupPercent"}]
           description: Administrator setting; omitted from public console policy. Defaults to zero. Omission on update preserves the current rate. Applies only to new shared-provider tasks.
-        customer_workspaces: {type: boolean, default: false, description: "Explicit host opt-in to dedicated installation-company provisioning; also requires shared_resources. Role detection never enables this setting. Existing credentials/billing remain independent."}
         setup_pending: {type: boolean, readOnly: true, description: Administrator-only first-owner guide state; upgrades default false and Skip never writes settings.}
         shared_storage_limit_bytes: {type: [integer, 'null'], description: Set through /v1/system/storage/quota; preserved by ordinary settings updates.}
         shared_resources: {type: boolean, default: false, description: "Enable shared providers and storage. Omission on update preserves the current policy. The console changes this only through the setup scenario. Disabling blocks new shared work; accepted tasks and existing files remain available."}

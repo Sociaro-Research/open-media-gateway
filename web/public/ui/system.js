@@ -21,12 +21,10 @@
       const form=el('form',undefined,'system-settings');
       form.innerHTML=`<label class="system-toggle"><input type="checkbox" name="generation"><span><strong>Show Playground / Templates</strong><small>Show the Playground and Templates screens. Turning this off hides both sections; API generation stays available.</small></span></label>
       <label class="system-toggle"><input type="checkbox" name="inlineReferences"><span><strong>Allow reference files in generation requests</strong><small>Allow supported providers to receive reference image contents with the request. When off, providers receive only HTTP(S) links or supported registered asset references. Applies to shared and personal connections when generation starts.</small></span></label>
-      <label class="system-toggle"><input type="checkbox" name="customerWorkspaces"><span><strong>Allow customer workspace onboarding</strong><small>Allow external installations to create dedicated companies. Each initiating customer manages their installation’s company as Supermanager. Requires shared resources and working sign-in; creates no credit.</small></span></label>
       <button class="primary compact" type="submit">Save</button>`;
-      form.elements.customerWorkspaces.checked=!!data.customer_workspaces;
       form.elements.inlineReferences.checked=data.allow_inline_references!==false;
       form.elements.generation.checked=data.generation_ui;
-      const fields={generation:'generation_ui',inlineReferences:'allow_inline_references',customerWorkspaces:'customer_workspaces'},values=state=>Object.fromEntries(Object.values(fields).map(key=>[key,!!state[key]])),read=()=>Object.fromEntries(Object.entries(fields).map(([name,key])=>[key,form.elements[name].checked]));
+      const fields={generation:'generation_ui',inlineReferences:'allow_inline_references'},values=state=>Object.fromEntries(Object.values(fields).map(key=>[key,!!state[key]])),read=()=>Object.fromEntries(Object.entries(fields).map(([name,key])=>[key,form.elements[name].checked]));
       let confirmed=values(data),saving=false,refreshing=false;
       systemPanel.append(form);const save=form.querySelector('button[type=submit]');FormUI.watch(form,save,{heading:advancedHeading,read:()=>JSON.stringify(read()),valid:()=>!saving&&!refreshing});
       function reconcile(next,submitted=confirmed,previousVersion){advanceMarkup(next.version,previousVersion);if(next.version<data.version)return false;const draft=read();for(const [name,key]of Object.entries(fields))if(draft[key]===submitted[key])form.elements[name].checked=!!next[key];confirmed=values(next);Object.assign(data,next);FormUI.commit(form,JSON.stringify(confirmed));return true;}

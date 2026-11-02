@@ -11,6 +11,7 @@ import (
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/apikey"
 	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
+	"github.com/Sociaro-Research/open-media-gateway/internal/installation"
 	org "github.com/Sociaro-Research/open-media-gateway/internal/organization"
 	wa "github.com/Sociaro-Research/open-media-gateway/internal/workspaceauth"
 	"github.com/google/uuid"
@@ -26,11 +27,11 @@ func scanWorkspaceChallenge(row interface{ Scan(...any) error }) (v wa.Challenge
 	return
 }
 func workspaceHost(ctx context.Context, tx *sql.Tx) error {
-	settings, err := readSystemSettings(ctx, tx, true)
+	_, err := readSystemSettings(ctx, tx, true)
 	if err != nil {
 		return err
 	}
-	if !settings.CustomerWorkspaces || !settings.SharedResources {
+	if installation.FromContext(ctx).Role != "central" {
 		return wa.ErrDisabled
 	}
 	return nil

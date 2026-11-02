@@ -14,11 +14,19 @@ func centralInstallation(r *http.Request) bool {
 func centralModeError(w http.ResponseWriter) {
 	writeError(w, 403, "central_companies_only", "The configured central installation supports service for companies only")
 }
+func effectiveInstallationSettings(r *http.Request, settings system.Settings) system.Settings {
+	if centralInstallation(r) {
+		settings.SharedResources = true
+		settings.PersonalProviders = false
+	}
+	return settings
+}
+
 func (s *Server) writeInstallationSettings(w http.ResponseWriter, r *http.Request, settings system.Settings) {
 	value := struct {
 		system.Settings
 		installation.Metadata
-	}{settings, installation.FromContext(r.Context())}
+	}{effectiveInstallationSettings(r, settings), installation.FromContext(r.Context())}
 	s.writeViewerJSON(w, r, 200, value)
 }
 
@@ -32,7 +40,7 @@ func centralRemoteClientRequest(r *http.Request) bool {
 }
 
 func installationConsolePolicy(r *http.Request, settings system.Settings) map[string]any {
-	policy := settings.Public()
+	policy := effectiveInstallationSettings(r, settings).Public()
 	meta := installation.FromContext(r.Context())
 	policy["installation_role"] = meta.Role
 	policy["central_origin"] = meta.CentralOrigin

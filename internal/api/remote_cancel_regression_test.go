@@ -62,7 +62,7 @@ func TestCancellationKeepsProofUnlessHostConfirms(t *testing.T) {
 }
 func TestExpiredCancellationRevokesIssuedKeyBeforeClearingProof(t *testing.T) {
 	db := workspaceDatabase(t)
-	ctx := context.Background()
+	ctx := configuredCentralTestContext(t)
 	owner, e := postgres.NewAuthRepository(db).UpsertGoogleUser(ctx, uuid.NewString(), uuid.NewString()+"@fixture.test", "Owner", "")
 	if e != nil {
 		t.Fatal(e)

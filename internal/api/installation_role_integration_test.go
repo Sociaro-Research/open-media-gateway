@@ -45,8 +45,8 @@ func TestConfiguredCentralReceivesDedicatedInstallation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	settings.CustomerWorkspaces = true
-	settings.SharedResources = true
+	settings.CustomerWorkspaces = false
+	settings.SharedResources = false
 	settings.PersonalProviders = false
 	if _, err = centralSystem.SaveSettings(ctx, operator.ID, settings); err != nil {
 		t.Fatal(err)

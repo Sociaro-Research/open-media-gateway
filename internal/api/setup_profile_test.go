@@ -29,7 +29,7 @@ func TestSystemSettingsPreserveScenarioPolicyWhenOmitted(t *testing.T) {
 		f := &setupFixture{systemFixture: &systemFixture{settings: settings, admins: map[string]bool{"alice": true}}}
 		s.system = f
 		h := s.handler()
-		body := `{"generation_ui":false,"allow_inline_references":false,"customer_workspaces":true,"version":1}`
+		body := `{"generation_ui":false,"allow_inline_references":false,"version":1}`
 		if w := sendTest(h, "PUT", "/v1/system/settings", body, "bob", ""); w.Code != 403 || f.writes != 0 {
 			t.Fatal("unauthorized partial settings update", w.Code)
 		}

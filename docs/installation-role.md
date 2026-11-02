@@ -47,13 +47,12 @@ older unbound shared key cannot start new central work. New reference uploads,
 provider-resource creation/estimates and project writes require a company. Installation-wide template authoring keeps
 its existing administrator and shared-library checks.
 
-Role detection does not rewrite stored settings, create a company, grant access,
-enable customer onboarding or add funds. For an older installation whose new
-central origin matches while its stored policy is personal or mixed, explicitly
-apply Service for companies through the normal reviewed setup form. Existing
-active-job/drain and optimistic-version checks still apply. Raw settings remain
-visible to administrators; the public console policy reports personal providers
-as unavailable for central. Incompatible direct settings updates are rejected.
+Role detection does not rewrite stored settings, create a company, grant a key
+or add funds. Central automatically hosts dedicated customer onboarding and uses
+an effective shared-resource, companies-only policy with personal providers
+unavailable. This is not a manual opt-in. Legacy resource/onboarding flags do not
+deny central hosting or enable it on an ordinary origin. Existing settings version
+and active-job/drain safeguards still apply to explicit configuration writes.
 
 Ordinary installations retain all three modes: **For myself**, **Service for
 companies** and **Sociaro**. The Sociaro connection form defaults to the central
@@ -62,9 +61,10 @@ origin instead of silently moving when a release changes the default.
 
 ## Dedicated installation companies
 
-The central server can receive an external installation only through the existing
-explicit `customer_workspaces` and shared-resources hosting policy, supported
-sign-in and the dedicated-company protocol. The external operator authenticates
+The central server receives external installations through its canonical role,
+supported sign-in and the dedicated-company protocol. The legacy
+`customer_workspaces` column cannot be changed through settings or confer hosting
+on an ordinary installation. The external operator authenticates
 with their own central account. A new installation receives a new separate
 company, its initiating customer becomes Supermanager, and all generation,
 history, balance and result operations use that company. The central owner's

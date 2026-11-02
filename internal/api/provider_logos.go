@@ -96,6 +96,7 @@ func (s *Server) providerLogo(w http.ResponseWriter, r *http.Request) {
 	if !allowed && s.system != nil {
 		settings, err := s.system.Settings(ctx)
 		if err == nil {
+			settings = effectiveInstallationSettings(r, settings)
 			scopes, _ := ctx.Value(apiKeyScopesContextKey{}).([]string)
 			key := identity.APIKeyID(ctx) != nil
 			// Configuration readers see their own logos under the same personal

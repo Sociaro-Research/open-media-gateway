@@ -25,7 +25,7 @@ type SettingsReader interface {
 }
 
 type Settings struct {
-	CustomerWorkspaces      bool          `json:"customer_workspaces"`
+	CustomerWorkspaces      bool          `json:"-"`
 	SetupPending            bool          `json:"setup_pending,omitempty"`
 	MarkupPercent           money.Percent `json:"markup_percent"`
 	AllowInlineReferences   bool          `json:"allow_inline_references"`

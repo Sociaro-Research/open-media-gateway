@@ -103,7 +103,7 @@ and an existing remote workspace. It has no separate global-header shortcut.
 The header's current-company selector continues to open the local company;
 it does not connect to another installation. Company-service and personal
 scenarios continue to manage local resource policy independently of the remote
-connection. The host's **Allow customer workspace onboarding** gate is unchanged.
+connection. Hosting is derived from the host's configured central installation role; there is no onboarding switch.
 
 For a new connection, enter the trusted public HTTPS server origin and an
 installation name, then explicitly consent to sending that name and the browser
@@ -186,14 +186,16 @@ so use a trusted browser session.
 
 ### Hosting and lifecycle
 
-Hosting customer onboarding is an explicit **off-by-default** setting:
-**Settings → System → Allow customer workspace onboarding**
-(`customer_workspaces`). It also requires `shared_resources`, working browser
-sign-in/registration and a public HTTPS console/API origin. Enabling shared mode
-alone never enables self-service company creation. Upgrades preserve existing
-behavior. This code does not activate an installation, configure a public paid
-Sociaro endpoint or assert any provider's resale permission. Hosting activation,
-provider terms/catalogue, funding, storage and payment setup remain operator work.
+Customer onboarding is hosted automatically by the canonical central installation,
+as derived from the trusted configured console origin. Ordinary installations,
+including staging, cannot enable hosting. There is no writable
+`customer_workspaces` setting; legacy stored values have no authority and remain
+preserved. Central uses its companies-only shared-resource policy even when old
+stored resource flags differ. Role detection itself writes no configuration,
+creates no company or funds, and revokes no grant. Browser sign-in, provider
+rights/catalogue, funding, storage and payment readiness remain prerequisites.
+Authorized grant reads, cancellation and revocation remain available after a role
+change, with the existing ownership and cancellation-proof checks.
 
 New companies retain the existing $0 funding and allowance defaults. Use the
 existing company controls for credit, member limits, model grants, storage and

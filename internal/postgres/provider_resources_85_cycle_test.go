@@ -28,7 +28,7 @@ import (
 // only by 085, through the supported schema-81 application rollback window.
 func TestProviderResources85CombinedCyclePreservesMetadataAndStoredBytes(t *testing.T) {
 	db := auditDatabase(t, false)
-	ctx := context.Background()
+	ctx := centralWorkspaceTestContext(t)
 	goose.SetBaseFS(migrations)
 	if err := goose.SetDialect("postgres"); err != nil {
 		t.Fatal(err)

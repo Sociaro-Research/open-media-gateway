@@ -50,6 +50,7 @@ func (s *Server) systemPolicy(next http.Handler) http.Handler {
 			systemError(w, err)
 			return
 		}
+		settings = effectiveInstallationSettings(r, settings)
 		path := r.URL.Path
 		if (identity.ProviderOwnerID(r.Context()) == identity.SharedOwnerID || identity.StorageOwnerID(r.Context()) == identity.SharedOwnerID) && !settings.SharedResources && ((r.Method == "POST" && r.Pattern != "POST /v1/references/uploads/{id}/complete") || isModelCatalogPath(path)) && !strings.HasPrefix(path, "/v1/system/") {
 			writeError(w, 403, "shared_resources_disabled", "shared providers and storage are disabled")
@@ -155,6 +156,10 @@ func (s *Server) systemSettings(w http.ResponseWriter, r *http.Request) {
 	if !decodeSystem(w, r, &input) {
 		return
 	}
+	if input.CustomerWorkspaces != nil {
+		writeError(w, 400, "read_only_setting", "Customer workspace hosting is determined by the configured installation role")
+		return
+	}
 	if input.GenerationUI == nil {
 		writeError(w, 400, "invalid_request", "generation_ui is required")
 		return
@@ -164,14 +169,11 @@ func (s *Server) systemSettings(w http.ResponseWriter, r *http.Request) {
 		systemError(w, err)
 		return
 	}
-	next := current
+	next := effectiveInstallationSettings(r, current)
 	next.GenerationUI = *input.GenerationUI
 	next.Version = input.Version
 	if input.PersonalProviders != nil {
 		next.PersonalProviders = *input.PersonalProviders
-	}
-	if input.CustomerWorkspaces != nil {
-		next.CustomerWorkspaces = *input.CustomerWorkspaces
 	}
 	if input.MarkupPercent != nil {
 		next.MarkupPercent = *input.MarkupPercent
