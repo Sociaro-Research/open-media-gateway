@@ -1808,3 +1808,15 @@ input[type=color]:focus-visible { outline:none; box-shadow:none; border:2px soli
 .media-preparation-dialog[open] { display:grid; gap:16px; }
 .media-preparation-dialog > :is(p,label) { margin:0; }
 .media-preparation-dialog .reference-actions { display:flex; gap:12px; flex-wrap:wrap; }
+
+/* One public/authenticated shell; the footer stays in document flow. */
+.site-page { display:flex; flex-direction:column; }
+.site-page > .shell { display:flex; flex-direction:column; min-height:100vh; padding-bottom:0; }
+.site-page > main,.site-page > .shell > main { flex:1; min-width:0; }
+.site-footer { flex-shrink:0; border-top:1px solid var(--line); padding:20px 0; color:var(--muted); }
+.site-page > .site-footer { width:min(var(--site-max-width,1280px),calc(100% - 2 * var(--site-gutter,20px))); margin-inline:auto; }
+.site-footer nav { display:flex; justify-content:flex-end; flex-wrap:wrap; gap:20px; }
+.site-footer a { display:inline-flex; align-items:center; min-height:44px; color:var(--muted); font-size:var(--type-detail); text-decoration:none; }
+.site-footer a:hover { color:var(--highlight); text-decoration:underline; text-underline-offset:3px; }
+.section-nav > a.nav-button { display:inline-flex; align-items:center; text-decoration:none; }
+@media(max-width:760px) { .site-footer nav { justify-content:center; } .site-page > .site-footer { width:calc(100% - 24px); } }

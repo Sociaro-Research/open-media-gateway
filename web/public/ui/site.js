@@ -1,5 +1,36 @@
 (() => {
   'use strict';
+  // Shared console/docs header: measure intrinsic content without resize feedback.
+  function bindHeader(header){
+    const nav=header.querySelector('nav'),brand=header.querySelector('.brand'),account=header.querySelector('.topbar-actions');
+    if(!nav||!brand)return;
+    nav.classList.add('section-nav');
+    const wordmark=brand.querySelector('.brand-wordmark'),symbol=brand.querySelector('.brand-symbol');
+    const layout=()=>{
+      const visible=[...nav.children].filter(n=>!n.hidden&&getComputedStyle(n).display!=='none');
+      const style=getComputedStyle(header),navStyle=getComputedStyle(nav);
+      const navWidth=visible.reduce((sum,n)=>sum+n.getBoundingClientRect().width,0)+Math.max(0,visible.length-1)*(parseFloat(navStyle.columnGap)||0);
+      const maximum=parseFloat(style.getPropertyValue('--brand-full-width'))||190;
+      const imageWidth=image=>image?.naturalHeight?Math.min(maximum,image.naturalWidth/image.naturalHeight*parseFloat(getComputedStyle(image).height)):40;
+      const controls=navWidth+(account?.getBoundingClientRect().width||0)+2*(parseFloat(style.columnGap)||0);
+      const compact=imageWidth(wordmark)+controls>header.clientWidth;
+      header.classList.toggle('compact-brand',compact);
+      header.classList.toggle('wrapped',(compact?imageWidth(symbol):imageWidth(wordmark))+controls>header.clientWidth);
+    };
+    let frame;const schedule=()=>{if(!frame)frame=requestAnimationFrame(()=>{frame=undefined;layout();});};
+    const observer=new ResizeObserver(schedule);[header,brand,nav,account].filter(Boolean).forEach(n=>observer.observe(n));
+    new MutationObserver(schedule).observe(nav,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['hidden']});
+    [wordmark,symbol].filter(Boolean).forEach(n=>n.addEventListener('load',schedule));
+    document.fonts.ready.then(schedule);window.addEventListener('resize',schedule);schedule();
+  }
+  document.querySelectorAll('.topbar').forEach(bindHeader);
+  // A single footer survives authentication, section changes and delayed site reads.
+  const footer=document.createElement('footer');footer.className='site-footer';
+  const legal=document.createElement('nav');legal.setAttribute('aria-label','Legal');footer.append(legal);
+  for(const [label,kind]of [['Terms of Use','terms'],['Privacy Policy','privacy']]){
+    const link=document.createElement('a');link.textContent=label;link.href='/'+kind;link.dataset.legalLink=kind;legal.append(link);
+  }
+  document.body.classList.add('site-page');(document.querySelector('.shell')||document.body).append(footer);
   let appearance;
   const systemOnly=['system','docs'].includes(document.documentElement.dataset.themeMode);
   let presetPreference='';
@@ -74,6 +105,7 @@
     const meta=document.querySelector('meta[name="gateway-url"]');if(meta)meta.content=site.api_url||location.origin;
     if(site.docs_url&&['/docs','/docs/'].includes(location.pathname)&&site.docs_url!==location.origin)location.replace(window.GatewayTheme?.docsURL(site.docs_url+'/'+location.hash)||site.docs_url+'/'+location.hash);
     document.querySelectorAll('[data-console-link]').forEach(n=>n.href=(site.ui_url||'')+'/');
+    footer.querySelectorAll('[data-legal-link]').forEach(n=>n.href=new URL('/'+n.dataset.legalLink,site.ui_url||location.origin).href);
     if(window.GatewaySite)window.GatewaySite.current=site;
     return site;
   }).catch(()=>({api_url:location.origin,ui_url:location.origin}));

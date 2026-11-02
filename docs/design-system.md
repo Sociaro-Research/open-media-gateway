@@ -85,12 +85,20 @@ its desktop/mobile layout and keyboard navigation separately. The console's
 palette and content security policy remain unchanged outside this path; Grafana
 supplies its own nonce-based content security policy.
 
-The standalone public documentation always follows the OS theme, including live
-changes, using the same shared palette. Its root declares
-`data-theme-mode="system"` before the shared theme script runs. It has no theme
-selector, uses the installation's default color preset, and neither reads nor
-writes the console's saved mode or color preset preference,
-including when served at `/docs` on the same origin during local development.
+The standalone documentation uses the console's shared palette, header measurement,
+logo, divider and navigation components. Its header links are **Console** and
+**Docs**, with Docs marked as the current page using the shared active underline.
+It has no separate theme selector and uses the installation's public default color
+preset. The saved or transferred Light/Dark/System mode follows the documented
+preference rules in [Public sites](public-sites.md#documentation-display-theme);
+System follows live OS changes. Documentation does not request account preferences.
+
+Every console, sign-in, recovery and legal page and the documentation page share
+the same in-flow legal footer with **Terms of Use** and **Privacy Policy** links.
+Use the configured Console origin's `/terms` and `/privacy` public pages; do not
+link to backend JSON endpoints or infer a Console hostname from a docs hostname.
+The footer uses shared colors, spacing and touch targets, remains below content,
+and wraps on narrow screens. Authentication or section changes must not remove it.
 
 ## 3. Controls
 

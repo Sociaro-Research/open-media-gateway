@@ -896,3 +896,7 @@ Run `node scripts/ui/generated-audio-inputs.cjs` for archived TTS audio/artifact
 selection, explicit artifact identity across restore and rename, selected-output
 preview, source removal and foreign/expired-source exclusion. This uses the same
 shared component harness and synthetic responses; repeat in Chromium and WebKit.
+
+The responsive header regression (`node scripts/ui/header-resize.cjs`) loads the
+shared public shell implementation, verifies a single in-flow footer and checks
+window/container resizing without observer feedback in both browser engines.

@@ -68,8 +68,11 @@ Every user selects a published **Color theme** in **Profile → Appearance**, us
 the existing inline Save. This choice is independent of **Theme** (Dark, Light,
 System), persists across sessions and does not change another user's selection.
 **Site default** follows later administrator changes. An unavailable saved ID
-renders the default safely. Public documentation always follows the OS mode and
-the installation default, ignoring personal console preferences.
+renders the default safely. Public documentation uses the installation's default
+color preset with the shared console tokens and shell. It accepts a transferred
+Light/Dark/System mode, or the documented same-origin/shared-cookie preference;
+an independent direct visit defaults to System. It never requests private account
+preferences. See [Public sites](public-sites.md#documentation-display-theme).
 
 Presets contain colors only. Site identity, images, widths and navigation settings
 remain installation-wide. Additional optional roles are `accent-text`, `chart-1`,

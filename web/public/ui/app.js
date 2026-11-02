@@ -1,34 +1,3 @@
-// Measure the full wordmark independently of the current logo, so resizing
-// switches full logo → symbol → wrapped navigation without oscillation.
-{
-  const header=document.querySelector('.topbar'), nav=document.querySelector('#sectionNav');
-  const brand=header.querySelector('.brand'), account=header.querySelector('.topbar-actions');
-  const wordmark=brand.querySelector('.brand-wordmark'),symbol=brand.querySelector('.brand-symbol');
-  const layoutHeader=()=>{
-    const items=[...nav.children].filter(item=>!item.hidden&&getComputedStyle(item).display!=='none');
-    const navWidth=items.reduce((width,item)=>width+item.getBoundingClientRect().width,0)+Math.max(0,items.length-1)*parseFloat(getComputedStyle(nav).columnGap);
-    const gap=parseFloat(getComputedStyle(header).columnGap);
-    const maximum=parseFloat(getComputedStyle(header).getPropertyValue('--brand-full-width'));
-    const imageWidth=(image,fallback)=>image.naturalHeight?Math.min(maximum,image.naturalWidth/image.naturalHeight*parseFloat(getComputedStyle(image).height)):fallback;
-    const fullWidth=imageWidth(wordmark,40),symbolWidth=imageWidth(symbol,40);
-    const controlsWidth=navWidth+account.getBoundingClientRect().width+gap*2;
-    const compact=fullWidth+controlsWidth>header.clientWidth;
-    header.classList.toggle('compact-brand',compact);
-    header.classList.toggle('wrapped',(compact?symbolWidth:fullWidth)+controlsWidth>header.clientWidth);
-  };
-  // The logo link must retain its intrinsic width for measuring available space.
-  // Defer writes outside ResizeObserver delivery; container changes can otherwise
-  // resize the observed navigation again in the same WebKit delivery cycle.
-  let layoutFrame;
-  const scheduleLayout=()=>{if(layoutFrame)return;layoutFrame=requestAnimationFrame(()=>{layoutFrame=undefined;layoutHeader();});};
-  const observer=new ResizeObserver(scheduleLayout);
-  [header,brand,nav,account].forEach(element=>observer.observe(element));
-  new MutationObserver(layoutHeader).observe(nav,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['hidden']});
-  [wordmark,symbol].forEach(image=>image.addEventListener('load',layoutHeader));
-  document.fonts.ready.then(layoutHeader);
-  window.addEventListener('resize',layoutHeader);
-}
-
 const expandedTaskParameters = new Set();
 const elements = {
   form: document.querySelector('#taskForm'),
