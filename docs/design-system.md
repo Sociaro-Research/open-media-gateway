@@ -627,7 +627,7 @@ Primary buttons center their content vertically through the shared flex alignmen
 
 Prompt labels use the common FormUI code-point counter and declared model maximum: **Prompt (10,000 characters max)** when empty and **Prompt (5,550 / 10,000 characters)** when filled. Remove detached duplicate counts, preserve validation and update on typing, paste, clear and model changes. Unknown model bounds remain unknown.
 
-Use Image URLs and Advanced Settings disclosures match Image References heading typography, with the shared chevron after the text: right when collapsed, up when expanded, and 16px before expanded content. Ordinary dropdown arrows retain their existing direction. Keep native keyboard and expanded semantics, retain values through collapse and omit the separator before Advanced Settings. Override Sound has its own sibling panel and heading after Output settings.
+Use Image URLs and Advanced Settings disclosures match Image References heading typography, with the shared chevron after the text: right when collapsed, up when expanded, and 16px before expanded content. Ordinary dropdown arrows retain their existing direction. Keep native keyboard and expanded semantics, retain values through collapse and omit the separator before Advanced Settings. Override Sound has its own sibling panel and heading after the Playground fields. Template authoring retains its existing output-settings panel.
 
 Templates have one current content and a Published visibility switch. Save applies current edits immediately, including to published templates. Do not expose internal revisions, a separate published draft or version history in the interface. Compare every UI change with this design system and complete the spacing and visual review gate above.
 
@@ -656,6 +656,8 @@ and supported Auto inference. Reference files retain their ordered identities an
 must pass the selected target's existing compatibility checks before generation.
 
 Playground and Template authoring share `ModelControls`. Only declared media-role schemas produce role choices; a single declared default needs no selector. Save only non-default overrides at the ordered image/video addresses. Removal and reordering move the matching roles by slot index, including duplicate URLs. Role-bearing reference cards reserve enough width for the shared floating picker and wrap as whole cards on narrow screens. A role is generation intent, never client-supplied media evidence or a native resource ID.
+
+Playground uses a flat field flow: Model, main parameters (including typed parameters), Prompt, Reference mode, then References. Do not add an Output settings heading, tinted panel or nested grouping. Keep the ordinary 20px peer spacing and shared responsive grids. Audio, Override Sound, resources and advanced controls remain available when declared.
 
 Descriptors that permit inference expose Auto (infer). This preserves omission of duration or aspect ratio instead of substituting a model default. Other models retain their declared ordinary defaults. Custom duration and its inference choice form one shared 12px group; hidden controls stay disabled across saves and validation. Unknown quantity means Estimate unavailable even with a verified tariff; only an explicit numeric zero may display Free, and an unavailable quote never enables confirmation.
 

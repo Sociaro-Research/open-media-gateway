@@ -954,7 +954,6 @@ function updateModelUI({preserve=true}={}) {
    delete settings.voice;settings.language=model.languages?.includes(previous.language)?previous.language:model.languages?.[0]||'';
   }
   renderedPlaygroundModel=model;renderedPlaygroundProvider=provider.id;
-  document.querySelector('#settingsTitle').textContent=model.session_operation?'Session settings':model.resource_operation?'Resource settings':'Output settings';
   const isVideo = model.media_type === 'video';
   const isImage = model.media_type === 'image';
   const isSpeech = model.media_type === 'speech';
@@ -1002,7 +1001,7 @@ function updateModelUI({preserve=true}={}) {
   elements.watermarkOption.hidden = isSpeech || !!model.no_watermark;
   elements.seed.closest('div').hidden = !!model.no_seed;
   elements.seed.max = model.max_seed || (isVideo ? 4294967295 : 2147483647);
-  document.querySelectorAll('#commonMediaFields > div').forEach(field => {
+  document.querySelectorAll('#mainMediaFields > div,#commonMediaFields > div').forEach(field => {
     field.querySelectorAll('input, select, textarea').forEach(input => { input.disabled = field.hidden || !!input.closest('[hidden]'); });
   });
   for(const [key,field] of Object.entries(optionFields)){
@@ -1743,7 +1742,7 @@ function renderProviderFields(provider){
 }
 
 function renderModelParameters(model,values={},outputCount=1){
- let area=document.querySelector('#modelParameters');if(!area){area=document.createElement('div');area.id='modelParameters';document.querySelector('#commonMediaFields').append(area);}
+ let area=document.querySelector('#modelParameters');if(!area){area=document.createElement('div');area.id='modelParameters';document.querySelector('#mainMediaFields').append(area);}
  modelParameterEditor=ModelControls.parameters(area,model,values,()=>{pendingSubmission=null;updatePrice();},outputCount);
 }
 

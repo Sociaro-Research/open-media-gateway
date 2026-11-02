@@ -6,7 +6,7 @@
   <title data-page-title="">Media gateway</title>
   <script src="/ui/theme.js"></script>
   <script src="/ui/console-entry.js?v=20261030-recovered-batch" defer></script>
-  <link rel="stylesheet" href="/ui/styles.css?v=20261102-shared-shell">
+  <link rel="stylesheet" href="/ui/styles.css?v=20261102-playground-fields">
   <link rel="stylesheet" href="/ui/docs.css?v=20261030-recovered-batch">
   <link rel="stylesheet" href="/ui/references.css?v=20261031-gw249">
   <link rel="stylesheet" href="/ui/templates.css?v=20261031-gw242">
@@ -112,17 +112,8 @@
               <option value="">Loading models…</option>
             </select>
 
-            <label for="prompt">Prompt</label>
-            <textarea id="prompt" name="prompt"></textarea>
-
-            <section class="generation-settings" id="generationSettings" aria-labelledby="settingsTitle">
-              <div class="settings-heading">
-                <div>
-                  <strong id="settingsTitle">Output settings</strong>
-                </div>
-              </div>
-
-              <div class="settings-grid" id="visualSettings">
+<div class="playground-fields" id="generationSettings">
+<div class="settings-grid" id="visualSettings">
                 <div id="resolutionField">
                   <label for="resolution">Resolution</label>
                   <select id="resolution" name="resolution" required></select>
@@ -136,10 +127,63 @@
                   <input id="duration" name="duration" type="number" required>
                 </div>
               </div>
+<div class="advanced-grid" id="mainMediaFields">
+<div id="qualityField" hidden>
+                  <label for="quality">Quality</label>
+                  <select id="quality" name="quality"></select>
+                </div>
+<div id="backgroundField" hidden>
+                  <label for="background">Background</label>
+                  <select id="background" name="background"></select>
+                </div>
+<div id="formatField" hidden>
+                  <label for="format">File format</label>
+                  <select id="format" name="format"></select>
+                </div>
+<div id="voiceField" hidden>
+                  <label for="voice">Voice</label>
+                  <input id="voice" name="voice" list="voiceOptions">
+                  <datalist id="voiceOptions"></datalist>
+                </div>
+<div id="languageField" hidden>
+                  <label for="language">Language</label>
+                  <select id="language" name="language">
+                    <option value="Auto">Auto</option><option value="Russian">Russian</option><option value="English">English</option><option value="Chinese">Chinese</option>
+                  </select>
+                </div>
+<div id="genderField" hidden>
+                  <label for="gender">Vocals</label>
+                  <select id="gender" name="gender"><option value="female">Female</option><option value="male">Male</option></select>
+                </div>
+<div id="instructionsField" hidden>
+                  <label for="instructions">Voice instructions <span class="optional">optional</span></label>
+                  <input id="instructions" name="instructions" type="text">
+                </div>
+<div id="lyricsField" hidden>
+                  <label for="lyrics">Lyrics <span class="optional">optional</span></label>
+                  <textarea id="lyrics" name="lyrics"></textarea>
+                </div>
+<div id="negativePromptField" hidden>
+                  <label for="negativePrompt">Negative prompt <span class="optional">optional</span></label>
+                  <input id="negativePrompt" name="negativePrompt" type="text">
+                </div>
+</div>
+<div class="toggle-grid">
+                <label class="toggle-option" id="audioOption">
+                  <span><strong>Audio</strong><small>Synchronized audio</small></span>
+                  <input id="generateAudio" name="generateAudio" type="checkbox">
+                </label>
+                <label class="toggle-option" id="cameraOption">
+                  <span><strong>Fixed camera</strong><small>No camera movement</small></span>
+                  <input id="cameraFixed" name="cameraFixed" type="checkbox">
+                </label>
+              </div>
+            <label for="prompt">Prompt</label>
+            <textarea id="prompt" name="prompt"></textarea>
 
-              <div class="advanced-grid" id="commonMediaFields">
-                <div id="referenceModeField" hidden><label for="referenceMode">Reference mode</label><select id="referenceMode" name="referenceMode"></select><small id="referenceModeHint"></small></div>
-                <div id="imageURLsField" hidden>
+<div class="advanced-grid" id="commonMediaFields">
+<div id="referenceModeField" hidden><label for="referenceMode">Reference mode</label><select id="referenceMode" name="referenceMode"></select><small id="referenceModeHint"></small></div>
+<div id="imageURLsField" hidden>
                   <label id="referencesLabel">Image references</label>
                   <div id="referenceDropzone" class="reference-dropzone" role="group" aria-labelledby="referencesLabel">
                     <p>Drop images here</p>
@@ -154,68 +198,18 @@
                   <textarea id="imageURLs" name="imageURLs"></textarea>
                   </details>
                 </div>
-                <div id="videoURLField" hidden>
+<div id="videoURLField" hidden>
                   <label for="videoURL">Video reference <span class="optional">URL</span></label>
                   <textarea id="videoURL" name="videoURL" rows="2"></textarea>
                   <small id="inputDurationHint" hidden>Output duration follows this video, up to the model’s maximum.</small>
                 </div>
-                <div id="audioURLField" hidden>
+<div id="audioURLField" hidden>
                   <label for="audioURL">Audio reference <span class="optional">URL</span></label>
                   <textarea id="audioURL" name="audioURL" rows="2"></textarea>
                 </div>
-                <div id="negativePromptField" hidden>
-                  <label for="negativePrompt">Negative prompt <span class="optional">optional</span></label>
-                  <input id="negativePrompt" name="negativePrompt" type="text">
-                </div>
-                <div id="voiceField" hidden>
-                  <label for="voice">Voice</label>
-                  <input id="voice" name="voice" list="voiceOptions">
-                  <datalist id="voiceOptions"></datalist>
-                </div>
-                <div id="languageField" hidden>
-                  <label for="language">Language</label>
-                  <select id="language" name="language">
-                    <option value="Auto">Auto</option><option value="Russian">Russian</option><option value="English">English</option><option value="Chinese">Chinese</option>
-                  </select>
-                </div>
-                <div id="instructionsField" hidden>
-                  <label for="instructions">Voice instructions <span class="optional">optional</span></label>
-                  <input id="instructions" name="instructions" type="text">
-                </div>
-                <div id="lyricsField" hidden>
-                  <label for="lyrics">Lyrics <span class="optional">optional</span></label>
-                  <textarea id="lyrics" name="lyrics"></textarea>
-                </div>
-                <div id="genderField" hidden>
-                  <label for="gender">Vocals</label>
-                  <select id="gender" name="gender"><option value="female">Female</option><option value="male">Male</option></select>
-                </div>
-                <div id="qualityField" hidden>
-                  <label for="quality">Quality</label>
-                  <select id="quality" name="quality"></select>
-                </div>
-                <div id="backgroundField" hidden>
-                  <label for="background">Background</label>
-                  <select id="background" name="background"></select>
-                </div>
-                <div id="formatField" hidden>
-                  <label for="format">File format</label>
-                  <select id="format" name="format"></select>
-                </div>
-              </div>
+</div>
 
-              <div class="toggle-grid">
-                <label class="toggle-option" id="audioOption">
-                  <span><strong>Audio</strong><small>Synchronized audio</small></span>
-                  <input id="generateAudio" name="generateAudio" type="checkbox">
-                </label>
-                <label class="toggle-option" id="cameraOption">
-                  <span><strong>Fixed camera</strong><small>No camera movement</small></span>
-                  <input id="cameraFixed" name="cameraFixed" type="checkbox">
-                </label>
-              </div>
-
-              <details class="advanced-settings">
+<details class="advanced-settings">
                 <summary>Advanced settings</summary>
                 <div class="advanced-grid">
                 <label class="toggle-option" id="watermarkOption">
@@ -238,8 +232,7 @@
                   </label>
                 </div>
               </details>
-
-            </section>
+</div>
 
             </div>
             <section class="generation-key" id="connectionPanel" aria-label="Generation API key and budget">
@@ -490,7 +483,7 @@
   <script src="/ui/templates.js?v=20261031-session-controls" defer></script>
   <script src="/ui/override-sound.js?v=20261031-ui-batch" defer></script>
   <script src="/ui/generation-artifacts.js?v=20261031-text-artifacts" defer></script>
-  <script src="/ui/app.js?v=20261101-media-scope" defer></script>
+  <script src="/ui/app.js?v=20261101-media-scope&controls=20261102" defer></script>
   <script src="/ui/email-delivery.js?v=20261030-recovered-batch" defer></script>
   <script src="/ui/login-methods.js" defer></script>
   <script src="/ui/branding.js" defer></script>
