@@ -161,12 +161,19 @@ func TestOrganizationMethodsPreserveRoleScopeAndBinding(t *testing.T) {
 		t.Run(role, func(t *testing.T) {
 			s, _ := newPersonalTestServer()
 			f := methodOrg()
+			// Preserve a previously issued personal management key across a
+			// transition to company mode; never create it through a hybrid policy.
+			f.settings.SharedResources, f.settings.PersonalProviders = false, true
 			s.system = f
 			h := s.handler()
+			_, systemOnly := issueTestKey(t, h, "alice", `{"name":"System without organizations","scopes":["generation","system:manage"]}`)
+			f.settings.SharedResources, f.settings.PersonalProviders = true, false
+			if w := methodSend(h, "POST", "/v1/api-keys", `{"name":"No personal company key"}`, "alice", ""); w.Code != 403 || !strings.Contains(w.Body.String(), "personal_providers_disabled") {
+				t.Fatal("company mode allowed personal issuance", w.Code, w.Body)
+			}
 			_, generation := issueTestKey(t, h, "alice", `{"name":"Generation","organization_id":"`+fixtureOrg+`"}`)
 			_, manage := issueTestKey(t, h, "alice", `{"name":"Manage","organization_id":"`+fixtureOrg+`","scopes":["generation","organizations:manage"]}`)
 			_, foreign := issueTestKey(t, h, "alice", `{"name":"Foreign","organization_id":"`+fixtureOtherOrg+`","scopes":["generation","organizations:manage"]}`)
-			_, systemOnly := issueTestKey(t, h, "alice", `{"name":"System without organizations","scopes":["generation","system:manage"]}`)
 			f.role = role
 			f.admins["alice"] = false
 			path := "/v1/organizations/" + fixtureOrg

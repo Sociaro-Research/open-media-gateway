@@ -64,11 +64,26 @@ func TestCentralCompaniesOnlyProfileAndMetadata(t *testing.T) {
 	call := func(method, path, body string) *httptest.ResponseRecorder {
 		return sendTest(h, method, "https://api.fixture.test"+path, body, "alice", "")
 	}
-	for _, body := range []string{`{"profile":"personal","version":1}`, `{"profile":"sociaro","version":1}`, `{"profile":"operator","allow_personal":true,"version":1}`} {
-		if w := call("POST", "/v1/system/setup-profile", body); w.Code != 403 || f.writes != 0 {
-			t.Fatal("central mode bypass", w.Code)
+	for _, tc := range []struct {
+		body   string
+		status int
+		code   string
+	}{
+		{`{"profile":"personal","version":1}`, 403, "central_companies_only"},
+		{`{"profile":"sociaro","version":1}`, 403, "central_companies_only"},
+		{`{"profile":"operator","allow_personal":true,"version":1}`, 400, "invalid_profile"},
+	} {
+		w := call("POST", "/v1/system/setup-profile", tc.body)
+		var problem struct {
+			Error struct {
+				Code string `json:"code"`
+			} `json:"error"`
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &problem); err != nil || w.Code != tc.status || problem.Error.Code != tc.code || f.writes != 0 || f.settings != original {
+			t.Fatal("central mode denial changed", w.Code, w.Body, f.writes, err)
 		}
 	}
+
 	if f.settings != original {
 		t.Fatal("role detection mutated stored settings")
 	}

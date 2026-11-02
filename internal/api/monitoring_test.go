@@ -18,10 +18,13 @@ func (unavailableMonitoringPolicy) IsAdmin(context.Context, string) (bool, error
 
 func TestMonitoringRequiresCurrentAdministratorBrowserSession(t *testing.T) {
 	s, _ := newPersonalTestServer()
-	policy := &systemFixture{admins: map[string]bool{"alice": true}}
+	policy := &systemFixture{settings: system.Defaults(), admins: map[string]bool{"alice": true}}
 	s.system = policy
 	h := s.handler()
 	_, key := issueTestKey(t, h, "alice", `{"name":"Monitoring test","scopes":["generation","system:manage"]}`)
+	if w := sendTest(h, "GET", "/v1/key", "", "", key); w.Code != 200 {
+		t.Fatal("bearer fixture is not valid", w.Code, w.Body)
+	}
 	for _, tc := range []struct {
 		session, token string
 		status         int

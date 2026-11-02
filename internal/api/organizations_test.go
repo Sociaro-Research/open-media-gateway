@@ -77,6 +77,7 @@ func TestOrganizationAPIRequiresRoleScopeAndKeyBinding(t *testing.T) {
 	s, _ := newPersonalTestServer()
 	f := &organizationFixture{systemFixture: &systemFixture{settings: system.Defaults(), admins: map[string]bool{"alice": true}}}
 	f.settings.SharedResources = true
+	f.settings.PersonalProviders = false
 	s.system = f
 	h := s.handler()
 	body := `{"amount_usd":10,"kind":"payment","external_id":"test"}`
@@ -123,16 +124,29 @@ func TestOrganizationAPIRequiresRoleScopeAndKeyBinding(t *testing.T) {
 	if w.Code != 403 {
 		t.Fatal("key issued foreign organization key", w.Code)
 	}
+	if denied := sendTest(h, "POST", "/v1/api-keys", `{"name":"Personal"}`, "alice", ""); denied.Code != 403 || !strings.Contains(denied.Body.String(), "personal_providers_disabled") {
+		t.Fatal("company mode issued a personal key", denied.Code, denied.Body)
+	}
+	// Personal-key shape remains covered in its valid exclusive mode.
+	f.settings.SharedResources, f.settings.PersonalProviders = false, true
 	w = sendTest(h, "POST", "/v1/api-keys", `{"name":"Personal"}`, "alice", "")
 	if w.Code != 201 {
 		t.Fatal("personal key without organization", w.Code)
 	}
 	var personalKey struct {
+		Secret         string `json:"secret"`
 		OrganizationID string `json:"organization_id"`
 		ResourceMode   string `json:"resource_mode"`
 	}
 	if err := json.Unmarshal(w.Body.Bytes(), &personalKey); err != nil || personalKey.OrganizationID != "" || personalKey.ResourceMode != "personal" {
 		t.Fatalf("wrong personal key context: %s", w.Body.String())
+	}
+	f.settings.SharedResources, f.settings.PersonalProviders = true, false
+	if retained := sendTest(h, "GET", "/v1/key", "", "", personalKey.Secret); retained.Code != 200 {
+		t.Fatal("mode change revoked existing credential", retained.Code)
+	}
+	if admission := sendTest(h, "POST", "/v1/generations", `{"model":"mock/mock-video-v1","prompt":"Must not admit personal work"}`, "", personalKey.Secret); admission.Code != 403 || !strings.Contains(admission.Body.String(), "personal_providers_disabled") {
+		t.Fatal("stale personal key bypassed company admission", admission.Code, admission.Body)
 	}
 	for _, body := range []string{`{"name":"Invalid","resource_mode":"shared"}`, `{"name":"Invalid","organization_id":"` + fixtureOrg + `","resource_mode":"personal"}`} {
 		if result := sendTest(h, "POST", "/v1/api-keys", body, "alice", ""); result.Code != 400 {

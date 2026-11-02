@@ -16,9 +16,13 @@ import (
 type quotaStorage struct {
 	storageAdminStub
 	usage storage.Usage
+	reads int
 }
 
-func (q *quotaStorage) SharedUsage(context.Context) (storage.Usage, error) { return q.usage, nil }
+func (q *quotaStorage) SharedUsage(context.Context) (storage.Usage, error) {
+	q.reads++
+	return q.usage, nil
+}
 func TestStorageQuotaAdmissionBoundary(t *testing.T) {
 	limit := int64(10)
 	store := &quotaStorage{usage: storage.Usage{LimitBytes: &limit}}
@@ -29,20 +33,36 @@ func TestStorageQuotaAdmissionBoundary(t *testing.T) {
 		status int
 	}{{9, true, 200}, {10, true, 200}, {11, true, 403}, {11, false, 200}} {
 		store.usage.UsedBytes = tc.used
+		s.system.(*systemFixture).settings = system.Settings{SharedResources: tc.shared, PersonalProviders: !tc.shared}
+		s.system.(*systemFixture).admins["consumer"] = !tc.shared
 		for _, path := range []string{"/v1/generations", "/v1/videos", "/v1/generations/estimate", "/v1/references", "/v1/references/uploads"} {
 			ctx := identity.WithOwnerID(context.Background(), "consumer")
 			if tc.shared {
 				ctx = identity.WithResourceOwners(ctx, identity.SharedOwnerID, identity.SharedOwnerID)
-			} else {
-				s.system.(*systemFixture).settings.PersonalProviders = true
-				s.system.(*systemFixture).admins["consumer"] = true
 			}
 			r := httptest.NewRequest("POST", path, strings.NewReader("{}")).WithContext(ctx)
 			w := httptest.NewRecorder()
-			s.systemPolicy(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(200) })).ServeHTTP(w, r)
+			called := false
+			reads := store.reads
+			s.systemPolicy(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { called = true; w.WriteHeader(200) })).ServeHTTP(w, r)
+			if called != (tc.status == 200) || tc.shared && store.reads != reads+1 || !tc.shared && store.reads != reads {
+				t.Fatal("wrong quota path or downstream admission", tc, called, store.reads-reads)
+			}
 			if w.Code != tc.status {
 				t.Fatalf("%s %+v: %d %s", path, tc, w.Code, w.Body)
 			}
+		}
+	}
+	// Company mode must reject personal admission even for administrators,
+	// independently of shared quota state and before downstream work.
+	s.system.(*systemFixture).settings = system.Settings{SharedResources: true, PersonalProviders: false}
+	for _, admin := range []bool{false, true} {
+		s.system.(*systemFixture).admins["consumer"] = admin
+		called := false
+		w := httptest.NewRecorder()
+		s.systemPolicy(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { called = true })).ServeHTTP(w, httptest.NewRequest("POST", "/v1/generations", nil).WithContext(identity.WithOwnerID(context.Background(), "consumer")))
+		if w.Code != 403 || called || !strings.Contains(w.Body.String(), "personal_providers_disabled") {
+			t.Fatal("personal admission bypassed company policy", admin, w.Code, called)
 		}
 	}
 	// Finishing an admitted direct upload (including a lost-response retry)

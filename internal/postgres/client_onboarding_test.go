@@ -358,6 +358,10 @@ func TestNewCustomerRegistersThenAcceptsOwnerInvite(t *testing.T) {
 		t.Fatal(e)
 	}
 	settings.SharedResources = true
+	settings.PersonalProviders = false
+	if e = settings.Validate(); e != nil {
+		t.Fatal("invalid company fixture policy", e)
+	}
 	if _, e = repo.SaveSettings(ctx, admin.ID, settings); e != nil {
 		t.Fatal(e)
 	}

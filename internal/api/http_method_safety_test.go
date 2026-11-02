@@ -55,6 +55,7 @@ func (f *methodOrgFixture) OrganizationInvites(context.Context, string, string) 
 func methodOrg() *methodOrgFixture {
 	f := &methodOrgFixture{rolePolicyFixture: &rolePolicyFixture{organizationFixture: &organizationFixture{systemFixture: &systemFixture{settings: system.Defaults(), admins: map[string]bool{"alice": true}}}, role: org.Supermanager}, name: "Original"}
 	f.settings.SharedResources = true
+	f.settings.PersonalProviders = false
 	return f
 }
 
@@ -176,7 +177,8 @@ func TestSafeMethodsNeverInvokeDomainWrites(t *testing.T) {
 				body = string(b)
 				snapshot = func() string { return fmt.Sprint(a.writes) }
 			case path == "/v1/system/settings":
-				body = `{"generation_ui":false,"personal_providers":true,"version":1}`
+				// The successful control changes only generation visibility, not provider mode.
+				body = `{"generation_ui":false,"version":1}`
 				snapshot = func() string { return fmt.Sprint(f.settings) }
 			case path == "/v1/system/payment-providers" || strings.HasSuffix(path, "/payments"):
 				a := &methodPaymentFixture{paymentAPIFixture: &paymentAPIFixture{}}
@@ -197,8 +199,21 @@ func TestSafeMethodsNeverInvokeDomainWrites(t *testing.T) {
 				writeMethod = "POST"
 				snapshot = func() string { return fmt.Sprint(a.creates) }
 			}
+			// Issue the unbound key under a valid personal policy. Existing
+			// management credentials remain usable for safe historical reads.
+			f.settings.SharedResources, f.settings.PersonalProviders = false, true
 			h := s.handler()
 			_, full := issueTestKey(t, h, "alice", `{"name":"Full fixture","scopes":["generation","organizations:manage","system:manage","keys:manage","providers:manage","storage:manage"]}`)
+			if path != "/v1/projects" {
+				f.settings.SharedResources, f.settings.PersonalProviders = true, false
+			}
+			if err := f.settings.Validate(); err != nil {
+				t.Fatal("invalid test mode", err)
+			}
+			if w := methodSend(h, "GET", "/v1/key", "", "", full); w.Code != 200 {
+				t.Fatal("fixture key did not authenticate", w.Code, w.Body)
+			}
+
 			before := snapshot()
 			for _, method := range []string{"GET", "HEAD"} {
 				for _, payload := range []string{body, ""} {
