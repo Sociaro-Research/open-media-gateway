@@ -100,10 +100,47 @@ const server = http.createServer((req, res) => {
     const transfer=await page.evaluateHandle(({bytes,name})=>{const d=new DataTransfer();d.items.add(new File([new Uint8Array(bytes)],name,{type:'image/png'}));return d;},{bytes:[...image],name});
     await page.locator(selector).dispatchEvent('drop',{dataTransfer:transfer});await transfer.dispose();
   }
+  const nativeExternal=[];
+  if(process.env.GATEWAY_NATIVE_CHOOSER_ONLY==='1')await page.route('**/*',route=>{const address=new URL(route.request().url());if(address.origin===`http://127.0.0.1:${server.address().port}`||address.origin===new URL(directURL).origin)return route.fallback();nativeExternal.push(address.origin);return route.abort();});
   try {
     await page.goto(`http://127.0.0.1:${server.address().port}`);
     await useFixtureKey(page,'fixture-key');
     await page.waitForFunction(()=>selectedModel()?.id==='video');
+    if(process.env.GATEWAY_NATIVE_CHOOSER_ONLY==='1'){
+      // This explicit subset proves native activation in the integrated portal.
+      // It does not waive or run the full reference suite's separate layout gate.
+      const results=[],external=nativeExternal;
+      for(const target of [
+        {model:'image',kind:'image',id:'referenceFiles',multiple:false,accept:['image/png','image/jpeg','image/webp','image/gif']},
+        {model:'video',kind:'image',id:'referenceFiles',multiple:true,accept:['image/png','image/jpeg','image/webp','image/gif']},
+        {model:'assets',kind:'video',id:'videoReferenceFiles',multiple:true,accept:['video/mp4','video/quicktime','video/webm']}
+      ]){
+        await page.locator('#model').selectOption(JSON.stringify(['mock',target.model]));await page.waitForFunction(model=>selectedModel()?.id===model,target.model);
+        if(target.kind==='video')await page.locator('#referenceMode').selectOption('references');
+        await page.waitForFunction(id=>{const input=document.getElementById(id);return input?.isConnected&&!input.disabled;},target.id);
+        const button=page.getByRole('button',{name:'Upload for '+target.kind[0].toUpperCase()+target.kind.slice(1)+' references',exact:true}),field=target.kind==='image'?'imageURLs':'videoURL';
+        for(const gesture of ['click','Enter','Space']){
+          const before={preparations,uploadCount,generations:posts.length,urls:await page.locator('#'+field).inputValue()};
+          const event=page.waitForEvent('filechooser',{timeout:5000});
+          if(gesture==='click')await button.click();else{await button.focus();await button.press(gesture);}
+          const chooser=await event,metadata=await chooser.element().evaluate(input=>({id:input.id,hidden:input.hidden,disabled:input.disabled,connected:input.isConnected,accept:input.accept.split(',').filter(Boolean),multiple:input.multiple}));
+          assert.equal(metadata.id,target.id);assert.equal(metadata.hidden,true);assert.equal(metadata.disabled,false);assert.equal(metadata.connected,true);assert.deepEqual([...metadata.accept].sort(),[...target.accept].sort());assert.equal(metadata.multiple,target.multiple);assert.equal(chooser.isMultiple(),target.multiple);
+          // Empty selection models cancelling the chooser; it must not change state or start transport.
+          await chooser.setFiles([]);await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(resolve)));
+          assert.equal(preparations,before.preparations);assert.equal(uploadCount,before.uploadCount);assert.equal(posts.length,before.generations);assert.equal(await page.locator('#'+field).inputValue(),before.urls);
+          results.push({model:target.model,media:target.kind,gesture,native_filechooser:true,...metadata,cancel_preserves_state:true});
+        }
+      }
+      // Selection through the actual chooser, not setInputFiles, must reach the existing upload binding.
+      for(const model of ['image','video']){
+        await page.locator('#model').selectOption(JSON.stringify(['mock',model]));await page.waitForFunction(id=>selectedModel()?.id===id,model);
+        const expected=uploadCount+1,event=page.waitForEvent('filechooser',{timeout:5000});await page.getByRole('button',{name:'Upload for Image references',exact:true}).click();await(await event).setFiles({name:'native-'+model+'.png',mimeType:'image/png',buffer:image});await page.waitForFunction(count=>document.querySelectorAll('#selectedReferences .reference-card').length===count,model==='image'?1:2);await waitMessage('1 file saved');assert.equal(uploadCount,expected);assert.match(await page.locator('#imageURLs').inputValue(),/\/references\//);results.push({model,selection_through_native_chooser:true,upload_binding:true});const retained=await page.locator('#selectedReferences .reference-card').first().elementHandle(),urls=await page.locator('#imageURLs').inputValue(),beforeCancel={preparations,uploadCount};const cancelEvent=page.waitForEvent('filechooser',{timeout:5000});await page.getByRole('button',{name:'Upload for Image references',exact:true}).press('Enter');await(await cancelEvent).setFiles([]);await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(resolve)));assert.equal(await retained.evaluate(n=>n.isConnected&&n===document.querySelector('#selectedReferences .reference-card')),true);assert.equal(await page.locator('#imageURLs').inputValue(),urls);assert.deepEqual({preparations,uploadCount},beforeCancel);results.push({model,cancel_existing_selection:true,retained_node_and_url:true});
+      }
+      assert.equal(posts.length,0);assert.deepEqual(external,[]);assert.deepEqual(errors,[]);
+      for(const theme of ['dark','light']){await page.setViewportSize({width:390,height:1100});await page.evaluate(t=>document.documentElement.dataset.theme=t,theme);await page.screenshot({path:path.join(output,'native-chooser-'+theme+'.png'),fullPage:true});}
+      fs.writeFileSync(path.join(output,'native-chooser-results.json'),JSON.stringify({engine:process.env.UI_BROWSER_ENGINE||'chromium',results,provider_generation_writes:posts.length,external,errors,scope:'native chooser subset only; full references/layout suite not run'},null,2));
+      console.log('PASS native integrated Playground chooser: image/video models and video references; click/Enter/Space; exact accept/multiple; hidden enabled input; safe empty selection; real chooser-selected PNG reaches existing upload; zero generations/external requests.');return;
+    }
     await page.locator('#chooseReferences').click();await waitMessage('empty');
     await page.getByRole('button',{name:'Close library',exact:true}).click();
     await drop('#referenceDropzone');await waitMessage('1 file saved');

@@ -16,6 +16,18 @@ ignored `.local/` or `dist/`; record limits explicitly.
 
 ## Available fixtures
 
+For the focused integrated Playground native Upload gate, run
+`GATEWAY_NATIVE_CHOOSER_ONLY=1 node scripts/ui/references.cjs` and repeat with
+`UI_BROWSER_ENGINE=webkit`. It loads the real portal and checks click, Enter and
+Space produce a `filechooser` event for image/video models and video-reference
+inputs, exact accept/multiple policy, enabled hidden input and cancellation
+without transport/state changes. PNG selection through that chooser must reach
+the existing upload binding in both image and video modes. All APIs/media are
+synthetic loopback fixtures and no generation is submitted. `UI_SCREENSHOT_DIR`
+retains JSON and screenshots. This explicit subset does not run or establish the
+full reference suite's layout/transport/security acceptance; normal invocation
+retains all its existing assertions.
+
 The CI container job prepares its synthetic video inputs before running browser
 checks. For the same setup in a clean checkout, install FFmpeg (`ffmpeg` and
 `ffprobe`), then run `python3 scripts/ui/template-video-fixtures.py
