@@ -1827,9 +1827,10 @@ input[type=color]:focus-visible { outline:none; box-shadow:none; border:2px soli
 @media(max-width:760px) { .site-footer nav { justify-content:center; } .site-page > .site-footer { width:calc(100% - 24px); } }
 
 /* Playground controls share the ordinary field flow, without an output panel. */
-.playground-fields { display:grid; gap:20px; margin-top:20px; min-width:0; }
+.playground-fields { display:grid; grid-template-columns:minmax(0,1fr); gap:20px; margin-top:20px; min-width:0; }
 .playground-fields > :is(.advanced-grid,.toggle-grid,.advanced-settings,.prompt-policy-group,.floating-field) { margin:0; }
-.playground-fields > .advanced-grid { gap:20px; }
+/* Peer groups must fit the available track, including populated URL fields. */
+.playground-fields > .advanced-grid { grid-template-columns:minmax(0,1fr); gap:20px; }
 #mainMediaFields:not(:has(> :not([hidden]))) { display:none; }
 #commonMediaFields:not(:has(> :not([hidden]))) { display:none; }
 @media (max-width:600px) {

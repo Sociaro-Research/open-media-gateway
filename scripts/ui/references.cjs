@@ -231,19 +231,18 @@ const server = http.createServer((req, res) => {
     assert.equal((await page.locator('#imageURLs').inputValue()).split('\n')[0],assetImage);
     assert.match(await page.locator('#selectedReferences .reference-card').first().innerText(),/Registered asset/);
     await page.locator('#prompt').fill('Use the registered character with the scene, video and audio references.');
-    for(const width of [1440,390,320]){
-      await page.setViewportSize({width,height:1000});
+    const layoutGeometry=[];
+    for(const theme of ['dark','light'])for(const width of [1440,390,320]){
+      await page.setViewportSize({width,height:1000});await page.evaluate(t=>document.documentElement.dataset.theme=t,theme);
       await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
-      if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)){
-        await page.screenshot({path:path.join(output,'overflow-'+width+'.png'),fullPage:true});
-        const diagnostic=await page.evaluate(()=>{const n=document.querySelector('#visualSettings'),input=document.querySelector('#duration'),style=document.createElement('style');const geometry=()=>({grid:n.getBoundingClientRect().width,input:input.getBoundingClientRect().width,inputMin:getComputedStyle(input).minWidth,label:input.closest('.floating-field').querySelector('label').textContent,viewport:innerWidth,overflow:document.documentElement.scrollWidth});const before=geometry();style.textContent='.media-picker{display:none!important}';document.head.append(style);const withoutPicker=geometry();style.remove();return {before,withoutPicker};});fs.writeFileSync(path.join(output,'overflow-diagnosis.json'),JSON.stringify(diagnostic,null,2));
-      }
-      if(!await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth))layoutFailures.push({width,element:'#visualSettings',diagnostic:'overflow-diagnosis.json'});
-      await page.locator('#imageURLsField').scrollIntoViewIfNeeded();
-      await page.screenshot({path:path.join(output,`registered-assets-${width}.png`)});
+      const geometry=await page.evaluate(()=>{
+        const box=n=>{const r=n.getBoundingClientRect(),s=getComputedStyle(n);return {id:n.id,width:r.width,left:r.left,right:r.right,minWidth:s.minWidth,columns:s.gridTemplateColumns};};
+        return {viewport:innerWidth,document:document.documentElement.scrollWidth,grid:box(document.querySelector('#visualSettings')),parent:box(document.querySelector('#generationSettings')),references:box(document.querySelector('#commonMediaFields')),controls:[...document.querySelectorAll('#visualSettings .select-trigger,#visualSettings #duration,#referenceModeField .select-trigger')].filter(n=>n.getClientRects().length).map(box)};
+      });layoutGeometry.push({theme,width,...geometry});
+      if(geometry.document>width||geometry.grid.width>geometry.parent.width+1||geometry.references.width>geometry.parent.width+1||geometry.controls.some(c=>c.left<0||c.right>width+1))layoutFailures.push({theme,width,element:'#visualSettings',diagnostic:'settings-geometry.json'});
+      await page.locator('#imageURLsField').scrollIntoViewIfNeeded();await page.screenshot({path:path.join(output,`registered-assets-${theme}-${width}.png`)});
     }
-    // Settle the textarea-to-button focus handoff after the viewport sweep.
-    // WebKit can scroll on focus between pointerdown and pointerup otherwise.
+    fs.writeFileSync(path.join(output,'settings-geometry.json'),JSON.stringify(layoutGeometry,null,2));
     await page.locator('#submitButton').focus();
     await page.locator('#submitButton').click();await page.locator('#confirmDialog').waitFor({state:'visible'});
     assert.match(await page.locator('#confirmFields').innerText(),/asset:\/\/asset-example-character/);
