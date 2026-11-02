@@ -9,7 +9,7 @@
  const el=(tag,text,cls)=>{const node=document.createElement(tag);if(text!=null)node.textContent=text;if(cls)node.className=cls;return node};
  window.RequestLimits={async mount(parent,api,{organization='',current=()=>true}={}){
   const url=organization?`/v1/organizations/${organization}/limits`:'/v1/system/limits';
-  const form=el('form',null,'keys-form organization-form request-limits');
+  const form=el('form',null,'keys-form organization-form request-limits'+(organization?' organization-settings-grid':''));
   form.append(el('h2',organization?'Organization request limits':'Request limits'));
   const actions=el('div',null,'form-actions'),status=el('p'),save=el('button','Save','primary compact');status.setAttribute('role','status');save.type='submit';actions.append(status,save);form.append(actions);
   const description=el('p',organization?'Limits apply separately to each member, across all their keys in this organization. Leave a field empty to inherit its system default.':'Defaults for personal keys and all organizations. User limits combine their keys within each organization; personal keys are counted separately.','field-explanation');form.append(description);

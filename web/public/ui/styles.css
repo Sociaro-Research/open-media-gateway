@@ -1830,3 +1830,11 @@ input[type=color]:focus-visible { outline:none; box-shadow:none; border:2px soli
 @media (max-width:600px) {
   .playground-fields > .toggle-grid { grid-template-columns:1fr; }
 }
+
+/* Organization editors share equal peer fields; headings/actions stay full width. */
+:is(#configurationView,#systemView) .keys-form.organization-settings-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.organization-settings-grid > .system-toggle { min-width:0; margin:0; }
+.organization-model-access { width:100%; max-width:none; min-width:0; }
+@media (max-width:760px) {
+ :is(#configurationView,#systemView) .keys-form.organization-settings-grid { grid-template-columns:minmax(0,1fr); }
+}

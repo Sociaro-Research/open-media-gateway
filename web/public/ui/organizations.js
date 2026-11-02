@@ -108,11 +108,16 @@
  }else if(name==='Audit Log'){await window.AuditLog.mount(body,api,{organization:o,current:()=>token===epoch&&activePage==='Audit Log'});
  }else if(name==='API keys'){await window.GatewayKeys.open(body,o.id);
  }else if(name==='Management'){
- let orgName,weekly;
- const f=form(body,'Management',async()=>{const input={name:orgName.value,default_weekly_limit_usd:nullable(weekly)};await api(base,{method:'PUT',body:JSON.stringify(input)});Object.assign(o,input);refreshSummary();await window.Workspace?.refresh()});
- orgName=field(f,'Name','text',o.name,true);weekly=field(f,'Default weekly limit for new members (USD)','number',o.default_weekly_limit_usd);f.finish();
- const logging=form(body,'Request logging',async()=>{await api(base+'/request-logging',{method:'PUT',body:JSON.stringify({minimize_request_logging:minimize.checked})});o.minimize_request_logging=minimize.checked});
- const loggingLabel=el('label',null,'system-toggle'),minimize=el('input'),loggingText=el('span');minimize.type='checkbox';minimize.checked=!!o.minimize_request_logging;loggingText.append(el('strong','Minimize request logging'),el('small','After a request finishes, its prompt, instructions and input links are removed. Usage, cost and status remain. Applies to new requests only.'));loggingLabel.append(minimize,loggingText);logging.append(loggingLabel);logging.finish();
+ let orgName,weekly,minimize,savedManagement={name:o.name,default_weekly_limit_usd:o.default_weekly_limit_usd??null},savedLogging=!!o.minimize_request_logging;
+ const f=form(body,'Management',async()=>{
+  const input={name:orgName.value,default_weekly_limit_usd:nullable(weekly)},loggingValue=minimize.checked;
+  if(input.name!==savedManagement.name||input.default_weekly_limit_usd!==savedManagement.default_weekly_limit_usd){
+   await api(base,{method:'PUT',body:JSON.stringify(input)});savedManagement={...input};Object.assign(o,input);refreshSummary();await window.Workspace?.refresh();
+  }
+  if(loggingValue!==savedLogging){await api(base+'/request-logging',{method:'PUT',body:JSON.stringify({minimize_request_logging:loggingValue})});savedLogging=loggingValue;o.minimize_request_logging=loggingValue;}
+ });
+ f.classList.add('organization-settings-grid');orgName=field(f,'Name','text',o.name,true);weekly=field(f,'Default weekly limit for new members (USD)','number',o.default_weekly_limit_usd);
+ const loggingLabel=el('label',null,'system-toggle'),loggingText=el('span');minimize=el('input');minimize.type='checkbox';minimize.checked=savedLogging;loggingText.append(el('strong','Minimize request logging'),el('small','After a request finishes, its prompt, instructions and input links are removed. Usage, cost and status remain. Applies to new requests only.'));loggingLabel.append(minimize,loggingText);f.append(loggingLabel);f.finish();
  if(o.billing_profile){const b=o.billing_profile,a=b.address||{},card=el('section',null,'organization-billing-details'),list=el('dl');card.append(el('h2','Billing details'),list);for(const [label,value] of [['Legal name',b.business_name],['Billing email',b.email],['Billing address',[a.line1,a.line2,a.city,a.state,a.postal_code,a.country].filter(Boolean).join(', ')],['Tax IDs',(b.tax_ids||[]).map(t=>t.value).join(', ')]]){if(!value)continue;const row=el('div');row.append(el('dt',label),el('dd',value));list.append(row)}body.append(card);}
  await window.OrganizationStorage.open(body,o.id);
  }else if(name==='Commercial settings'){
@@ -131,7 +136,7 @@
   if(managerValue!==savedManager){await api(base+'/client-manager',{method:'PUT',body:JSON.stringify({user:managerValue})});savedManager=managerValue;o.client_manager_email=managerValue.includes('@')?managerValue:'';o.client_manager_id=managerValue.includes('@')?'':managerValue}
   await window.Workspace?.refresh();
  });
- credit=field(f,'Credit Limit (USD)','number',o.credit_limit_usd,true);manager=field(f,'Client manager','text',savedManager);manager.title='Email or user ID';f.finish();
+ f.classList.add('organization-settings-grid');credit=field(f,'Credit Limit (USD)','number',o.credit_limit_usd,true);manager=field(f,'Client manager','text',savedManager);manager.title='Email or user ID';f.finish();
  const current=()=>token===epoch&&activePage==='Settings';
  await window.ModelAccess.organization(body,api,{organization:o.id,current});if(!current())return;
  await window.MarkupSettings.mount(body,api,{organization:o.id,current});if(!current())return;

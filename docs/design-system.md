@@ -740,3 +740,16 @@ necessary preparation within the selected media input group, using shared fields
 16px resource group gaps and 12px action gaps. Review cost before any preparation
 submission; never auto-submit or auto-retry mutations. Preserve media previews,
 existing input bindings, key-change cancellation and visible keyboard focus.
+
+### Organization editor layout
+
+Organization Settings, Management and Organization request limits use the shared
+form grid with two equal desktop fields per row, collapsing to one column at the
+existing 760px breakpoint. Future fields follow the same grid automatically.
+Headings, explanations, validation messages and actions span the content width.
+Additional models fills the same content width as Settings, Markups and limits.
+Management includes Minimize request logging as its third field, preserving its
+value and dedicated request-logging endpoint. Rendering, tab changes and checkbox
+changes never save automatically. The Management Save submits only changed
+company/logging settings; a failed endpoint retains its draft without replaying
+already confirmed changes. This does not change who may update either setting.
