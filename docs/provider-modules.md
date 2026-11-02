@@ -185,10 +185,10 @@ Administrators upload or replace each connection's logo in its provider settings
 using the shared click/keyboard and drag-and-drop upload area. A round × beside
 installed artwork removes it immediately and persistently without changing
 provider credentials or settings; uploading again remains available.
-Only PNG images with at least one partially or fully transparent pixel are accepted,
-including palette transparency and 16-bit PNG. The upload limit is 1 MiB, with
+Decoded PNG images are accepted, including opaque RGB/RGBA, palette transparency
+and 16-bit PNG. The upload limit is 1 MiB, with
 1–2048 pixels per side (at most 4,194,304 decoded pixels). SVG, other formats,
-malformed files and fully opaque PNG are rejected; no source-color check is applied.
+malformed files are rejected; no source-color check is applied.
 
 The original image is displayed unchanged in dark theme. Light theme sets RGB to
 black while preserving every alpha value. The same shared renderer covers the

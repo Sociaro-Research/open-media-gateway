@@ -119,7 +119,7 @@ validate the same 1440/390/320 px layouts and keyboard controls as email sign-in
 - **Dates/months:** use the shared calendar, including its icon, navigation, selection, Clear/Today actions and keyboard controls. Never introduce a native browser calendar as an alternative.
 - **Model selection:** always use `ModelPicker`: provider groups, model names, information button; internal name search, release-date cutoff and content-type filter. Provider headings use 32px square artwork, 16px bold names, at least 64px height and 16px separation with a shared divider between groups. Every provider logo uses the original PNG in dark theme and `brightness(0)` in light theme, preserving transparency and antialiased edges. Missing or failed artwork uses an initial in the same slot. Long names wrap; distinct connections retain separate headings even with equal display names. Filters combine and never select a model automatically. Keep filters in one row on wide screens and stack them on narrow screens; keep them visible while results scroll.
 - **Scrollbars:** one global style: transparent track/corner; 8px width; rounded thumb mixing accent 45% with border color; accent on hover. Firefox uses the shared thin scrollbar equivalent. No local overrides.
-- **Provider settings:** show connection settings in expanded cards using the shared provider header, availability switch and field grid. Administrators immediately upload provider logos through the shared `ReferenceUpload` dropzone, separate from credential drafts. Hide native file-input chrome; reuse its styled keyboard picker, drag/drop, small muted hint and progress/error/retry states. Show a round 44px remove control beside installed artwork; removal persists immediately, retains credential drafts and restores the no-logo state. Accept only decoded transparent PNG, up to ≈1.05 MB (1,048,576 bytes) and 2048 pixels per side; retain the confirmed image and show local retry feedback after failure. The compact square preview keeps the remove action beside it; upload actions and the 11px format hint wrap within the shared dropzone on narrow screens. Use an unlabeled header switch with an accessible provider-specific name. Payment modes are **Production** and **Test**. Place credential validation beside the relevant field in `.field-action-row.control-row`; validation of saved credentials is unavailable while that credential has unsaved changes. Put settings shared by all providers above the cards; avoid Configure buttons and repeated scope explanations.
+- **Provider settings:** show connection settings in expanded cards using the shared provider header, availability switch and field grid. Administrators immediately upload provider logos through the shared `ReferenceUpload` dropzone, separate from credential drafts. Hide native file-input chrome; reuse its styled keyboard picker, drag/drop, small muted hint and progress/error/retry states. Use the shared preview Remove overlay; removal persists immediately, retains credential drafts and restores the no-logo state. Accept only decoded PNG (opaque or transparent), up to ≈1.05 MB (1,048,576 bytes) and 2048 pixels per side; retain the confirmed image and show local retry feedback after failure. The shared media picker retains Upload and its exact-byte accessible limit when artwork is selected. Use an unlabeled header switch with an accessible provider-specific name. Payment modes are **Production** and **Test**. Place credential validation beside the relevant field in `.field-action-row.control-row`; validation of saved credentials is unavailable while that credential has unsaved changes. Put settings shared by all providers above the cards; avoid Configure buttons and repeated scope explanations.
 - **Payment provider actions:** the form includes its shared card header. Save
   and the new-provider Cancel use `.form-heading-actions` beside the immediate
   availability switch, with equal 40px heights and 12px gaps. Save remains
@@ -220,7 +220,7 @@ fit the existing header height while preserving their own aspect ratios.
 Appearance uses shared floating fields, action headings, saves, feedback and the
 shared theme dropdown. Native color inputs complement editable hex fields: this
 is a justified exception because the browser provides a keyboard-accessible color
-chooser. File inputs use the native accessible upload control. The isolated
+chooser. File selection uses `ReferenceUpload`, with a native accessible chooser behind its Upload action. The isolated
 preview changes only its own tokens until the administrator saves. See
 [site-branding.md](site-branding.md) for scope, images and fallback behavior.
 
@@ -753,3 +753,32 @@ value and dedicated request-logging endpoint. Rendering, tab changes and checkbo
 changes never save automatically. The Management Save submits only changed
 company/logging settings; a failed endpoint retains its draft without replaying
 already confirmed changes. This does not change who may update either setting.
+
+## Unified media selection
+
+`ReferenceUpload` owns the shared picker heading, compact constraints, Upload,
+Use library and drop target. Callers retain transport, authorization, exact model
+limits and durable value binding. Drop targets contain only “Drop file here” or
+“Drop files here”; actions sit beside them. URL-enabled references use “Use URLs”
+and keep the raw draft, caret and blank lines while parsing a separate selection.
+Invalid drafts retain the last valid cards and show an error.
+
+Media cards retain their nodes across selection updates. Image/video previews use
+native proportional widths at a common 150px height, reduced uniformly when the
+widest item needs it, with wrapped rows and no horizontal media scrolling.
+Captions use 12px text with left/bottom spacing. Selected library cards have an
+integral full-width bottom strip whose color and opacity match the configured
+accent border. Remove/Delete/Play overlays are neutral translucent controls.
+Image actions appear on hover or keyboard focus; touch requires a completed
+reveal gesture before a later action gesture, including a first tap on the action.
+
+Library selection applies immediately; closing with ×, Escape or the backdrop
+retains it and restores focus. Single selections can be replaced without closing
+the library. Remove detaches the current binding; library Delete retains its
+durable operation, confirmation and authorization checks. Upload and URL entry
+remain available while using the library. Routine success messages are announced
+accessibly; errors and warnings remain visible.
+
+The title and constraints share one header row, with no truncation, shrinking or
+artificial width cap. Rare collisions at narrow widths are an approved exception
+to the normal wrapping rule. Asset/card content still fits its available width.

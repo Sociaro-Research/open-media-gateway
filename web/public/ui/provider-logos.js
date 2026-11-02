@@ -106,61 +106,11 @@
     }
   });
 
-  // Canvas exposes 8-bit alpha and rounds near-opaque 16-bit samples to 255.
-  // Read original alpha samples only for that case, after browser decoding.
-  async function transparent16(bytes, width, height) {
-    const channels = bytes[25]===6 ? 4 : bytes[25]===4 ? 2 : 0;
-    if (bytes[24]!==16 || !channels) return false;
-    const view = new DataView(bytes.buffer), chunks = [];
-    for (let offset=8; offset+12<=bytes.length;) {
-      const length=view.getUint32(offset), type=String.fromCharCode(...bytes.slice(offset+4,offset+8));
-      if (offset+length+12>bytes.length) throw new Error('Invalid PNG image.');
-      if (type==='IDAT') chunks.push(bytes.slice(offset+8,offset+8+length));
-      offset+=length+12;
-    }
-    const reader=new Blob(chunks).stream().pipeThrough(new DecompressionStream('deflate')).getReader();
-    const parts=[]; let size=0;
-    try {
-      while (true) {
-        const {done,value}=await reader.read(); if (done) break;
-        size+=value.length;
-        if (size>width*height*channels*2+height*14+7) { await reader.cancel(); throw new Error('Invalid PNG decoded size.'); }
-        parts.push(value);
-      }
-    } finally { reader.releaseLock(); }
-    const raw=new Uint8Array(size); let position=0;
-    for (const part of parts) { raw.set(part,position); position+=part.length; }
-    position=0;
-    const passes=bytes[28]===1?[[0,0,8,8],[4,0,8,8],[0,4,4,8],[2,0,4,4],[0,2,2,4],[1,0,2,2],[0,1,1,2]]:[[0,0,1,1]];
-    const bpp=channels*2;
-    for (const [x,y,dx,dy] of passes) {
-      const w=Math.max(0,Math.ceil((width-x)/dx)), h=Math.max(0,Math.ceil((height-y)/dy));
-      if (!w || !h) continue;
-      let previous=new Uint8Array(w*bpp);
-      for (let row=0; row<h; row++) {
-        const filter=raw[position++], line=raw.slice(position,position+w*bpp); position+=w*bpp;
-        if (line.length!==w*bpp || filter>4) throw new Error('Invalid PNG image.');
-        for (let i=0; i<line.length; i++) {
-          const left=i>=bpp?line[i-bpp]:0, up=previous[i], corner=i>=bpp?previous[i-bpp]:0;
-          let predictor=0;
-          if (filter===1) predictor=left;
-          if (filter===2) predictor=up;
-          if (filter===3) predictor=Math.floor((left+up)/2);
-          if (filter===4) { const p=left+up-corner,a=Math.abs(p-left),b=Math.abs(p-up),c=Math.abs(p-corner); predictor=a<=b&&a<=c?left:b<=c?up:corner; }
-          line[i]=(line[i]+predictor)&255;
-        }
-        for (let i=bpp-2; i<line.length; i+=bpp) if (line[i]!==255 || line[i+1]!==255) return true;
-        previous=line;
-      }
-    }
-    return false;
-  }
-
   async function validate(file) {
     if (file.size > limit) throw new Error('Logo must be at most '+FileSize.megabytes(limit)+' ('+FileSize.exact(limit)+').');
     const bytes = new Uint8Array(await file.arrayBuffer());
     if (!/\.png$/i.test(file.name) || (file.type && file.type !== 'image/png') || !signature.every((b,i) => bytes[i] === b)) {
-      throw new Error('Choose a PNG image with transparency. Other formats are unsupported.');
+      throw new Error('Choose a PNG image. Other formats are unsupported.');
     }
     // Check IHDR before decoding, bounding the browser's decoded allocation.
     if (bytes.length < 33 || String.fromCharCode(...bytes.slice(12,16)) !== 'IHDR') throw new Error('Invalid PNG image. Choose a complete, valid PNG file.');
@@ -170,12 +120,6 @@
     try {
       img.src = source;
       try { await img.decode(); } catch { throw new Error('Invalid PNG image. Choose a complete, valid PNG file.'); }
-      const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = height;
-      const context = canvas.getContext('2d', {willReadFrequently:true}); context.drawImage(img,0,0);
-      const pixels = context.getImageData(0,0,width,height).data;
-      for (let i=3; i<pixels.length; i+=4) if (pixels[i]<255) return;
-      if (await transparent16(bytes,width,height)) return;
-      throw new Error('PNG must contain transparency. At least one pixel must be partially or fully transparent.');
     } finally { URL.revokeObjectURL(source); }
   }
 
@@ -183,12 +127,12 @@
     const revision = {}; host.logoRevision = revision;
     const isCurrent = () => current() && host.isConnected && host.logoRevision===revision;
     host.replaceChildren(); host.className = 'provider-logo-editor';
-    FormUI.sectionHeading(host,'Provider logo','h3');
+
     let operationState, intent='upload', shown=Symbol('initial');
     const upload=ReferenceUpload.create({
-      label:provider.name+' logo', title:'No logo. Drop a PNG here',selectedTitle:provider.name+' logo',uploadLabel:'Upload Logo',kinds:['image'],onRemove:removeLogo,
-      hint:'PNG with transparency · up to '+FileSize.megabytes(limit)+' · maximum 2048 × 2048 px',maxBytes:()=>limit,
-      limits:()=>({content_types:['image/png']}), locked:()=>uploads.has(identity), cancelable:()=>false,
+      label:'Provider logo', title:'No logo. Drop a PNG here',selectedTitle:provider.name+' logo',uploadLabel:'Upload Logo',kinds:['image'],onRemove:removeLogo,
+      dimensions:'2048 × 2048 px max',maxBytes:()=>limit,
+      limits:()=>({content_types:['image/png']}), locked:()=>uploads.has(identity)&&uploads.get(identity)!==operationState,canContinue:isCurrent, cancelable:()=>false,
       retainedMessage:()=>provider.icon_url?' Current logo retained.':' No logo installed.',
       onBusy:busy=>{
         if (busy) {
@@ -224,9 +168,9 @@
     }
     function renderPreview(){
       if(shown===provider.icon_url)return;shown=provider.icon_url;
-      upload.setPreview(provider.icon_url?{name:'Current logo'}:null);
-      const preview=upload.root.querySelector('.template-reference-preview');preview.classList.add('provider-logo-preview');
-      if(provider.icon_url){const mark=document.createElement('span');mark.className='provider-logo-mark';image(mark,provider);preview.replaceChildren(mark);}
+      upload.setPreview(provider.icon_url?{name:'Current logo',type:'image/png'}:null);
+      const preview=upload.root.querySelector('.template-reference-preview');if(!preview)return;preview.classList.add('provider-logo-preview');
+      if(provider.icon_url){const mark=document.createElement('span');mark.className='provider-logo-mark';image(mark,provider);preview.querySelector('.provider-logo-mark')?.remove();preview.querySelector('.media-picker-media').prepend(mark);}
     }
     function update(state){
       if(!isCurrent())return;

@@ -23,9 +23,9 @@
 .template-editor .reference-actions button { min-width:0; }
 .template-editor .reference-status { margin:12px 0 0; min-height:18px; line-height:1.5; }
 .template-editor .reference-dropzone small { font-size:var(--type-detail); line-height:1.5; }
-.template-editor .template-reference-preview { width:160px; max-width:100%; margin:0 auto 16px; }
-.template-editor .template-reference-preview img { height:112px; }
-.template-editor .template-reference-preview .reference-name { white-space:normal; overflow-wrap:anywhere; }
+.template-editor .template-reference-preview:not(.media-picker-card) { width:160px; max-width:100%; margin:0 auto 16px; }
+.template-editor .template-reference-preview:not(.media-picker-card) img { height:112px; }
+.template-editor .template-reference-preview:not(.media-picker-card) .reference-name { white-space:normal; overflow-wrap:anywhere; }
 .template-editor .prompt-reference-mirror .prompt-reference-text { text-align:left; }
 .template-editor [role=status]:empty { display:none; }
 @media(max-width:600px) {
@@ -46,8 +46,8 @@
 
 
 .template-reference-preview :is(video,audio) { width:100%; max-width:100%; height:auto; display:block; }
-.template-editor .template-reference-preview { width:240px; }
-.template-editor .template-reference-preview img { height:auto; max-height:240px; object-fit:contain; }
+.template-editor .template-reference-preview:not(.media-picker-card) { width:240px; }
+.template-editor .template-reference-preview:not(.media-picker-card) img { height:auto; max-height:240px; object-fit:contain; }
 .template-fixed-reference { display:grid; gap:12px; min-width:0; }
 .template-fixed-reference h3,.template-fixed-reference p { margin:0; }
 .template-reference-preview video { aspect-ratio:auto; object-fit:contain; background:var(--bg); }
@@ -81,7 +81,7 @@
 .template-variable-reference .reference-dropzone { padding:16px; }
 .template-variable-reference .reference-actions { flex-wrap:wrap; gap:12px; }
 .template-variable-reference .reference-actions button { flex:1 1 140px; }
-.template-variable-reference .template-reference-preview { max-width:240px; margin:0 auto 16px; }
+.template-variable-reference .template-reference-preview:not(.media-picker-card) { max-width:240px; margin:0 auto 16px; }
 
 .template-fixed-reference .template-media { max-width:160px; }
 #templateSelection .template-use > :is(h2,p) { margin:0; }

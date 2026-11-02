@@ -101,7 +101,7 @@ const server=http.createServer((req,res)=>{
    const button=inLibrary?dialog.locator('[data-upload]'):page.locator('#audioUploadReference');
    const [chooser]=await Promise.all([page.waitForEvent('filechooser'),activation==='click'?button.click():button.press(activation)]);
    assert.equal(await chooser.element().isDisabled(),false,'genuine chooser must target an enabled input');
-   assert.equal(await chooser.element().getAttribute('id'),'audioReferenceFiles');
+   assert.equal(await chooser.element().evaluate(n=>n.type==='file'&&n.accept.includes('audio/mpeg')&&!!n.closest('[data-reference-upload]')),true);
    assert.equal(await chooser.element().getAttribute('accept'),'audio/mpeg,audio/aac,audio/mp4,audio/wave,audio/wav,audio/x-wav,audio/ogg,audio/flac');
    chooserEvents.push({activation,in_library:inLibrary,input_enabled:true});
    return chooser;

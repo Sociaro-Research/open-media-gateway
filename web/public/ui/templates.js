@@ -153,7 +153,7 @@
   const compatible=item=>kinds.some(type=>(item.content_type||'').startsWith(type+'/'));
   const endpoint=administrator?'/v1/system/template-references':'/v1/references';
   const previousUpload=previousFocus?.closest('[data-reference-upload]');
-  const close=()=>{view.stop();operation.abort();dialog.close();dialog.remove();const host=previousUpload?.isConnected?previousUpload:previousSlot?document.querySelector(`[data-slot-id="${CSS.escape(previousSlot)}"] [data-reference-upload]`):null;const focus=host?.querySelector('[data-upload-remove]:not([hidden]):not(:disabled)')||host?.querySelector('[data-upload-picker]:not([hidden]):not(:disabled)')||(previousFocus?.isConnected&&!previousFocus.hidden&&!previousFocus.disabled?previousFocus:null);if(focus){focus.focus();requestAnimationFrame(()=>{if(fresh(token)&&!parentSignal.aborted&&focus.isConnected&&!focus.disabled&&!focus.hidden&&(document.activeElement===document.body||document.activeElement===previousFocus))focus.focus({preventScroll:true});});}};
+  const close=()=>{view.dispose();operation.abort();dialog.close();dialog.remove();const host=previousUpload?.isConnected?previousUpload:previousSlot?document.querySelector(`[data-slot-id="${CSS.escape(previousSlot)}"] [data-reference-upload]`):null;const focus=host?.querySelector('[data-upload-remove]:not([hidden]):not(:disabled)')||host?.querySelector('[data-upload-picker]:not([hidden]):not(:disabled)')||(previousFocus?.isConnected&&!previousFocus.hidden&&!previousFocus.disabled?previousFocus:null);if(focus){focus.focus();requestAnimationFrame(()=>{if(fresh(token)&&!parentSignal.aborted&&focus.isConnected&&!focus.disabled&&!focus.hidden&&(document.activeElement===document.body||document.activeElement===previousFocus))focus.focus({preventScroll:true});});}};
   const view=ReferenceLibrary.create({title:administrator?'Template references':'Reference library',description:administrator?'Shared template files. Administrators manage this library. Upload a file, then select it to assign a fixed slot.':'Choose a reference for this slot.',onClose:close});
   const {dialog,status:message,more}=view;dialog.classList.add('template-reference-library');
   function render(){view.render(items.filter(compatible),{
@@ -173,7 +173,7 @@
    }catch(error){if(!signal.aborted)message.textContent=error.message;}finally{if(stamp===sequence){busy=false;if(!signal.aborted)render();}}
   }
   async function select(item){if(busy||uploadPending||signal.aborted||!administrator&&validationPending)return;busy=true;render();message.textContent='Checking reference…';
-   try{if(item.id===selectedID()&&onClear)await onClear();else await onSelect(item,signal);if(fresh(token)&&!signal.aborted)close();}catch(error){if(!signal.aborted)message.textContent=error.message;}finally{busy=false;if(!signal.aborted)render();}
+   try{if(item.id===selectedID()&&onClear)await onClear();else await onSelect(item,signal);if(fresh(token)&&!signal.aborted)message.textContent='';}catch(error){if(!signal.aborted)message.textContent=error.message;}finally{busy=false;if(!signal.aborted)render();}
   }
   async function remove(item){if(busy||uploadPending||signal.aborted||!administrator&&validationPending)return;busy=true;render();
    try{await api(endpoint+'/'+encodeURIComponent(item.id),{method:'DELETE',signal});signal.throwIfAborted();window.ReferenceLibrary.deleted(item,administrator?'template':'organization');await load();message.textContent='Deleted '+item.name+'.';window.dispatchEvent(new Event('gateway-storage-change'));}
@@ -322,8 +322,8 @@
   countFields.append(el('p','For workflows without prompt markers, declare the ordered inputs. Leave blank to use the workflow minimum. The prompt is submitted unchanged.','field-hint'));
   const slots=el('div','','template-slots');let bindings=structuredClone(draft.slots||[]),syntax=ReferencePrompts.syntax,coverID=draft.cover_id||'';
   let overrideSoundID=draft.override_sound_id||'';
-  const sound=OverrideSound.create({value:overrideSoundID,signal,load:id=>loadImage(id),locked:()=>writing||uploading>0,onBusy:busy=>{if(!fresh(token))return;uploading+=busy?1:-1;lock(uploading>0);},onChange:id=>{if(!fresh(token))return;overrideSoundID=id;cache();},upload:async(file,operationSignal)=>{const body=new FormData();body.append('file',file);return api(`/v1/system/templates/${record.id}/assets`,{method:'POST',body,signal:operationSignal});}});
-  let promptEditor=null,coverUpload=null;const widgets=new Set(),assetPreviews=new Map(),imageLoads=new Map(),metadataLoads=new Map(),assetNames=new Map();
+  let soundBusy=false;const sound=OverrideSound.create({value:overrideSoundID,signal,load:id=>loadImage(id),locked:()=>writing&&!soundBusy||uploading>(soundBusy?1:0),onBusy:busy=>{soundBusy=busy;if(!fresh(token))return;uploading+=busy?1:-1;lock(uploading>0);},onChange:id=>{if(!fresh(token))return;overrideSoundID=id;cache();},upload:async(file,operationSignal)=>{const body=new FormData();body.append('file',file);return api(`/v1/system/templates/${record.id}/assets`,{method:'POST',body,signal:operationSignal});}});
+  let promptEditor=null,coverUpload=null;const widgets=new Set(),slotRows=new Map(),assetLibraryOrigins=new Map(),assetPreviews=new Map(),imageLoads=new Map(),metadataLoads=new Map(),assetNames=new Map();
   signal.addEventListener('abort',()=>{for(const item of assetPreviews.values())if(item.url)URL.revokeObjectURL(item.url);assetPreviews.clear();},{once:true});
   const assetTypes=new Map();for(const s of bindings)if(s.asset_id)assetTypes.set(s.asset_id,s.type+'/unknown');if(coverID&&!assetTypes.has(coverID))assetTypes.set(coverID,'image/unknown');
   function selected(){if(!model.value)return null;const [p,m]=JSON.parse(model.value);return adminCatalog.find(x=>x.id===p)?.models.find(x=>x.id===m);}
@@ -387,26 +387,30 @@
    rememberAsset(a,name,file);if(slot)slot.asset_id=a.id;else coverID=a.id;cache();
    renderSlots();
    if(coverUpload)showPreview(coverUpload,coverID,a.content_type.startsWith('image/')?'image':'video','Cover');
-   if(slot)slots.querySelector(`[data-slot-id="${CSS.escape(slot.id)}"] .reference-status`).textContent='Assigned '+name+' to '+slot.label+'.';
+   if(slot)slotRows.get(slot.id)?.widget.message('Assigned '+name+' to '+slot.label+'.');
   }
   function uploadControl(slot){
-   const kind=slot?.type,label=slot?.label||'Cover',widget=ReferenceUpload.create({label,title:slot?'Drop '+(kind==='audio'?'an audio file':'an '+kind)+' here':'Drop an image or video cover here',uploadLabel:slot?'Upload '+kind:'Upload cover',kinds:slot?[kind]:['image','video'],removeOnPreview:true,limits:slot?inputLimits:()=>({}),maxBytes:slot?kind=>ReferenceValidation.fileLimit(selected(),kind,{reference_mode:mode.value}):undefined,signal,locked:()=>writing||uploading>0,
+   let ownBusy=false;const kind=slot?.type,label=slot?.label||'Cover',widget=ReferenceUpload.create({label,title:slot?'Drop '+(kind==='audio'?'an audio file':'an '+kind)+' here':'Drop an image or video cover here',uploadLabel:slot?'Upload '+kind:'Upload cover',kinds:slot?[kind]:['image','video'],removeOnPreview:true,limits:slot?inputLimits:()=>({}),maxBytes:slot?kind=>ReferenceValidation.fileLimit(selected(),kind,{reference_mode:mode.value}):undefined,signal,locked:()=>writing&&!ownBusy||uploading>(ownBusy?1:0),canContinue:()=>fresh(token),
     onRemove:()=>{if(slot)slot.asset_id='';else coverID='';cache();renderSlots();checkMedia();if(!slot)showPreview(coverUpload,'','image','Cover');else slots.querySelector(`[data-slot-id="${CSS.escape(slot.id)}"] :is([data-upload-remove],[data-upload-picker]):not([hidden])`)?.focus({preventScroll:true});},
-    onBusy:(busy,{restoreFocus=false}={})=>{if(!fresh(token))return;uploading+=busy?1:-1;lock(uploading>0);if(!busy&&restoreFocus&&slot)slots.querySelector(`[data-slot-id="${CSS.escape(slot.id)}"] :is([data-upload-remove],[data-upload-picker]):not([hidden])`)?.focus({preventScroll:true});},
+    onBusy:(busy,{restoreFocus=false}={})=>{ownBusy=busy;if(!fresh(token))return;uploading+=busy?1:-1;lock(uploading>0);if(!busy&&restoreFocus&&slot)slots.querySelector(`[data-slot-id="${CSS.escape(slot.id)}"] :is([data-upload-remove],[data-upload-picker]):not([hidden])`)?.focus({preventScroll:true});},
     onFile:async(file,operationSignal)=>{const started=intent(),a=await copyFile(file,slot,operationSignal);await acceptAsset(slot,a,file.name,file,started,operationSignal);return slot?'Assigned '+file.name+' to '+slot.label+'.':'Cover ready: '+file.name;},
-    ...({onLibrary:picker=>chooseLibrary(kind,true,async(item,selectionSignal)=>{const started=intent(),a=await api(`/v1/system/templates/${record.id}/assets`,{method:'POST',body:JSON.stringify({library_reference_id:item.id,...(slot?{validation:validation()}:{})}),signal:selectionSignal});await acceptAsset(slot,a,item.name,null,started,selectionSignal);},slot?validation:null,()=>slot?slot.asset_id:coverID,()=>{if(slot)slot.asset_id='';else coverID='';cache();renderSlots();checkMedia();if(!slot)showPreview(coverUpload,'','image','Cover');},picker.root,slot?selected:()=>null)})
+    ...({onLibrary:picker=>chooseLibrary(kind,true,async(item,selectionSignal)=>{const started=intent(),a=await api(`/v1/system/templates/${record.id}/assets`,{method:'POST',body:JSON.stringify({library_reference_id:item.id,...(slot?{validation:validation()}:{})}),signal:selectionSignal});await acceptAsset(slot,a,item.name,null,started,selectionSignal);assetLibraryOrigins.set(a.id,item.id);},slot?validation:null,()=>{const id=slot?slot.asset_id:coverID;return assetLibraryOrigins.get(id)||id;},()=>{if(slot)slot.asset_id='';else coverID='';cache();renderSlots();checkMedia();if(!slot)showPreview(coverUpload,'','image','Cover');},picker.root,slot?selected:()=>null)})
    });widgets.add(widget);showPreview(widget,slot?.asset_id||(!slot&&coverID),kind||'image',slot?label:'Cover');return widget;
   }
+  function syncSlot(entry){
+   const {slot,row,widget}=entry,address=slot.type+'_'+slot.index,schema=ModelControls.schema(selected(),slot.type),value=ModelControls.role(selected(),slot.type,modelOptions.reference_roles?.[address]),key=JSON.stringify([schema,value]);
+   if(entry.roleKey!==key){entry.role?.remove();entry.role=ModelControls.roleField(selected(),slot.type,slot.index,value,next=>{modelOptions.reference_roles={...modelOptions.reference_roles,[address]:next};entry.roleKey=JSON.stringify([ModelControls.schema(selected(),slot.type),next]);cache();checkMedia();});if(entry.role)row.insertBefore(entry.role,widget.root);entry.roleKey=key;}
+   widget.root.setAttribute('aria-description',slot.asset_id?'Fixed '+slot.type+' reference. Users cannot replace it.':'Required '+slot.type+' reference. The user supplies this input when generating.');
+   showPreview(widget,slot.asset_id,slot.type,slot.label);
+  }
   function renderSlots(){
-   for(const widget of widgets)if(widget!==coverUpload){widget.dispose();widgets.delete(widget);}
-   slots.replaceChildren();if(!bindings.length)slots.append(el('p','No reference slots. Infer from the selected model and prompt.'));
-   for(const slot of bindings){const row=el('div','','template-slot');row.dataset.slotId=slot.id;const heading=el('div','','template-slot-heading');heading.append(el('h3',slot.type[0].toUpperCase()+slot.type.slice(1)+' '+slot.index));row.append(heading);
+   const keep=new Set(bindings.map(slot=>slot.id));for(const [id,entry]of slotRows)if(!keep.has(id)||!bindings.includes(entry.slot)){entry.widget.dispose();widgets.delete(entry.widget);entry.row.remove();slotRows.delete(id);}const rows=[];if(!bindings.length)rows.push(el('p','No reference slots. Infer from the selected model and prompt.'));
+   for(const slot of bindings){const previous=slotRows.get(slot.id);if(previous){syncSlot(previous);rows.push(previous.row);continue;}const row=el('div','','template-slot');row.dataset.slotId=slot.id;const heading=el('div','','template-slot-heading');heading.append(el('h3',slot.type[0].toUpperCase()+slot.type.slice(1)+' '+slot.index));row.append(heading);
     const label=field(row,'Label','text',slot.label);label.oninput=()=>{slot.label=label.value;widget.setLabel(slot.label);cache();};
-    const address=slot.type+'_'+slot.index,role=ModelControls.roleField(selected(),slot.type,slot.index,modelOptions.reference_roles?.[address],value=>{modelOptions.reference_roles={...modelOptions.reference_roles,[address]:value};cache();checkMedia();});if(role)row.append(role);
     const widget=uploadControl(slot);widget.root.setAttribute('aria-description',slot.asset_id?'Fixed '+slot.type+' reference. Users cannot replace it.':'Required '+slot.type+' reference. The user supplies this input when generating.');row.append(widget.root);
-    slots.append(row);
+    const entry={slot,row,widget};slotRows.set(slot.id,entry);syncSlot(entry);rows.push(row);
    }
-   FormUI.refresh();promptEditor?.refresh();
+   ReferenceUpload.reconcile(slots,rows);FormUI.refresh();promptEditor?.refresh();
   }
   const infer=button('Infer and review slots',async()=>{if(writing||uploading)return;lock(true);try{const d=read(),result=await api(`/v1/system/templates/${record.id}/infer`,{method:'POST',body:JSON.stringify(d),signal:controller.signal});if(!fresh(token))return;bindings=result.slots.map(s=>{const previous=bindings.find(x=>x.id===s.id&&x.role===s.role);return {...s,...(previous?{asset_id:previous.asset_id,label:previous.label}:{})};});syntax=result.syntax;cache();renderSlots();checkMedia();say('Review each slot, fixed references and the cover before publishing.');}catch(e){fail(e,token)}finally{if(fresh(token))lock(false);}});
   form.append(infer,slots);

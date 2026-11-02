@@ -8085,7 +8085,7 @@ paths:
     put:
       tags: [Providers admin]
       summary: Personal — Upload or replace a provider logo
-      description: Administrator only. Atomically replace this connection's logo without changing settings or credentials. PNG signature and full decoding are checked. At least one pixel must have alpha below full opacity, including palette tRNS and 16-bit alpha. SVG, other formats and opaque PNG are rejected. Failures preserve the previous upload. No remote URL import is supported.
+      description: Administrator only. Atomically replace this connection's logo without changing settings or credentials. PNG signature and full decoding are checked. Opaque and transparent PNG are accepted, including palette tRNS and 16-bit samples. SVG and other formats are rejected. Failures preserve the previous upload. No remote URL import is supported.
       security:
       - bearerAuth: []
       - sessionAuth: []
@@ -8093,7 +8093,7 @@ paths:
         required: true
         content:
           image/png:
-            schema: {type: string, format: binary, maxLength: 1048576, description: PNG with actual transparency; maximum 2048 pixels per side}
+            schema: {type: string, format: binary, maxLength: 1048576, description: Decoded PNG, opaque or transparent; maximum 2048 pixels per side}
       responses:
         '200':
           description: Logo saved; refresh images using the new content-versioned URL
@@ -8103,7 +8103,7 @@ paths:
                 type: object
                 properties:
                   icon_url: {type: string}
-        '400': {description: Unsupported content type, malformed/opaque PNG, exceeded byte/dimension limit or incomplete upload; previous logo retained}
+        '400': {description: Unsupported content type, malformed PNG, exceeded byte/dimension limit or incomplete upload; previous logo retained}
         '401': {description: Authentication required}
         '403': {description: Administrator permission and applicable API-key scopes required}
         '404': {description: Provider not found}
@@ -8135,7 +8135,7 @@ paths:
     put:
       tags: [Providers admin]
       summary: Shared — Upload or replace a provider logo
-      description: Administrator only. Atomically replace this connection's logo without changing settings or credentials. PNG signature and full decoding are checked. At least one pixel must have alpha below full opacity, including palette tRNS and 16-bit alpha. SVG, other formats and opaque PNG are rejected. Failures preserve the previous upload. No remote URL import is supported.
+      description: Administrator only. Atomically replace this connection's logo without changing settings or credentials. PNG signature and full decoding are checked. Opaque and transparent PNG are accepted, including palette tRNS and 16-bit samples. SVG and other formats are rejected. Failures preserve the previous upload. No remote URL import is supported.
       security:
       - bearerAuth: []
       - sessionAuth: []
@@ -8143,7 +8143,7 @@ paths:
         required: true
         content:
           image/png:
-            schema: {type: string, format: binary, maxLength: 1048576, description: PNG with actual transparency; maximum 2048 pixels per side}
+            schema: {type: string, format: binary, maxLength: 1048576, description: Decoded PNG, opaque or transparent; maximum 2048 pixels per side}
       responses:
         '200':
           description: Logo saved; refresh images using the new content-versioned URL
@@ -8153,7 +8153,7 @@ paths:
                 type: object
                 properties:
                   icon_url: {type: string}
-        '400': {description: Unsupported content type, malformed/opaque PNG, exceeded byte/dimension limit or incomplete upload; previous logo retained}
+        '400': {description: Unsupported content type, malformed PNG, exceeded byte/dimension limit or incomplete upload; previous logo retained}
         '401': {description: Authentication required}
         '403': {description: Administrator permission and applicable API-key scopes required}
         '404': {description: Provider not found}
@@ -10291,7 +10291,7 @@ components:
           items: {$ref: '#/components/schemas/ProviderField'}
         values: {type: object, additionalProperties: {type: string}, description: Non-secret saved settings.}
         hints: {type: object, additionalProperties: {type: string}, description: Masked hints only for secret fields.}
-        icon_url: {type: string, description: Authenticated uploaded transparent PNG logo URL.}
+        icon_url: {type: string, description: Authenticated uploaded PNG logo URL.}
         icon_monochrome: {type: boolean}
         billing_help: {type: string}
         supports_billing_credentials: {type: boolean, description: Whether separate billing credentials are supported.}

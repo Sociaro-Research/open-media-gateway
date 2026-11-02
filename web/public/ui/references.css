@@ -82,3 +82,73 @@ textarea.reference-hover { cursor:pointer; }
 /* Keep native audio controls and preview failure text clear of the overlay. */
 .reference-card:has(> .reference-preview-remove) > audio { margin-top:calc(44px + 8px); }
 .reference-card:has(> .reference-preview-remove) > .reference-placeholder { height:auto; min-height:90px; padding:calc(44px + 8px) 8px 12px; }
+
+/* One picker surface; caller-specific panels do not redefine media geometry. */
+.media-picker { display:grid; gap:12px; min-width:0; border:1px solid var(--line); border-radius:12px; padding:16px; background:transparent; }
+.media-picker-heading { display:flex; align-items:baseline; justify-content:space-between; gap:12px; }
+.media-picker-heading > :first-child { margin:0; font-size:16px; font-weight:600; white-space:nowrap; flex-shrink:0; }
+.media-picker-requirements { color:var(--muted); font-size:12px; white-space:nowrap; flex-shrink:0; margin:0; }
+.media-picker-input-row { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+.media-picker .reference-dropzone,.template-editor .media-picker .reference-dropzone,.provider-logo-editor .media-picker .reference-dropzone { display:grid; place-items:center; flex:1 1 140px; min-height:58px; padding:12px; background:transparent; border:1px dashed var(--line); }
+.media-picker .reference-dropzone > p { margin:0; font-size:14px; font-weight:400; }
+.media-picker .reference-actions { justify-content:flex-start; gap:12px; }
+.media-picker .reference-actions button { min-height:44px; font-size:14px; }
+.media-picker > .reference-status { margin:0; }
+.media-picker > .reference-status:empty { display:none; }
+.media-picker-previews,.reference-library-grid,.selected-references { display:flex; flex-wrap:wrap; align-items:flex-start; gap:12px; min-width:0; margin:0; --media-height:150px; }
+.media-picker-previews:empty { display:none; }
+.reference-library-grid { margin:16px 0; }
+.media-picker-card,.template-editor .media-picker-card,.template-variable-reference .media-picker-card { flex:0 0 auto; width:calc(var(--media-height,150px)*var(--media-ratio,1) + 2px); max-width:100%; padding:0; margin:0; border-radius:12px; background:transparent; overflow:hidden; }
+.media-picker-media { position:relative; height:var(--media-height,150px); width:100%; }
+.media-picker-card .media-picker-media > :is(img,video),.template-editor .media-picker-card .media-picker-media > :is(img,video) { display:block; width:100%; height:100%; max-height:none; border-radius:0; object-fit:contain; aspect-ratio:auto; background:transparent; }
+.media-picker-card .media-picker-media > audio { position:absolute; bottom:8px; width:100%; height:54px; z-index:2; }
+.media-picker-card .reference-placeholder { height:100%; width:100%; border-radius:0; background:transparent; }
+.media-picker-card > .reference-name { display:block; margin:0; padding:8px 12px 12px; font-size:12px; text-align:left; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.media-picker-card > .reference-choice { position:absolute; inset:0; width:100%; height:100%; border:0; padding:0; background:transparent; z-index:1; }
+.media-picker-card > .reference-choice:hover { background:transparent; }
+.media-picker-card .reference-play { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); display:grid; place-items:center; width:44px; min-width:44px; height:44px; min-height:44px; border-radius:50%; padding:0; z-index:3; font-size:20px; }
+.media-picker-card .reference-play,.media-picker-card .reference-selection-remove,.media-picker-card .reference-delete { background:rgb(20 20 20 / 58%); color:white; border:1px solid rgb(255 255 255 / 25%); }
+.media-picker-card .reference-selection-remove,.media-picker-card .reference-delete { position:absolute; top:6px; right:6px; margin:0; min-height:44px; height:44px; min-width:44px; padding:8px 12px; border-radius:12px; z-index:4; font-size:12px; opacity:1; }
+.media-picker-card[data-media-kind="image"] :is(.reference-selection-remove,.reference-delete) { opacity:0; }
+.media-picker-card[data-media-kind="image"]:is(:hover,:focus-within,[data-actions-visible="true"]) :is(.reference-selection-remove,.reference-delete) { opacity:1; }
+.media-picker-card .reference-selected-strip { position:relative; display:block; width:100%; text-align:center; padding:6px 8px; background:var(--accent); color:var(--accent-text); font-size:12px; pointer-events:none; }
+.media-picker-card[data-selected="true"] { --interaction-border-color:var(--accent); border-color:var(--accent); }
+.media-picker-card .reference-delete-warning,.media-picker-card .reference-card-actions { position:relative; z-index:5; margin:8px 12px; }
+.media-picker-card > .reference-role,.media-picker-card > .reference-voice { position:relative; z-index:2; }
+.media-picker-card > .reference-role { margin:0 12px 12px; }
+.media-picker [hidden],.media-picker-card [hidden] { display:none!important; }
+.media-picker .media-picker-previews > .provider-logo-preview { display:block; width:calc(var(--media-height,150px)*var(--media-ratio,1) + 2px); height:auto; padding:0; margin:0; }
+.media-picker .provider-logo-preview .provider-logo-mark { display:flex; align-items:center; justify-content:center; width:100%; height:var(--media-height,150px); }
+.media-picker .provider-logo-preview .provider-logo-mark img { width:auto; height:auto; max-width:100%; max-height:100%; }
+@media (pointer:coarse) { .media-picker-card[data-media-kind="image"]:not([data-actions-visible="true"]) :is(.reference-selection-remove,.reference-delete) { opacity:0; } }
+
+/* Native video controls remain above the independent library selection layer. */
+.media-picker-card .media-picker-media > video { position:relative; z-index:2; }
+
+/* Requirements share the title baseline; rare narrow collisions are intentional. */
+.media-picker-heading { position:relative; display:block; }
+.media-picker-heading > .media-picker-requirements { position:absolute; right:0; top:0; line-height:24px; }
+/* Theme columns share rows even when one asset inherits the other theme. */
+.branding-asset:has(> .media-picker) { padding:0; border:0; }
+.media-picker.branding-asset-inline { grid-template-columns:minmax(0,1fr); }
+@media (min-width:761px) {
+ .branding-theme-columns:has(> .branding-image-column) { grid-template-rows:repeat(4,auto); }
+ .branding-theme-columns > .branding-image-column { grid-row:span 4; grid-template-rows:subgrid; }
+}
+
+.media-picker-card > [data-provider-management] { position:relative; z-index:3; }
+/* Preserve narrow portrait media; reserve room for usable overlay hit targets. */
+.media-picker-card[data-compact-controls="true"] { overflow:visible; margin-right:max(0px,calc(44px - var(--media-height,150px)*var(--media-ratio,1))); }
+.media-picker-card[data-compact-controls="true"] .reference-play { left:0; top:calc(var(--media-height,150px) + 6px); transform:none; }
+.media-picker-card[data-compact-controls="true"]:has(.reference-play) > .reference-name { padding-top:56px; }
+.media-picker-card[data-compact-controls="true"] :is(.reference-delete,.reference-selection-remove) { left:0; right:auto; padding:8px 4px; font-size:10px; }
+.media-picker-card[data-compact-controls="true"] .media-picker-media > :is(img,video) { border-radius:12px 12px 0 0; }
+.media-picker-card[data-compact-controls="true"] .reference-selected-strip { border-radius:0 0 12px 12px; }
+
+.media-picker-preview-error,.media-picker-preview-retry { position:absolute; left:0; bottom:0; z-index:5; font-size:12px; background:var(--panel); color:var(--text); }
+.media-picker-preview-error { bottom:44px; padding:6px; }
+
+/* Flex flow recomputes wrapped feedback height consistently in both engines. */
+.media-picker { display:flex; flex-direction:column; }
+.media-picker > .reference-status { flex:none; }
+.media-picker-card { touch-action:manipulation; }

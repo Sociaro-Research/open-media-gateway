@@ -31,7 +31,7 @@ function hashReferenceFile(file,signal){
    for(const kind of ['image','video','audio']) {
      const target=document.querySelector(kind==='image'?'#imageURLsField':`#${kind}URLField`);
      const manual=target.querySelector('.reference-manual');
-     const managed=!!model.resource_input_schemas?.length;FormUI.disclosure(manual.querySelector('summary'),`Use ${kind} URLs${model.supports_asset_references&&!managed?' or registered assets':''}`);
+     const managed=!!model.resource_input_schemas?.length;FormUI.disclosure(manual.querySelector('summary'),'Use URLs');
      let hint=manual.querySelector('[data-asset-hint]');
      if(!hint){hint=document.createElement('p');hint.className='field-hint';hint.dataset.assetHint='';manual.append(hint);}
      hint.hidden=!model.supports_asset_references||managed;
@@ -59,10 +59,10 @@ function hashReferenceFile(file,signal){
   }
 
   const field = document.querySelector(image?'#imageURLs':`#${kind}URL`);
-  const dropzone = document.querySelector(image?'#referenceDropzone':`#${kind}ReferenceDropzone`);
-  const files = document.querySelector(image?'#referenceFiles':`#${kind}ReferenceFiles`);
-  const selected = document.querySelector(image?'#selectedReferences':`#${kind}SelectedReferences`);
-  const status = document.querySelector(image?'#referenceStatus':`#${kind}ReferenceStatus`);
+  let dropzone = document.querySelector(image?'#referenceDropzone':`#${kind}ReferenceDropzone`);
+  let files = document.querySelector(image?'#referenceFiles':`#${kind}ReferenceFiles`);
+  let selected = document.querySelector(image?'#selectedReferences':`#${kind}SelectedReferences`);
+  let status = document.querySelector(image?'#referenceStatus':`#${kind}ReferenceStatus`);
   const metadata = new Map();
   let draggedURL = null;
   const dragType = 'application/x-gateway-reference-'+kind;
@@ -70,7 +70,7 @@ function hashReferenceFile(file,signal){
   let controller = new AbortController();
   let checkedSignature='',checking=false,validationError='';
   const validationTarget=()=>{const model=selectedModel();const t=model?ReferenceValidation.target(selectedProvider()?.id,model.id,requestOptions(model)):null;if(t&&kind==='audio'&&voiceTarget)t.role='reference_voice';return t;};
-  const selectionSignature=()=>JSON.stringify([selectionVersion,validationTarget(),urls(),kind==='audio'?activeVoices():null]);
+  const selectionSignature=()=>JSON.stringify([selectionVersion,validationTarget(),urls(),field.value,kind==='audio'?activeVoices():null]);
   const candidateIDs=values=>[...new Set([...(validationTarget()?.reference_ids||[]).filter(id=>!ReferenceValidation.ids(urls()).includes(id)),...ReferenceValidation.ids(values)])];
  let remote,returnFocus=null,previousFocus=null;
   const libraryView=ReferenceLibrary.create({id:image?'referenceLibrary':`${kind}ReferenceLibrary`,description:`Choose ${displayPlural} for this generation.`});
@@ -79,25 +79,39 @@ function hashReferenceFile(file,signal){
   document.body.append(library);
   let sharedLibrary=false,lastRemoteSource='local',listSequence=0,listController=null;
   const sourceLabel=document.createElement('label');sourceLabel.textContent='Library';const source=document.createElement('select');source.append(new Option('My references','private'),new Option('Template references','shared'));sourceLabel.append(source);library.querySelector('p').after(sourceLabel);
-  source.onchange=()=>{if(loading||busy){source.value=sharedLibrary?'shared':'private';return;}sharedLibrary=source.value==='shared';library.querySelector('[data-upload]').closest('.reference-dropzone').hidden=sharedLibrary;load();};
+  source.onchange=()=>{if(loading||busy){source.value=sharedLibrary?'shared':'private';return;}sharedLibrary=source.value==='shared';library.querySelector('[data-upload]').closest('.media-picker').hidden=sharedLibrary;load();};
   const grid = library.querySelector('[data-grid]');
   const libraryStatus = library.querySelector('[data-status]');
   const more = library.querySelector('[data-more]');
   let sparse=false,missingTarget=null,roleEntries=[];
   function syncRoles(values){const remaining=[...roleEntries];roleEntries=values.map((url,index)=>{const found=remaining.findIndex(e=>e.url===url);return {url,role:found>=0?remaining.splice(found,1)[0].role:roleEntries[index]?.url===''?roleEntries[index].role:undefined};});}
   const readRoles=()=>Object.fromEntries(roleEntries.map((e,i)=>[kind+'_'+(i+1),ModelControls.role(selectedModel(),kind,e.role)]));
-  const urls = () => {const values=field.value.split('\n').map(s=>s.trim());return sparse?values:values.filter(Boolean);};
-  const insert = (values,url) => {const next=[...values],hole=sparse?(missingTarget!==null&&next[missingTarget]===''?missingTarget:next.indexOf('')):-1;if(hole>=0)next[hole]=url;else next.push(url);return next;};
+  let acceptedValues=[],lastDraft=null,urlDraftError='';
+  function parseDraft(){if(field.value===lastDraft)return;lastDraft=field.value;const values=field.value.split('\n').map(s=>s.trim());const next=sparse?values:[...new Set(values.filter(Boolean))];urlDraftError='';
+   for(const value of next){if(!value)continue;let valid=false;try{const u=new URL(value);valid=['http:','https:'].includes(u.protocol)&&!!u.hostname&&!u.username&&!u.password&&!/\s/.test(value)&&!/:\/\//.test(value.replace(/^https?:\/\//,''));if(u.protocol==='asset:')valid=!!selectedModel()?.supports_asset_references&&/^asset:\/\/[^\s/]+$/.test(value);}catch{}if(!valid){urlDraftError='Enter a valid URL'+(limit()===1?'.':', one per line.');return;}}
+   if(next.filter(Boolean).length>limit()){urlDraftError='Use up to '+limit()+' URL'+(limit()===1?'':'s')+'.';return;}acceptedValues=next;
+  }
+  const urls=()=>{parseDraft();return [...acceptedValues];};
+  const insert = (values,url) => {if(limit()===1)return [url];const next=[...values],hole=sparse?(missingTarget!==null&&next[missingTarget]===''?missingTarget:next.indexOf('')):-1;if(hole>=0)next[hole]=url;else next.push(url);return next;};
   const absolute = url => new URL(url, location.origin).href;
-  const limit = () => mode()?.['max_'+plural] ?? (image ? selectedModel()?.max_image_inputs || Infinity : 1);
+  function limit(){return mode()?.['max_'+plural] ?? (image ? selectedModel()?.max_image_inputs || Infinity : 1);}
+  const pickerUI=ReferenceUpload.create({label:kind[0].toUpperCase()+kind.slice(1)+' references',kinds:[kind],multiple:()=>limit()!==1,maxCount:limit,maxBytes,limits:()=>selectedModel()?.reference_media_limits?.[kind]||{},locked:()=>busy||loading,onFiles:upload,onLibrary:()=>{returnFocus=pickerUI.library;previousFocus=document.activeElement;library.showModal();renderLibrary();load();}});
+  const oldDrop=dropzone,oldFiles=files,oldSelected=selected,oldStatus=status,heading=oldDrop.previousElementSibling;
+  oldDrop.before(pickerUI.root);if(heading?.tagName==='LABEL'&&!heading.contains(field))heading.remove();
+  pickerUI.drop.id=oldDrop.id;pickerUI.input.id=oldFiles.id;pickerUI.previews.id=oldSelected.id;pickerUI.status.id=oldStatus.id;pickerUI.upload.id=image?'uploadReference':kind+'UploadReference';pickerUI.library.id=image?'chooseReferences':kind+'ChooseReferences';
+  oldDrop.remove();oldFiles.remove();oldSelected.remove();oldStatus.remove();dropzone=pickerUI.drop;files=pickerUI.input;selected=pickerUI.previews;status=pickerUI.status;
+  const manual=field.closest('.reference-manual');pickerUI.root.append(manual);const urlLabel=manual.querySelector('label');if(urlLabel){const text=urlLabel.querySelector('.floating-label')||urlLabel;if(text===urlLabel&&text.contains(field)){for(const n of [...text.childNodes])if(n.nodeType===3)n.remove();text.prepend(document.createTextNode('URLs (one per line)'));}else text.textContent='URLs (one per line)';}FormUI.disclosure(manual.querySelector('summary'),'Use URLs');
+  const libraryUI=ReferenceUpload.create({label:kind[0].toUpperCase()+kind.slice(1)+' references',kinds:[kind],multiple:true,maxBytes,limits:()=>selectedModel()?.reference_media_limits?.[kind]||{},locked:()=>busy||loading,onFiles:upload});
+  const oldLibraryDrop=library.querySelector('#libraryDropzone');oldLibraryDrop.replaceWith(libraryUI.root);libraryUI.drop.id='libraryDropzone';libraryUI.upload.dataset.upload='';
+  const selectedCards=new Map();
   function message(text = '', error = false) {
-    for (const target of [status, libraryStatus]) { target.textContent = text; target.classList.toggle('error', error); }
+    for (const target of [status, libraryStatus]) { target.textContent = text; target.classList.toggle('error', error); target.classList.toggle('sr-only',!!text&&!error&&!/saved without|cancelled|unavailable|pending|unchanged|could not|failed/i.test(text)); }
   }
   function button(text, label, action) {
     const node = document.createElement('button'); node.type = 'button'; node.className = 'secondary'; node.textContent = text;
     node.setAttribute('aria-label', label); node.addEventListener('click', action); return node;
   }
-  function write(values,validated=false,entries=null) { if(!values.length)sparse=false;if(entries)roleEntries=entries.map((entry,i)=>({...entry,url:values[i]}));else syncRoles(values);field.value = values.join('\n');if(validated){checkedSignature=selectionSignature();checking=false;validationError='';} field.dispatchEvent(new Event('input', {bubbles:true})); }
+  function write(values,validated=false,entries=null) { if(!values.length)sparse=false;if(entries)roleEntries=entries.map((entry,i)=>({...entry,url:values[i]}));else syncRoles(values);acceptedValues=[...values];lastDraft=values.join('\n');urlDraftError='';field.value = lastDraft;if(validated){checkedSignature=selectionSignature();checking=false;validationError='';} field.dispatchEvent(new Event('input', {bubbles:true})); }
   function preview(card, url, name) {
     const providerPreview=metadata.get(url)?.preview_url;
     if(url.startsWith('asset://')&&providerPreview&&window.ProviderReferenceLibrary?.safeURL(providerPreview)){const n=document.createElement(image?'img':kind==='video'?'video':'div');if(image||kind==='video'){n.src=providerPreview;n.alt=name;n.referrerPolicy='no-referrer';n.preload='metadata';n.muted=true;}else n.textContent='Audio';card.append(n);return;}
@@ -113,46 +127,54 @@ function hashReferenceFile(file,signal){
     // Voice uploads use this input while the ordinary audio field is hidden.
     if(kind==='audio')files.disabled=field.closest('#audioURLField').hidden&&!(library.open&&voiceTarget&&mode()?.supports_reference_voice);
   }
+  function updateCaption(card,name,index){const roleName=mode()?.image_roles?.[image?index:-1],spec=window.ReferencePrompts?.contract(selectedModel(),{reference_mode:modeSelect.value}),offset=image&&mode()?.id==='first_frame_references'?1:0,address=spec?.types.includes(kind)&&index>=offset?ReferencePrompts.label(spec.syntax,kind,index-offset):'';card.querySelector('.reference-name').textContent=(address?address+' · ':roleName?roleName+': ':'')+name;}
+
   function render() {
-    const text='Up to '+limitText()+' each',exact=FileSize.exact(maxBytes())+' maximum';for(const [index,zone] of [dropzone,library.querySelector('#libraryDropzone')].entries()){const hint=zone.querySelector('small');hint.textContent=text;hint.title=exact;hint.id=kind+'Limit'+index;let precision=zone.querySelector('[data-byte-limit]');if(!precision){precision=document.createElement('span');precision.dataset.byteLimit='';precision.className='sr-only';precision.id=hint.id+'Exact';zone.append(precision);}precision.textContent=exact;for(const action of zone.querySelectorAll('button'))action.setAttribute('aria-describedby',hint.id+' '+precision.id);}
+    pickerUI.sync();libraryUI.sync();const label=manual.querySelector('label');if(label&&!label.contains(field))label.textContent=limit()===1?'URL':'one per line';parseDraft();if(urlDraftError)message(urlDraftError,true);
     syncFileInput();files.accept=accept();
-    recheck();
+    if(!urlDraftError)recheck();
     for(const node of document.querySelectorAll(`[data-reference-cancel="${kind}"]`))node.hidden=!busy;
     const values = urls();syncRoles(values);selected.classList.toggle('has-reference-roles',(ModelControls.schema(selectedModel(),kind)?.roles.length||0)>1);
-    selected.replaceChildren(...values.map((url, index) => {
-      const card = document.createElement('div'); card.className = 'reference-card';
+    const occurrences=new Map();const nodes=values.map((url,index)=>{
+      const info=metadata.get(url),identity=info?.id?JSON.stringify([info.scope||'organization',info.id]):url||'empty:'+index,occurrence=occurrences.get(identity)||0;occurrences.set(identity,occurrence+1);const key=identity+'#'+occurrence;let card=selectedCards.get(key);if(card){if(info)card.update({name:info.name||card.querySelector('.reference-name').textContent,type:kind+'/unknown',url:url.startsWith('asset://')?ProviderReferenceLibrary.safeURL(info.preview_url):absolute(info.url||url),version:info.version,revision:info.revision});card.currentIndex=index;card.draggable=!busy;card.querySelector('.reference-selection-remove').disabled=busy;if(card.decoration===JSON.stringify([selectionVersion,voices[url],roleEntries[index]?.role,index])){updateCaption(card,!url?'Choose reference':info?.name||(url.startsWith('asset://')?url.slice(8):`Reference ${index+1}`),index);return card;}card.querySelectorAll('.reference-role,.reference-voice,.reference-clear-voice').forEach(n=>n.remove());}
       const name = !url?'Choose reference':metadata.get(url)?.name || (url.startsWith('asset://') ? url.slice(8) : `Reference ${index + 1}`);
-      if(url)preview(card,url,name);else{const choose=button('Choose reference',`Choose ${kind} reference ${index+1}`,()=>{missingTarget=index;returnFocus=choose;previousFocus=document.activeElement;library.showModal();renderLibrary();load();});card.append(choose);}
-      const title = document.createElement('span'); title.className = 'reference-name'; const spec=window.ReferencePrompts?.contract(selectedModel(),{reference_mode:document.querySelector('#referenceMode').value});const offset=image&&mode()?.id==='first_frame_references'?1:0;const address=spec?.types.includes(kind)&&index>=offset?ReferencePrompts.label(spec.syntax,kind,index-offset):'';title.textContent = `${address||mode()?.image_roles?.[image?index:-1]||index+1}. ${name}`; title.title = name;
-      const remove = button('Remove', `Remove ${name} from generation`, () => write(urls().filter((_, i) => i !== index),false,roleEntries.filter((_,i)=>i!==index)));
-      remove.classList.add('reference-selection-remove'); remove.disabled = busy;
+      let previewURL='';try{const u=new URL(url);if(u.origin===location.origin&&u.pathname.startsWith('/references/'))previewURL=url;}catch{}if(url.startsWith('asset://'))previewURL=ProviderReferenceLibrary.safeURL(metadata.get(url)?.preview_url)||'';
+      if(!card){card=ReferenceUpload.mediaCard({url:previewURL,name,type:kind+'/unknown',placeholder:url.startsWith('asset://')?'Registered asset':kind+' URL'},{onRemove:()=>{if(busy)return;const i=card.currentIndex;write(urls().filter((_,n)=>n!==i),false,roleEntries.filter((_,n)=>n!==i));pickerUI.upload.focus();}});selectedCards.set(key,card);card.currentIndex=index;
+      if(!url){const choose=button('Choose reference',`Choose ${kind} reference ${index+1}`,()=>{missingTarget=card.currentIndex;returnFocus=choose;previousFocus=document.activeElement;library.showModal();renderLibrary();load();});card.querySelector('.media-picker-media').append(choose);}
+      card.removeButton.setAttribute('aria-label','Remove '+name+' from generation');
+      const remove=card.removeButton;remove.disabled=busy;
       card.draggable = !busy; card.tabIndex = 0; card.title = 'Drag to reorder. Use Alt + Left or Right Arrow with the keyboard.';
       card.addEventListener('dragstart', event => {
         if (busy || event.target.closest('button,input,select')) { event.preventDefault(); return; }
-        draggedURL = String(index); event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData(dragType, String(index)); card.classList.add('dragging');
+        draggedURL = String(card.currentIndex); event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData(dragType, String(card.currentIndex)); card.classList.add('dragging');
       });
       card.addEventListener('dragend', () => { draggedURL = null; card.classList.remove('dragging'); document.querySelectorAll('.dragover').forEach(el => el.classList.remove('dragover')); });
       card.addEventListener('keydown', event => {
         if (!event.altKey || !['ArrowLeft','ArrowRight'].includes(event.key) || busy) return;
-        event.preventDefault(); reorder(index, index + (event.key === 'ArrowLeft' ? -1 : 1),true);
+        event.preventDefault(); reorder(card.currentIndex, card.currentIndex + (event.key === 'ArrowLeft' ? -1 : 1),true);
       });
-      card.append(title, remove);
-      const role=ModelControls.roleField(selectedModel(),kind,index+1,roleEntries[index]?.role,value=>{roleEntries[index].role=value;checkedSignature='';recheck();window.dispatchEvent(new Event('gateway-reference-change'));updatePrice();});if(role){role.classList.add('reference-role');card.append(role);}
+
+      bindDrop(card,()=>card.currentIndex);}
+      card.currentIndex=index;card.draggable=!busy;card.decoration=JSON.stringify([selectionVersion,voices[url],roleEntries[index]?.role,index]);
+      updateCaption(card,name,index);
+      const role=ModelControls.roleField(selectedModel(),kind,index+1,roleEntries[index]?.role,value=>{roleEntries[card.currentIndex].role=value;checkedSignature='';recheck();window.dispatchEvent(new Event('gateway-reference-change'));updatePrice();});if(role){role.classList.add('reference-role');card.append(role);}
       if(url&&kind!=='audio'&&mode()?.supports_reference_voice&&!(image&&index<(mode()?.voice_image_start||0))){
         const voice=button(voices[url]?'Change voice reference':'Add voice reference',`Voice reference for ${name}`,()=>{voiceTarget={url};pickers[2].open(voice);});voice.classList.add('reference-voice');card.append(voice);
-        if(voices[url]) card.append(button('Clear voice',`Clear voice for ${name}`,()=>{delete voices[url];render();updatePrice();}));
+        if(voices[url]){const clear=button('Clear voice',`Clear voice for ${name}`,()=>{delete voices[url];render();updatePrice();});clear.classList.add('reference-clear-voice');card.append(clear);}
       }
-      bindDrop(card, index); return card;
-    }));
+      return card;
+    });
+    ReferenceUpload.reconcile(selected,nodes);for(const [key,card]of selectedCards)if(!nodes.includes(card))selectedCards.delete(key);
     remote?.configure();
     if (library.open) renderLibrary();
     window.dispatchEvent(new Event('gateway-reference-change'));
   }
   async function select(item) {
-    const values=urls(),url=absolute(item.url),voiceIntent=kind==='audio'?voiceTarget:null;
+    const values=urls(),canonical=absolute(item.url),url=values.find(value=>{const known=metadata.get(value);return known?.id===item.id&&(known.scope||'organization')===(item.scope||'organization');})||canonical,voiceIntent=kind==='audio'?voiceTarget:null;
+    if(busy)return;
     if(!voiceIntent&&values.includes(url)&&!(sparse&&values.includes(''))){write(values.filter(value=>value!==url));message();return;}
     if(busy)return;
-    if(!voiceIntent&&values.length>=limit()&&!(sparse&&values.includes(''))){message(`This model accepts up to ${limit()} ${plural}. Remove one first.`,true);return;}
+    if(!voiceIntent&&limit()!==1&&values.length>=limit()&&!(sparse&&values.includes(''))){message(`This model accepts up to ${limit()} ${plural}. Remove one first.`,true);return;}
     const token=epoch,validation=validationTarget(),intent=ReferenceValidation.signature(validation),selection=selectionSignature();
     busy=true;message(`Checking ${item.name}…`);renderLibrary();
     try{
@@ -179,8 +201,8 @@ function hashReferenceFile(file,signal){
     if(remote?.active()){remote.render();return;}
     const values = urls();
     libraryView.render(items.filter(item=>(item.content_type||'image/png').startsWith(kind+'/')).map(item=>({...item,url:absolute(item.url)})),{
-      selected:item=>values.includes(item.url),onSelect:select,busy,
-      onDelete:sharedLibrary?null:deleteItem
+      selected:item=>values.some(url=>url===item.url||metadata.get(url)?.id===item.id&&(metadata.get(url)?.scope||'organization')===(item.scope||'organization')),onSelect:select,busy,
+      scope:sharedLibrary?'template':'organization',onDelete:sharedLibrary?null:deleteItem
     });
     more.hidden = !hasMore; more.disabled = busy || loading;
   }
@@ -194,7 +216,7 @@ function hashReferenceFile(file,signal){
       if (currentEpoch !== epoch || sequence!==listSequence) return;
       items = append ? [...items, ...(data.data || []).filter(item => !items.some(old => old.id === item.id))] : (data.data || []);
       offset = data.next_offset || items.length; hasMore = !!data.has_more;
-      items.forEach(item => metadata.set(absolute(item.url), item));
+      items.forEach(item=>{item.scope=requestedShared?'template':'organization';for(const [url,known]of metadata)if(known.id===item.id&&(known.scope||'organization')===item.scope)metadata.set(url,item);metadata.set(absolute(item.url),item);});
       message(items.length ? '' : 'Your library is empty. Upload a reference file.');
  window.StorageQuota?.refresh().catch(()=>{});
     } catch (error) { if (currentEpoch === epoch && sequence===listSequence && error.name!=='AbortError') message(`Could not load library: ${error.message}`, true); }
@@ -238,7 +260,7 @@ function hashReferenceFile(file,signal){
           if(currentEpoch!==epoch)return;
           if(expectedSelection!==selectionSignature()||intent!==ReferenceValidation.signature(validationTarget())){unattached++;continue;}
           if (replaceIndex !== null && replaceIndex < values.length) { values[replaceIndex] = url; replaceIndex = null; write(values,true); }
-          else if (values.length < limit() || sparse&&values.includes('')) write(insert(values,url),true);
+          else if (limit()===1||values.length < limit() || sparse&&values.includes('')) write(insert(values,url),true);
           else unattached++;
           expectedSelection=selectionSignature();
         } catch (error) { if (currentEpoch === epoch) failures.push(`${file.name}: ${error.message}`); }
@@ -280,22 +302,25 @@ function hashReferenceFile(file,signal){
   }
   function bindDrop(target, index = null) {
     target.addEventListener('dragover', event => {
+      const at=typeof index==='function'?index():index;
       const internal = draggedURL !== null || event.dataTransfer.types.includes(dragType);
       if (!internal && !event.dataTransfer.types.includes('Files')) return;
-      event.preventDefault(); event.stopPropagation(); event.dataTransfer.dropEffect = internal ? 'move' : index!==null&&urls()[index] ? 'none' : 'copy'; if(internal||index===null||!urls()[index])target.classList.add('dragover');
+      event.preventDefault(); event.stopPropagation(); event.dataTransfer.dropEffect = internal ? 'move' : at!==null&&urls()[at] ? 'none' : 'copy'; if(internal||index===null||!urls()[at])target.classList.add('dragover');
     });
     target.addEventListener('dragleave', event => { if (!target.contains(event.relatedTarget)) target.classList.remove('dragover'); });
     target.addEventListener('drop', event => {
+      const at=typeof index==='function'?index():index;
       event.preventDefault(); event.stopPropagation(); target.classList.remove('dragover');
       const source = draggedURL || event.dataTransfer.getData(dragType);
-      if (source) { draggedURL = null; reorder(source, index === null ? urls().length - 1 : index); return; }
+      if (source) { draggedURL = null; reorder(source, at === null ? urls().length - 1 : at); return; }
       // Browser-native URL/image drags are not file uploads.
       if (event.dataTransfer.types.includes('text/uri-list') || event.dataTransfer.types.includes('text/html')) return;
-      if(index!==null&&urls()[index]){message('Remove this reference before choosing another file.');return;}
-      upload([...event.dataTransfer.files], index);
+      if(at!==null&&urls()[at]){message('Remove this reference before choosing another file.');return;}
+      upload([...event.dataTransfer.files], at);
     });
   }
   function validate() {
+    parseDraft();if(urlDraftError){message(urlDraftError,true);return false;}
     if(remote&&!remote.validate())return false;
     if (checking) { message('Wait for reference validation to finish.',true);return false; }
     if(validationError){message(validationError,true);return false;}
@@ -318,11 +343,7 @@ function hashReferenceFile(file,signal){
     epoch++;controller.abort();controller=new AbortController();busy=false;loading=false;checking=false;checkedSignature='';files.value='';remote?.setUploading(false);render();message('Upload cancelled. Your previous selection is unchanged.');
   };
   for(const host of [status,libraryStatus]){const cancel=button('Cancel upload','Cancel reference upload',cancelUpload);cancel.dataset.referenceCancel=kind;cancel.hidden=true;host.after(cancel);}
-  bindDrop(dropzone); bindDrop(library.querySelector('#libraryDropzone'));
-  document.querySelector(image?'#uploadReference':`#${kind}UploadReference`).addEventListener('click', () => { if (!busy) files.click(); });
-  library.querySelector('[data-upload]').addEventListener('click', () => { if (!busy) files.click(); });
-  files.addEventListener('change', () => upload([...files.files]));
-  document.querySelector(image?'#chooseReferences':`#${kind}ChooseReferences`).addEventListener('click', event => { returnFocus=event.currentTarget;previousFocus=document.activeElement;library.showModal(); renderLibrary(); load(); });
+  // The shared surface owns file chooser and drop handlers.
   function cancelVoice(){missingTarget=null;if(kind==='audio'){voiceTarget=null;syncFileInput();}}
   library.querySelectorAll('[data-close]').forEach(node => node.addEventListener('click', () => {cancelVoice();library.close();}));
   library.addEventListener('cancel',cancelVoice);
@@ -335,8 +356,8 @@ function hashReferenceFile(file,signal){
     try { const parsed = new URL(url); if (parsed.origin === location.origin && parsed.pathname.startsWith('/references/')) return `Library reference ${index + 1}`; } catch {}
     return url;
   }
-  remote=window.ProviderReferenceLibrary?.mount({kind,library,field,metadata,more,message,urls,write,select,renderSelected:render,loadLocal:()=>load(),onSourceChange:value=>{if(value!==lastRemoteSource){lastRemoteSource=value;listSequence++;listController?.abort();loading=false;items=[];offset=0;hasMore=false;}sourceLabel.hidden=value==='provider';if(value==='provider'){sharedLibrary=false;source.value='private';library.querySelector('.reference-dropzone').hidden=false;}}});
-  return {render,validate,describe,reset,roles:readRoles,restoreRoles(value){roleEntries=urls().map((url,i)=>({url,role:value?.[kind+'_'+(i+1)]}));},restoreSlots(values){sparse=!!values?.length;missingTarget=null;},values:urls,info:url=>metadata.get(url),issue:()=>validationError,open(trigger){returnFocus=trigger||document.activeElement;previousFocus=document.activeElement;library.showModal();render();load();},has:url=>metadata.has(url)};
+  remote=window.ProviderReferenceLibrary?.mount({kind,library,field,metadata,more,message,urls,write,select,renderSelected:render,loadLocal:()=>load(),onSourceChange:value=>{if(value!==lastRemoteSource){lastRemoteSource=value;listSequence++;listController?.abort();loading=false;items=[];offset=0;hasMore=false;}sourceLabel.hidden=value==='provider';if(value==='provider'){sharedLibrary=false;source.value='private';libraryUI.root.hidden=false;}}});
+  return {render,validate,describe,reset,roles:readRoles,restoreRoles(value){roleEntries=urls().map((url,i)=>({url,role:value?.[kind+'_'+(i+1)]}));},restoreSlots(values){sparse=!!values?.length;missingTarget=null;},values:urls,info:url=>metadata.get(url),issue:()=>urlDraftError||validationError,open(trigger){returnFocus=trigger||document.activeElement;previousFocus=document.activeElement;library.showModal();render();load();},has:url=>metadata.has(url)};
  }
  for(const kind of ["image","video","audio"])pickers.push(picker(kind));
  window.referencePicker={configure,roles(){const values=Object.assign({},...pickers.map(p=>p.roles())),addresses=Object.keys(values);return ModelControls.roles(selectedModel(),values,addresses);},restoreRoles(value){pickers.forEach(p=>p.restoreRoles(value));},values(kind){return pickers[['image','video','audio'].indexOf(kind)].values();},restoreSlots(options){pickers.forEach((p,i)=>p.restoreSlots(options?.[['image_urls','video_urls','audio_urls'][i]]));},get(kind,index){const p=pickers[['image','video','audio'].indexOf(kind)];const url=p?.values()[index];return url?{url,name:p.describe(url,index),...p.info(url)}:null;},restoreMode(options){

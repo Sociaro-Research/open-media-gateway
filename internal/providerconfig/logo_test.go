@@ -25,7 +25,8 @@ func TestLogoValidation(t *testing.T) {
 		img  image.Image
 		want string
 	}{
-		{"transparent RGBA", rgba, ""}, {"palette tRNS", palette, ""}, {"opaque RGB", opaque, "transparency"},
+		{"transparent RGBA", rgba, ""}, {"palette tRNS", palette, ""}, {"opaque RGB", opaque, ""},
+		{"maximum dimension", image.NewNRGBA(image.Rect(0, 0, MaxLogoDimension, 1)), ""},
 		{"oversized dimensions", image.NewNRGBA(image.Rect(0, 0, 2049, 1)), "dimensions"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -57,6 +58,13 @@ func TestLogoValidation(t *testing.T) {
 	}
 	var b bytes.Buffer
 	_ = png.Encode(&b, rgba)
+	padded := append(append([]byte{}, b.Bytes()...), make([]byte, MaxLogoBytes-b.Len())...)
+	if err := ValidateLogo(padded); err != nil {
+		t.Fatal("exact byte limit rejected", err)
+	}
+	if err := ValidateLogo(append(padded, 0)); err == nil {
+		t.Fatal("over byte limit accepted")
+	}
 	if err := ValidateLogo(b.Bytes()[:len(b.Bytes())-10]); err == nil || !strings.Contains(err.Error(), "invalid PNG") {
 		t.Fatal("truncated PNG accepted", err)
 	}

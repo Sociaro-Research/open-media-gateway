@@ -1,75 +1,88 @@
-// File selection UI shared by references, template media and provider logos. Transport,
-// authorization and durable bindings stay with the caller and existing API.
+// Shared media-picker presentation. Callers own transport, authorization, scope,
+// validation and durable bindings; this module never sends an API request.
 (() => {
  'use strict';
  let sequence=0;
  const types={image:['image/png','image/jpeg','image/webp','image/gif'],video:['video/mp4','video/quicktime','video/webm'],audio:['audio/mpeg','audio/aac','audio/mp4','audio/wave','audio/wav','audio/x-wav','audio/ogg','audio/flac']};
- const extended={image:['image/heic','image/heif'],video:[],audio:[]};
+ const extended={image:['image/heic','image/heif','image/svg+xml'],video:[],audio:[]};
  const equivalent=type=>['audio/wav','audio/x-wav'].includes(type)?'audio/wave':type;
  function fileTypes(kind,rule){const declared=rule?.content_types;return declared?.length?[...types[kind],...extended[kind]].filter(type=>declared.some(item=>equivalent(item)===equivalent(type))):types[kind];}
- const el=(tag,text='',cls='')=>{const node=document.createElement(tag);node.textContent=text;node.className=cls;return node;};
+ const el=(tag,text='',cls='')=>{const n=document.createElement(tag);n.textContent=text;n.className=cls;return n;};
+ const button=(text,fn)=>{const b=el('button',text,'secondary');b.type='button';b.onclick=fn;return b;};
  const formatLimit=bytes=>FileSize.megabytes(bytes);
+ const compactLimit=bytes=>{const unit=bytes>=1000000?1000000:bytes>=1000?1000:1,value=Math.round(bytes/unit);return (value*unit!==bytes?'≈':'')+value+(unit===1000000?' MB':unit===1000?' KB':' B');};
+ const formatNames={'image/jpeg':'JPEG','image/svg+xml':'SVG','image/webp':'WebP','video/quicktime':'MOV','audio/mpeg':'MP3','audio/mp4':'M4A','audio/wave':'WAV','audio/wav':'WAV','audio/x-wav':'WAV'};
+ const formats=values=>[...new Set(values.map(t=>formatNames[t]||t.split('/')[1]?.toUpperCase()||t))].join(', ');
+ function stop(root){for(const media of root.querySelectorAll('video,audio')){media.pause();media.removeAttribute('src');media.load();}}
+ // The first completed touch gesture reveals actions. Snapshot the armed state
+ // at pointerdown, before focus/hover emulation can expose the hidden button.
+ function touchGuard(card,actionSelector){
+  let touch=false,armed=false,pointer=null;
+  card.addEventListener('pointerdown',event=>{touch=event.pointerType==='touch';pointer=event.pointerId;armed=!touch||card.dataset.actionsVisible==='true';},true);
+  card.addEventListener('pointerup',event=>{if(touch&&event.pointerId===pointer)card.dataset.actionsVisible='true';},true);
+  card.addEventListener('pointercancel',()=>{touch=false;armed=false;pointer=null;});
+  card.addEventListener('keydown',()=>{touch=false;armed=true;});
+  card.addEventListener('click',event=>{if(!touch)return;if(!armed){card.dataset.actionsVisible='true';if(event.target.closest(actionSelector)){event.preventDefault();event.stopImmediatePropagation();}}else if(!event.target.closest(actionSelector))card.dataset.actionsVisible='true';pointer=null;},true);
+  card.addEventListener('pointerleave',event=>{if(event.pointerType==='mouse')delete card.dataset.actionsVisible;});
+ }
+ function trackRatio(card,media){
+  const update=()=>{const width=media.naturalWidth||media.videoWidth,height=media.naturalHeight||media.videoHeight;if(width>0&&height>0){card.dataset.mediaRatio=String(width/height);card.style.setProperty('--media-ratio',width/height);layoutRow(card.parentElement);}};
+  media.addEventListener(media.tagName==='IMG'?'load':'loadedmetadata',update);update();
+ }
+ function layoutRow(row){if(!row)return;const width=row.clientWidth;if(!width)return;const widest=Math.max(2,...[...row.children].map(n=>Number(n.dataset.mediaRatio)||1));const height=Math.min(150,(width-2)/widest);row.style.setProperty('--media-height',height+'px');for(const card of row.children)card.dataset.compactControls=String(height*(Number(card.dataset.mediaRatio)||1)<88);}
+ function observeRow(row){let frame=0;const observer=new ResizeObserver(()=>{if(!frame)frame=requestAnimationFrame(()=>{frame=0;layoutRow(row);});});observer.observe(row);return ()=>{observer.disconnect();cancelAnimationFrame(frame);};}
+ const lifetimes=new Map();
+ new MutationObserver(records=>{for(const [root,dispose]of lifetimes)if(!root.isConnected&&records.some(record=>[...record.removedNodes].some(node=>node===root||node.contains?.(root))))dispose();}).observe(document.body,{childList:true,subtree:true});
+ // Reconcile by identity without detaching unchanged nodes (including players).
+ function reconcile(row,nodes){const keep=new Set(nodes);for(const old of [...row.children])if(!keep.has(old)){stop(old);old.remove();}nodes.forEach((node,index)=>{if(row.children[index]!==node){if(node.parentElement===row&&row.moveBefore)row.moveBefore(node,row.children[index]||null);else row.insertBefore(node,row.children[index]||null);}});layoutRow(row);}
+ function mediaCard(item,{onRemove,removeLabel='Remove',onSelect,selectionLabel,library=false}={}){
+  const card=el('div','','reference-card media-picker-card'),shell=el('div','','media-picker-media'),caption=el('span',item.name||'Reference','reference-name');
+  const kind=(item.type||item.content_type||'').split('/')[0];card.dataset.mediaKind=kind;card.dataset.mediaRatio=kind==='audio'?'2':'1';card.style.setProperty('--media-ratio',card.dataset.mediaRatio);
+  let current=item,select=onSelect,remove=onRemove;const choose=onSelect?button('',()=>{if(!choose.disabled)select?.(current);}):null;
+  if(choose){choose.className='reference-choice';choose.setAttribute('aria-label',selectionLabel||'Use '+item.name+' in generation');}
+  const media=item.url&&['image','video','audio'].includes(kind)?el(kind==='image'?'img':kind):el('div',item.placeholder||(kind==='audio'?'Audio':'Preview unavailable'),'reference-placeholder');
+  if(media.tagName==='IMG'){media.alt=item.name||'Reference';media.loading='lazy';media.draggable=false;media.referrerPolicy='no-referrer';}
+  if(['VIDEO','AUDIO'].includes(media.tagName)){media.controls=true;media.preload='metadata';media.playsInline=true;media.setAttribute('aria-label',item.name||'Reference');}
+  if(item.url&&media.tagName!=='DIV'){media.src=item.url;media.addEventListener('error',()=>{card.dataset.previewError='true';if(current.url&&media.getAttribute('src')!==current.url)media.src=current.url;});trackRatio(card,media);}
+  const failure=el('span','Preview unavailable','media-picker-preview-error'),retryPreview=button('Retry preview',event=>{event.stopPropagation();if(current.url&&media.tagName!=='DIV'){delete card.dataset.previewError;failure.hidden=true;retryPreview.hidden=true;media.src=current.url;if(media.tagName!=='IMG')media.load();}});failure.hidden=retryPreview.hidden=true;retryPreview.classList.add('media-picker-preview-retry');media.addEventListener('error',()=>{failure.hidden=retryPreview.hidden=false;});media.addEventListener(media.tagName==='IMG'?'load':'loadedmetadata',()=>{delete card.dataset.previewError;failure.hidden=retryPreview.hidden=true;});
+  shell.append(media,failure,retryPreview);card.append(shell,caption);if(choose){choose.append(el('span',item.name||'Reference','sr-only'));card.append(choose);}
+  let play;if(kind==='video'&&media.tagName==='VIDEO'){play=button('▶',event=>{event.stopPropagation();if(media.paused)media.play().catch(()=>{card.dataset.previewError='true';});else media.pause();});play.classList.add('reference-play');const sync=()=>{play.textContent=media.paused?'▶':'Ⅱ';play.setAttribute('aria-label',(media.paused?'Play ':'Pause ')+(current.name||'video'));};media.addEventListener('play',sync);media.addEventListener('pause',sync);sync();shell.append(play);}
+  let removeButton;if(onRemove){removeButton=button(removeLabel,event=>{event.stopPropagation();if(!removeButton.disabled)remove?.(current,event);});removeButton.classList.add(library?'reference-delete':'reference-selection-remove');removeButton.setAttribute('aria-label',removeLabel+' '+item.name+(library?' from library':''));shell.append(removeButton);touchGuard(card,'.reference-delete,.reference-selection-remove');}
+  const strip=library?el('span','Selected','reference-selected-strip'):null;if(strip){strip.hidden=true;card.append(strip);}
+  card.update=(value,options={})=>{const previous=current;current=value;if(media.tagName!=='DIV'&&value.url&&(value.revision!==previous.revision||value.version!==previous.version||!media.hasAttribute('src')||card.dataset.previewError==='true'&&value.url!==media.getAttribute('src'))){delete card.dataset.previewError;media.src=value.url;}select=options.onSelect??select;remove=options.onRemove??remove;caption.textContent=value.name||'Reference';caption.title=caption.textContent;if(choose){choose.setAttribute('aria-pressed',String(!!options.selected));choose.disabled=!!options.busy||!!value.deleting;choose.setAttribute('aria-label',options.selectionLabel||selectionLabel||'Use '+value.name+' in generation');}if(removeButton){removeButton.disabled=!!options.busy||!!value.deleting||options.canDelete===false;removeButton.title=options.deleteReason||'';}if(strip)strip.hidden=!options.selected;card.dataset.selected=String(!!options.selected);};
+  card.preview=media;card.removeButton=removeButton;card.update(item);return card;
+ }
  function create(config){
-  const id='referenceUpload'+(++sequence),root=el('div','','reference-dropzone'),input=el('input'),title=el('p',config.title),actions=el('div','','reference-actions'),hint=el('small'),precision=el('span','','sr-only'),status=el('p','','reference-status'),preview=el('div','','reference-card template-reference-preview');
-  root.setAttribute('role','group');root.setAttribute('aria-label',config.label);root.dataset.referenceUpload='';
-  input.type='file';input.hidden=true;input.setAttribute('aria-label',config.label+' file');
-  input.accept=config.kinds.flatMap(kind=>types[kind]).join(',');
+  const id='referenceUpload'+(++sequence),root=el('section','','media-picker'),header=el('div','','media-picker-heading'),heading=el(config.headingTag||'h3',config.label),hint=el('small','','media-picker-requirements'),row=el('div','','media-picker-input-row'),drop=el('div','','reference-dropzone'),actions=el('div','','reference-actions'),input=el('input'),precision=el('span','','sr-only'),status=el('p','','reference-status'),previews=el('div','','selected-references media-picker-previews');
+  root.setAttribute('role','group');root.setAttribute('aria-label',config.label);root.dataset.referenceUpload='';heading.id=id+'Title';root.setAttribute('aria-labelledby',heading.id);header.append(heading,hint);
+  input.type='file';input.hidden=true;input.multiple=!!config.multiple;input.setAttribute('aria-label',config.label+(config.multiple?' files':' file'));
   hint.id=id+'Hint';precision.id=id+'Exact';status.id=id+'Status';status.setAttribute('role','status');status.setAttribute('aria-live','polite');
-  const button=(text,fn)=>{const node=el('button',text,'secondary');node.type='button';node.onclick=fn;return node;};
-  const upload=button(config.uploadLabel,()=>{if(!busy){returnFocus=true;input.click();}});upload.dataset.uploadPicker='';upload.setAttribute('aria-label',config.uploadLabel+' for '+config.label);upload.setAttribute('aria-describedby',hint.id+' '+precision.id);
-  const library=config.onLibrary?button('Choose from library',()=>{if(!busy)config.onLibrary(api);}):null;
+  let disposed=false,busy=false,operation=null,lastFiles=[],depth=0,returnFocus=false,assignedName='',selected=false,preview=null,previewKey='';
+  const externallyLocked=()=>disposed||!!config.locked?.()||!!config.disabled||!!config.readOnly||!!config.signal?.aborted;
+  const locked=()=>busy||externallyLocked();
+  const upload=button('Upload',()=>{if(!locked()){returnFocus=true;input.click();}});upload.dataset.uploadPicker='';upload.setAttribute('aria-label','Upload for '+config.label);upload.setAttribute('aria-describedby',hint.id+' '+precision.id);
+  const library=config.onLibrary?button('Use library',()=>{if(!locked())config.onLibrary(api);}):null;if(library){library.setAttribute('aria-label','Use library');library.setAttribute('aria-description','Use library for '+config.label);}
   const cancel=button('Cancel upload',()=>operation?.abort());cancel.dataset.uploadCancel='';cancel.hidden=true;
-  const retry=button('Retry upload',()=>{returnFocus=true;if(lastFile)select([lastFile]);});retry.hidden=true;
-  actions.append(upload);if(library)actions.append(library);actions.append(cancel,retry);
-  preview.hidden=true;root.append(preview,title,actions,hint,precision,status,input);
-  let busy=false,operation=null,lastFile=null,depth=0,returnFocus=false,assignedName='',selected=false;
-  const remove=config.onRemove?button('Remove',event=>{event.stopPropagation();if(busy||config.locked?.())return;config.onRemove();if(root.isConnected)focusAction();}):null;
-  if(remove){remove.dataset.uploadRemove='';if(config.removeOnPreview){remove.classList.add('reference-delete','reference-preview-remove');remove.setAttribute('aria-description','Remove '+config.label+' binding');}else actions.append(remove);}
+  const retry=button('Retry upload',()=>{returnFocus=true;if(lastFiles.length)select(lastFiles);});retry.hidden=true;
+  actions.append(upload);if(library)actions.append(library);actions.append(cancel,retry);drop.append(el('p',config.multiple?'Drop files here':'Drop file here'));row.append(drop,actions);root.append(header,row,previews,precision,status,input);
+  const remove=config.onRemove?button('Remove',event=>{event.stopPropagation();if(locked())return;config.onRemove();if(root.isConnected)upload.focus({preventScroll:true});}):null;
+  if(remove){remove.dataset.uploadRemove='';remove.classList.add('reference-selection-remove','reference-preview-remove');remove.setAttribute('aria-label','Remove');remove.setAttribute('aria-description','Remove '+config.label);remove.hidden=true;}
+  const unobserve=observeRow(previews);
   function focusAction(){const action=remove&&selected?remove:upload;if(!action.disabled)action.focus({preventScroll:true});}
   const retained=()=>config.retainedMessage?config.retainedMessage():assignedName?' Current assignment remains '+assignedName+'.':' No new reference assigned.';
   const allowedTypes=kind=>fileTypes(kind,config.limits?.(kind));
-  function limits(kind){const base={image:30,video:200,audio:50}[kind]*1024*1024,shared=config.maxBytes?.(kind)??base,rule=config.limits?.(kind)||{};return {shared,rule};}
-  function message(text='',error=false){status.textContent=text;status.classList.toggle('error',error);}
-  function sync(){const locked=busy||!!config.locked?.();if(remove){upload.hidden=selected;if(library)library.hidden=selected;remove.hidden=!selected;remove.disabled=locked;title.hidden=selected&&!config.selectedTitle;title.textContent=selected&&config.selectedTitle?config.selectedTitle:config.title;hint.hidden=selected;if(selected)retry.hidden=true;}upload.disabled=locked;input.disabled=locked;if(library)library.disabled=locked;retry.disabled=locked;cancel.disabled=!busy;cancel.hidden=!busy||config.cancelable?.()===false;root.setAttribute('aria-busy',String(busy));input.accept=config.kinds.flatMap(allowedTypes).join(',');precision.textContent=hint.title=config.kinds.map(kind=>{const {shared,rule}=limits(kind);return kind+': '+FileSize.exact(Math.min(shared,rule.max_bytes?rule.max_bytes-(rule.max_bytes_inclusive?0:1):shared))+' maximum';}).join(' · ');hint.textContent=config.hint||config.kinds.map(kind=>{const {shared,rule}=limits(kind);return kind+' · '+(rule.max_bytes&&rule.max_bytes-(rule.max_bytes_inclusive?0:1)<=shared?formatLimit(rule.max_bytes-(rule.max_bytes_inclusive?0:1)):formatLimit(shared))+' maximum';}).join(' · ');}
-  function error(file){
-   const kind=config.kinds.find(kind=>allowedTypes(kind).includes(file.type));
-   if(!kind)return file.name+': format '+(file.type||'unknown')+'; use a supported '+config.kinds.join(' or ')+' file ('+config.kinds.flatMap(kind=>types[kind]).join(', ')+').';
-   const {shared,rule}=limits(kind);
-   const maximum=Math.min(shared,rule.max_bytes?rule.max_bytes-(rule.max_bytes_inclusive?0:1):shared);
-   if(!file.size||file.size>maximum)return file.name+': size '+file.size+' bytes; use a nonempty '+kind+' file at most '+maximum+' bytes. Reduce the file size.';
-   if(rule.content_types?.length&&!rule.content_types.some(type=>equivalent(type)===equivalent(file.type)))return file.name+': format '+file.type+'; this model accepts '+rule.content_types.join(', ')+'. Export in a supported format.';
-   return '';
-  }
-  async function run(work,name){
-   if(busy||config.locked?.()||config.signal?.aborted)return;
-   const requestedFocus=returnFocus||root.contains(document.activeElement);returnFocus=false;operation=new AbortController();const abort=()=>operation?.abort();config.signal?.addEventListener('abort',abort,{once:true});
-   busy=true;retry.hidden=true;message('Uploading '+name+'…');config.onBusy?.(true);sync();
-   try{const result=await work(operation.signal);operation.signal.throwIfAborted();if(!config.signal?.aborted){message(typeof result==='string'?result:'Ready');lastFile=null;}}
-   catch(e){if(!config.signal?.aborted){message((e.name==='AbortError'?'Upload cancelled. Choose the file again or retry.':e.message)+retained(),true);retry.hidden=!lastFile;}}
-   finally{config.signal?.removeEventListener('abort',abort);operation=null;busy=false;const restoreFocus=requestedFocus||root.contains(document.activeElement);config.onBusy?.(false,{restoreFocus});sync();if(restoreFocus&&root.isConnected&&!config.signal?.aborted&&!upload.disabled)focusAction();}
-  }
-  function select(files){if(busy||config.locked?.()||remove&&selected||!files.length)return;retry.hidden=true;lastFile=null;if(files.length!==1){message('Choose one file for '+config.label+'.',true);return;}const file=files[0],problem=config.validate?'':error(file);input.value='';if(problem){message(problem+retained(),true);return;}lastFile=file;return run(async signal=>{if(config.validate)await config.validate(file,signal);signal.throwIfAborted();return config.onFile(file,signal);},file.name);}
+  function limits(kind){const base={image:30,video:200,audio:50}[kind]*1024*1024,shared=config.maxBytes?.(kind)??base,rule=config.limits?.(kind)||{};return {maximum:Math.min(shared,rule.max_bytes?rule.max_bytes-(rule.max_bytes_inclusive?0:1):shared),rule};}
+  function message(text='',error=false){status.textContent=text;status.classList.toggle('error',error);status.classList.toggle('sr-only',!!text&&!error&&!/saved without|cancelled|unavailable|pending|unchanged|could not|failed/i.test(text));}
+  function sync(){const isLocked=locked();upload.disabled=input.disabled=retry.disabled=isLocked;if(library)library.disabled=isLocked;if(remove){remove.hidden=!selected||!!config.readOnly;remove.disabled=isLocked;}row.hidden=!!config.readOnly;cancel.disabled=!busy;cancel.hidden=!busy||config.cancelable?.()===false;root.setAttribute('aria-busy',String(busy));root.setAttribute('aria-disabled',String(!!config.disabled));input.accept=config.kinds.flatMap(allowedTypes).join(',');input.multiple=typeof config.multiple==='function'?config.multiple():!!config.multiple;drop.firstChild.textContent=input.multiple?'Drop files here':'Drop file here';precision.textContent=hint.title=config.kinds.map(kind=>kind+': '+FileSize.exact(limits(kind).maximum)+' maximum').join(' · ');const sizes=[...new Set(config.kinds.map(kind=>limits(kind).maximum))];hint.textContent=config.hint||[formats(config.kinds.flatMap(allowedTypes)),sizes.length===1?compactLimit(sizes[0])+' max'+(input.multiple?' each':''):config.kinds.map(kind=>kind[0].toUpperCase()+kind.slice(1)+' '+compactLimit(limits(kind).maximum)+' max').join(' · '),input.multiple&&Number.isFinite(config.maxCount?.())?config.maxCount()+' files max':'',config.dimensions||''].filter(Boolean).join(' · ');}
+  function error(file){const kind=config.kinds.find(kind=>allowedTypes(kind).includes(file.type));if(!kind)return file.name+': unsupported '+config.kinds.join(' or ')+' format '+(file.type||'unknown')+'. Use '+formats(config.kinds.flatMap(allowedTypes))+'.';const {maximum}=limits(kind);if(!file.size||file.size>maximum)return file.name+': size '+file.size+' bytes; use a nonempty '+kind+' file at most '+maximum+' bytes. Reduce the file size.';return '';}
+  async function run(work,name){if(locked())return;const requestedFocus=returnFocus||root.contains(document.activeElement);returnFocus=false;operation=new AbortController();const abort=()=>operation?.abort();config.signal?.addEventListener('abort',abort,{once:true});busy=true;retry.hidden=true;message('Uploading '+name+'…');config.onBusy?.(true);sync();try{const result=await work(operation.signal);operation.signal.throwIfAborted();if(!config.signal?.aborted){message(typeof result==='string'?result:'Ready');lastFiles=[];}}catch(e){if(!config.signal?.aborted){message((e.name==='AbortError'?'Upload cancelled. Choose the file again or retry.':e.message)+retained(),true);retry.hidden=!lastFiles.length;}}finally{config.signal?.removeEventListener('abort',abort);operation=null;busy=false;const restoreFocus=requestedFocus||root.contains(document.activeElement);config.onBusy?.(false,{restoreFocus});sync();if(restoreFocus&&root.isConnected&&!config.signal?.aborted&&!upload.disabled)focusAction();}}
+  function select(files){if(locked()||!files.length)return;retry.hidden=true;lastFiles=[];input.value='';if(!input.multiple&&files.length!==1){message('Choose one file for '+config.label+'.',true);return;}if(config.maxCount&&files.length>config.maxCount()){message('Choose up to '+config.maxCount()+' files.',true);return;}for(const file of files){const problem=config.validate?'':error(file);if(problem){message(problem+retained(),true);return;}}if(config.onFiles)return config.onFiles(files);lastFiles=files;return run(async signal=>{let result;for(const file of files){if(config.validate)await config.validate(file,signal);signal.throwIfAborted();if(externallyLocked()||config.canContinue?.()===false)throw new DOMException('Selection is no longer editable','AbortError');result=await config.onFile(file,signal);}return result;},files.map(f=>f.name).join(', '));}
   input.onchange=()=>select([...input.files]);
-  root.onclick=e=>{if(!e.target.closest('button,input,video,audio')&&!busy&&!config.locked?.()&&!(remove&&selected)){returnFocus=root.contains(document.activeElement);input.click();}};
-  root.ondragenter=e=>{if(e.dataTransfer?.types.includes('Files')){e.preventDefault();depth++;if(!busy&&!config.locked?.()&&!(remove&&selected))root.classList.add('dragover');}};
-  root.ondragover=e=>{if(e.dataTransfer?.types.includes('Files')){e.preventDefault();e.dataTransfer.dropEffect=busy||config.locked?.()||remove&&selected?'none':'copy';}};
-  root.ondragleave=e=>{e.preventDefault();if(--depth<=0){depth=0;root.classList.remove('dragover');}};
-  root.ondrop=e=>{e.preventDefault();depth=0;root.classList.remove('dragover');select([...e.dataTransfer.files]);};
-  function setPreview(item){
-   const restoreRemoveFocus=config.removeOnPreview&&remove===document.activeElement;
-   for(const node of preview.querySelectorAll('video,audio')){node.pause();node.removeAttribute('src');node.load();}
-   selected=!!item;assignedName=item?.name||'';preview.replaceChildren();preview.hidden=!item;sync();if(!item){lastFile=null;retry.hidden=true;return;}
-   const name=el('span',item.name||config.label,'reference-name');
-   if(item.url&&/^(image|video|audio)\//.test(item.type||'')){
-    const kind=item.type.split('/')[0],asset=el(kind==='image'?'img':kind);asset.setAttribute('aria-label',item.name||config.label);
-    if(kind==='image')asset.alt=item.name||config.label;else{asset.controls=true;asset.preload='metadata';if(kind==='video')asset.playsInline=true;}
-    asset.src=item.url;asset.onerror=()=>{asset.remove();preview.prepend(el('div','Preview unavailable. The saved reference is still assigned.','reference-placeholder'));};preview.append(asset);
-   }else preview.append(el('div',item.type?.split('/')[0]||'Reference','reference-placeholder'));
-   preview.append(name);if(remove&&config.removeOnPreview){preview.append(remove);if(restoreRemoveFocus&&root.isConnected&&!remove.disabled)remove.focus({preventScroll:true});}
-  }
-  function setLabel(label){config.label=label;if(remove&&config.removeOnPreview)remove.setAttribute('aria-description','Remove '+label+' binding');root.setAttribute('aria-label',label);upload.setAttribute('aria-label',config.uploadLabel+' for '+label);}
-  const dispose=()=>{operation?.abort();setPreview(null);};config.signal?.addEventListener('abort',dispose,{once:true});
-  const api={root,input,message,sync,setPreview,run,error,setLabel,dispose,clearRetry(){lastFile=null;retry.hidden=true;}};sync();return api;
+  drop.ondragenter=e=>{if(e.dataTransfer?.types.includes('Files')){e.preventDefault();depth++;if(!locked())drop.classList.add('dragover');}};drop.ondragover=e=>{if(e.dataTransfer?.types.includes('Files')){e.preventDefault();e.dataTransfer.dropEffect=locked()?'none':'copy';}};drop.ondragleave=e=>{e.preventDefault();if(--depth<=0){depth=0;drop.classList.remove('dragover');}};drop.ondrop=e=>{e.preventDefault();depth=0;drop.classList.remove('dragover');select([...e.dataTransfer.files]);};
+  function setPreview(item){if(disposed&&item)return;selected=!!item;assignedName=item?.name||'';const key=item?JSON.stringify([item.url,item.type,item.id]):'';if(!item){if(preview)stop(preview);previews.replaceChildren();preview=null;previewKey='';lastFiles=[];retry.hidden=true;}else if(!preview||key!==previewKey){if(preview)stop(preview);preview=mediaCard(item);preview.classList.add('template-reference-preview');previewKey=key;if(remove){preview.querySelector('.media-picker-media').append(remove);touchGuard(preview,'.reference-selection-remove');}reconcile(previews,[preview]);}else preview.update(item);sync();}
+  function setLabel(label){config.label=label;heading.textContent=label;root.setAttribute('aria-label',label);upload.setAttribute('aria-label','Upload for '+label);library?.setAttribute('aria-description','Use library for '+label);remove?.setAttribute('aria-description','Remove '+label);}
+  const dispose=()=>{if(disposed)return;disposed=true;lifetimes.delete(root);operation?.abort();setPreview(null);unobserve();};lifetimes.set(root,dispose);config.signal?.addEventListener('abort',dispose,{once:true});
+  const api={root,input,drop,actions,header,hint,previews,status,upload,library,remove,message,sync,setPreview,run,error,setLabel,dispose,select,clearRetry(){lastFiles=[];retry.hidden=true;}};if(remove)previews.append(remove);sync();return api;
  }
- window.ReferenceUpload={create,formatLimit,fileTypes};
+ window.ReferenceUpload={create,formatLimit,compactLimit,formats,fileTypes,mediaCard,touchGuard,trackRatio,layoutRow,observeRow,reconcile,stop};
 })();

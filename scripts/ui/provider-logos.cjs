@@ -40,7 +40,7 @@ const cleanup=[];
   }
   const iconURL=async id=>{const r=await context.request.get(base+'/v1/admin/providers/'+id);assert.equal(r.status(),200);return (await r.json()).icon_url;};
   if(phase==='upload'){
-   for(const id of ['openai','sonilo']){await select(id);assert.equal(await editor().locator('img').count(),0);assert.match(await editor().innerText(),/No logo/);assert.equal(await row(id).locator('img').count(),0);}
+   for(const id of ['openai','sonilo']){await select(id);assert.equal(await editor().locator('img').count(),0);assert.match(await editor().innerText(),/Drop file here/);assert.equal(await row(id).locator('img').count(),0);}
    await select('openai');await editor().screenshot({path:path.join(out,'empty-upload-control.png')});
    // Browser-side failures must not send a mutation; each error is distinct.
    let writes=0;page.on('request',r=>{if(r.method()==='PUT'&&r.url().includes('/logo'))writes++});
@@ -49,21 +49,20 @@ const cleanup=[];
     ['MIME mismatch',fixtures.valid,'logo.png','image/jpeg','unsupported'],
     ['wrong extension',fixtures.valid,'logo.jpg','image/png','unsupported'],
     ['malformed',Buffer.from([137,80,78,71,13,10,26,10]),'logo.png','image/png','Invalid PNG'],
-    ['opaque RGB',fixtures.opaqueRGB,'logo.png','image/png','contain transparency'],
-    ['opaque RGBA',fixtures.opaqueRGBA,'logo.png','image/png','contain transparency'],
-    ['opaque16',fixtures.opaque16,'logo.png','image/png','contain transparency'],
     ['oversize',Buffer.alloc(1048577),'logo.png','image/png','1.05 MB'],
     ['dimensions',fixtures.make({width:2049}),'logo.png','image/png','dimensions']
    ]){await input().setInputFiles({name,mimeType,buffer});await editor().getByRole('status').filter({hasText:message}).waitFor();assert.equal(writes,0,label+' reached server');assert.equal(await input().isEnabled(),true);assert.equal(await editor().locator('img').count(),0);}
    // Independently exercise the real server with all same content failures.
-   for(const [buffer,mimeType,message] of [[Buffer.from('<svg/>'),'image/png','unsupported'],[fixtures.valid,'image/jpeg','Content-Type'],[fixtures.valid.subarray(0,35),'image/png','invalid PNG'],[fixtures.opaqueRGB,'image/png','transparency'],[fixtures.opaqueRGBA,'image/png','transparency'],[fixtures.opaque16,'image/png','transparency'],[Buffer.alloc(1048577),'image/png','1.05 MB'],[fixtures.make({width:2049}),'image/png','dimensions']]){
+   for(const [buffer,mimeType,message] of [[Buffer.from('<svg/>'),'image/png','unsupported'],[fixtures.valid,'image/jpeg','Content-Type'],[fixtures.valid.subarray(0,35),'image/png','invalid PNG'],[Buffer.alloc(1048577),'image/png','1.05 MB'],[fixtures.make({width:2049}),'image/png','dimensions']]){
     const r=await context.request.put(base+'/v1/admin/providers/openai/logo',{data:buffer,headers:{'Content-Type':mimeType}});assert.equal(r.status(),400);assert.match(await r.text(),new RegExp(message));assert.equal(await iconURL('openai'),undefined);
    }
+   // Opaque and transparent PNG both pass browser and real-server decoding.
+   for(const bytes of [fixtures.opaqueRGB,fixtures.opaqueRGBA,fixtures.opaque16]){await upload(bytes);await removeCurrent();}
    // Valid16-bit near-opaque alpha must pass both validators.
-   const chooserReady=page.waitForEvent('filechooser');await editor().getByRole('button',{name:/^Upload [Ll]ogo/}).press('Space');await (await chooserReady).setFiles({name:'logo.png',mimeType:'image/png',buffer:fixtures.nearOpaque16});await editor().getByRole('status').filter({hasText:'Logo uploaded.'}).waitFor();let previous=await iconURL('openai');assert.ok(previous);
+   const chooserReady=page.waitForEvent('filechooser');await editor().getByRole('button',{name:/^Upload for Provider logo/}).press('Space');await (await chooserReady).setFiles({name:'logo.png',mimeType:'image/png',buffer:fixtures.nearOpaque16});await editor().getByRole('status').filter({hasText:'Logo uploaded.'}).waitFor();let previous=await iconURL('openai');assert.ok(previous);
    await upload(fixtures.valid);assert.notEqual(await iconURL('openai'),previous);previous=await iconURL('openai');
    await select('sonilo');await drop([{buffer:fixtures.palette}]);await editor().getByRole('status').filter({hasText:'Logo uploaded.'}).waitFor();const second=await iconURL('sonilo');assert.ok(second);assert.equal(await iconURL('openai'),previous);
-   fs.appendFileSync(path.join(out,'phases.log'),'Logo phase: selected drop\n');await select('openai');const beforeBlocked=writes;await drop([{buffer:fixtures.valid},{buffer:fixtures.palette}],false);assert.equal(writes,beforeBlocked);assert.equal(await iconURL('openai'),previous,'selected logo cannot be replaced before Remove');
+   fs.appendFileSync(path.join(out,'phases.log'),'Logo phase: selected drop\n');await select('openai');const beforeBlocked=writes;await drop([{buffer:fixtures.valid},{buffer:fixtures.palette}],true);assert.equal(writes,beforeBlocked);assert.equal(await iconURL('openai'),previous,'a single logo picker rejects multiple files without replacing its binding');
    await select('openai');await removeCurrent();previous=undefined;const draft=page.locator('[data-provider-field=api_key]');await draft.fill('synthetic-unsaved-draft');
    let entered,release;const gate=new Promise(r=>{release=r;cleanup.push(r);}),arrived=new Promise(r=>entered=r);
    await page.route('**/v1/admin/providers/openai/logo',async route=>{entered();await gate;await route.fulfill({status:503,json:{error:{message:'Synthetic storage interruption'}}});},{times:1});

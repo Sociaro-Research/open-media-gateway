@@ -31,7 +31,7 @@ const server = http.createServer((req, res) => {
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   const browser = await browserEngine.launch({headless:true,...(process.env.UI_BROWSER_PATH ? {executablePath:process.env.UI_BROWSER_PATH} : {})});
   const page = await browser.newPage({viewport:{width:1440,height:1100},ignoreHTTPSErrors:true});
-  const errors=[];page.on('pageerror',e=>{if(process.env.UI_BROWSER_ENGINE==='webkit'&&e.message==='ResizeObserver loop completed with undelivered notifications.'){console.warn('WebKit resize notice: '+e.message);return;}errors.push(e.message);});
+  const layoutFailures=[],errors=[];page.on('pageerror',e=>{if(process.env.UI_BROWSER_ENGINE==='webkit'&&e.message==='ResizeObserver loop completed with undelivered notifications.'){console.warn('WebKit resize notice: '+e.message);return;}errors.push(e.message);});
   const models=[{id:'video',display_name:'Video with references',media_type:'video',resolutions:['720p'],ratios:['16:9'],min_duration:2,max_duration:10,default_duration:5,supports_image_input:true,max_image_inputs:2,pricing:{known:true,reference_price_usd:0}},
     {id:'image',display_name:'Image with references',media_type:'image',resolutions:['1024*1024'],supports_image_input:true,max_image_inputs:1,requires_image_input:true,pricing:{known:true,reference_price_usd:0}}];
   models.push({id:'assets',display_name:'Seedance registered assets',media_type:'video',resolutions:['720p'],ratios:['16:9'],min_duration:4,max_duration:15,default_duration:5,supports_image_input:true,max_image_inputs:9,supports_video_input:true,supports_audio_input:true,supports_asset_references:true,pricing:{known:true,reference_price_usd:0},reference_modes:[{id:'references',label:'References',min_images:0,max_images:9,min_videos:0,max_videos:3,min_audios:0,max_audios:3},{id:'first_last_frames',label:'First and last frames',min_images:2,max_images:2,min_videos:0,max_videos:0,min_audios:0,max_audios:0,image_roles:['First frame','Last frame']}]});
@@ -111,6 +111,7 @@ const server = http.createServer((req, res) => {
     const first=await page.locator('#imageURLs').inputValue();assert.match(first,/^http:\/\/127\.0\.0\.1:\d+\/references\//);
     await page.locator('#referenceFiles').setInputFiles({name:'selected.png',mimeType:'image/png',buffer:image});await waitMessage('1 file saved');
     await page.waitForFunction(()=>document.querySelectorAll('#selectedReferences .reference-card').length===2);
+    const retainedCaption=await page.locator('#selectedReferences .reference-name').allTextContents(),retainedNode=await page.locator('#selectedReferences .reference-card').first().elementHandle();assert.match(retainedCaption[0],/^@Image1 · /);await page.evaluate(()=>{referencePicker.render();referencePicker.render();});assert.deepEqual(await page.locator('#selectedReferences .reference-name').allTextContents(),retainedCaption);assert.equal(await retainedNode.evaluate(n=>n===document.querySelector('#selectedReferences .reference-card')),true);console.log('PASS decorated @Image1 caption and media node survive repeated unchanged render');
     const beforeReorder=uploadCount;
     await page.locator('#selectedReferences .reference-card').nth(1).dragTo(page.locator('#selectedReferences .reference-card').first());
     assert.equal(uploadCount,beforeReorder,'Reordering must not upload a duplicate');
@@ -146,7 +147,7 @@ const server = http.createServer((req, res) => {
     await page.locator('#selectedReferences').getByRole('button',{name:/^Remove .+ from generation$/}).first().click();
     await page.locator('#submitButton').click();await waitMessage('at least 1');
     const uploadsBefore=uploadCount;
-    await page.locator('#referenceFiles').setInputFiles({name:'bad.svg',mimeType:'image/svg+xml',buffer:Buffer.from('<svg/>')});await waitMessage('supported image');assert.equal(uploadCount,uploadsBefore);
+    await page.locator('#referenceFiles').setInputFiles({name:'bad.svg',mimeType:'image/svg+xml',buffer:Buffer.from('<svg/>')});await waitMessage('unsupported image');assert.equal(uploadCount,uploadsBefore);
     failUpload=true;await drop('#referenceDropzone');await waitMessage('Storage unavailable');assert.equal(await page.locator('#selectedReferences .reference-card').count(),0);failUpload=false;
     uploadWaiting=false;uploadHold=new Promise(resolve=>releaseUpload=resolve);await drop('#referenceDropzone');for(let wait=0;!uploadWaiting&&wait<200;wait++)await page.waitForTimeout(10);assert.equal(uploadWaiting,true);await page.locator('#submitButton').click();await waitMessage('Wait for');releaseUpload();uploadHold=null;await waitMessage('1 file saved');
     await page.setViewportSize({width:390,height:844});
@@ -184,7 +185,7 @@ const server = http.createServer((req, res) => {
     for(const [kind,value] of [['image',`https://example.test/scene.png\n${assetImage}`],['video',assetVideo],['audio',assetAudio]]){
       const container=page.locator(kind==='image'?'#imageURLsField':`#${kind}URLField`);
       await container.locator('summary').click();
-      assert.match(await container.locator('summary').innerText(),/registered assets/);
+      assert.equal(await container.locator('summary').innerText(),'Use URLs');
       assert.equal(await container.locator('[data-asset-hint]').isVisible(),true);
       await page.locator(kind==='image'?'#imageURLs':`#${kind}URL`).fill(value);
     }
@@ -196,7 +197,11 @@ const server = http.createServer((req, res) => {
     for(const width of [1440,390,320]){
       await page.setViewportSize({width,height:1000});
       await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
-      assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`asset picker overflows at ${width}px: `+JSON.stringify(await page.evaluate(()=>[...document.querySelectorAll('body *')].filter(n=>n.getBoundingClientRect().right>innerWidth).map(n=>({tag:n.tagName,id:n.id,cls:n.className,right:n.getBoundingClientRect().right,width:n.getBoundingClientRect().width})).slice(0,12))));
+      if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)){
+        await page.screenshot({path:path.join(output,'overflow-'+width+'.png'),fullPage:true});
+        const diagnostic=await page.evaluate(()=>{const n=document.querySelector('#visualSettings'),input=document.querySelector('#duration'),style=document.createElement('style');const geometry=()=>({grid:n.getBoundingClientRect().width,input:input.getBoundingClientRect().width,inputMin:getComputedStyle(input).minWidth,label:input.closest('.floating-field').querySelector('label').textContent,viewport:innerWidth,overflow:document.documentElement.scrollWidth});const before=geometry();style.textContent='.media-picker{display:none!important}';document.head.append(style);const withoutPicker=geometry();style.remove();return {before,withoutPicker};});fs.writeFileSync(path.join(output,'overflow-diagnosis.json'),JSON.stringify(diagnostic,null,2));
+      }
+      if(!await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth))layoutFailures.push({width,element:'#visualSettings',diagnostic:'overflow-diagnosis.json'});
       await page.locator('#imageURLsField').scrollIntoViewIfNeeded();
       await page.screenshot({path:path.join(output,`registered-assets-${width}.png`)});
     }
@@ -216,7 +221,7 @@ const server = http.createServer((req, res) => {
     assert.match(await page.locator('#selectedReferences .reference-card').nth(1).innerText(),/@Image2/);assert.deepEqual(await page.evaluate(()=>selectedModel().reference_modes.find(m=>m.id===document.querySelector('#referenceMode').value).image_roles),['First frame','Last frame']);
     await page.locator('#model').selectOption(JSON.stringify(['mock','image']));
     assert.equal(await page.locator('#imageURLsField [data-asset-hint]').isVisible(),false);
-    assert.equal(await page.locator('#imageURLsField summary').innerText(),'Use image URLs');
+    assert.equal(await page.locator('#imageURLsField summary').innerText(),'Use URLs');
     await page.locator('#model').selectOption(JSON.stringify(['mock','assets']));
     await page.locator('#chooseReferences').click();const sharedDialog=page.locator('#referenceLibrary');await sharedDialog.locator('.reference-card').first().waitFor();
     await chooseSharedSource(sharedDialog,'shared');await sharedDialog.getByRole('button',{name:'Use Shared image.png in generation',exact:true}).waitFor();
@@ -228,7 +233,14 @@ const server = http.createServer((req, res) => {
     await chooseProviderSource(sharedDialog,'provider');await chooseProviderSource(sharedDialog,'local');releaseShared();sharedHold=null;
     await sharedDialog.getByRole('button',{name:/^Use /}).first().waitFor();assert.equal(await sharedDialog.getByRole('button',{name:'Use Shared image.png in generation',exact:true}).count(),0);await sharedDialog.getByRole('button',{name:'Close library',exact:true}).click();
     console.log('Shared library passed: read-only selection, no private provider-registration action, ordinary upload after closing shared library and delayed shared→BytePlus→private source isolation.');
+    await page.locator('#referenceMode').selectOption('references');await page.locator('#imageURLsField details').evaluate(n=>n.open=true);const draft=page.locator('#imageURLs');
+    await draft.fill('https://example.test/first.png');await draft.press('End');await draft.press('Enter');assert.equal(await draft.inputValue(),'https://example.test/first.png\n');assert.equal(await draft.evaluate(n=>n.selectionStart),'https://example.test/first.png\n'.length);assert.equal(await page.locator('#selectedReferences .reference-card').count(),1);
+    await draft.pressSequentially('https://example.test/second.png');assert.equal(await page.locator('#selectedReferences .reference-card').count(),2);await draft.press('Enter');await draft.press('Enter');const raw=await draft.inputValue(),caret=await draft.evaluate(n=>[n.selectionStart,n.selectionEnd]);await page.evaluate(()=>referencePicker.render());assert.equal(await draft.inputValue(),raw);assert.deepEqual(await draft.evaluate(n=>[n.selectionStart,n.selectionEnd]),caret);
+    await draft.fill('https://example.test/first.pnghttps://example.test/second.png');assert.equal(await page.locator('#selectedReferences .reference-card').count(),2);assert.equal(await page.evaluate(()=>referencePicker.validate()),false);assert.match(await page.locator('#referenceStatus').textContent(),/valid URL/);
+    await draft.fill('https://example.test/first.png\nhttps://example.test/first.png\n');assert.equal(await page.locator('#selectedReferences .reference-card').count(),1);assert.equal(await draft.inputValue(),'https://example.test/first.png\nhttps://example.test/first.png\n');await page.locator('#selectedReferences .reference-selection-remove').click();assert.equal(await draft.inputValue(),'');
+    console.log('PASS real URL keyboard trailing lines, raw draft/caret preservation, invalid draft retains last valid cards, dedupe and external Remove synchronization');
     assert.deepEqual(errors,[]);
+    assert.deepEqual(layoutFailures,[],'Page layout overflow; independent interaction checks above completed');
     console.log('Registered assets passed: mixed image/video/audio references, unchanged request URIs, keyboard reorder, frame roles, capability hints and 1440/390/320px layout.');
     console.log('Reference UI passed: direct S3 PUT without gateway credentials, no proxy fallback, chunked hashing, workspace cancellation, CSP, upload, drop, replace, reorder, library, pagination, limits, deletion, failures, generation, persistence and mobile.');
   } catch(error) {

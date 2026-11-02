@@ -138,15 +138,15 @@
      const merged=append?[...new Map([...items,...next].map(item=>[item.id,item])).values()]:next,changed=JSON.stringify(merged)!==JSON.stringify(items);items=merged;offset=position;failed=false;
      if(changed||!library.grid.children.length){
       const focused=library.grid.contains(document.activeElement)?{id:document.activeElement.closest('.reference-card')?.dataset.id,label:document.activeElement.getAttribute('aria-label')}:null;
-      library.render(items.filter(item=>kinds.includes((item.content_type||'').split('/')[0])),{onSelect:item=>{if(!current())return;sourceItems[index]=item;widget.setPreview({name:item.name,url:item.url,type:item.content_type});library.dialog.close();changedState();}});
+      renderChoices();
       if(focused?.id){const card=library.grid.querySelector('[data-id="'+CSS.escape(focused.id)+'"]');([...card?.querySelectorAll('button')||[]].find(b=>b.getAttribute('aria-label')===focused.label)||card?.querySelector('.reference-choice'))?.focus();}
      }
      library.more.hidden=!data.has_more;library.more.textContent='Load more';library.status.textContent=library.grid.children.length?'':'No matching files in this library.';
     }catch(e){if(fresh()&&e.name!=='AbortError'){failed=true;appendNext=append;library.status.textContent='Could not load files. Retrying automatically. '+e.message;library.more.hidden=false;library.more.textContent='Retry loading';}}
     finally{library.more.disabled=false;}
    }});
-   function changedState(){changed();requestAnimationFrame(()=>{if(current()&&widget.root.isConnected)widget.root.querySelector('[data-upload-remove]:not([hidden])')?.focus();});}
-   library.more.onclick=()=>{appendNext=failed?lastAppend:true;updates.refresh({restart:true,quiet:false});};library.dialog.addEventListener('close',()=>{updates.stop();library.dialog.remove();dialogs=dialogs.filter(value=>value!==library.dialog);},{once:true});updates.refresh({quiet:false});
+   function renderChoices(){library.render(items.filter(item=>kinds.includes((item.content_type||'').split('/')[0])),{scope,selected:item=>sourceItems[index]?.id===item.id,busy:locked(),onSelect:item=>{if(!current()||locked())return;sourceItems[index]=sourceItems[index]?.id===item.id?null:item;widget.setPreview(sourceItems[index]?{name:item.name,url:item.url,type:item.content_type}:null);changed();renderChoices();}});}
+   library.more.onclick=()=>{appendNext=failed?lastAppend:true;updates.refresh({restart:true,quiet:false});};library.dialog.addEventListener('close',()=>{updates.stop();library.dispose();library.dialog.remove();if(current()&&widget.root.isConnected)widget.upload.focus();dialogs=dialogs.filter(value=>value!==library.dialog);},{once:true});updates.refresh({quiet:false});
   }
   function sources(parent){widgets.forEach(w=>w.dispose());widgets=[];sourceItems=[];generated=null;generatedArtifact=null;boundVoice=null;const version=++sourceVersion,v=variant,saved=restoring&&initialIntent?.subtype===v?.subtype?initialIntent:null;parent.replaceChildren();if(!v){parent.append(node('p','This operation has no reviewed input schema.','field-hint'));return;}if(v.help)parent.append(node('p',v.help,'field-hint'));if(v.allowed_dimensions?.length)parent.append(node('p','Required dimensions: '+v.allowed_dimensions.map(d=>d.width+'×'+d.height).join(' or '),'field-hint'));
    sourceMode=field(parent,'Source','select');if(v.max_sources>0&&v.source_kinds?.length)sourceMode.append(new Option('Local references','local'));if(v.generated_sources?.length)sourceMode.append(new Option('Completed generation','generated'));if(saved?.generated_task_id)sourceMode.value='generated';const sourceHost=node('div','','resource-sources');parent.append(sourceHost);

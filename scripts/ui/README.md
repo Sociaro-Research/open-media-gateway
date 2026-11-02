@@ -776,7 +776,7 @@ Repeat with `UI_BROWSER_ENGINE=webkit`. Node needs Playwright and pngjs on its
 module path. `UI_EVIDENCE_DIR` selects screenshots/results. The fixture uses real
 synthetic administrator sessions, uploads and PostgreSQL, then kills/restarts its
 owned API subprocess against the same database and verifies persisted associations
-and unchanged credentials/settings. Both engines check decoded PNG transparency,
+and unchanged credentials/settings. Both engines check decoded opaque and transparent PNG acceptance,
 validation failures, retries/interruptions, live theme changes, exact rendered RGB
 and alpha, keyboard access and 1440/390/320px layouts. With `CADDY_BIN`, it runs the
 production proxy configuration and verifies bearer-only image reads. All traffic
@@ -928,3 +928,15 @@ no provider or generation calls. Run `model-settings-preservation.cjs`,
 Template, capability, saved-state and Override Sound coverage. Provider HTTP
 fixtures independently verify native duration sentinels; UI omission alone does
 not prove a provider request is valid or a paid job can be quoted.
+
+### Unified media picker
+
+Run `node scripts/ui/media-picker.cjs` with a generated
+`GATEWAY_TEMPLATE_CLIP_DIR` (see the video fixture setup above). Repeat with
+`UI_BROWSER_ENGINE=webkit`. The fixture exercises native keyboard Upload, opaque
+PNG acceptance and unchanged invalid-content limits, durable library identities,
+failed URL refresh, retained playback, confirmation, compact portrait controls,
+configured accent colors, true touch gestures and disposal during validation.
+`references.cjs` also checks raw URL keyboard drafts, caret/blank-line retention,
+last-valid cards and explicit card-to-URL synchronization. These tests use only
+synthetic local APIs and media.

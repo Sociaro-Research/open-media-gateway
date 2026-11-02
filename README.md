@@ -38,7 +38,7 @@ Included adapters: [OpenAI](docs/openai-provider.md),
 [direct Kling AI](docs/kling-provider.md),
 [direct MiniMax image/video](docs/minimax-provider.md), plus `mock`.
 Media types and controls depend on the selected provider and model. Administrators
-can upload or remove [transparent PNG provider logos](docs/provider-modules.md#provider-logos)
+can upload or remove [PNG provider logos](docs/provider-modules.md#provider-logos)
 from provider settings; logos follow the active light/dark display mode.
 The Playground highlights [supported prompt references](docs/prompt-reference-syntax.md)
 and previews their selected files without rewriting submitted text. Real generation
