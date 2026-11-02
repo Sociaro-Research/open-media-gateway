@@ -28,10 +28,10 @@
   const footer=document.createElement('footer');footer.className='site-footer';
   const legal=document.createElement('nav');legal.setAttribute('aria-label','Legal');footer.append(legal);
   for(const [label,kind]of [['Terms of Use','terms'],['Privacy Policy','privacy']]){
-    const link=document.createElement('a');link.textContent=label;link.href='/'+kind;link.dataset.legalLink=kind;legal.append(link);
+    const link=document.createElement('a');link.textContent=label;link.setAttribute('aria-disabled','true');link.dataset.legalLink=kind;legal.append(link);
   }
   document.body.classList.add('site-page');(document.querySelector('.shell')||document.body).append(footer);
-  let appearance;
+  let appearance,siteConfiguration;
   const systemOnly=['system','docs'].includes(document.documentElement.dataset.themeMode);
   let presetPreference='';
   if(!systemOnly){try{presetPreference=localStorage.getItem('gateway-color-preset')||'';}catch{}}
@@ -101,14 +101,39 @@
       if(settings.contact_email)n.href='mailto:'+settings.contact_email;else n.removeAttribute('href');
     });
   }
-  const ready=fetch('/site.json',{credentials:'omit'}).then(async r=>{if(!r.ok)throw Error('Site configuration unavailable');const site=await r.json();window.GatewayTheme?.configure(site,r.headers.get('X-Gateway-Theme-Cookie-Domain')||'');if(site.branding)apply(site.branding);
+  function targetDocs(site,hash=location.hash){
+    const url=new URL(site.docs_url?'/' : '/docs',site.docs_url||site.ui_url||location.origin);
+    if(hash.startsWith('#docs/'))url.hash=hash;
+    return window.GatewayTheme?.docsURL(url.href)||url.href;
+  }
+  function targetConsole(site){if(!site.ui_url)return null;const url=new URL('/',site.ui_url);return window.GatewayTheme?.docsURL(url.href)||url.href;}
+  function updateLinks(site){
+    document.querySelectorAll('[data-console-link]').forEach(n=>{const url=targetConsole(site);if(url){n.href=url;n.removeAttribute('aria-disabled');}else{n.removeAttribute('href');n.setAttribute('aria-disabled','true');}});
+    document.querySelectorAll('[data-docs-link]').forEach(n=>n.href=targetDocs(site));
+    footer.querySelectorAll('[data-legal-link]').forEach(n=>{
+      // A separate docs page cannot infer its Console host while config is unavailable.
+      if(!site.ui_url)return;
+      n.href=new URL('/'+n.dataset.legalLink,site.ui_url||location.origin).href;n.removeAttribute('aria-disabled');
+    });
+  }
+  // Bound the shared promise too: reference text must not wait forever on config.
+  const controller=new AbortController(),deadline=setTimeout(()=>controller.abort(),8000);
+  const ready=fetch('/site.json',{credentials:'omit',signal:controller.signal}).then(async r=>{
+    if(!r.ok)throw Error('Site configuration unavailable');
+    const site=await r.json();window.GatewayTheme?.configure(site,r.headers.get('X-Gateway-Theme-Cookie-Domain')||'');if(site.branding)apply(site.branding);
     const meta=document.querySelector('meta[name="gateway-url"]');if(meta)meta.content=site.api_url||location.origin;
-    if(site.docs_url&&['/docs','/docs/'].includes(location.pathname)&&site.docs_url!==location.origin)location.replace(window.GatewayTheme?.docsURL(site.docs_url+'/'+location.hash)||site.docs_url+'/'+location.hash);
-    document.querySelectorAll('[data-console-link]').forEach(n=>n.href=(site.ui_url||'')+'/');
-    footer.querySelectorAll('[data-legal-link]').forEach(n=>n.href=new URL('/'+n.dataset.legalLink,site.ui_url||location.origin).href);
-    if(window.GatewaySite)window.GatewaySite.current=site;
-    return site;
-  }).catch(()=>({api_url:location.origin,ui_url:location.origin}));
-  new MutationObserver(()=>{if(appearance)apply(appearance);}).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
-  window.GatewaySite={ready,apply,normalize,paletteColors,selectPreset,presets:()=>appearance?.presets||[],defaultPreset:()=>appearance?.default_preset||''};
+    // Compatibility for old bookmarks only. New links already target the docs origin.
+    if(site.docs_url&&['/docs','/docs/'].includes(location.pathname)&&new URL(site.docs_url).origin!==location.origin)location.replace(targetDocs(site));
+    siteConfiguration=site;updateLinks(site);if(window.GatewaySite)window.GatewaySite.current=site;return site;
+  }).catch(()=>{const site={api_url:location.origin,ui_url:document.documentElement.dataset.themeMode==='docs'?'':location.origin};siteConfiguration=site;updateLinks(site);return site;}).finally(()=>clearTimeout(deadline));
+  async function docsURL(hash=location.hash){return targetDocs(await ready,hash);}
+  async function consoleURL(){return targetConsole(await ready);}
+  async function openDocs(hash=location.hash,current=()=>true){const target=await docsURL(hash);if(current())location.assign(target);}
+  let linkNavigation=0;
+  for(const link of document.querySelectorAll('[data-docs-link],[data-console-link]'))link.addEventListener('click',async event=>{
+    if(event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey||link.target==='_blank')return;
+    event.preventDefault();const intent=++linkNavigation;const target=link.hasAttribute('data-docs-link')?await docsURL():await consoleURL();if(target&&intent===linkNavigation)location.assign(target);
+  });
+  new MutationObserver(()=>{if(appearance)apply(appearance);if(siteConfiguration)updateLinks(siteConfiguration);}).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+  window.GatewaySite={ready,docsURL,consoleURL,openDocs,apply,normalize,paletteColors,selectPreset,presets:()=>appearance?.presets||[],defaultPreset:()=>appearance?.default_preset||''};
 })();

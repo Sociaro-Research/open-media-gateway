@@ -46,7 +46,8 @@ ordered service updates and rollback.
 | --- | --- |
 | Docs host `/`, `/docs`, OpenAPI and appearance resources | Public standalone reference |
 | Docs host API, auth, media and console scripts | 404, even with credentials |
-| Console `/docs` | Navigates to the configured documentation origin; otherwise local reference |
+| Console Docs navigation | Directly opens the configured docs root with the current theme; local `/docs` when no separate docs origin is configured |
+| Console `/docs` legacy bookmarks | Public internal rewrite, then compatibility navigation to the configured docs origin; otherwise local reference |
 | Console OpenAPI downloads | API contract with configured API server URL |
 | Console pages without a valid session | Only the sign-in shell |
 | Console scripts and provider icons | Session preflight against `/auth/session` |
@@ -71,10 +72,22 @@ API origins and a free mock generation with result download.
 
 ## Documentation display theme
 
+Console and documentation reuse the same public shell, responsive logo/header
+and legal footer. Docs has Console and an active Docs navigation entry. Footer
+links always target the configured Console `/terms` and `/privacy` pages.
+
 Documentation on the console origin uses the saved Light, Dark or System
 preference. Links from the console also carry only that preference as a `theme`
-query parameter to a separate documentation origin. The documentation page removes
-this parameter immediately and retains it in memory, preserving the section hash.
+query parameter directly to a separate documentation origin, without first
+loading Console `/docs`. Links wait for the bounded public site configuration
+read; if it fails, Console uses the same-origin `/docs` fallback. Unknown Console
+links on a failed standalone docs configuration remain unavailable rather than
+guessing a hostname. A newer Console section selection cancels a pending Docs
+navigation. Reverse Console navigation carries the same non-sensitive preference.
+The destination removes
+only this parameter with `history.replaceState`, without another document request,
+preserving other query parameters and the section hash. The docs page retains the
+preference in memory.
 It does not send or request identity, session tokens or account data. A direct
 visit or reload on an unrelated docs origin defaults to System.
 

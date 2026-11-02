@@ -697,7 +697,7 @@ async function updateAdminProvider(payload, successMessage, showSaved = false) {
 
 function showConsoleSection(name) {
   const navigation=++consoleNavigation;
-  if(name==='docs'){location.assign(GatewayTheme.docsURL('/docs'+(location.hash.startsWith('#docs/')?location.hash:'')));return;}
+  if(name==='docs'){void GatewaySite.openDocs(location.hash,()=>navigation===consoleNavigation);return;}
   window.Workspace?.restore();
   if(name!=='system')window.GatewaySystem?.close();
   let page={keys:'API keys',reports:'Billing',providers:'Providers',storage:'Storage'}[name];

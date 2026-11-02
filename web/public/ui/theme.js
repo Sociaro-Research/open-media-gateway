@@ -29,8 +29,10 @@
   }
   function docsURL(value){const url=new URL(value,location.href);url.searchParams.set('theme',preference);return url.href;}
   function clear(){shared=false;writeCookie(true);preference='system';try{localStorage.removeItem('gateway-theme')}catch{}render();}
-  if(docs){const url=new URL(location.href);const value=url.searchParams.get('theme');transferred=valid(value)?value:null;if(url.searchParams.has('theme')){url.searchParams.delete('theme');history.replaceState(null,'',url.pathname+url.search+url.hash);}apply(transferred);}
-  else apply(stored());
+  const incoming=new URL(location.href),incomingTheme=incoming.searchParams.get('theme');
+  if(incoming.searchParams.has('theme')){incoming.searchParams.delete('theme');history.replaceState(null,'',incoming.pathname+incoming.search+incoming.hash);}
+  if(docs){transferred=valid(incomingTheme)?incomingTheme:null;apply(transferred);}
+  else apply(valid(incomingTheme)?incomingTheme:stored());
   media.addEventListener('change',render);
   window.addEventListener('focus',refresh);window.addEventListener('pageshow',refresh);window.addEventListener('storage',refresh);
   window.GatewayTheme={apply,configure,docsURL,clear};

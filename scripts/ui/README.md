@@ -900,3 +900,18 @@ shared component harness and synthetic responses; repeat in Chromium and WebKit.
 The responsive header regression (`node scripts/ui/header-resize.cjs`) loads the
 shared public shell implementation, verifies a single in-flow footer and checks
 window/container resizing without observer feedback in both browser engines.
+
+### Shared Console/documentation shell and navigation
+
+Run `node scripts/ui/documentation-shell.cjs` in Chromium and WebKit with
+`CADDY_BIN` pointing to the pinned local Caddy runtime. The fixture serves the
+actual public UI through Caddy with a loopback synthetic API and intercepts all
+browser origins; it makes no live request. It clicks the real Console Docs button
+and sign-in link, counts document requests separately from history cleanup, and
+checks configured central/staging origins, self-hosted paths, delayed/failed/hung
+configuration, stale navigation, reverse theme transfer, blocked storage and
+Back/Forward. It checks the shared header, active Docs, footer/legal targets,
+actual public/private asset policy and light/dark 1440/390/320px screenshots.
+`UI_BASELINE_DIR` optionally binds preserved pre-change app/site scripts for the
+two-document before measurement. Keep evidence outside tracked source and inspect
+the rendered screenshots; source assertions alone do not establish visual acceptance.
