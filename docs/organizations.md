@@ -23,6 +23,13 @@ preserving media headers and the original method for direct-storage signing.
 | Request logs | All, with content | All, without content | All, with content | Own, with content | Own, with content |
 | Delete generation results and input files | Any | None | None | Own only | Own only |
 
+Company API-key lists and usage reports remain scoped to the selected company
+when request-limit accounting is enabled. Key revocation uses the actor's current
+company role and recipient hierarchy; request quotas do not replace these checks.
+Stores without company-scoped read support fail closed instead of returning an
+unscoped personal list. The internal owner-only revoke operation remains separate
+from role-authorized company revocation.
+
 The API identifiers are `supermanager`, `admin` (Manager), `content_officer`, `developer` and `member`. An Administrator appoints the first Supermanager; existing Supermanagers may appoint more. Organization locking protects the last Supermanager against concurrent removal or demotion. Managers cannot change roles, limits or keys of Supermanagers or Content Officers, and cannot assign or remove Managers. They may change Managers' weekly limits without changing their role.
 
 Content includes prompts, instructions, input materials, provider payloads and generated results. Manager logs use an allowlist of operational/accounting metadata, including status, model, author, key, usage and cost. Errors and raw provider usage are excluded because they can contain request content. Content Officers have read-only content access and cannot delete files or generate through previously issued keys. Live role checks apply on every authenticated request.

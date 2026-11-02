@@ -29,6 +29,35 @@ func WithRequestLimits(keys apikey.Repository, policies limits.Reader, limiter l
 	}
 	return &limitedKeys{keys, policies, limiter}
 }
+
+// Keep optional company-management capabilities visible through admission accounting.
+// Scoped reads must not fall back to an unscoped owner list or usage report.
+func (k *limitedKeys) OrganizationKeys(ctx context.Context, actor, organization string) ([]apikey.Key, error) {
+	if repo, ok := k.Repository.(interface {
+		OrganizationKeys(context.Context, string, string) ([]apikey.Key, error)
+	}); ok {
+		return repo.OrganizationKeys(ctx, actor, organization)
+	}
+	return nil, apikey.ErrForbidden
+}
+func (k *limitedKeys) OrganizationUsage(ctx context.Context, actor, organization string, month time.Time) ([]apikey.MonthlyUsage, error) {
+	if repo, ok := k.Repository.(interface {
+		OrganizationUsage(context.Context, string, string, time.Time) ([]apikey.MonthlyUsage, error)
+	}); ok {
+		return repo.OrganizationUsage(ctx, actor, organization, month)
+	}
+	return nil, apikey.ErrForbidden
+}
+func (k *limitedKeys) RevokeForActor(ctx context.Context, actor, id string) error {
+	if repo, ok := k.Repository.(interface {
+		RevokeForActor(context.Context, string, string) error
+	}); ok {
+		return repo.RevokeForActor(ctx, actor, id)
+	}
+	// Older stores retain their existing owner-only revoke contract.
+	return k.Repository.Revoke(ctx, actor, id)
+}
+
 func (k *limitedKeys) CheckLimits(ctx context.Context, org, operation string) error {
 	p, err := k.policies.RequestLimits(ctx, org)
 	if err != nil {
