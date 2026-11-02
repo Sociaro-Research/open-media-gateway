@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	remote "github.com/Sociaro-Research/open-media-gateway/internal/remoteworkspace"
+	"github.com/google/uuid"
 )
 
 const attemptColumns = `owner_id::text,id::text,origin,client_name,client_origin,device_ciphertext,base_version,expires_at`
@@ -103,4 +104,56 @@ func (r *SystemRepository) InstallationIdentity(ctx context.Context, owner, orig
 		return nil, err
 	}
 	return ciphertext, tx.Commit()
+}
+
+// FinishSavedAuthorization only clears the original attempt after its dedicated
+// connection has already committed. Dedicated writes come from verified device
+// redemption; manual key replacement cannot create or replace such a connection.
+// The exact one-step revision and owner/origin checks exclude disconnects, other
+// attempts, legacy replacements and later connection changes. Expiry blocks new
+// issuance, not cleanup of this already-verified save. No key/grant is revoked.
+func (r *SystemRepository) FinishSavedAuthorization(ctx context.Context, owner, id string) (remote.Record, bool, error) {
+	tx, err := beginAuditTx(ctx, r.db)
+	if err != nil {
+		return remote.Record{}, false, err
+	}
+	defer tx.Rollback()
+	if _, err = readSystemSettings(ctx, tx, true); err != nil {
+		return remote.Record{}, false, err
+	}
+	if _, err = systemActor(ctx, tx, owner); err != nil {
+		return remote.Record{}, false, err
+	}
+	saved, err := scanRemote(tx.QueryRowContext(ctx, `SELECT `+remoteColumns+` FROM remote_workspaces WHERE owner_id=$1 FOR UPDATE`, owner))
+	if errors.Is(err, remote.ErrNotFound) {
+		return remote.Record{}, false, nil
+	}
+	if err != nil {
+		return remote.Record{}, false, err
+	}
+	attempt, err := scanRemoteAuthorization(tx.QueryRowContext(ctx, `SELECT `+attemptColumns+` FROM remote_workspace_authorizations WHERE owner_id=$1 FOR UPDATE`, owner))
+	if err != nil {
+		return remote.Record{}, false, err
+	}
+	if attempt.ID != id {
+		return remote.Record{}, false, remote.ErrConflict
+	}
+	if saved.Version == attempt.Version {
+		return remote.Record{}, false, nil
+	}
+	a, ae := remote.Origin(saved.Origin)
+	b, be := remote.Origin(attempt.Origin)
+	_, keyErr := uuid.Parse(saved.KeyID)
+	_, userErr := uuid.Parse(saved.UserID)
+	_, companyErr := uuid.Parse(saved.OrganizationID)
+	if !saved.Active || saved.Provisioning != "dedicated" || saved.Version != attempt.Version+1 || ae != nil || be != nil || a != b || len(saved.TokenHash) != 32 || saved.VerifiedAt == nil || keyErr != nil || userErr != nil || companyErr != nil {
+		return remote.Record{}, false, remote.ErrConflict
+	}
+	if _, err = tx.ExecContext(ctx, `DELETE FROM remote_workspace_authorizations WHERE owner_id=$1 AND id::text=$2`, owner, id); err != nil {
+		return remote.Record{}, false, err
+	}
+	if err = tx.Commit(); err != nil {
+		return remote.Record{}, false, err
+	}
+	return saved, true, nil
 }

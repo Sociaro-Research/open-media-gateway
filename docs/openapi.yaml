@@ -156,22 +156,22 @@ paths:
       summary: Read this local administrator's pending connection request
       description: Local read only. No remote request or device secret is returned.
       responses:
-        '200': {description: 'Pending id/origin/user_code/verification_uri/expiry, or pending false'}
+        '200': {description: 'Pending id/origin/base_version/user_code/verification_uri/expiry, or pending false'}
     post:
       operationId: beginLocalInstallationAuthorization
-      summary: Request trusted-host signup/login and company consent
-      description: Current local Administrator plus explicit metadata-transfer consent. Preserves the current dedicated connection and company until its renewed key is verified; active legacy connections require explicit legacy management. The backend retains a durable installation proof per normalized central origin and stores an encrypted device secret and makes checked outbound HTTPS calls only; no local management credential is forwarded. Retries resume the same pending request.
+      summary: Connect this installation to Sociaro with explicit approval
+      description: Current local Administrator plus explicit metadata-transfer consent. Preserves the current dedicated connection and company until its renewed key is verified; active legacy connections require explicit legacy management. The backend retains a durable installation proof per normalized central origin and stores an encrypted device secret and makes checked outbound HTTPS calls only; no local management credential is forwarded. Retries resume the same pending request, retaining its original display metadata and proof. The destination is fixed server-side to the canonical Sociaro origin; request headers and browser fields cannot select another host. The display address comes from UI_PUBLIC_URL (AUTH_PUBLIC_URL fallback); missing configuration uses http://localhost. Names and addresses are display-only, not ownership verification.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [origin, client_name, client_origin, version, consent]
+              required: [version, consent]
               properties:
-                origin: {type: string, format: uri}
-                client_name: {type: string, maxLength: 80}
-                client_origin: {type: string, format: uri}
+                origin: {type: string, format: uri, deprecated: true, description: Optional legacy field; must equal the configured canonical Sociaro origin.}
+                client_name: {type: string, deprecated: true, description: Ignored; trusted public configuration supplies the installation label.}
+                client_origin: {type: string, format: uri, deprecated: true, description: Ignored; trusted public configuration supplies the display address.}
                 version: {type: integer, minimum: 0}
                 consent: {type: boolean, const: true}
       responses:

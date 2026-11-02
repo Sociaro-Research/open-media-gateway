@@ -3,10 +3,11 @@ package api
 import (
 	"errors"
 	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
+	"github.com/Sociaro-Research/open-media-gateway/internal/installation"
 	remote "github.com/Sociaro-Research/open-media-gateway/internal/remoteworkspace"
 	wa "github.com/Sociaro-Research/open-media-gateway/internal/workspaceauth"
 	"net/http"
-	"strings"
+	"net/url"
 )
 
 func remoteAuthorizationError(w http.ResponseWriter, err error) {
@@ -55,10 +56,55 @@ func (s *Server) remoteAuthorization(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !in.Consent || in.Version < 0 {
-		writeError(w, 400, "consent_required", "Confirm sending this installation's name and origin to the selected trusted server")
+		writeError(w, 400, "consent_required", "Confirm sharing this installation’s name and address with Sociaro")
 		return
 	}
-	view, err := s.remoteWorkspaceManager.BeginAuthorization(r.Context(), owner, in.Origin, strings.TrimSpace(in.Name), in.ClientOrigin, in.Version)
+	central := installation.FromContext(r.Context()).CentralOrigin
+	if centralInstallation(r) {
+		centralModeError(w)
+		return
+	}
+	if in.Origin != "" {
+		requested, e := installation.NormalizeOrigin(in.Origin)
+		if e != nil || requested != central {
+			writeError(w, 400, "invalid_destination", "Connect to the configured Sociaro service")
+			return
+		}
+	}
+	// Only trusted public configuration supplies the label/address sent to Sociaro.
+	own, _ := r.Context().Value(storageBrowserOriginKey{}).(string)
+	label := "Local installation"
+	if own == "" {
+		own = "http://localhost"
+	} else if parsed, e := url.Parse(own); e == nil {
+		label = parsed.Host
+	}
+	if len(label) > 80 {
+		label = label[:80]
+	}
+	if current, e := s.remoteWorkspaceManager.Repo.RemoteWorkspace(r.Context(), owner); e != nil && !errors.Is(e, remote.ErrNotFound) {
+		remoteAuthorizationError(w, e)
+		return
+	} else if e == nil && current.Active {
+		previous, e := installation.NormalizeOrigin(current.Origin)
+		if e != nil || previous != central {
+			writeError(w, 409, "remote_destination_changed", "This saved connection is preserved. Manage its existing access before connecting to a different service")
+			return
+		}
+	}
+	// Retry the retained request with its original display metadata and proof.
+	if pending, e := s.remoteWorkspaceManager.Authorization(r.Context(), owner); e == nil {
+		prior, e := installation.NormalizeOrigin(pending.Origin)
+		if e != nil || prior != central {
+			writeError(w, 409, "remote_destination_changed", "Cancel the saved request before connecting to Sociaro")
+			return
+		}
+		label, own = pending.Name, pending.ClientOrigin
+	} else if !errors.Is(e, remote.ErrNotFound) {
+		remoteAuthorizationError(w, e)
+		return
+	}
+	view, err := s.remoteWorkspaceManager.BeginAuthorization(r.Context(), owner, central, label, own, in.Version)
 	if err != nil {
 		remoteAuthorizationError(w, err)
 		return

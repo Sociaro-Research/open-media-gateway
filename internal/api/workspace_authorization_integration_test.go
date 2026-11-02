@@ -69,11 +69,15 @@ func (failedWorkspaceBody) Read([]byte) (int, error) { return 0, errors.New("syn
 func (failedWorkspaceBody) Close() error             { return nil }
 
 type loseWorkspaceReply struct {
-	base http.RoundTripper
-	lost atomic.Bool
+	base  http.RoundTripper
+	lost  atomic.Bool
+	polls atomic.Int32
 }
 
 func (t *loseWorkspaceReply) RoundTrip(r *http.Request) (*http.Response, error) {
+	if r.URL.Path == "/auth/workspace/poll" {
+		t.polls.Add(1)
+	}
 	if r.Header.Get("Cookie") != "" || r.Header.Get("Authorization") != "" && strings.HasPrefix(r.URL.Path, "/auth/workspace/") {
 		return nil, errors.New("local credential leaked")
 	}
@@ -84,6 +88,39 @@ func (t *loseWorkspaceReply) RoundTrip(r *http.Request) (*http.Response, error) 
 	}
 	return response, err
 }
+
+type retainCompletedAttemptOnce struct {
+	*postgres.SystemRepository
+	fail atomic.Bool
+}
+
+func (r *retainCompletedAttemptOnce) ClearAuthorizationAttempt(ctx context.Context, owner, id string) error {
+	if r.fail.Swap(false) {
+		return remote.ErrUnavailable
+	}
+	return r.SystemRepository.ClearAuthorizationAttempt(ctx, owner, id)
+}
+
+// Only the wire transport uses loopback; the application retains its canonical
+// destination and never resolves or calls a real public host in this fixture.
+type canonicalWorkspaceTransport struct {
+	base   http.RoundTripper
+	target *url.URL
+}
+
+func (t canonicalWorkspaceTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	if r.URL.Scheme == "https" && r.URL.Host == "console.sociaro.ai" {
+		copy := r.Clone(r.Context())
+		address := *r.URL
+		address.Scheme = t.target.Scheme
+		address.Host = t.target.Host
+		copy.URL = &address
+		copy.Host = t.target.Host
+		return t.base.RoundTrip(copy)
+	}
+	return t.base.RoundTrip(r)
+}
+
 func TestWorkspaceSignupCompanyAndInstallationEndToEnd(t *testing.T) {
 	ctx := context.Background()
 	hostDB, localDB := workspaceDatabase(t), workspaceDatabase(t)
@@ -118,11 +155,17 @@ func TestWorkspaceSignupCompanyAndInstallationEndToEnd(t *testing.T) {
 	hostHandler := NewGateway(Dependencies{Service: hostService, Health: healthStub{}, Auth: hostAuth, System: hostSystem, Keys: postgres.NewAPIKeyRepository(hostDB), WorkspaceAuthorization: wa.New(hostSystem, cipher)})
 	host := httptest.NewTLSServer(hostHandler)
 	defer host.Close()
-	transport := &loseWorkspaceReply{base: host.Client().Transport}
+	target, _ := url.Parse(host.URL)
+	transport := &loseWorkspaceReply{base: canonicalWorkspaceTransport{host.Client().Transport, target}}
 	client := *host.Client()
 	client.Transport = transport
-	manager := remote.New(localSystem, cipher, &client)
-	localHandler := NewGateway(Dependencies{Service: &accountService{}, Health: healthStub{}, Auth: localAuth, System: localSystem, Keys: postgres.NewAPIKeyRepository(localDB), RemoteWorkspace: manager})
+	localStorage := &retainCompletedAttemptOnce{SystemRepository: localSystem}
+	manager := remote.New(localStorage, cipher, &client)
+	localGateway := NewGateway(Dependencies{Service: &accountService{}, Health: healthStub{}, Auth: localAuth, System: localSystem, Keys: postgres.NewAPIKeyRepository(localDB), RemoteWorkspace: manager})
+	localHandler, err := WithPublicAPI(localGateway, "", "https://local.fixture.test", "")
+	if err != nil {
+		t.Fatal(err)
+	}
 	localToken, _ := wa.DeviceCode()
 	if err = localPeople.CreateSession(ctx, wa.Digest(localToken), localOwner.ID, time.Now().Add(time.Hour)); err != nil {
 		t.Fatal(err)
@@ -167,12 +210,23 @@ func TestWorkspaceSignupCompanyAndInstallationEndToEnd(t *testing.T) {
 		}
 		return n
 	}
-	begin := map[string]any{"origin": host.URL, "client_name": "My private installation", "client_origin": "http://192.168.1.8:8088", "version": 0, "consent": false}
+	begin := map[string]any{"version": 0, "consent": false}
 	expect(call(localHandler, "POST", "/v1/system/remote-workspace/authorization", begin, localCookie, "", false), 400)
 	if count(hostDB, "workspace_authorizations") != 0 || count(localDB, "remote_workspace_authorizations") != 0 {
 		t.Fatal("preview/absent consent wrote authorization")
 	}
 	begin["consent"] = true
+	for _, origin := range []string{"https://attacker.invalid", host.URL, "https://console.sociaro.ai:444"} {
+		crafted := map[string]any{"version": 0, "consent": true, "origin": origin}
+		expect(call(localHandler, "POST", "/v1/system/remote-workspace/authorization", crafted, localCookie, "", false), 400)
+	}
+	if count(hostDB, "workspace_authorizations") != 0 || count(localDB, "remote_workspace_authorizations") != 0 {
+		t.Fatal("crafted destination created a request")
+	}
+	// Legacy display fields are ignored, never accepted as identity or callback.
+	begin["client_name"] = "Attacker display"
+	begin["client_origin"] = "https://attacker.invalid"
+
 	expect(call(localHandler, "POST", "/v1/system/remote-workspace/authorization", begin, localCookie, "", false), 403)
 	hostHandler, err = WithPublicAPI(hostHandler, "", installation.DefaultCentralOrigin, "")
 	if err != nil {
@@ -183,6 +237,9 @@ func TestWorkspaceSignupCompanyAndInstallationEndToEnd(t *testing.T) {
 	expect(w, 200)
 	var view remote.AuthorizationView
 	decode(w, &view)
+	if view.Version != 0 || view.Origin != installation.DefaultCentralOrigin || view.Name != "local.fixture.test" || view.ClientOrigin != "https://local.fixture.test" {
+		t.Fatal("untrusted installation metadata", view.Origin, view.Name, view.ClientOrigin)
+	}
 	if view.Code == "" || view.ID == "" || strings.Contains(w.Body.String(), "device_code") || strings.Contains(w.Body.String(), "ciphertext") {
 		t.Fatal("unsafe authorization view")
 	}
@@ -261,7 +318,28 @@ func TestWorkspaceSignupCompanyAndInstallationEndToEnd(t *testing.T) {
 	if _, err = hostDB.Exec(`UPDATE workspace_authorizations SET next_poll_at=NOW()-INTERVAL '1 second'`); err != nil {
 		t.Fatal(err)
 	}
+	localStorage.fail.Store(true)
+	expect(call(localHandler, "POST", "/v1/system/remote-workspace/authorization/poll", poll, localCookie, "", false), 502)
+	beforeRecovery, e := localSystem.RemoteWorkspace(ctx, localOwner.ID)
+	if e != nil || !beforeRecovery.Active {
+		t.Fatal("verified save did not commit before cleanup failure", e)
+	}
+	if _, e = localDB.Exec(`UPDATE remote_workspace_authorizations SET expires_at=NOW()-INTERVAL '1 minute'`); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = hostDB.Exec(`UPDATE workspace_authorizations SET expires_at=NOW()-INTERVAL '1 minute'`); e != nil {
+		t.Fatal(e)
+	}
+	beforePolls := transport.polls.Load()
 	connected := call(localHandler, "POST", "/v1/system/remote-workspace/authorization/poll", poll, localCookie, "", false)
+	if transport.polls.Load() != beforePolls || count(localDB, "remote_workspace_authorizations") != 0 {
+		t.Fatal("saved completion retried host/revocation or retained stale attempt")
+	}
+	afterRecovery, e := localSystem.RemoteWorkspace(ctx, localOwner.ID)
+	if e != nil || afterRecovery.Version != beforeRecovery.Version || afterRecovery.OrganizationID != beforeRecovery.OrganizationID || string(afterRecovery.TokenHash) != string(beforeRecovery.TokenHash) || string(afterRecovery.Ciphertext) != string(beforeRecovery.Ciphertext) {
+		t.Fatal("cleanup changed saved connection", e)
+	}
+
 	expect(connected, 200)
 	if count(hostDB, "user_api_keys") != 1 || count(localDB, "tasks") != 0 || count(localDB, "organizations") != 0 || count(localDB, "organization_credits") != 0 {
 		t.Fatal("duplicate grant or local tenant/billing mirror")

@@ -497,12 +497,23 @@ reuse the local company balance or silently switch paid providers. Use the
 shared theme, modal scrollbars and 1440/390/320 px layout. There is no new design
 system exception.
 
-Installation authorization uses the existing trusted sign-in card and shared
-native consent dialogs, floating fields, company dropdowns and switches. Label
-the requesting installation origin as reported data and require explicit code
-matching/consent. Preserve the remote/local workspace distinction and use the
-existing company funding controls. The new primary flow never collects a remote
-password in the local portal; the existing-key option is an advanced fallback.
+Installation connection starts with one **Connect to Sociaro** action after a
+brief name/address sharing disclosure. There are no editable destination or
+installation-name fields. Resume the saved request after reload; never create
+requests on page load or radio selection. The compact pending state shows the
+comparison code, Open Sociaro fallback, status and Cancel. Only a verified,
+redeemed and locally saved connection is labeled Connected.
+
+On Sociaro, use the existing shared modal heading, account identity and compact
+actions: **Connect this installation?**, its name/address, comparison code and
+plain generation-only permission/balance/expiry disclosure. Explicit Connect
+replaces the consent checkbox, never the code comparison safeguard. The reported
+name/address is not verified ownership. Sign-in or opening the modal grants
+nothing. Renewal retains a separately explicit, default-off previous-access
+revocation choice. Keep company funding and management outside this approval
+form. An existing legacy-key connection retains its original company and
+protected management flow. Do not collect a remote password in the local portal,
+redirect to the reported address or use wildcard cross-window messaging.
 
 ## Reference libraries
 

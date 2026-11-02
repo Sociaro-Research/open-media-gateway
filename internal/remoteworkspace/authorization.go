@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"time"
@@ -20,7 +21,7 @@ type Attempt struct {
 	Name         string    `json:"client_name"`
 	ClientOrigin string    `json:"client_origin"`
 	Cipher       []byte    `json:"-"`
-	Version      int64     `json:"-"`
+	Version      int64     `json:"base_version"`
 	Expires      time.Time `json:"expires_at"`
 }
 type AuthorizationRepository interface {
@@ -83,7 +84,11 @@ func (m *Manager) BeginAuthorization(ctx context.Context, owner, origin, name, c
 	if len(name) < 1 || len(name) > 80 || len(clientOrigin) > 300 {
 		return AuthorizationView{}, ErrRoute
 	}
-	if current, e := m.Repo.RemoteWorkspace(ctx, owner); e == nil && current.Active && current.Provisioning != "dedicated" {
+	current, e := m.Repo.RemoteWorkspace(ctx, owner)
+	if e != nil && !errors.Is(e, ErrNotFound) {
+		return AuthorizationView{}, e
+	}
+	if e == nil && current.Active && current.Provisioning != "dedicated" {
 		return AuthorizationView{}, wa.ErrLegacy
 	}
 	identityProof, err := wa.DeviceCode()
@@ -128,8 +133,14 @@ func (m *Manager) BeginAuthorization(ctx context.Context, owner, origin, name, c
 		return AuthorizationView{}, err
 	}
 	replacement := ""
-	if current, e := m.Repo.RemoteWorkspace(ctx, owner); e == nil && current.Active && current.Origin == origin {
+	if current, e := m.Repo.RemoteWorkspace(ctx, owner); e == nil && current.Active {
+		savedOrigin, normalizeErr := Origin(current.Origin)
+		if normalizeErr != nil || savedOrigin != origin {
+			return AuthorizationView{}, ErrConflict
+		}
 		replacement = current.KeyID
+	} else if e != nil && !errors.Is(e, ErrNotFound) {
+		return AuthorizationView{}, e
 	}
 	response, err := m.authorizationRequest(ctx, origin, "/auth/workspace/start", map[string]any{"device_code": string(raw), "client_name": attempt.Name, "client_origin": attempt.ClientOrigin, "replace_key_id": replacement, "installation_proof": string(identityRaw)})
 	if err != nil {
@@ -188,6 +199,19 @@ func (m *Manager) PollAuthorization(ctx context.Context, owner, id string) (Reco
 	if attempt.ID != id {
 		return Record{}, ErrConflict
 	}
+	// Production storage can finish a previously committed dedicated save under
+	// the same locks as the retained attempt, without reissuing or revoking a key.
+	if recovery, ok := m.Repo.(interface {
+		FinishSavedAuthorization(context.Context, string, string) (Record, bool, error)
+	}); ok {
+		saved, complete, e := recovery.FinishSavedAuthorization(ctx, owner, id)
+		if e != nil {
+			return Record{}, e
+		}
+		if complete {
+			return saved, nil
+		}
+	}
 	raw, err := m.Cipher.Decrypt(attempt.Cipher)
 	if err != nil {
 		return Record{}, err
@@ -244,8 +268,14 @@ func (m *Manager) PollAuthorization(ctx context.Context, owner, id string) (Reco
 	if reply.InstallationID != hex.EncodeToString(wa.Digest("installation:"+string(identityRaw))) {
 		return Record{}, ErrConflict
 	}
-	if current, e := m.Repo.RemoteWorkspace(ctx, owner); e == nil && current.Active && (current.Origin != attempt.Origin || current.OrganizationID != reply.Company || current.Provisioning != "dedicated") {
-		return Record{}, ErrConflict
+	if current, e := m.Repo.RemoteWorkspace(ctx, owner); e == nil && current.Active {
+		previous, normalizeErr := Origin(current.Origin)
+		destination, destinationErr := Origin(attempt.Origin)
+		if normalizeErr != nil || destinationErr != nil || previous != destination || current.OrganizationID != reply.Company || current.Provisioning != "dedicated" {
+			return Record{}, ErrConflict
+		}
+	} else if e != nil && !errors.Is(e, ErrNotFound) {
+		return Record{}, e
 	}
 	saved, err := m.connect(ctx, owner, attempt.Origin, reply.Token, reply.Company, attempt.Version, "dedicated")
 	if err != nil {

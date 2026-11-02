@@ -1571,6 +1571,9 @@ body:has(.detail-dialog[open]) { overflow:hidden; }
 .setup-option input{padding:0;margin-top:5px}
 .setup-option strong,.setup-option small{display:block}.setup-option small{font-size:13px;color:var(--muted);line-height:1.6;margin:0}
 .setup-section{display:grid;gap:16px;padding-bottom:24px}.setup-section>button{justify-self:start}
+.remote-dialog.connection-dialog{max-width:620px;width:min(620px,calc(100vw - 24px))}
+.connection-dialog .remote-content>section{display:flex;flex-direction:column;gap:16px}
+.connection-dialog .remote-content [role=status]:empty{display:none}
 .remote-content{display:flex;flex-direction:column;gap:20px;min-width:0}.remote-content .keys-form{max-width:none;margin:0}.remote-controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr));gap:16px}
 .remote-confirmation{display:grid;gap:12px}.remote-job{border-bottom:1px solid var(--line);padding:16px 0;overflow-wrap:anywhere}.remote-job p{white-space:pre-wrap}
 .remote-job a{color:var(--accent-text,var(--accent))}

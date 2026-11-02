@@ -29,18 +29,18 @@
   ]){if(isCentral&&value!=='operator')continue;const label=node('label',undefined,'storage-choice-header setup-option'),radio=node('input');radio.type='radio';radio.name='scenario';radio.value=value;const copy=node('span');copy.append(node('strong',title),node('small',description));label.append(radio,copy);choices.append(label);}
   const actions=node('div',undefined,'dialog-actions'),skip=node('button','Skip for now','secondary'),apply=node('button','Apply','primary compact');skip.type='button';skip.hidden=!onboarding||isCentral;apply.type='submit';skip.onclick=dismiss;actions.append(skip,apply);
 
-  form.append(choices,status,actions);
+  const disclosure=node('p','Your installation’s name and address will be shared with Sociaro.','field-explanation');disclosure.hidden=true;form.append(choices,disclosure,status,actions);
   function draft(){return JSON.stringify(form.elements.scenario.value);}
   function baseline(){return JSON.stringify((onboarding&&settings.setup_pending)||settings.mode_selection_required||isCentral&&needsCompanySetup(settings)?'':scenario(settings));}
   function sync(){for(const radio of choices.querySelectorAll('input'))radio.checked=radio.value===(isCentral?'operator':scenario(settings));FormUI.watch(form,apply,{placement:'footer',hideWhenClean:true,read:draft,valid:()=>!!form.elements.scenario.value&&!busy&&!reconciling});FormUI.commit(form,baseline());update();}
-  function update(){const value=form.elements.scenario.value;apply.textContent=value==='sociaro'?'Open Sociaro workspace':'Apply';for(const control of [choices])control.disabled=busy||reconciling;for(const control of [skip,close])control.disabled=busy;FormUI.update(form);
+  function update(){const value=form.elements.scenario.value;disclosure.hidden=value!=='sociaro';apply.textContent=value==='sociaro'?'Connect to Sociaro':'Apply';for(const control of [choices])control.disabled=busy||reconciling;for(const control of [skip,close])control.disabled=busy;FormUI.update(form);
 
   }
   choices.onchange=update;
   async function reconcile(){try{const next=await api('/v1/system/settings');if(!active())return;settings=next;reconciling=false;sync();published(next);FormUI.message(status,'Settings changed. Current configuration has been loaded. Choose and review your changes before applying again.','error');}catch{if(!active())return;FormUI.message(status,'Could not load the changed settings. Retrying automatically…','error');retry=setTimeout(reconcile,1500);}}
   modal.addEventListener('cancel',e=>{e.preventDefault();dismiss();});
-  form.onsubmit=async e=>{e.preventDefault();const value=form.elements.scenario.value;if(busy||apply.disabled||!value)return;
-   if(value==='sociaro'){dismiss();await window.RemoteWorkspace.open();return;}
+  form.onsubmit=async e=>{e.preventDefault();const value=form.elements.scenario.value;if(!active()||busy||apply.disabled||!value)return;
+   if(value==='sociaro'){dismiss();await window.RemoteWorkspace.open({connect:true});return;}
    busy=true;update();FormUI.message(status,'Applying…');modal.setAttribute('aria-busy','true');
    try{const previous=settings,next=await api('/v1/system/setup-profile',{method:'POST',body:JSON.stringify({profile:value,version:settings.version})});if(!active())return;settings=next;if(typeof consolePolicy==='undefined'||!consolePolicy.version||next.version>=consolePolicy.version)window.applySystemAccess(next,true);published(next,previous);dismissAfterSave();}
    catch(error){if(!active())return;FormUI.message(status,error.message,'error');if(error.status===409){reconciling=true;void reconcile();}}

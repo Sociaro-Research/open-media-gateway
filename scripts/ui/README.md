@@ -628,23 +628,11 @@ removal, keyboard activation, both themes and 1440/390/320px layouts.
 All authorization and media requests stay local; no provider is called.
 
 Run `node scripts/ui/setup-remote.cjs` and repeat with
-`UI_BROWSER_ENGINE=webkit` for the three setup scenarios, no-write Skip and
-reload, failed/reversible preset changes, honest mixed settings, explicit remote
-consent, catalogue/estimate/job/history/download, interrupted submission recovery
-with the same idempotency key, and disconnect. It checks both themes at
-1440/390/320 px using localhost fixtures and blocks all external requests.
-`UI_SCREENSHOT_DIR` selects retained images. It does not exercise real account
-registration, company creation, credential grants, payments or provider calls.
-
-Run `node scripts/ui/setup-selector.cjs` in Chromium and WebKit for saved setup
-selection across reopen/reload, shared plus personal policy, custom legacy
-combinations, unchanged Apply, native radio keyboard navigation, no-write
-Skip/Close/Escape, failed and interrupted saves, pending locks and version
-conflicts. Synthetic localhost fixtures capture both themes at 1440/390/320px
-and measure footer text centering, equal button sizes, padding and legend gaps.
-`UI_EVIDENCE_DIR` selects evidence; `UI_SOURCE_DIR` with `UI_BASELINE=1` records
-the same layout against an archived UI. Backend persistence remains covered by
-the setup-profile API and PostgreSQL setup tests.
+`UI_BROWSER_ENGINE=webkit` for the three setup scenarios, no-write Close/Skip and
+reload, failed/reversible exclusive mode changes, protected existing legacy-key
+renewal, catalogue/estimate/job/history/download, interrupted submission recovery
+with the same idempotency key, and disconnect. It uses synthetic localhost data
+and captures both themes at 1440/390/320px; it does not grant real remote access.
 
 Run `node scripts/ui/system-scenarios.cjs` in Chromium and WebKit for the
 Settings scenario/Advanced settings boundary: no duplicate resource switches,
@@ -655,22 +643,31 @@ All four legacy policy combinations survive those saves. Reopen/reload and
 selects output; `UI_SOURCE_DIR` with `UI_BASELINE=1` captures an archived layout.
 
 Run `node scripts/ui/remote-navigation.cjs` in Chromium and WebKit for the real
-console header and scenario-only outbound connection entry. It preserves the
+console header and explicit scenario-only connection entry. It preserves the
 local company selector, checks keyboard navigation/focus return, no-write
-cancellation and closing, connected reopen/reload, ordinary-role visibility and
-the independent onboarding gate. Synthetic localhost APIs block all writes and
-external requests. Both themes at 1440/390/320px use `UI_EVIDENCE_DIR`; archived
-`app.js`/`setup-selector.js` via `UI_SOURCE_DIR` and `UI_BASELINE=1` capture before.
+cancellation/closing, connected reopen/reload and ordinary-role visibility.
+Synthetic localhost APIs reject settings writes; only the explicit connection
+action can create a synthetic pending request. Both themes at 1440/390/320px use
+`UI_EVIDENCE_DIR`. No real server or provider is contacted.
 
 Run `node scripts/ui/workspace-authorization.cjs` and repeat with
-`UI_BROWSER_ENGINE=webkit` for explicit connection consent, trusted existing
-login return, company creation/selection consent, renewal, cancellation,
-revocation, uncertain-response recovery, keyboard and both themes at
-1440/390/320 px. It uses only localhost fixtures. The real signup/login,
-company/grant SQL transactions, delivery failures and isolation run in
-`TestWorkspaceSignupCompanyAndInstallationEndToEnd` and the PostgreSQL
-`TestWorkspaceAuthorization*` suites on disposable services; no real account,
-email, payment or provider service is used.
+`UI_BROWSER_ENGINE=webkit` for the complete two-origin Sociaro journey. It loads
+the production sign-in/authorization modules with isolated synthetic endpoints:
+no start on render/radio selection, direct explicit start, popup and blocked-popup
+fallback, login/account switch, comparison code, explicit approval/denial,
+reload, expiry/slow polling, uncertain start/redemption/cancellation, exact renewal
+consent, malformed completion rejection and stale response/write isolation.
+Saved-completion cleanup must preserve the credential/company and allow a later
+Reconnect. The fixture controls only poll scheduling, records the requested
+intervals and invokes the actual scheduled handler; all UI actions remain real
+browser interactions. It captures both themes at 1440/390/320px.
+
+Actual signup/login, dedicated-company/grant SQL transactions, delivery failure,
+saved-connection cleanup after expiry and cross-company isolation run in
+`TestWorkspaceSignupCompanyAndInstallationEndToEnd`,
+`TestSavedAuthorizationCleanupBoundaries` and the PostgreSQL
+`TestWorkspaceAuthorization*` suites with disposable services. These fixtures use
+no real account, email, payment, grant or provider service.
 
 Run `node scripts/ui/remote-context.cjs` with Chromium and
 `UI_BROWSER_ENGINE=webkit` for reviewed destination rejection, retained uncertain

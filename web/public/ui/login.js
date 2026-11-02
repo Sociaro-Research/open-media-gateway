@@ -1,6 +1,6 @@
 (() => {
   'use strict';
-  const workspaceCode=location.hash.match(/^#workspace_authorize=([A-Z2-7]{13})$/)?.[1];if(workspaceCode){try{sessionStorage.setItem('gateway-workspace-authorization',JSON.stringify({code:workspaceCode,time:Date.now()}));}catch{}history.replaceState(null,'',location.pathname+location.search);}
+  const workspaceCode=location.hash.match(/^#workspace_authorize=([A-Z2-7]{13})$/)?.[1];if(workspaceCode){try{sessionStorage.setItem('gateway-workspace-authorization',JSON.stringify({code:workspaceCode,time:Date.now()}));history.replaceState(null,'',location.pathname+location.search);}catch{/* Retain the bounded link when session storage is unavailable. */}}
 
   // Keep invitation behavior when only the sign-in shell is loaded.
   if(location.pathname==='/organizations'&&location.hash.startsWith('#invite=')){

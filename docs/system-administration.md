@@ -100,26 +100,44 @@ another explicit save. It never repeats a conflicting write automatically.
 
 ### Connect an account and company
 
-In **Settings → System → Choose setup**, select **Sociaro** and activate
-**Open Sociaro workspace**. This scenario is the entry to both a new connection
-and an existing remote workspace. It has no separate global-header shortcut.
-The header's current-company selector continues to open the local company;
-it does not connect to another installation. Company-service and personal
-scenarios continue to manage local resource policy independently of the remote
-connection. Hosting is derived from the host's configured central installation role; there is no onboarding switch.
+In **Settings → System → Change Mode**, select **Sociaro**. The brief disclosure
+explains that the installation's name and address will be shared. Activate
+**Connect to Sociaro** to start; choosing a radio or opening the dialog does not
+create a request or change local resource policy. This scenario also opens an
+existing connection. The header's current-company selector remains local.
 
-For a new connection, enter the trusted public HTTPS server origin and an
-installation name, then explicitly consent to sending that name and the browser
-origin. Open the displayed trusted sign-in/signup window. That host uses its
-existing Google or verified email/password identity flow; this installation
-never asks for the remote password. Match the displayed code and reported
-installation. Its name/origin are supplied by the requesting installation and
-are not proof of domain ownership.
+The backend fixes the destination to the canonical Sociaro origin and derives
+the display label/address from trusted public configuration (`UI_PUBLIC_URL`,
+with the existing `AUTH_PUBLIC_URL` fallback). No browser-supplied name, address,
+Host or Forwarded header selects the destination or installation identity. With
+no configured public address, the display fallback is `http://localhost` and
+“Local installation”. These values are display-only, not ownership proof.
 
-On the central server, sign in or register as the customer who initiated this
-external installation. Confirm the matching code. This is the customer's own
-confirmation; the central server owner does not approve another customer's
-connection and their company is never a default destination.
+Sign in on Sociaro if necessary, using the existing Google or verified email
+flow. The local portal never collects that password. A blocked popup leaves an
+**Open Sociaro** link. Sociaro shows the signed-in account, installation details
+and **Check that this code matches the one in your installation**. Compare the
+code before explicitly choosing **Connect**; the supplied name/address is not
+verified ownership. Sign-in, inspection or closing the dialog grants nothing.
+The customer who initiated the connection approves it; a central operator does
+not approve on another customer's behalf or become its default billing account.
+The compact permission text discloses generation-only access, up to 30 days,
+and charges against the installation company's Sociaro balance, without adding
+credit or account administration.
+
+Approval shows a plain return instruction. There is no redirect to the reported
+installation address or wildcard cross-window messaging. The local UI shows
+**Connected** only after redemption, binding verification and local credential
+save. Reload resumes the retained request. An uncertain start, redemption or
+cancellation is reconciled against the saved request/connection before another
+intent is allowed; retries never silently replace the proof. Existing connected
+metadata and version must match before a lost reply can be treated as success.
+If a verified dedicated save committed before pending-request cleanup failed,
+the backend locks and checks the exact owned attempt and one-step saved revision
+before finishing cleanup. It preserves the credential and company; cleanup
+neither reissues nor revokes access, even after the request deadline. Other
+revisions, destinations, legacy or disconnected records cannot use this path.
+The connected summary offers the existing generation workspace separately.
 
 The first confirmation for an installation atomically creates a **new dedicated
 company**, makes that customer its **Supermanager**, and records an immutable
@@ -206,7 +224,7 @@ payments. The connection wizard performs no top-up transaction and introduces no
 new identity or billing system. Registration/email delivery, provider rights and
 host configuration remain prerequisites.
 
-**Renew connection** confirms a replacement generation-only key for the same
+**Reconnect** confirms a replacement generation-only key for the same
 installation company, preserving the current connection until verification
 succeeds. The customer may explicitly revoke this installation's own prior key
 as the replacement is issued. Keys from another installation cannot be rotated
@@ -220,7 +238,7 @@ onboarding is disabled. It is not a central administrator's list of all customer
 companies. Company administration remains in the existing company controls.
 Revoking a role/membership or key is enforced on subsequent requests.
 
-**Cancel connection request** serializes with issuance and revokes any key that
+**Cancel** serializes with issuance and revokes any key that
 request issued. Cancellation keeps remote company data and funds. Cancellation remains able to revoke a key after the ten-minute request deadline;
 expired consent/redemption remain forbidden. If cancellation is uncertain, retry
 it: only positive host confirmation permits local proof deletion. Ambiguous 410,
