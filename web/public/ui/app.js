@@ -1682,7 +1682,12 @@ async function initialize() {
   if (retryFocused) document.querySelector(user?'#userMenuToggle':'#generationNav').focus();
   if (user) {
     // A workspace read failure is not an authentication failure.
-    try { await window.Workspace.initialize(user); showConsoleSection(currentConsoleSection); }
+    try {
+      await window.Workspace.initialize(user);
+      // Authentication already opened Profile. Keep its editable draft and focus
+      // when the independent workspace read finishes.
+      if(currentConsoleSection!=='profile')showConsoleSection(currentConsoleSection);
+    }
     catch { FormUI.message(elements.sessionMessage,'Could not load workspaces. Open your workspace to try again.','error'); elements.sessionMessage.hidden=false; }
   }
   if (clientManager) window.GenerationKey.forget(); else window.GenerationKey.initialize(user || null);

@@ -1,15 +1,18 @@
 // Invoked by TestProfileContactsBrowserWorkflow. Real API responses; localhost only.
-const {chromium}=require('playwright');
+const {chromium,webkit}=require('playwright');
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 (async()=>{
  const [base,editorToken,viewerToken,company]=process.argv.slice(2);
  assert.equal(new URL(base).hostname,'127.0.0.1');
- const browser=await chromium.launch({headless:true,...(process.env.UI_BROWSER_PATH?{executablePath:process.env.UI_BROWSER_PATH}:{})});
- const errors=[],writes=[];let committed=0,holdNextWrite=false,releaseWrite,writeHeld;
+ const engine=process.env.UI_BROWSER_ENGINE||'chromium';
+ const browser=await ({chromium,webkit}[engine]).launch({headless:true,...(engine==='chromium'&&process.env.UI_BROWSER_PATH?{executablePath:process.env.UI_BROWSER_PATH}:{})});
+ const errors=[],writes=[];let committed=0,holdNextWrite=false,releaseWrite,writeHeld,holdOrganization=true,releaseOrganization,organizationArrived,organizationTimer;
+ const organizationHeld=new Promise(done=>organizationArrived=done);
  try{
   const context=await browser.newContext({viewport:{width:1440,height:1000}});
   await context.route('**/*',async route=>{
    const request=route.request();if(new URL(request.url()).origin!==base)return route.abort();
+   if(holdOrganization&&new URL(request.url()).pathname==='/v1/organizations'&&request.method()==='GET'){holdOrganization=false;await new Promise(done=>{releaseOrganization=done;organizationArrived();});}
    // Delay dispatch of one actual PATCH to inspect pending controls; never mock its response.
    if(holdNextWrite&&new URL(request.url()).pathname==='/v1/me'&&request.method()==='PATCH'){
     holdNextWrite=false;await new Promise(resolve=>{releaseWrite=resolve;writeHeld();});
@@ -24,7 +27,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
   const label=()=>page.getByLabel('Contact label',{exact:true}),link=()=>page.getByLabel('Contact link',{exact:true});
   const artifact=process.env.UI_SCREENSHOT_DIR;
   async function capture(name){if(artifact){fs.mkdirSync(artifact,{recursive:true});await page.screenshot({path:path.join(artifact,name+'.png'),fullPage:true});}}
-  async function reload(){await page.reload();await form.waitFor();}
+  async function reload(){await page.reload();await page.waitForFunction(()=>window.Workspace?.ready());await form.waitFor();}
   async function persist(expected,hold=false,reloadAfter=true){
    const response=page.waitForResponse(r=>new URL(r.url()).pathname==='/v1/me'&&r.request().method()==='PATCH');
    let held;if(hold){holdNextWrite=true;held=new Promise(resolve=>writeHeld=resolve);}
@@ -37,6 +40,13 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
    await reload();assert.equal(await form.locator('tbody tr').count(),expected.length);
    for(let i=0;i<expected.length;i++){assert.equal(await label().nth(i).inputValue(),expected[i].label);assert.equal(await link().nth(i).inputValue(),expected[i].url);}
   }
+  // Workspace initialization must not replace an already editable Profile.
+  await page.goto(base+'/profile');await Promise.race([organizationHeld,new Promise((_,reject)=>organizationTimer=setTimeout(()=>reject(new Error('Organization bootstrap read did not arrive')),6000))]);clearTimeout(organizationTimer);await form.waitFor();
+  assert.equal(await page.evaluate(()=>Workspace.ready()),false);await add().click();await label().fill('Bootstrap draft');await link().fill('bootstrap@@example.test');await save().waitFor({state:'visible'});await save().click();await page.getByRole('alert').filter({hasText:'mailto:'}).waitFor();assert.equal(await link().getAttribute('aria-invalid'),'true');assert.equal(writes.length,0);
+  const firstForm=await form.elementHandle();assert.equal(await link().evaluate(el=>el===document.activeElement),true);await capture('bootstrap-before');
+  releaseOrganization();await page.waitForFunction(()=>Workspace.ready());await page.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))));await form.waitFor();await capture('bootstrap-after');
+  assert.equal(await firstForm.evaluate(el=>el.isConnected),true,'workspace bootstrap must retain the editable Profile form');assert.equal(await form.locator('tbody tr').count(),1);assert.equal(await label().inputValue(),'Bootstrap draft');assert.equal(await link().inputValue(),'bootstrap@@example.test');assert.equal(await link().getAttribute('aria-invalid'),'true');assert.equal(await link().evaluate(el=>el===document.activeElement),true);assert.equal(writes.length,0);
+  await form.getByRole('button',{name:'Remove contact',exact:true}).click();assert.equal(await form.locator('tbody tr').count(),0);assert.equal(await save().isVisible(),false);
   await page.goto(base+'/');await page.waitForFunction(()=>window.Workspace?.ready());await page.locator('#userMenuToggle').press('ArrowDown');await page.getByRole('menuitem',{name:'Profile',exact:true}).press('Enter');await form.waitFor();
   assert.equal(await save().isVisible(),false);
   await add().click();await label().fill('Email');await link().fill('editor@example.test');
@@ -85,5 +95,5 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
   assert.deepEqual(members.find(m=>m.name==='Contact editor').contacts,[{label:'Saved contact',url:'mailto:editor@example.test'}]);
   assert.deepEqual(errors,[]);
   console.log('PASS: real UI → PATCH → PostgreSQL → reload → authorized member UI; invalid/mixed rows, correction, revert, unsaved reload, keyboard, themes and 1440/390/320px');
- }finally{await browser.close();}
+ }finally{clearTimeout(organizationTimer);releaseOrganization?.();await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

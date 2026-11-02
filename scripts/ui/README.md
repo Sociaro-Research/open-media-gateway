@@ -485,8 +485,11 @@ The persisted contact workflow runs via `TestProfileContactsBrowserWorkflow` in
 the real UI and auth/profile/company API against PostgreSQL, without mocked API
 responses. It checks ordinary email → Save → PATCH → reload → a second authorized
 company viewer, plus invalid/mixed rows, field errors, reversion, pending-write
-locking and desktop/mobile layouts. The Go CI job installs the browser and enables
-this workflow explicitly. `UI_BROWSER_PATH` can select local Chromium and
+locking and desktop/mobile layouts. A held workspace-initialization read verifies
+that an already editable Profile retains the same form, unsaved contact rows and
+keyboard focus after bootstrap completes. The Go CI job installs Chromium and
+enables this workflow explicitly; `UI_BROWSER_ENGINE=webkit` also exercises the
+fixture with WebKit. `UI_BROWSER_PATH` can select local Chromium and
 `UI_SCREENSHOT_DIR` retains screenshots outside the public source tree.
 
 Generate disposable clips with `python3 scripts/ui/template-video-fixtures.py
