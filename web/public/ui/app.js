@@ -1115,6 +1115,7 @@ function updatePrice() {
  clearTimeout(quoteTimer);
  const sequence=++quoteSequence;
  const request=estimateRequest(); if(!request) return;
+ if(durationChoice&&!durationChoice.valid()){elements.priceValue.textContent='Choose a valid duration';elements.priceCard.classList.add('unknown');FormUI.message(elements.priceDetails,'Use the duration values shown in the field label.');return;}
  if(voiceLanguageControl&&!voiceLanguageControl.valid()){elements.priceValue.textContent='Choose voice and language';elements.priceCard.classList.add('unknown');FormUI.message(elements.priceDetails,'Choose an available voice and language to get a verified estimate.');return;}
  if(playgroundResources&&!playgroundResources.valid()){elements.priceValue.textContent='Complete resource inputs';elements.priceCard.classList.add('unknown');FormUI.message(elements.priceDetails,'Complete the resource fields to get a verified estimate.');return;}
  if(modelParameterEditor&&!modelParameterEditor.valid()){elements.priceValue.textContent='Complete model parameters';elements.priceCard.classList.add('unknown');FormUI.message(elements.priceDetails,'Complete the parameter fields to get a verified estimate.');return;}
@@ -1199,7 +1200,7 @@ function requestOptions(model) {
   if (['video', 'image'].includes(model.media_type) && model.resolutions?.length) options.resolution = elements.resolution.value;
   if (['video', 'image'].includes(model.media_type) && model.ratios?.length&&elements.ratio.value) options.ratio = elements.ratio.value;
   if (model.max_duration > 0 && !model.duration_from_input) {
-    const value=durationChoice?.read()??(model.duration_may_be_inferred?undefined:Number(elements.duration.value));if(value!==undefined)options.duration=value;
+    const value=durationChoice?durationChoice.read():Number(elements.duration.value);if(value!==undefined)options.duration=value;
   }
   if (model.supports_audio) options.generate_audio = model.audio_always_on || elements.generateAudio.checked;
   if (model.supports_camera_fixed) options.camera_fixed = elements.cameraFixed.checked;

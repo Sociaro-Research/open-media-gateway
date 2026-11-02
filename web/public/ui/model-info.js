@@ -22,7 +22,7 @@
   if(min!==null&&max!==null&&min>max)return 'Duration (s)';
   const range=min!==null&&max!==null?(min===max?min+' s':min+'–'+max+' s'):max!==null?'up to '+max+' s':min!==null?'from '+min+' s':'s';
   const step=Number.isFinite(model.duration_step)&&model.duration_step>1&&min!==max?'; step '+model.duration_step+' s':'';
-  return 'Duration ('+range+step+')';
+  return 'Duration ('+range+step+(model.duration_may_be_inferred?'; 0 = Auto':'')+')';
  }
  function close(restore=false){clearTimeout(timer);if(!active)return;const {panel,button}=active;active=null;panel.remove();button.setAttribute('aria-expanded','false');button.removeAttribute('aria-describedby');if(restore&&button.isConnected)button.focus();}
  function position(){if(!active)return;const {panel,button}=active,r=button.getBoundingClientRect();panel.style.maxHeight=Math.max(120,Math.min(560,innerHeight-24))+'px';const b=panel.getBoundingClientRect();const right=r.right+10;panel.style.left=Math.max(12,Math.min(right+b.width<innerWidth-12?right:r.left-b.width-10,innerWidth-b.width-12))+'px';panel.style.top=Math.max(12,Math.min(r.top,innerHeight-b.height-12))+'px';}

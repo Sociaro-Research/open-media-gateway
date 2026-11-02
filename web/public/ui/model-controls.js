@@ -19,7 +19,8 @@
    const targetHasVideo=model.supports_video_input&&(!mode||mode.max_videos!==0)&&values.video_urls?.some(Boolean);
    const min=model.min_duration||0,max=Math.min(model.max_duration,targetHasVideo&&mode?.max_duration_with_video>0?mode.max_duration_with_video:model.max_duration),step=model.duration_step||1;
    const valid=v=>Number.isInteger(v)&&v>=min&&v<=max&&(v-min)%step===0;
-   if(valid(values.duration))result.duration=values.duration;
+   if(model.duration_may_be_inferred&&values.duration===0){}
+   else if(valid(values.duration))result.duration=values.duration;
    else if(!model.duration_may_be_inferred||values.duration!=null){
     const fallback=model.default_duration;
     if(valid(fallback))result.duration=fallback;
@@ -80,14 +81,21 @@
   }
   FormUI.refresh();return {count:()=>count?Number(count.value):undefined,setChoices(key,items){controls.find(c=>c.key===key)?.setChoices?.(items);},sync(){controls.forEach(c=>c.sync?.());},read(){return Object.fromEntries(controls.map(c=>[c.key,c.read()]).filter(([,v])=>v!==undefined));},valid(){return (!count||count.validity.valid)&&controls.every(c=>c.valid());}};
  }
+ const durationCleanups=new WeakMap();
  function inferredDuration(field,input,model,value,onChange){
-  const previous=field.parentElement.closest('.inferred-duration-group');if(previous){previous.before(field);previous.remove();}let select=null;
-  if(model.duration_may_be_inferred&&!model.duration_from_input){const label=node('label','Duration'),host=node('div');host.dataset.durationMode='';select=document.createElement('select');select.setAttribute('aria-label','Duration');select.append(new Option('Auto (infer)','auto'),new Option('Set seconds','custom'));label.append(select);host.append(label);const group=node('div','','inferred-duration-group');field.before(group);group.append(host,field);select.onchange=()=>{sync();onChange();};}
-  function sync(){if(select){field.hidden=select.value==='auto';input.disabled=field.hidden;}FormUI.refresh();}
-  function restore(value){if(select)select.value=value===undefined||value===null||value===0?'auto':'custom';if(value>0)input.value=value;sync();}
-  restore(value);return {restore,sync,read:()=>select?.value==='auto'?undefined:Number(input.value)};
+  durationCleanups.get(input)?.();
+  const auto=!!model.duration_may_be_inferred&&!model.duration_from_input,available=model.max_duration>0&&!model.duration_from_input;
+  const min=model.min_duration||0,max=model.max_duration,step=model.duration_step||1;
+  // Auto is a separate valid value, not the origin of the positive duration step.
+  input.min=auto?0:min;input.max=max;input.step=auto?'any':step;
+  function valid(){const v=input.value===''?NaN:Number(input.value);return Number.isInteger(v)&&((auto&&v===0)||(v>0&&v>=min&&v<=max&&(v-min)%step===0));}
+  function sync(){if(available)input.setCustomValidity(valid()?'':auto?'Use 0 for Auto or a supported duration in seconds.':'Use a supported duration in seconds.');}
+  function restore(value){if(available){input.value=auto&&(value==null||value===0)?0:value??model.default_duration;sync();}FormUI.refresh();}
+  const changed=()=>{sync();onChange();};input.addEventListener('input',changed);input.addEventListener('change',changed);
+  durationCleanups.set(input,()=>{input.removeEventListener('input',changed);input.removeEventListener('change',changed);});
+  restore(value);return {restore,sync,valid:()=>!available||valid(),read:()=>!available||input.value===''||(auto&&Number(input.value)===0)?undefined:Number(input.value)};
  }
- function ratios(input,model,choices,value){input.dataset.inference=String(!!model.ratio_may_be_inferred);input.replaceChildren(...(model.ratio_may_be_inferred?[new Option('Auto (infer)','')]:[]),...choices.map(v=>new Option(v,v)));if(value!==undefined&&value!==''&&!choices.includes(value))input.append(new Option('Unsupported saved value: '+value,value));input.required=!model.ratio_may_be_inferred;input.value=value!==undefined&&[...input.options].some(o=>o.value===value)?value:model.ratio_may_be_inferred?'':choices[0]||'';window.ControlPickers?.sync(input);}
+ function ratios(input,model,choices,value){input.dataset.inference=String(!!model.ratio_may_be_inferred);input.replaceChildren(...(model.ratio_may_be_inferred?[new Option('Provider default','')]:[]),...choices.map(v=>new Option(v==='adaptive'?'Adaptive':v,v)));if(value!==undefined&&value!==''&&!choices.includes(value))input.append(new Option('Unsupported saved value: '+value,value));input.required=!model.ratio_may_be_inferred;input.value=value!==undefined&&[...input.options].some(o=>o.value===value)?value:model.ratio_may_be_inferred?'':choices[0]||'';window.ControlPickers?.sync(input);}
  function resourceParameters(editor,bindings){if(!editor)return;const faces=bindings.filter(item=>item.kind==='face_session'&&item.usable===true&&Date.parse(item.session?.expires_at)>Date.now()).flatMap(item=>item.session?.faces||[]);editor.setChoices('face_index',faces.filter(face=>Number.isSafeInteger(face.index)&&face.index>0).map(face=>({value:face.index,label:'Face '+face.index+' · '+face.start_ms+'–'+face.end_ms+' ms'})));}
  const legacyLanguageValues=new WeakMap();
  function voiceChoices(model){return Array.isArray(model?.voice_choices)?model.voice_choices.filter(c=>typeof c.id==='string'&&c.id&&Array.isArray(c.languages)&&c.languages.length&&c.languages.every(l=>typeof l==='string'&&l)&&c.languages.includes(c.default_language)):[];}

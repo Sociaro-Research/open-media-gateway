@@ -225,3 +225,24 @@ occurs. HTTP responses retain their authenticated private no-store policy.
 Uploaded artwork remains subject to its owner's branding permissions; the project
 license does not establish rights to third-party marks. Keep provenance and notices
 with any independently distributed artwork or upstream-derived catalogue fixtures.
+
+### Automatic video duration
+
+The provider-neutral `duration_may_be_inferred` descriptor permits omitted/zero
+Gateway duration; it is not a universal native wire value. The shared UI displays
+this as one Duration field with `0 = Auto`. Positive seconds still obey the
+selected model's minimum, maximum and step. An unknown output duration cannot
+produce a verified quantity-based quote or enable paid admission.
+
+Kling 4 Omni preserves omitted `settings.duration` for native prompt/base-video
+inference, as documented in [the direct Omni endpoint](https://kling.ai/document-api/api/video/4-0/video-omni.md).
+BytePlus Seedance 1.5 Pro and reviewed 2.x models translate Gateway omission to
+native `duration: -1` intelligent selection. Their positive bounds are 4–12 and
+4–15 seconds respectively; Seedance 2.5 permits 4–30. Seedance 1.0 remains
+2–12 seconds without Auto. These are the [direct video task API](https://docs.byteplus.com/en/docs/modelark/create-video-generation-task-api?redirect=1)
+contracts, not defaults inferred from a general user guide. Gateway reference
+workflows remain new generation; this does not add native edit/extension modes.
+
+Aspect-ratio omission and native `adaptive` are distinct. Preserve each model and
+workflow's constraints, including adaptive-only frame workflows. Do not assume
+that a provider's prompt-selected ratio and input-following ratio are equivalent.

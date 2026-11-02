@@ -26,6 +26,9 @@ func quotePublic(endpoint string, model core.MediaModel, request core.MediaReque
 		return core.TaskCost{}, core.ErrPricingUnavailable
 	}
 	price.Source, price.Region = bytePriceSource, "Singapore"
+	if model.MediaType == "video" && o.Duration <= 0 {
+		return core.TaskCost{}, core.ErrPricingUnavailable
+	}
 	if model.MediaType == "image" {
 		price.Unit = "image"
 		switch id {

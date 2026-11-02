@@ -28,5 +28,28 @@ func (a *Adapter) ValidateRequest(ctx context.Context, r core.MediaRequest) erro
 	if core.IsManualCall(ctx) {
 		return nil
 	}
+	if knownModel(r.Model) && describeModel(r.Model).MediaType == "video" {
+		if _, err := normalizeVideoDuration(describeModel(r.Model), r.Options.Duration); err != nil {
+			return err
+		}
+	}
 	return core.ValidateReferenceMode(describeModel(r.Model), r.Options)
+}
+
+// normalizeVideoDuration uses Gateway omission/zero for inference, never a native sentinel.
+func normalizeVideoDuration(model core.MediaModel, duration int) (int, error) {
+	if duration == 0 {
+		if model.DurationMayBeInferred {
+			return 0, nil
+		}
+		return model.DefaultDuration, nil
+	}
+	step := model.DurationStep
+	if step <= 0 {
+		step = 1
+	}
+	if duration < model.MinDuration || duration > model.MaxDuration || (duration-model.MinDuration)%step != 0 {
+		return 0, core.ErrOptionsInvalid
+	}
+	return duration, nil
 }

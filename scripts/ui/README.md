@@ -915,3 +915,16 @@ actual public/private asset policy and light/dark 1440/390/320px screenshots.
 `UI_BASELINE_DIR` optionally binds preserved pre-change app/site scripts for the
 two-document before measurement. Keep evidence outside tracked source and inspect
 the rendered screenshots; source assertions alone do not establish visual acceptance.
+
+### Flat Playground parameters and automatic duration
+
+Run `node scripts/ui/playground-parameters.cjs` with `UI_BROWSER_ENGINE=chromium`
+and `webkit` for actual-console ordering, a single numeric Duration field,
+zero/positive range and step-union validation, invalid-estimate suppression,
+model-switch preservation and distinct provider-default/adaptive ratio values.
+The loopback fixture captures both themes at 1440, 390 and 320 pixels and makes
+no provider or generation calls. Run `model-settings-preservation.cjs`,
+`provider-capabilities.cjs`, `duration-labels.cjs` and `disclosures.cjs` for shared
+Template, capability, saved-state and Override Sound coverage. Provider HTTP
+fixtures independently verify native duration sentinels; UI omission alone does
+not prove a provider request is valid or a paid job can be quoted.

@@ -111,6 +111,9 @@ func (a *Adapter) Generate(ctx context.Context, request core.MediaRequest) (core
 	if strings.Contains(strings.ToLower(request.Model), "seedream") {
 		return a.createImage(ctx, request)
 	}
+	if knownModel(request.Model) && !core.IsManualCall(ctx) {
+		request.Options.Duration, _ = normalizeVideoDuration(describeModel(request.Model), request.Options.Duration)
+	}
 	text := request.Prompt
 	legacyCommands := strings.HasPrefix(request.Model, "seedance-1-0-")
 	if legacyCommands {
@@ -167,6 +170,9 @@ func (a *Adapter) Generate(ctx context.Context, request core.MediaRequest) (core
 		payload.Resolution = request.Options.Resolution
 		payload.Ratio = request.Options.Ratio
 		payload.Duration = request.Options.Duration
+		if describeModel(request.Model).DurationMayBeInferred && request.Options.Duration == 0 {
+			payload.Duration = -1 // Native intelligent selection; Gateway requests remain provider-neutral.
+		}
 		payload.Watermark = request.Options.Watermark
 	}
 
@@ -368,6 +374,8 @@ func describeModel(id string) (result core.MediaModel) {
 		model.Pricing.ReferencePriceUSD = 0.1215
 	case "seedance-1-5-pro-251215":
 		model.DisplayName = "Seedance 1.5 Pro"
+		model.MinDuration = 4
+		model.DurationMayBeInferred = true
 		model.SupportsAudio = true
 		model.SupportsDraft = true
 		model.DraftResolutions = []string{"480p"}
@@ -400,6 +408,7 @@ func describeModel(id string) (result core.MediaModel) {
 }
 
 func configure2x(model *core.MediaModel, rate, reference float64, supports4K bool) {
+	model.DurationMayBeInferred = true
 	model.SupportsAssetReferences = true
 	model.MinDuration = 4
 	model.MaxDuration = 15
