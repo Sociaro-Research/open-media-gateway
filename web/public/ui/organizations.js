@@ -136,7 +136,7 @@
   if(managerValue!==savedManager){await api(base+'/client-manager',{method:'PUT',body:JSON.stringify({user:managerValue})});savedManager=managerValue;o.client_manager_email=managerValue.includes('@')?managerValue:'';o.client_manager_id=managerValue.includes('@')?'':managerValue}
   await window.Workspace?.refresh();
  });
- f.classList.add('organization-settings-grid');credit=field(f,'Credit Limit (USD)','number',o.credit_limit_usd,true);manager=field(f,'Client manager','text',savedManager);manager.title='Email or user ID';f.finish();
+ f.classList.add('organization-settings-grid');credit=field(f,'Credit Limit (USD)','number',o.credit_limit_usd,true);manager=field(f,'Client manager','text',savedManager);manager.title='Email or user ID';const managerHint=el('p','Enter an email or user ID. The user must already have a sales role assigned in Administration → Users.','field-explanation');managerHint.id='organization-manager-hint';manager.setAttribute('aria-describedby',managerHint.id);f.append(managerHint);f.finish();
  const current=()=>token===epoch&&activePage==='Settings';
  await window.ModelAccess.organization(body,api,{organization:o.id,current});if(!current())return;
  await window.MarkupSettings.mount(body,api,{organization:o.id,current});if(!current())return;

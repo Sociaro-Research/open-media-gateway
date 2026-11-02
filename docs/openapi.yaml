@@ -2509,6 +2509,9 @@ paths:
         current and proposed employees belong to their own branch (including themselves).
         Leaders cannot clear assignments or claim unassigned companies. The target must
         already hold a sales role. One employee can serve multiple organizations.
+        Only installation Administrators receive a distinct wrong-role diagnostic;
+        branch-limited sales leaders retain the same not-found response for absent
+        or ineligible users. No role is assigned by this endpoint.
       parameters:
       - {name: org, in: path, required: true, schema: {type: string, format: uuid}}
       requestBody:
@@ -2523,6 +2526,7 @@ paths:
                 user: {type: string, description: "Existing client manager email or user ID; empty string clears the assignment."}
       responses:
         "204": {description: Assignment updated}
+        "400": {description: "invalid_client_manager_role — The selected user does not have the Client manager role. (Administrator-only diagnostic)"}
         "403": {description: Administrator access or an eligible sales leader's own branch required}
         "404": {description: Organization or eligible client manager not found}
   "/v1/organizations/{org}/members":

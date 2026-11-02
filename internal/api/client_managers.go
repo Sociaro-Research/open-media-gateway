@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -110,7 +111,14 @@ func (s *Server) assignClientManager(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err = repo.AssignClientManager(r.Context(), identity.ActorID(r.Context()), r.PathValue("org"), *input.User); err != nil {
-		orgError(w, err)
+		switch {
+		case errors.Is(err, system.ErrClientManagerRole) && admin:
+			writeError(w, 400, "invalid_client_manager_role", err.Error())
+		case errors.Is(err, system.ErrNotFound), errors.Is(err, system.ErrClientManagerRole):
+			writeError(w, 404, "not_found", "User not found.")
+		default:
+			orgError(w, err)
+		}
 		return
 	}
 	w.WriteHeader(204)

@@ -14,6 +14,7 @@ var ErrRoleConflict = errors.New("remove administrator and manager roles before 
 
 var ErrLastAdmin = errors.New("the last administrator cannot be removed")
 var ErrNotFound = errors.New("user not found")
+var ErrClientManagerRole = errors.New("The selected user does not have the Client manager role.")
 var ErrSetupBusy = errors.New("finish active generations before disabling their provider access")
 
 var ErrConflict = errors.New("settings changed; reload before saving")

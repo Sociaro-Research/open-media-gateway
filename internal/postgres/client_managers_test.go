@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -188,5 +189,70 @@ func TestClientManagerAssignmentsAndRevocation(t *testing.T) {
 	}
 	if items, err = repo.Organizations(ctx, other, false); err != nil || len(items) != 0 {
 		t.Fatalf("cleared assignment %v %v", items, err)
+	}
+}
+
+func TestClientManagerAssignmentDiagnosticBoundary(t *testing.T) {
+	ctx := context.Background()
+	db := auditDatabase(t, true)
+	repo := NewSystemRepository(db)
+	auth := NewAuthRepository(db)
+	users := []identity.User{}
+	for _, name := range []string{"Administrator", "Eligible", "Ordinary", "Owner", "Lead"} {
+		u, err := auth.UpsertGoogleUser(ctx, uuid.NewString(), uuid.NewString()+"@example.test", name, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		users = append(users, u)
+	}
+	admin, eligible, ordinary, owner, lead := users[0], users[1], users[2], users[3], users[4]
+	if _, err := db.Exec(`UPDATE users SET is_system_admin=TRUE WHERE id=$1`, admin.ID); err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range []struct{ id, role string }{{eligible.ID, "client_manager"}, {lead.ID, "lead_client_manager"}} {
+		if err := repo.SetUserRole(ctx, admin.ID, entry.id, entry.role); err != nil {
+			t.Fatal(err)
+		}
+	}
+	company, err := repo.CreateOrganization(ctx, admin.ID, "Diagnostic fixture", owner.ID, uuid.NewString()+".fixture.test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	unchanged := func() {
+		t.Helper()
+		var current string
+		if err := db.QueryRow(`SELECT client_manager_id::text FROM organizations WHERE id=$1`, company.ID).Scan(&current); err != nil || current != eligible.ID {
+			t.Fatalf("assignment changed: %q %v", current, err)
+		}
+	}
+	for _, target := range []string{"  " + strings.ToUpper(eligible.Email) + "  ", eligible.ID} {
+		if err := repo.AssignClientManager(ctx, admin.ID, company.ID, target); err != nil {
+			t.Fatalf("eligible email/ID: %v", err)
+		}
+		unchanged()
+	}
+	for _, target := range []string{admin.Email, admin.ID, ordinary.Email, ordinary.ID} {
+		if err := repo.AssignClientManager(ctx, admin.ID, company.ID, target); !errors.Is(err, system.ErrClientManagerRole) {
+			t.Fatalf("existing wrong role: %v", err)
+		}
+		unchanged()
+	}
+	for _, target := range []string{"missing@example.test", uuid.NewString(), "malformed-id"} {
+		if err := repo.AssignClientManager(ctx, admin.ID, company.ID, target); !errors.Is(err, system.ErrNotFound) {
+			t.Fatalf("missing user: %v", err)
+		}
+		unchanged()
+	}
+	for _, target := range []string{ordinary.Email, "missing@example.test"} {
+		if err := repo.AssignClientManager(ctx, lead.ID, company.ID, target); !errors.Is(err, system.ErrNotFound) {
+			t.Fatalf("leader must not enumerate roles: %v", err)
+		}
+		unchanged()
+	}
+	for _, target := range []string{ordinary.Email, "missing@example.test", eligible.ID} {
+		if err := repo.AssignClientManager(ctx, ordinary.ID, company.ID, target); !errors.Is(err, system.ErrForbidden) {
+			t.Fatalf("unauthorized lookup: %v", err)
+		}
+		unchanged()
 	}
 }

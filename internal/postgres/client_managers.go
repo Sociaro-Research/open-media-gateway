@@ -114,12 +114,18 @@ func (r *SystemRepository) AssignClientManager(ctx context.Context, actor, id, t
 	var manager any
 	if target = strings.TrimSpace(target); target != "" {
 		var uid string
-		err = tx.QueryRowContext(ctx, `SELECT id FROM users WHERE (id::text=$1 OR lower(email)=lower($1)) AND is_client_manager`, target).Scan(&uid)
+		var eligible bool
+		// Only installation Administrators may distinguish an existing wrong-role
+		// account. Branch-limited sales leaders retain the non-enumerating lookup.
+		err = tx.QueryRowContext(ctx, `SELECT id, is_client_manager FROM users WHERE (id::text=$1 OR lower(email)=lower($1)) AND ($2::boolean OR is_client_manager)`, target, administrator).Scan(&uid, &eligible)
 		if errors.Is(err, sql.ErrNoRows) {
 			return system.ErrNotFound
 		}
 		if err != nil {
 			return err
+		}
+		if !eligible {
+			return system.ErrClientManagerRole
 		}
 		manager = uid
 	}

@@ -11,13 +11,14 @@ const server=http.createServer((req,res)=>{const name=path.basename(new URL(req.
  page.setDefaultTimeout(10000);
  const id='11111111-1111-4111-8111-111111111111',writes=[],errors=[];
  let nativeTab='Tab';
- let admin=true,role='admin',fail=false,failLogging=false,holdLogging=false;const pendingLogging=[];let grants=[],grantVersion=1;const grantModel={id:'22222222-2222-4222-8222-222222222222',provider:'mock',model:'image',public_id:'mock/image',name:'Fixture image',enabled_by_default:false,capabilities:{media_type:'image'}};
+ let admin=true,role='admin',fail=false,failLogging=false,holdLogging=false,managerFailure=null;const pendingLogging=[];let grants=[],grantVersion=1;const grantModel={id:'22222222-2222-4222-8222-222222222222',provider:'mock',model:'image',public_id:'mock/image',name:'Fixture image',enabled_by_default:false,capabilities:{media_type:'image'}};
  const company={id,name:'Example company',balance_usd:50,credit_limit_usd:100,default_weekly_limit_usd:20,storage_bytes:0,minimize_request_logging:false,billing_profile:{business_name:'Example Ltd',email:'billing@example.test'}};
  page.on('pageerror',e=>errors.push(e.message));
  await page.route('**/v1/**',async route=>{
   const request=route.request(),url=new URL(request.url()),p=url.pathname,method=request.method(),json=data=>route.fulfill({json:data});
   if(method==='PUT'){
    const data=request.postDataJSON();writes.push({p,data});
+   if(managerFailure&&p.endsWith('/client-manager'))return route.fulfill({status:managerFailure.status,json:{error:{code:managerFailure.code,message:managerFailure.message}}});
    if(failLogging&&p.endsWith('/request-logging'))return route.fulfill({status:500,json:{error:{message:'Logging save failed'}}});
    if(holdLogging&&p.endsWith('/request-logging'))await new Promise(resolve=>pendingLogging.push(resolve));
    if(fail)return route.fulfill({status:500,json:{error:{message:'Save failed'}}});
@@ -84,7 +85,8 @@ const server=http.createServer((req,res)=>{const name=path.basename(new URL(req.
   await form.getByLabel('Client manager',{exact:true}).fill('manager@example.test');
   await form.getByRole('button',{name:'Save',exact:true}).click();await form.getByRole('button',{name:'Saved',exact:true}).waitFor();
   assert.deepEqual(writes.slice(before),[{p:'/v1/organizations/'+id+'/client-manager',data:{user:'manager@example.test'}}]);
-
+  assert.equal(await form.getByLabel('Client manager',{exact:true}).getAttribute('aria-describedby'),'organization-manager-hint');await form.getByText('Enter an email or user ID. The user must already have a sales role assigned in Administration → Users.',{exact:true}).waitFor();
+  for(const item of [{user:'admin@example.test',status:400,code:'invalid_client_manager_role',message:'The selected user does not have the Client manager role.'},{user:'unknown@example.test',status:404,code:'not_found',message:'User not found.'}]){managerFailure=item;await form.getByLabel('Client manager',{exact:true}).fill(item.user);await form.getByRole('button',{name:'Save',exact:true}).click();await form.getByText(item.message,{exact:true}).waitFor();assert.equal(await form.getByLabel('Client manager',{exact:true}).inputValue(),item.user);assert.equal(company.client_manager_email,'manager@example.test');if(item.status===400)await capture('manager-error');}managerFailure=null;
 
   fail=true;await form.getByLabel('Credit Limit (USD)',{exact:true}).fill('600');
   await form.getByRole('button',{name:'Save',exact:true}).click();await form.getByText('Save failed',{exact:true}).waitFor();
