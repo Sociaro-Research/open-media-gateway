@@ -85,11 +85,15 @@ func fixtureAuth(t *testing.T, db *sql.DB, origin string, admin bool) (*auth.Man
 }
 
 type fixtureWire struct {
-	base        http.RoundTripper
-	target      *url.URL
-	lose        atomic.Bool
-	loseCleanup atomic.Bool
-	calls       atomic.Int32
+	base           http.RoundTripper
+	target         *url.URL
+	lose           atomic.Bool
+	loseCleanup    atomic.Bool
+	loseRefresh    atomic.Bool
+	loseLogout     atomic.Bool
+	pauseRefresh   chan struct{}
+	releaseRefresh chan struct{}
+	calls          atomic.Int32
 }
 
 func (f *fixtureWire) RoundTrip(r *http.Request) (*http.Response, error) {
@@ -113,6 +117,23 @@ func (f *fixtureWire) RoundTrip(r *http.Request) (*http.Response, error) {
 	if e == nil && r.URL.Path == ci.ProtocolBase+"/revoke-issued-family" && response.StatusCode == 200 && f.loseCleanup.Swap(false) {
 		response.Body.Close()
 		return nil, errors.New("committed cleanup response lost")
+	}
+	if e == nil && response.StatusCode == 200 && r.URL.Path == ci.ProtocolBase+"/refresh" {
+		if f.pauseRefresh != nil {
+			select {
+			case f.pauseRefresh <- struct{}{}:
+				<-f.releaseRefresh
+			default:
+			}
+		}
+		if f.loseRefresh.Swap(false) {
+			response.Body.Close()
+			return nil, errors.New("committed refresh response lost")
+		}
+	}
+	if e == nil && response.StatusCode == 200 && r.URL.Path == ci.ProtocolBase+"/revoke-family" && f.loseLogout.Swap(false) {
+		response.Body.Close()
+		return nil, errors.New("committed logout response lost")
 	}
 	return response, e
 }

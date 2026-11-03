@@ -1,6 +1,11 @@
 package companyinterface
 
 import (
+	"bytes"
+	"encoding/json"
+	"github.com/Sociaro-Research/open-media-gateway/internal/apikey"
+	"io"
+	"mime"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -24,30 +29,57 @@ const (
 
 // Contract is a transport ceiling, not a substitute for the central handler's
 // object ownership, current membership, role, scope and redaction checks. This
-// first subset has no bodies or recipient selectors and grants no mutations.
+// bounded subset includes typed company-management bodies. Every additional
+// route remains denied until its request/response contract is implemented.
 // ResponseURLs names a typed response adapter which later transport must supply;
 // it does not authorize rewriting arbitrary JSON or following redirects.
 type Contract struct {
-	ID           string
-	Class        Classification
-	Auth         []AuthKind
-	Scope        string
-	ResponseURLs string
-	Binary       bool
+	ID                string
+	Class             Classification
+	Auth              []AuthKind
+	Scope             string
+	ResponseURLs      string
+	RequestBody       string
+	BrowserManagement bool
+	Binary            bool
 }
 
 // Classify is deliberately exact. GET's Go ServeMux HEAD alias is spelled out.
 // Unknown paths, encoded aliases, unsupported verbs and not-yet-implemented
 // operations are disallowed. Never turn this into a /v1 or /system prefix rule.
 func Classify(method, path string) Contract {
+	c := classifyCustomerRoute(method, path)
+	switch c.ID {
+	case "central-profile", "central-profile-update", "company-list", "company-detail", "company-members", "company-invitations", "company-keys", "company-key-create", "company-key-revoke", "playground-key/create", "playground-key/restore":
+		c.BrowserManagement = true
+	}
+	return c
+}
+func classifyCustomerRoute(method, path string) Contract {
 	if strings.ContainsAny(path, "%\\?#\r\n") || strings.Contains(path, "//") || strings.Contains(path, "..") {
 		return Contract{Class: Disallowed}
+	}
+	if method == "PATCH" && path == "/v1/me" {
+		return Contract{ID: "central-profile-update", Class: CentralCustomer, Auth: []AuthKind{CentralSession}, ResponseURLs: "profile", RequestBody: "profile"}
+	}
+	if method == "POST" && (path == "/v1/playground-key/create" || path == "/v1/playground-key/restore") {
+		return Contract{ID: strings.TrimPrefix(path, "/v1/"), Class: CentralCustomer, Auth: []AuthKind{CentralSession}, ResponseURLs: "managed-key", RequestBody: "managed-key"}
+	}
+	if method == "POST" && path == "/v1/api-keys" {
+		return Contract{ID: "company-key-create", Class: CentralCustomer, Auth: []AuthKind{CentralSession, CentralKey}, Scope: "keys:manage", ResponseURLs: "key", RequestBody: "company-key"}
+	}
+	if method == "DELETE" && strings.HasPrefix(path, "/v1/api-keys/") && validID(strings.TrimPrefix(path, "/v1/api-keys/")) {
+		return Contract{ID: "company-key-revoke", Class: CentralCustomer, Auth: []AuthKind{CentralSession, CentralKey}, Scope: "keys:manage", ResponseURLs: "none"}
 	}
 	read := method == "GET" || method == "HEAD"
 	if read {
 		switch path {
 		case "/auth/session", "/site.json":
 			return Contract{ID: "local-bootstrap", Class: LocalControl}
+		case "/v1/organizations":
+			return Contract{ID: "company-list", Class: CentralCustomer, Auth: []AuthKind{CentralSession, CentralKey}, Scope: "generation", ResponseURLs: "company-list"}
+		case "/v1/api-keys":
+			return Contract{ID: "company-keys", Class: CentralCustomer, Auth: []AuthKind{CentralSession, CentralKey}, Scope: "keys:manage", ResponseURLs: "keys"}
 		case "/v1/me":
 			return Contract{ID: "central-profile", Class: CentralCustomer, Auth: []AuthKind{CentralSession}, ResponseURLs: "profile"}
 		case "/v1/key":
@@ -58,6 +90,15 @@ func Classify(method, path string) Contract {
 			return Contract{ID: "shared-template-library", Class: CentralCustomer, Auth: []AuthKind{CentralSession, CentralKey}, Scope: "generation", ResponseURLs: "reference-list"}
 		}
 		parts := strings.Split(path, "/")
+		if len(parts) >= 4 && parts[0] == "" && parts[1] == "v1" && parts[2] == "organizations" && validID(parts[3]) {
+			if len(parts) == 4 {
+				return Contract{ID: "company-detail", Class: CentralCustomer, Auth: []AuthKind{CentralSession, CentralKey}, Scope: "generation", ResponseURLs: "company"}
+			}
+			if len(parts) == 5 && (parts[4] == "members" || parts[4] == "invitations") {
+				return Contract{ID: "company-" + parts[4], Class: CentralCustomer, Auth: []AuthKind{CentralSession, CentralKey}, Scope: "generation", ResponseURLs: "none"}
+			}
+		}
+
 		if len(parts) == 6 && parts[0] == "" && parts[1] == "v1" && parts[2] == "system" && parts[3] == "template-references" && validID(parts[4]) && parts[5] == "content" {
 			return Contract{ID: "shared-template-content", Class: CentralCustomer, Auth: []AuthKind{CentralSession, CentralKey}, Scope: "generation", ResponseURLs: "no-follow", Binary: true}
 		}
@@ -65,18 +106,49 @@ func Classify(method, path string) Contract {
 	return Contract{Class: Disallowed}
 }
 
-// RequestContract validates the complete initial read-only request shape.
+// RequestContract validates each implemented request shape.
 // Callers must pass the original escaped path and query, before normalization;
 // decoding and cleaning an attacker path before this check is not permitted.
-// Body is bounded/read by the caller; even one byte on these reads is rejected.
+// Body is bounded/read by the caller; reads require an empty body.
 func RequestContract(method, escapedPath, rawQuery string, body []byte, p Principal) (Contract, error) {
 	c := Classify(method, escapedPath)
-	if c.Class != CentralCustomer || len(body) != 0 {
+	if c.Class != CentralCustomer || len(body) > 8192 || (c.RequestBody == "" && len(body) != 0) {
 		return Contract{}, ErrDenied
 	}
 	query, err := url.ParseQuery(rawQuery)
-	if err != nil || len(query) != 0 || rawQuery != "" {
+	if err != nil {
 		return Contract{}, ErrDenied
+	}
+	for name, values := range query {
+		if len(values) != 1 {
+			return Contract{}, ErrDenied
+		}
+		switch c.ID {
+		case "company-keys":
+			if name != "organization_id" || values[0] != p.Grant.Company {
+				return Contract{}, ErrDenied
+			}
+		case "company-list":
+			if name != "all" || values[0] != "false" {
+				return Contract{}, ErrDenied
+			}
+		default:
+			return Contract{}, ErrDenied
+		}
+	}
+	if rawQuery != "" && len(query) == 0 {
+		return Contract{}, ErrDenied
+	}
+	if strings.HasPrefix(escapedPath, "/v1/organizations/") {
+		parts := strings.Split(escapedPath, "/")
+		if len(parts) < 4 || parts[3] != p.Grant.Company {
+			return Contract{}, ErrDenied
+		}
+	}
+	if c.RequestBody != "" {
+		if err = validateCustomerBody(c, body, p.Grant.Company); err != nil {
+			return Contract{}, err
+		}
 	}
 	allowed := false
 	for _, kind := range c.Auth {
@@ -104,8 +176,8 @@ func RequestContract(method, escapedPath, rawQuery string, body []byte, p Princi
 // ForwardHeaders creates a fresh allowlist. Caller Authorization, cookies,
 // installation/session/identity headers, Host and all hop/forwarded headers are
 // never copied. Trusted transport attaches its own credentials after this step.
-// Connection-nominated headers are stripped too. No transport exists yet:
-// bounded streaming and before/after-body epoch checks remain integration gates.
+// Connection-nominated headers are stripped too. Full streaming and local
+// before/after-body epoch integration remain separate activation gates.
 func ForwardHeaders(c Contract, incoming http.Header) (http.Header, error) {
 	if c.Class != CentralCustomer {
 		return nil, ErrDenied
@@ -123,7 +195,7 @@ func ForwardHeaders(c Contract, incoming http.Header) (http.Header, error) {
 	}
 	for k, values := range incoming {
 		name := http.CanonicalHeaderKey(k)
-		if name != "Accept" && !(c.Binary && (name == "Range" || name == "If-Range")) {
+		if name != "Accept" && !(c.RequestBody != "" && name == "Content-Type") && !(c.Binary && (name == "Range" || name == "If-Range")) {
 			continue
 		}
 		if connection[name] {
@@ -131,6 +203,12 @@ func ForwardHeaders(c Contract, incoming http.Header) (http.Header, error) {
 		}
 		if len(values) != 1 || len(values[0]) > 1024 || strings.ContainsAny(values[0], "\r\n\x00") || out[name] != nil {
 			return nil, ErrDenied
+		}
+		if name == "Content-Type" {
+			mediaType, _, e := mime.ParseMediaType(values[0])
+			if e != nil || mediaType != "application/json" {
+				return nil, ErrDenied
+			}
 		}
 		if name == "Range" && !singleRange(values[0]) {
 			return nil, ErrDenied
@@ -165,4 +243,53 @@ func singleRange(value string) bool {
 		numbers[i] = n
 	}
 	return (parts[0] != "" || numbers[1] > 0) && (parts[0] == "" || parts[1] == "" || numbers[0] <= numbers[1])
+}
+
+func strictCustomerJSON(raw []byte, v any) error {
+	d := json.NewDecoder(bytes.NewReader(raw))
+	d.DisallowUnknownFields()
+	if d.Decode(v) != nil || d.Decode(new(any)) != io.EOF {
+		return ErrDenied
+	}
+	return nil
+}
+func validateCustomerBody(c Contract, raw []byte, company string) error {
+	switch c.RequestBody {
+	case "company-key":
+		var in apikey.CreateInput
+		if strictCustomerJSON(raw, &in) != nil || in.OrganizationID != company || !validID(company) || (in.UserID != "" && !validID(in.UserID)) || (in.ResourceMode != "" && in.ResourceMode != "shared") {
+			return ErrDenied
+		}
+		for _, scope := range in.Scopes {
+			if scope != apikey.Generation && scope != apikey.KeysManage && scope != apikey.OrganizationsManage {
+				return ErrDenied
+			}
+		}
+	case "managed-key":
+		var in struct {
+			OrganizationID string `json:"organization_id"`
+			RequestID      string `json:"request_id,omitempty"`
+		}
+		if strictCustomerJSON(raw, &in) != nil || in.OrganizationID != company || !validID(company) {
+			return ErrDenied
+		}
+		if c.ID == "playground-key/create" && !validID(in.RequestID) || c.ID == "playground-key/restore" && in.RequestID != "" {
+			return ErrDenied
+		}
+	case "profile":
+		var in map[string]json.RawMessage
+		if strictCustomerJSON(raw, &in) != nil || len(in) == 0 {
+			return ErrDenied
+		}
+		for name := range in {
+			switch name {
+			case "name", "theme", "color_preset", "contacts", "report_columns":
+			default:
+				return ErrDenied
+			}
+		}
+	default:
+		return ErrDenied
+	}
+	return nil
 }

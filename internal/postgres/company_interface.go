@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"github.com/Sociaro-Research/open-media-gateway/internal/apikey"
+	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
 
 	ci "github.com/Sociaro-Research/open-media-gateway/internal/companyinterface"
 )
@@ -71,3 +72,12 @@ func (r *CompanyInterfaceAuthority) AuthorizeKeyRecipient(ctx context.Context, c
 	}
 	return nil
 }
+
+func (r *CompanyInterfaceAuthority) User(ctx context.Context, actor string) (identity.User, error) {
+	if !ci.ValidID(actor) {
+		return identity.User{}, ci.ErrDenied
+	}
+	return scanProfile(r.db.QueryRowContext(ctx, `SELECT id,email,display_name,COALESCE(picture_url,''),theme,report_columns,color_preset,contacts FROM users WHERE id=$1 AND NOT is_client_manager`, actor))
+}
+
+var _ ci.CustomerAuthority = (*CompanyInterfaceAuthority)(nil)

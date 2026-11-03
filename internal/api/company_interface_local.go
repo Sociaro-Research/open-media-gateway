@@ -16,6 +16,8 @@ func (s *Server) registerCompanyInterfaceLocalRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /auth/company-interface/local/session", func(w http.ResponseWriter, r *http.Request) { s.companyInterfaceLocal(w, r, "session") })
 	mux.HandleFunc("POST /auth/company-interface/local/begin", func(w http.ResponseWriter, r *http.Request) { s.companyInterfaceLocal(w, r, "begin") })
 	mux.HandleFunc("POST /auth/company-interface/local/poll", func(w http.ResponseWriter, r *http.Request) { s.companyInterfaceLocal(w, r, "poll") })
+	mux.HandleFunc("POST /auth/company-interface/local/refresh", func(w http.ResponseWriter, r *http.Request) { s.companyInterfaceLocal(w, r, "refresh") })
+	mux.HandleFunc("POST /auth/company-interface/local/logout", func(w http.ResponseWriter, r *http.Request) { s.companyInterfaceLocal(w, r, "logout") })
 	mux.HandleFunc("POST /auth/company-interface/local/cancel", func(w http.ResponseWriter, r *http.Request) { s.companyInterfaceLocal(w, r, "cancel") })
 
 }
@@ -39,9 +41,11 @@ func (s *Server) companyInterfaceLocal(w http.ResponseWriter, r *http.Request, o
 		return
 	}
 	var in struct {
-		Mode      string `json:"mode,omitempty"`
-		AttemptID string `json:"attempt_id,omitempty"`
-		Consent   bool   `json:"consent,omitempty"`
+		Mode         string `json:"mode,omitempty"`
+		AttemptID    string `json:"attempt_id,omitempty"`
+		Consent      bool   `json:"consent,omitempty"`
+		ContextEpoch int64  `json:"context_epoch,omitempty"`
+		TokenVersion int64  `json:"token_version,omitempty"`
 	}
 	if !decodeCompanyInterface(w, r, &in) {
 		return
@@ -56,7 +60,7 @@ func (s *Server) companyInterfaceLocal(w http.ResponseWriter, r *http.Request, o
 		local = cookies[0].Value
 	}
 	if operation == "session" {
-		if in.Mode != "" || in.AttemptID != "" || in.Consent {
+		if in.Mode != "" || in.AttemptID != "" || in.Consent || in.ContextEpoch != 0 || in.TokenVersion != 0 {
 			companyInterfaceError(w, ci.ErrDenied)
 			return
 		}
@@ -83,8 +87,37 @@ func (s *Server) companyInterfaceLocal(w http.ResponseWriter, r *http.Request, o
 		return
 	}
 	switch operation {
+	case "refresh", "logout":
+		if in.Mode != "" || in.AttemptID != "" || in.Consent || in.ContextEpoch < 1 {
+			companyInterfaceError(w, ci.ErrDenied)
+			return
+		}
+		if operation == "logout" {
+			if in.TokenVersion != 0 {
+				companyInterfaceError(w, ci.ErrDenied)
+				return
+			}
+			if e := s.companyCoordinator.LogoutSession(ctx, local, in.ContextEpoch); e != nil {
+				companyInterfaceError(w, e)
+				return
+			}
+			// Retain the non-authorizing browser nonce for uncertain cleanup; a late
+			// logout response must not erase a newer context sharing this browser.
+			writeJSON(w, 200, map[string]string{"state": "signed_out"})
+			return
+		}
+		if in.TokenVersion < 1 {
+			companyInterfaceError(w, ci.ErrDenied)
+			return
+		}
+		result, e := s.companyCoordinator.RefreshSession(ctx, local, in.ContextEpoch, in.TokenVersion)
+		if e != nil {
+			companyInterfaceError(w, e)
+			return
+		}
+		writeJSON(w, 200, map[string]any{"state": "authorized", "context_epoch": result.Epoch, "connection_revision": result.Revision, "version": result.Tokens.Version})
 	case "begin":
-		if !in.Consent || in.AttemptID != "" {
+		if !in.Consent || in.AttemptID != "" || in.ContextEpoch != 0 || in.TokenVersion != 0 {
 			companyInterfaceError(w, ci.ErrDenied)
 			return
 		}
@@ -109,7 +142,7 @@ func (s *Server) companyInterfaceLocal(w http.ResponseWriter, r *http.Request, o
 		}
 		writeJSON(w, 200, map[string]any{"attempt_id": challenge.ID, "user_code": challenge.Code, "state": challenge.State, "expires_at": challenge.ExpiresAt, "central_origin": s.companyCoordinator.CentralOrigin()})
 	case "poll", "cancel":
-		if in.Mode != "" || in.Consent || !ci.ValidID(in.AttemptID) {
+		if in.Mode != "" || in.Consent || in.ContextEpoch != 0 || in.TokenVersion != 0 || !ci.ValidID(in.AttemptID) {
 			companyInterfaceError(w, ci.ErrDenied)
 			return
 		}

@@ -42,7 +42,7 @@ func NewClient(origin string) (*Client, error) {
 func (c *Client) Origin() string { return c.origin }
 func (c *Client) request(ctx context.Context, operation string, in, out any) error {
 	switch operation {
-	case "capabilities", "start", "redeem", "refresh", "cancel", "reconcile", "recover-installation", "logout", "revoke-issued-family":
+	case "capabilities", "start", "redeem", "refresh", "cancel", "reconcile", "recover-installation", "logout", "revoke-issued-family", "revoke-family":
 	default:
 		return ErrDenied
 	}
@@ -207,4 +207,13 @@ func (c *Client) RevokeIssuedFamily(ctx context.Context, in Redemption) error {
 		return ErrConflict
 	}
 	return e
+}
+
+func (c *Client) RevokeFamilyProof(ctx context.Context, in Refresh) (FamilyRevocation, error) {
+	var v FamilyRevocation
+	e := c.request(ctx, "revoke-family", in, &v)
+	if e == nil && (!v.Revoked || v.SessionID != in.SessionID || v.Version != in.Version || v.LocalOrigin != in.LocalOrigin || v.LocalSessionHash != Digest(in.LocalSession) || v.RequestHash != Fingerprint(in) || !ValidID(v.GrantID) || v.GrantEpoch < 1) {
+		e = ErrConflict
+	}
+	return v, e
 }

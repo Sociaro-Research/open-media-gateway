@@ -105,3 +105,31 @@ The image's license collector includes the exact module's Apache-2.0 notice and
 checksum in `/licenses/modules.json`. Verify that binary/module identity and run
 the unchanged HIGH/CRITICAL image scan for every built architecture; a local
 patch or a new-looking version string alone is not evidence of remediation.
+
+
+## Company active sessions and reserved customer adapter
+
+Exercise company-interface lifecycle and customer-handler tests with disposable
+PostgreSQL. Migration 090 retains encrypted pending and settled operations across
+rollback and re-upgrade. Refresh adoption and logout use exact local epoch,
+revision, original grant/family and operation bindings; lost replies must survive
+restart without rotating again or revoking a healthy concurrent session.
+Terminal cleanup authenticates the installation and refresh proof, including an
+exact committed old-version rotation within its fixed recovery window. It never
+returns replacement credentials or revokes a successor family.
+
+The reserved central customer adapter composes the original handlers and policy
+chain under a one-company ceiling. Browser management uses the verified central
+session actor; selected keys are independently checked, then removed before
+management dispatch. Browser generation and SDK operations retain the original
+key recipient. Test a global administrator with an ordinary company role, a weak
+browser actor with a coworker's management key, malformed explicit credentials,
+foreign company selectors, stale authority after body creation and a stalled
+socket body. Narrow Playground create/restore retains existing issuance and
+saved-key restore semantics. Existing direct-central behavior stays unchanged.
+
+This bounded adapter buffers at most 8 MiB, admits only typed implemented
+contracts and does not advertise full-company-surface/v1. Local portal/SDK
+forwarding, complete route/response URL coverage, streaming media, uploads,
+payment returns and all fourteen complete runtime surfaces remain separate
+activation requirements. Passing these focused tests is not full mode acceptance.

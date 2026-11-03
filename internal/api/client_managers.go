@@ -12,6 +12,9 @@ import (
 )
 
 func (s *Server) isClientManager(ctx context.Context) (bool, error) {
+	if identity.CompanyBoundary(ctx) != "" {
+		return false, nil
+	}
 	repo, ok := s.system.(system.ClientManagers)
 	if !ok {
 		return false, nil

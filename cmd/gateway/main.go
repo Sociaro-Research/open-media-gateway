@@ -193,6 +193,7 @@ func run() error {
 	handler := api.NewGateway(api.Dependencies{
 		CompanyCoordinator: companyCoordinator,
 		CompanyInterface:   companyInterface, CompanyCentralOrigin: installation.DefaultCentralOrigin,
+		CompanyCustomer:    postgres.NewCompanyInterfaceAuthority(db),
 		ResourceRepository: postgres.NewProviderResourceRepository(db), ResourceScopes: providerManager.ResolveResourceConnection, ResourceDirectory: providerManager,
 		PlaygroundKeys:         playgroundKeys,
 		CatalogSync:            catalogRepository,

@@ -64,6 +64,7 @@ type BrowserAuth interface {
 type Server struct {
 	companyCoordinator     *ci.Coordinator
 	companyInterface       ci.Lifecycle
+	companyCustomer        ci.CustomerAuthority
 	companyCentralOrigin   string
 	resourceRepository     providerresources.Repository
 	resourceScopes         providerresources.ScopeResolver
@@ -128,6 +129,7 @@ func NewWithPayments(service Service, health HealthChecker, apiKey string, media
 type Dependencies struct {
 	CompanyCoordinator     *ci.Coordinator
 	CompanyInterface       ci.Lifecycle
+	CompanyCustomer        ci.CustomerAuthority
 	CompanyCentralOrigin   string
 	ResourceRepository     providerresources.Repository
 	ResourceScopes         providerresources.ScopeResolver
@@ -162,6 +164,7 @@ func NewGateway(d Dependencies) http.Handler {
 	s := &Server{service: service, health: health, apiKey: apiKey, storage: mediaStorage, providerAdmin: providerAdmin, payments: funding}
 	s.companyCoordinator = d.CompanyCoordinator
 	s.companyInterface = d.CompanyInterface
+	s.companyCustomer = d.CompanyCustomer
 	s.companyCentralOrigin = d.CompanyCentralOrigin
 	s.remoteWorkspaceManager = d.RemoteWorkspace
 	s.workspaceAuthorization = d.WorkspaceAuthorization
@@ -215,6 +218,7 @@ func NewGateway(d Dependencies) http.Handler {
 func (s *Server) handler() http.Handler {
 	mux := http.NewServeMux()
 	s.registerCompanyInterfaceRoutes(mux)
+	s.registerCompanyCustomerRoutes(mux)
 	s.registerCompanyInterfaceLocalRoutes(mux)
 	s.registerTemplateRoutes(mux)
 	mux.Handle("POST /v1/playground-key/restore", s.authenticate(http.HandlerFunc(s.playgroundKey)))
@@ -533,6 +537,14 @@ func (s *Server) authenticate(next http.Handler) http.Handler {
 			writeError(w, http.StatusUnauthorized, "unauthorized", "a Gateway API key is required; browser sign-in does not authorize generation")
 			return
 		}
+		if delegated, ok := companyCustomerFromContext(r.Context()); ok && !hasBearer && !hasXKey {
+			if delegated.Kind != ci.CentralSession || !management {
+				companyInterfaceError(w, ci.ErrDenied)
+				return
+			}
+			next.ServeHTTP(w, r)
+			return
+		}
 		if !hasBearer && !hasXKey && s.auth != nil && management {
 			if user, err := s.auth.Authenticate(r); err == nil {
 				next.ServeHTTP(w, r.WithContext(identity.WithUser(r.Context(), user)))
@@ -546,6 +558,12 @@ func (s *Server) authenticate(next http.Handler) http.Handler {
 		if s.keys != nil && strings.HasPrefix(provided, "gw_") && len(provided) == 46 {
 			user, key, err := s.keys.Authenticate(r.Context(), apikey.Hash(provided))
 			if err == nil {
+				if delegated, ok := companyCustomerFromContext(r.Context()); ok {
+					if delegated.Kind != ci.CentralKey || delegated.KeyID != key.ID || delegated.Actor != user.ID || delegated.Grant.Company != key.OrganizationID {
+						companyInterfaceError(w, ci.ErrDenied)
+						return
+					}
+				}
 				scope := apikey.Generation
 				if strings.HasPrefix(r.URL.Path, "/provider-assets/") && !slices.Contains(key.Scopes, apikey.Generation) {
 					scope = apikey.ProvidersManage
@@ -617,7 +635,7 @@ func (s *Server) authenticate(next http.Handler) http.Handler {
 				}
 				ctx = context.WithValue(ctx, apiKeyScopesContextKey{}, key.Scopes)
 				ctx = context.WithValue(ctx, credentialOrganizationKey{}, key.OrganizationID)
-				if slices.Contains(key.Scopes, apikey.SystemManage) && s.system != nil {
+				if identity.CompanyBoundary(ctx) == "" && slices.Contains(key.Scopes, apikey.SystemManage) && s.system != nil {
 					global, e := s.system.IsAdmin(ctx, user.ID)
 					if e != nil {
 						systemError(w, e)

@@ -20,8 +20,12 @@ import (
 const weekStartSQL = `(date_trunc('week',NOW() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC')`
 
 func organizationAccess(ctx context.Context, q rowQuerier, actor, id string) (string, error) {
+	if bound := identity.CompanyBoundary(ctx); bound != "" && bound != id {
+		return "", org.ErrForbidden
+	}
+
 	var role string
-	err := q.QueryRowContext(ctx, `SELECT CASE WHEN u.is_client_manager THEN CASE WHEN EXISTS(SELECT 1 FROM organizations WHERE id=$2 AND sales_manages(u.id,client_manager_id)) THEN 'client_manager' ELSE '' END WHEN u.is_system_admin AND $3 THEN 'system_admin' ELSE COALESCE(m.role,'') END FROM users u LEFT JOIN organization_members m ON m.user_id=u.id AND m.organization_id=$2 AND m.removed_at IS NULL WHERE u.id=$1 AND EXISTS(SELECT 1 FROM organizations WHERE id=$2)`, actor, id, identity.SystemPermissionAllowed(ctx)).Scan(&role)
+	err := q.QueryRowContext(ctx, `SELECT CASE WHEN u.is_client_manager AND $4 THEN CASE WHEN EXISTS(SELECT 1 FROM organizations WHERE id=$2 AND sales_manages(u.id,client_manager_id)) THEN 'client_manager' ELSE '' END WHEN u.is_system_admin AND $3 THEN 'system_admin' ELSE COALESCE(m.role,'') END FROM users u LEFT JOIN organization_members m ON m.user_id=u.id AND m.organization_id=$2 AND m.removed_at IS NULL WHERE u.id=$1 AND EXISTS(SELECT 1 FROM organizations WHERE id=$2)`, actor, id, identity.SystemPermissionAllowed(ctx), identity.CompanyBoundary(ctx) == "").Scan(&role)
 	if errors.Is(err, sql.ErrNoRows) || err == nil && role == "" {
 		return "", org.ErrForbidden
 	}
@@ -61,22 +65,22 @@ func (r *SystemRepository) OrganizationsWithUsage(ctx context.Context, actor str
 func (r *SystemRepository) organizations(ctx context.Context, actor string, all bool, from, until *time.Time) ([]org.Organization, error) {
 	all = all && identity.SystemPermissionAllowed(ctx)
 	columns, join := "", ""
-	args := []any{actor, all}
+	args := []any{actor, all, identity.CompanyBoundary(ctx)}
 	if from != nil {
 		columns = `,usage.spend,usage.unknown_costs,usage.last_activity`
 		join = ` LEFT JOIN LATERAL (
- SELECT COALESCE(SUM(CEIL((` + taskConsumedSQL + `)*1000000)) FILTER (WHERE created_at >= $3 AND created_at < $4),0)::bigint AS spend,
- COUNT(*) FILTER (WHERE created_at >= $3 AND created_at < $4 AND status NOT IN ('queued','running') AND (` + taskConsumedSQL + `) IS NULL) AS unknown_costs,
+ SELECT COALESCE(SUM(CEIL((` + taskConsumedSQL + `)*1000000)) FILTER (WHERE created_at >= $4 AND created_at < $5),0)::bigint AS spend,
+ COUNT(*) FILTER (WHERE created_at >= $4 AND created_at < $5 AND status NOT IN ('queued','running') AND (` + taskConsumedSQL + `) IS NULL) AS unknown_costs,
  MAX(created_at) AS last_activity FROM tasks WHERE owner_id=o.id
  ) usage ON TRUE`
 		args = append(args, *from, *until)
 	}
-	rows, e := r.db.QueryContext(ctx, `SELECT o.id,o.name,o.domain,CASE WHEN u.is_client_manager THEN 'client_manager' ELSE COALESCE(m.role,CASE WHEN $2 AND u.is_system_admin THEN 'system_admin' ELSE '' END) END,o.credit_limit_micros,o.default_weekly_limit_micros,o.created_at,m.weekly_limit_micros,
+	rows, e := r.db.QueryContext(ctx, `SELECT o.id,o.name,o.domain,CASE WHEN (u.is_client_manager AND $3='') THEN 'client_manager' ELSE COALESCE(m.role,CASE WHEN $2 AND u.is_system_admin THEN 'system_admin' ELSE '' END) END,o.credit_limit_micros,o.default_weekly_limit_micros,o.created_at,m.weekly_limit_micros,
  COALESCE((SELECT SUM(amount_micros) FROM organization_credits WHERE organization_id=o.id),0)::bigint,
  COALESCE((SELECT SUM(CEIL((`+taskConsumedSQL+`)*1000000)) FROM tasks WHERE owner_id=o.id AND created_at>=o.created_at AND provider_owner_id='00000000-0000-0000-0000-000000000001'),0)::bigint,
  COALESCE((SELECT SUM(CEIL((`+taskConsumedSQL+`)*1000000)) FROM tasks WHERE owner_id=o.id AND actor_id=$1 AND created_at>=`+weekStartSQL+` AND created_at>=o.created_at AND provider_owner_id='00000000-0000-0000-0000-000000000001'),0)::bigint,
  COALESCE((SELECT SUM(size_bytes) FROM stored_objects WHERE owner_id=o.id AND deleted_at IS NULL),0)::bigint,o.client_manager_id,COALESCE((SELECT email FROM users WHERE id=o.client_manager_id),''),o.markup_basis_points,COALESCE(o.markup_basis_points,(SELECT markup_basis_points FROM system_settings WHERE id=TRUE)),u.is_system_admin,o.billing_profile,o.minimize_request_logging
- `+columns+` FROM organizations o JOIN users u ON u.id=$1 LEFT JOIN organization_members m ON m.organization_id=o.id AND m.user_id=$1 AND m.removed_at IS NULL`+join+` WHERE (u.is_client_manager AND sales_manages(u.id,o.client_manager_id)) OR (NOT u.is_client_manager AND (m.user_id IS NOT NULL OR ($2 AND u.is_system_admin))) ORDER BY o.created_at,o.id`, args...)
+ `+columns+` FROM organizations o JOIN users u ON u.id=$1 LEFT JOIN organization_members m ON m.organization_id=o.id AND m.user_id=$1 AND m.removed_at IS NULL`+join+` WHERE ($3='' OR o.id::text=$3) AND (((u.is_client_manager AND $3='') AND sales_manages(u.id,o.client_manager_id)) OR (NOT (u.is_client_manager AND $3='') AND (m.user_id IS NOT NULL OR ($2 AND u.is_system_admin)))) ORDER BY o.created_at,o.id`, args...)
 	if e != nil {
 		return nil, e
 	}

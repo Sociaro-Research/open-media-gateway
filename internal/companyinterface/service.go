@@ -19,6 +19,7 @@ type Lifecycle interface {
 	Revoke(context.Context, string) error
 	Logout(context.Context, Credentials) error
 	RevokeIssuedFamily(context.Context, Redemption) error
+	RevokeFamilyProof(context.Context, Refresh) (FamilyRevocation, error)
 	AllowAttempt(context.Context, []byte, int, time.Duration) (bool, error)
 }
 

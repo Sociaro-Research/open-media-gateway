@@ -19,6 +19,9 @@ import (
 type systemSettingsKey struct{}
 
 func (s *Server) systemAdmin(ctx context.Context) (bool, error) {
+	if identity.CompanyBoundary(ctx) != "" {
+		return false, nil
+	}
 	if s.system == nil {
 		return false, nil
 	}

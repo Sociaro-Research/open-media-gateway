@@ -23,6 +23,7 @@ func (s *Server) registerCompanyInterfaceRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /auth/company-interface/v1/cancel", func(w http.ResponseWriter, r *http.Request) { s.companyInterfaceProof(w, r, "cancel") })
 	mux.HandleFunc("POST /auth/company-interface/v1/reconcile", func(w http.ResponseWriter, r *http.Request) { s.companyInterfaceProof(w, r, "reconcile") })
 	mux.HandleFunc("POST /auth/company-interface/v1/recover-installation", func(w http.ResponseWriter, r *http.Request) { s.companyInterfaceProof(w, r, "recover-installation") })
+	mux.HandleFunc("POST /auth/company-interface/v1/revoke-family", func(w http.ResponseWriter, r *http.Request) { s.companyInterfaceProof(w, r, "revoke-family") })
 	mux.HandleFunc("POST /auth/company-interface/v1/revoke-issued-family", func(w http.ResponseWriter, r *http.Request) { s.companyInterfaceProof(w, r, "revoke-issued-family") })
 	mux.HandleFunc("POST /auth/company-interface/v1/logout", func(w http.ResponseWriter, r *http.Request) { s.companyInterfaceProof(w, r, "logout") })
 	mux.HandleFunc("POST /v1/company-interface/authorizations/inspect", func(w http.ResponseWriter, r *http.Request) { s.companyInterfaceBrowser(w, r, "inspect") })
@@ -143,6 +144,12 @@ func (s *Server) companyInterfaceProof(w http.ResponseWriter, r *http.Request, o
 		}
 		e = s.companyInterface.Logout(ctx, in)
 		value = map[string]bool{"logged_out": e == nil}
+	case "revoke-family":
+		var in ci.Refresh
+		if !decodeCompanyInterface(w, r, &in) {
+			return
+		}
+		value, e = s.companyInterface.RevokeFamilyProof(ctx, in)
 	case "refresh":
 		var in ci.Refresh
 		if !decodeCompanyInterface(w, r, &in) {

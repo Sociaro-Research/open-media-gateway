@@ -149,6 +149,25 @@ func (r *CompanyInterfaceLifecycle) ActivateLocal(ctx context.Context, in ci.Sta
 	if e = r.saveLocalInstallation(ctx, tx, in, result); e != nil {
 		return e
 	}
+	// Retain this family's original installation credential in encrypted server
+	// custody even for login receipts, so a later global rebind cannot redirect
+	// or destroy terminal cleanup of this exact older family.
+	if result.InstallationCredential == "" {
+		binding, cipher, err := readLocalInstallation(ctx, tx)
+		if err != nil || binding.GrantID != result.GrantID || binding.GrantEpoch != result.GrantEpoch || binding.Company != result.Company {
+			return ci.ErrConflict
+		}
+		var stored ci.LocalInstallation
+		if err = r.cipher.Open(cipher, localInstallationAAD(binding), &stored); err != nil {
+			return err
+		}
+		check := stored
+		check.Credential = ""
+		if check != binding || !ci.ValidSecret(stored.Credential) {
+			return ci.ErrDenied
+		}
+		result.InstallationCredential = stored.Credential
+	}
 	encrypted, e := r.cipher.Seal(result, localAAD("session", hash, epoch, in.ConnectionRevision, result.SessionID, result.Version))
 	if e != nil {
 		return e

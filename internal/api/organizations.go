@@ -18,6 +18,9 @@ type credentialOrganizationKey struct{}
 type globalOrganizationKey struct{}
 
 func credentialOrganization(ctx context.Context) string {
+	if company := identity.CompanyBoundary(ctx); company != "" {
+		return company
+	}
 	global, _ := ctx.Value(globalOrganizationKey{}).(bool)
 	if global {
 		return ""

@@ -236,6 +236,9 @@ func TestReadContractsDenyUnknownMethodsTenantFieldsAndBodies(t *testing.T) {
 			}
 		}
 		for _, method := range []string{"POST", "PUT", "PATCH", "DELETE", "OPTIONS", "CONNECT", "TRACE"} {
+			if method == "PATCH" && path == "/v1/me" {
+				continue
+			}
 			if Classify(method, path).Class != Disallowed {
 				t.Fatal(method, path)
 			}
@@ -249,10 +252,13 @@ func TestReadContractsDenyUnknownMethodsTenantFieldsAndBodies(t *testing.T) {
 			t.Fatal("read body accepted")
 		}
 	}
-	for _, path := range []string{"/v1/system/templates/library", "/v1/system/providers", "/v1/system/storage", "/v1/system/templates", "/v1/organizations/" + id, "/v1/models/vendor/model", "/v1/models/../providers", "/v1/%70roviders", "/v1//providers", content + "/", strings.Replace(content, id, "%2e%2e", 1)} {
+	for _, path := range []string{"/v1/system/templates/library", "/v1/system/providers", "/v1/system/storage", "/v1/system/templates", "/v1/models/vendor/model", "/v1/models/../providers", "/v1/%70roviders", "/v1//providers", content + "/", strings.Replace(content, id, "%2e%2e", 1)} {
 		if Classify("GET", path).Class != Disallowed {
 			t.Fatal(path)
 		}
+	}
+	if _, err := RequestContract("GET", "/v1/organizations/"+id, "", nil, p); err == nil {
+		t.Fatal("foreign company accepted")
 	}
 	if Classify("GET", "/auth/session").Class != LocalControl {
 		t.Fatal("local control misclassified")

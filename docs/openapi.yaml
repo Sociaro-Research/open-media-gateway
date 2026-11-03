@@ -35,6 +35,178 @@ tags:
 - name: Organizations
 - name: Payments
 paths:
+  /auth/company-interface/v1/customer-browser/{path}:
+    parameters:
+      - name: path
+        in: path
+        required: true
+        schema: {type: string}
+        description: Exact inner route; only the implemented typed company contract is admitted.
+    get:
+      operationId: customerbrowserGet
+      summary: Reserved bounded central company adapter
+      security: []
+      description: "Reserved server-to-server customer adapter. Installation grant and stored approved frontend origin are required. Browser entry requires separately verified central session and local-context binding; management uses that session actor, generation uses the independently verified original key recipient. SDK entry requires the original central key. Invalid explicit keys never fall back. Original central middleware and object/role checks remain authoritative under one-company ceiling. Browser cookies, Origin, Referer and Sec-Fetch are rejected. Exact method/path/query/body allowlist; 8192-byte request and 8388608-byte buffered response limits; 15-second total deadline including body read. Authority rechecked after body before release. No credentials in URLs and no capability or full-mode activation. Local portal/SDK forwarding and streaming media remain unavailable."
+      responses:
+        '200': {description: Existing central handler response under the company ceiling}
+        '403': {description: Exact contract or separately verified authority rejected}
+        '409': {description: Authority changed before body release}
+        '429': {description: Rate limit; Retry-After 60}
+        '503': {description: Unavailable or response budget exceeded}
+    head:
+      operationId: customerbrowserHead
+      summary: Reserved bounded central company adapter
+      security: []
+      description: "Reserved server-to-server customer adapter. Installation grant and stored approved frontend origin are required. Browser entry requires separately verified central session and local-context binding; management uses that session actor, generation uses the independently verified original key recipient. SDK entry requires the original central key. Invalid explicit keys never fall back. Original central middleware and object/role checks remain authoritative under one-company ceiling. Browser cookies, Origin, Referer and Sec-Fetch are rejected. Exact method/path/query/body allowlist; 8192-byte request and 8388608-byte buffered response limits; 15-second total deadline including body read. Authority rechecked after body before release. No credentials in URLs and no capability or full-mode activation. Local portal/SDK forwarding and streaming media remain unavailable."
+      responses:
+        '200': {description: Existing central handler response under the company ceiling}
+        '403': {description: Exact contract or separately verified authority rejected}
+        '409': {description: Authority changed before body release}
+        '429': {description: Rate limit; Retry-After 60}
+        '503': {description: Unavailable or response budget exceeded}
+    post:
+      operationId: customerbrowserPost
+      summary: Reserved bounded central company adapter
+      security: []
+      description: "Reserved server-to-server customer adapter. Installation grant and stored approved frontend origin are required. Browser entry requires separately verified central session and local-context binding; management uses that session actor, generation uses the independently verified original key recipient. SDK entry requires the original central key. Invalid explicit keys never fall back. Original central middleware and object/role checks remain authoritative under one-company ceiling. Browser cookies, Origin, Referer and Sec-Fetch are rejected. Exact method/path/query/body allowlist; 8192-byte request and 8388608-byte buffered response limits; 15-second total deadline including body read. Authority rechecked after body before release. No credentials in URLs and no capability or full-mode activation. Local portal/SDK forwarding and streaming media remain unavailable."
+      responses:
+        '200': {description: Existing central handler response under the company ceiling}
+        '403': {description: Exact contract or separately verified authority rejected}
+        '409': {description: Authority changed before body release}
+        '429': {description: Rate limit; Retry-After 60}
+        '503': {description: Unavailable or response budget exceeded}
+    patch:
+      operationId: customerbrowserPatch
+      summary: Reserved bounded central company adapter
+      security: []
+      description: "Reserved server-to-server customer adapter. Installation grant and stored approved frontend origin are required. Browser entry requires separately verified central session and local-context binding; management uses that session actor, generation uses the independently verified original key recipient. SDK entry requires the original central key. Invalid explicit keys never fall back. Original central middleware and object/role checks remain authoritative under one-company ceiling. Browser cookies, Origin, Referer and Sec-Fetch are rejected. Exact method/path/query/body allowlist; 8192-byte request and 8388608-byte buffered response limits; 15-second total deadline including body read. Authority rechecked after body before release. No credentials in URLs and no capability or full-mode activation. Local portal/SDK forwarding and streaming media remain unavailable."
+      responses:
+        '200': {description: Existing central handler response under the company ceiling}
+        '403': {description: Exact contract or separately verified authority rejected}
+        '409': {description: Authority changed before body release}
+        '429': {description: Rate limit; Retry-After 60}
+        '503': {description: Unavailable or response budget exceeded}
+    delete:
+      operationId: customerbrowserDelete
+      summary: Reserved bounded central company adapter
+      security: []
+      description: "Reserved server-to-server customer adapter. Installation grant and stored approved frontend origin are required. Browser entry requires separately verified central session and local-context binding; management uses that session actor, generation uses the independently verified original key recipient. SDK entry requires the original central key. Invalid explicit keys never fall back. Original central middleware and object/role checks remain authoritative under one-company ceiling. Browser cookies, Origin, Referer and Sec-Fetch are rejected. Exact method/path/query/body allowlist; 8192-byte request and 8388608-byte buffered response limits; 15-second total deadline including body read. Authority rechecked after body before release. No credentials in URLs and no capability or full-mode activation. Local portal/SDK forwarding and streaming media remain unavailable."
+      responses:
+        '200': {description: Existing central handler response under the company ceiling}
+        '403': {description: Exact contract or separately verified authority rejected}
+        '409': {description: Authority changed before body release}
+        '429': {description: Rate limit; Retry-After 60}
+        '503': {description: Unavailable or response budget exceeded}
+  /auth/company-interface/v1/customer-sdk/{path}:
+    parameters:
+      - name: path
+        in: path
+        required: true
+        schema: {type: string}
+        description: Exact inner route; only the implemented typed company contract is admitted.
+    get:
+      operationId: customersdkGet
+      summary: Reserved bounded central company adapter
+      security: []
+      description: "Reserved server-to-server customer adapter. Installation grant and stored approved frontend origin are required. Browser entry requires separately verified central session and local-context binding; management uses that session actor, generation uses the independently verified original key recipient. SDK entry requires the original central key. Invalid explicit keys never fall back. Original central middleware and object/role checks remain authoritative under one-company ceiling. Browser cookies, Origin, Referer and Sec-Fetch are rejected. Exact method/path/query/body allowlist; 8192-byte request and 8388608-byte buffered response limits; 15-second total deadline including body read. Authority rechecked after body before release. No credentials in URLs and no capability or full-mode activation. Local portal/SDK forwarding and streaming media remain unavailable."
+      responses:
+        '200': {description: Existing central handler response under the company ceiling}
+        '403': {description: Exact contract or separately verified authority rejected}
+        '409': {description: Authority changed before body release}
+        '429': {description: Rate limit; Retry-After 60}
+        '503': {description: Unavailable or response budget exceeded}
+    head:
+      operationId: customersdkHead
+      summary: Reserved bounded central company adapter
+      security: []
+      description: "Reserved server-to-server customer adapter. Installation grant and stored approved frontend origin are required. Browser entry requires separately verified central session and local-context binding; management uses that session actor, generation uses the independently verified original key recipient. SDK entry requires the original central key. Invalid explicit keys never fall back. Original central middleware and object/role checks remain authoritative under one-company ceiling. Browser cookies, Origin, Referer and Sec-Fetch are rejected. Exact method/path/query/body allowlist; 8192-byte request and 8388608-byte buffered response limits; 15-second total deadline including body read. Authority rechecked after body before release. No credentials in URLs and no capability or full-mode activation. Local portal/SDK forwarding and streaming media remain unavailable."
+      responses:
+        '200': {description: Existing central handler response under the company ceiling}
+        '403': {description: Exact contract or separately verified authority rejected}
+        '409': {description: Authority changed before body release}
+        '429': {description: Rate limit; Retry-After 60}
+        '503': {description: Unavailable or response budget exceeded}
+    post:
+      operationId: customersdkPost
+      summary: Reserved bounded central company adapter
+      security: []
+      description: "Reserved server-to-server customer adapter. Installation grant and stored approved frontend origin are required. Browser entry requires separately verified central session and local-context binding; management uses that session actor, generation uses the independently verified original key recipient. SDK entry requires the original central key. Invalid explicit keys never fall back. Original central middleware and object/role checks remain authoritative under one-company ceiling. Browser cookies, Origin, Referer and Sec-Fetch are rejected. Exact method/path/query/body allowlist; 8192-byte request and 8388608-byte buffered response limits; 15-second total deadline including body read. Authority rechecked after body before release. No credentials in URLs and no capability or full-mode activation. Local portal/SDK forwarding and streaming media remain unavailable."
+      responses:
+        '200': {description: Existing central handler response under the company ceiling}
+        '403': {description: Exact contract or separately verified authority rejected}
+        '409': {description: Authority changed before body release}
+        '429': {description: Rate limit; Retry-After 60}
+        '503': {description: Unavailable or response budget exceeded}
+    patch:
+      operationId: customersdkPatch
+      summary: Reserved bounded central company adapter
+      security: []
+      description: "Reserved server-to-server customer adapter. Installation grant and stored approved frontend origin are required. Browser entry requires separately verified central session and local-context binding; management uses that session actor, generation uses the independently verified original key recipient. SDK entry requires the original central key. Invalid explicit keys never fall back. Original central middleware and object/role checks remain authoritative under one-company ceiling. Browser cookies, Origin, Referer and Sec-Fetch are rejected. Exact method/path/query/body allowlist; 8192-byte request and 8388608-byte buffered response limits; 15-second total deadline including body read. Authority rechecked after body before release. No credentials in URLs and no capability or full-mode activation. Local portal/SDK forwarding and streaming media remain unavailable."
+      responses:
+        '200': {description: Existing central handler response under the company ceiling}
+        '403': {description: Exact contract or separately verified authority rejected}
+        '409': {description: Authority changed before body release}
+        '429': {description: Rate limit; Retry-After 60}
+        '503': {description: Unavailable or response budget exceeded}
+    delete:
+      operationId: customersdkDelete
+      summary: Reserved bounded central company adapter
+      security: []
+      description: "Reserved server-to-server customer adapter. Installation grant and stored approved frontend origin are required. Browser entry requires separately verified central session and local-context binding; management uses that session actor, generation uses the independently verified original key recipient. SDK entry requires the original central key. Invalid explicit keys never fall back. Original central middleware and object/role checks remain authoritative under one-company ceiling. Browser cookies, Origin, Referer and Sec-Fetch are rejected. Exact method/path/query/body allowlist; 8192-byte request and 8388608-byte buffered response limits; 15-second total deadline including body read. Authority rechecked after body before release. No credentials in URLs and no capability or full-mode activation. Local portal/SDK forwarding and streaming media remain unavailable."
+      responses:
+        '200': {description: Existing central handler response under the company ceiling}
+        '403': {description: Exact contract or separately verified authority rejected}
+        '409': {description: Authority changed before body release}
+        '429': {description: Rate limit; Retry-After 60}
+        '503': {description: Unavailable or response budget exceeded}
+  /auth/company-interface/v1/revoke-family:
+    post:
+      operationId: companyInterfaceRevokeFamilyProof
+      summary: Terminal cleanup using current or exact committed rotation proof
+      security: []
+      description: "Server-to-server only. Requires original installation credential and high-entropy refresh proof. Old-version proof matches the exact committed operation, family, origin and local context within its fixed recovery deadline. Hash alone is never authority. No credential issuance; permanent grant and other families/keys remain unchanged. Strict 32768-byte JSON and 15-second budget."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/CompanyInterfaceRefresh"}
+      responses:
+        '200': {description: Exact typed terminal acknowledgement, no user credentials}
+        '403': {description: Proof or binding rejected}
+        '409': {description: Conflicting operation}
+        '503': {description: Unknown result; retain original proof}
+  /auth/company-interface/local/refresh:
+    post:
+      operationId: localCompanyInterfaceRefresh
+      summary: Rotate with persistent exact operation and local CAS
+      security: []
+      description: "Exact configured Origin and opaque HttpOnly local browser context required; central credentials never reach the browser. Strict JSON; 15-second total request budget. Persist immutable operation before remote I/O. Lost replies/restart retain the same operation and proof. Logout invalidates its context first and cannot clear or activate a successor context. No full-company mode activation."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"type": "object", "additionalProperties": false, "properties": {"context_epoch": {"type": "integer", "minimum": 1}, "token_version": {"type": "integer", "minimum": 1}}, "required": ["context_epoch", "token_version"]}
+      responses:
+        '200': {description: Secret-free context state}
+        '403': {description: Browser context or origin rejected}
+        '409': {description: Exact context/version conflict}
+        '503': {description: Unknown remote outcome; retain operation}
+  /auth/company-interface/local/logout:
+    post:
+      operationId: localCompanyInterfaceLogout
+      summary: Invalidate local context and reconcile exact original family cleanup
+      security: []
+      description: "Exact configured Origin and opaque HttpOnly local browser context required; central credentials never reach the browser. Strict JSON; 15-second total request budget. Persist immutable operation before remote I/O. Lost replies/restart retain the same operation and proof. Logout invalidates its context first and cannot clear or activate a successor context. No full-company mode activation."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"type": "object", "additionalProperties": false, "properties": {"context_epoch": {"type": "integer", "minimum": 1}}, "required": ["context_epoch"]}
+      responses:
+        '200': {description: Secret-free context state}
+        '403': {description: Browser context or origin rejected}
+        '409': {description: Exact context/version conflict}
+        '503': {description: Unknown remote outcome; retain operation}
   /auth/company-interface/v1/revoke-issued-family:
     post:
       operationId: companyInterfaceRevokeIssuedFamily

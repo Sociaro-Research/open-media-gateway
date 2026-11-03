@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	ci "github.com/Sociaro-Research/open-media-gateway/internal/companyinterface"
 	"io"
 	"net/http"
 
@@ -19,14 +20,24 @@ func (s *Server) playgroundKey(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store, private")
 	w.Header().Set("Pragma", "no-cache")
 	w.Header().Set("Referrer-Policy", "no-referrer")
-	if s.auth == nil || len(r.Header.Values("Authorization")) > 0 || identity.APIKeyID(r.Context()) != nil {
-		writeError(w, 403, "browser_session_required", "Use your signed-in account to restore its Playground key")
-		return
-	}
-	user, err := s.auth.Authenticate(r)
-	if err != nil || user.ID != identity.ActorID(r.Context()) {
-		writeError(w, 401, "unauthorized", "Sign in again")
-		return
+	var user identity.User
+	var err error
+	if delegated, ok := companyCustomerFromContext(r.Context()); ok {
+		if delegated.Kind != "central-session" || delegated.BrowserActor != identity.ActorID(r.Context()) || identity.APIKeyID(r.Context()) != nil || len(r.Header.Values("Authorization")) > 0 {
+			companyInterfaceError(w, ci.ErrDenied)
+			return
+		}
+		user, _ = identity.UserFromContext(r.Context())
+	} else {
+		if s.auth == nil || len(r.Header.Values("Authorization")) > 0 || identity.APIKeyID(r.Context()) != nil {
+			writeError(w, 403, "browser_session_required", "Use your signed-in account to restore its Playground key")
+			return
+		}
+		user, err = s.auth.Authenticate(r)
+		if err != nil || user.ID != identity.ActorID(r.Context()) {
+			writeError(w, 401, "unauthorized", "Sign in again")
+			return
+		}
 	}
 	if s.playgroundKeys == nil {
 		writeError(w, 503, "playground_key_unavailable", "Account key storage is unavailable")
