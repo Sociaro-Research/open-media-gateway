@@ -145,3 +145,32 @@ func (m *Manager) Create(ctx context.Context, owner, organization, request strin
 	}
 	return m.open(ctx, r)
 }
+
+// Prepare creates a purpose-bound ordinary generation key before atomic central
+// provisioning. The caller must use existing repository issuance policy in its
+// transaction; preparation grants no authority and performs no persistence.
+func (m *Manager) Prepare(owner, organization string) (apikey.Key, string, Record, error) {
+	key, secret, err := apikey.Generate(apikey.CreateInput{UserID: owner, OrganizationID: organization, Name: Name, Scopes: []string{apikey.Generation}, ResourceMode: "shared", StorageMode: "shared"}, time.Now())
+	if err != nil {
+		return key, "", Record{}, err
+	}
+	key.CreatedBy = owner
+	key.Purpose = Purpose
+	record := Record{Owner: owner, Organization: organization, KeyID: key.ID}
+	record.Ciphertext, err = m.seal(record, secret)
+	return key, secret, record, err
+}
+
+// DecodeRecord decrypts a record already verified by a central transaction.
+// It is not authentication; ordinary Restore continues to revalidate the key.
+func (m *Manager) DecodeRecord(r Record) (string, error) {
+	n := m.aead.NonceSize()
+	if len(r.Ciphertext) <= n {
+		return "", ErrUnavailable
+	}
+	raw, err := m.aead.Open(nil, r.Ciphertext[:n], r.Ciphertext[n:], binding(r))
+	if err != nil {
+		return "", ErrUnavailable
+	}
+	return string(raw), nil
+}

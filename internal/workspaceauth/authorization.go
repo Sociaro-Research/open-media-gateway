@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/apikey"
+	"github.com/Sociaro-Research/open-media-gateway/internal/installation"
 	"github.com/Sociaro-Research/open-media-gateway/internal/providerconfig"
 )
 
@@ -103,7 +104,7 @@ func (m *Manager) Start(ctx context.Context, device string, in Challenge) (Chall
 	if !ValidDevice(in.InstallationProof) {
 		return Challenge{}, ErrLegacy
 	}
-	in.InstallationHash = Digest("installation:" + in.InstallationProof)
+	in.InstallationHash = installation.ProofDigest(in.InstallationProof)
 	in.InstallationProof = ""
 	if !ValidDevice(device) || len(in.Label) < 1 || len(in.Label) > 80 || len(in.Origin) > 300 {
 		return Challenge{}, ErrUnavailable

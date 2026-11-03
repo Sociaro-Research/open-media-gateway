@@ -28,6 +28,28 @@ func (r *APIKeyRepository) CreatePlaygroundKey(ctx context.Context, owner, organ
 		return playgroundkey.Record{}, err
 	}
 	defer tx.Rollback()
+	current, err := createPlaygroundKey(ctx, tx, owner, organization, request, key, hash, encrypted)
+	if err != nil {
+		return current, err
+	}
+	if err = tx.Commit(); err != nil {
+		return current, err
+	}
+	return current, nil
+}
+
+// Used by atomic company-interface provisioning, without starting a nested
+// transaction. It preserves ordinary issuance rules and org-before-user locks.
+func createPlaygroundKey(ctx context.Context, tx *sql.Tx, owner, organization, request string, key apikey.Key, hash, encrypted []byte, checkpoints ...func(string) error) (playgroundkey.Record, error) {
+	check := func(name string) error {
+		for _, hook := range checkpoints {
+			if err := hook(name); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	var err error
 	// Match ordinary issuance/membership lock order, then serialize this account.
 	var ignored string
 	if organization != "" {
@@ -64,7 +86,13 @@ func (r *APIKeyRepository) CreatePlaygroundKey(ctx context.Context, owner, organ
 		if err = createAPIKey(ctx, tx, owner, key, hash); err != nil {
 			return current, err
 		}
+		if err = check("key"); err != nil {
+			return current, err
+		}
 		if _, err = tx.ExecContext(ctx, `INSERT INTO playground_key_slots(user_id,workspace,key_id,ciphertext) VALUES($1,$2,$3,$4) ON CONFLICT(user_id,workspace) DO UPDATE SET key_id=EXCLUDED.key_id,ciphertext=EXCLUDED.ciphertext`, owner, organization, key.ID, encrypted); err != nil {
+			return current, err
+		}
+		if err = check("key_slot"); err != nil {
 			return current, err
 		}
 		current = playgroundkey.Record{Owner: owner, Organization: organization, KeyID: key.ID, Ciphertext: encrypted}
@@ -72,7 +100,7 @@ func (r *APIKeyRepository) CreatePlaygroundKey(ctx context.Context, owner, organ
 	if _, err = tx.ExecContext(ctx, `INSERT INTO playground_key_requests(user_id,request_id,workspace,key_id) VALUES($1,$2,$3,$4)`, owner, request, organization, current.KeyID); err != nil {
 		return current, err
 	}
-	if err = tx.Commit(); err != nil {
+	if err = check("key_request"); err != nil {
 		return current, err
 	}
 	return current, nil

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/Sociaro-Research/open-media-gateway/internal/installation"
 	wa "github.com/Sociaro-Research/open-media-gateway/internal/workspaceauth"
 	"github.com/google/uuid"
 )
@@ -265,7 +266,7 @@ func (m *Manager) PollAuthorization(ctx context.Context, owner, id string) (Reco
 	if err != nil {
 		return Record{}, err
 	}
-	if reply.InstallationID != hex.EncodeToString(wa.Digest("installation:"+string(identityRaw))) {
+	if reply.InstallationID != hex.EncodeToString(installation.ProofDigest(string(identityRaw))) {
 		return Record{}, ErrConflict
 	}
 	if current, e := m.Repo.RemoteWorkspace(ctx, owner); e == nil && current.Active {

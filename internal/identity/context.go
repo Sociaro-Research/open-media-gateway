@@ -17,6 +17,8 @@ type User struct {
 	ReportColumns []string  `json:"report_columns,omitempty"`
 	Picture       string    `json:"picture,omitempty"`
 	SessionID     string    `json:"session_id,omitempty"`
+	// SourceSessionID is a trusted central database anchor, never a browser field.
+	SourceSessionID string `json:"-"`
 }
 
 type contextKey struct{}

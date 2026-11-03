@@ -68,6 +68,11 @@ func (r *AuthRepository) UserBySession(ctx context.Context, tokenHash []byte, no
 	if err != nil {
 		return identity.User{}, fmt.Errorf("read user session: %w", err)
 	}
+	// This second read must still find the same live cookie session. A concurrent
+	// logout fails closed; the stable anchor is never derived from browser SessionID.
+	if err = r.db.QueryRowContext(ctx, `SELECT session_id::text FROM user_sessions WHERE token_hash=$1 AND user_id=$2 AND expires_at>$3`, tokenHash, user.ID, now).Scan(&user.SourceSessionID); err != nil {
+		return identity.User{}, errors.New("session not found")
+	}
 	return user, nil
 }
 

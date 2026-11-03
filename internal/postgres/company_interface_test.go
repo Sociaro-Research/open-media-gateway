@@ -34,7 +34,16 @@ func companyInterfaceSeed(t *testing.T, db *sql.DB) (ci.Grant, ci.Credentials, s
 	refresh := sha256.Sum256([]byte("refresh fixture"))
 	exec(`INSERT INTO company_interface_installations(installation_hash,organization_id,central_origin) VALUES($1,$2,'https://central.example')`, installation[:], company)
 	exec(`INSERT INTO company_interface_grants(id,installation_hash,organization_id,central_origin,approved_local_origin,purpose,protocol_version,credential_hash) VALUES($1,$2,$3,'https://central.example','https://local.example','company-interface',1,$4)`, grant, installation[:], company, token[:])
-	exec(`INSERT INTO company_interface_sessions(id,grant_id,organization_id,actor_id,local_session_hash,grant_epoch,access_hash,access_expires_at,refresh_hash,refresh_expires_at) VALUES($1,$2,$3,$4,$5,1,$6,NOW()+INTERVAL '1 hour',$7,NOW()+INTERVAL '7 days')`, session, grant, company, actor, c.LocalSessionHash[:], access[:], refresh[:])
+	// The current protocol requires a real private central source-session anchor.
+	sourceHash := sha256.Sum256([]byte("foundation source " + actor))
+	if err := NewAuthRepository(db).CreateSession(context.Background(), sourceHash[:], actor, time.Now().Add(24*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	var source string
+	if err := db.QueryRow(`SELECT session_id::text FROM user_sessions WHERE token_hash=$1`, sourceHash[:]).Scan(&source); err != nil {
+		t.Fatal(err)
+	}
+	exec(`INSERT INTO company_interface_sessions(id,grant_id,organization_id,actor_id,local_session_hash,grant_epoch,access_hash,access_expires_at,refresh_hash,refresh_expires_at,source_session_id) VALUES($1,$2,$3,$4,$5,1,$6,NOW()+INTERVAL '1 hour',$7,NOW()+INTERVAL '7 days',$8)`, session, grant, company, actor, c.LocalSessionHash[:], access[:], refresh[:], source)
 	g, err := NewCompanyInterfaceAuthority(db).Installation(context.Background(), token)
 	if err != nil {
 		t.Fatal(err)
