@@ -16,6 +16,13 @@ ignored `.local/` or `dist/`; record limits explicitly.
 
 ## Available fixtures
 
+`node scripts/ui/footer-layout.cjs` loads the actual portal and documentation modules
+with synthetic HTTPS routes. Repeat with `UI_BROWSER_ENGINE=webkit`;
+`UI_EVIDENCE_DIR` retains responsive screenshots and geometry. It checks the
+Playground footer gap, copyright/legal layout, configured primary hover, no
+underlines, keyboard focus and console-host legal targets in both themes at
+1440/390/320px. It does not establish live authentication or Caddy serving policy.
+
 For the focused integrated Playground native Upload gate, run
 `GATEWAY_NATIVE_CHOOSER_ONLY=1 node scripts/ui/references.cjs` and repeat with
 `UI_BROWSER_ENGINE=webkit`. It loads the real portal and checks click, Enter and

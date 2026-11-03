@@ -85,6 +85,13 @@ its desktop/mobile layout and keyboard navigation separately. The console's
 palette and content security policy remain unchanged outside this path; Grafana
 supplies its own nonce-based content security policy.
 
+The shared console/documentation footer shows noninteractive **© 2026 Sociaro Baltic OÜ**
+on the left and the legal links on the right, wrapping without overlap on narrow
+screens. Footer links never use underlines; hover/focus uses the configured
+primary foreground (`--accent-text`, falling back to `--accent`) and retains the
+shared visible keyboard focus outline. Playground retains the same 80px bottom
+section spacing as the portal's configuration and documentation content.
+
 The standalone documentation uses the console's shared palette, header measurement,
 logo, divider and navigation components. Its header links are **Console** and
 **Docs**, with Docs marked as the current page using the shared active underline.

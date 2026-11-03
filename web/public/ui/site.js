@@ -26,6 +26,7 @@
   document.querySelectorAll('.topbar').forEach(bindHeader);
   // A single footer survives authentication, section changes and delayed site reads.
   const footer=document.createElement('footer');footer.className='site-footer';
+  const copyright=document.createElement('span');copyright.className='site-footer-copyright';copyright.textContent='© 2026 Sociaro Baltic OÜ';footer.append(copyright);
   const legal=document.createElement('nav');legal.setAttribute('aria-label','Legal');footer.append(legal);
   for(const [label,kind]of [['Terms of Use','terms'],['Privacy Policy','privacy']]){
     const link=document.createElement('a');link.textContent=label;link.setAttribute('aria-disabled','true');link.dataset.legalLink=kind;legal.append(link);
