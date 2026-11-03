@@ -822,3 +822,8 @@ width. File limits omit the approximate symbol; monetary estimates may retain it
 Post-generation replacement audio uses the plain **Post-processing** section and
 shared **Override audio** picker, without an explanatory paragraph or nested panel.
 Its upload bindings and processing behavior remain unchanged.
+
+Playground shows the current verified estimate in its primary Generate action,
+including a monetary approximation when applicable. Pending, invalid and unavailable
+estimates replace the amount immediately; allowance/errors remain adjacent feedback.
+The confirmation retains its separate review and authoritative admission checks.

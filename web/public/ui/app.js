@@ -945,7 +945,7 @@ function updateModelUI({preserve=true}={}) {
   document.querySelector('#generationSettings').hidden = !provider || !model;
   elements.priceCard.hidden = !model;
   syncOverrideSound(model);
-  if (!provider || !model) { clearTimeout(quoteTimer); ++quoteSequence;window.referencePicker?.configure();return; }
+  if (!provider || !model) { clearTimeout(quoteTimer); ++quoteSequence;setActionEstimate('Choose a model');window.referencePicker?.configure();return; }
   const settings=ModelControls.reconcile(model,previous);
   pendingSubmission=null;if(dialog.open&&!submitting)dialog.close();
   const sameProvider=provider.id===renderedPlaygroundProvider,sameModel=sameProvider&&model.id===renderedPlaygroundModel?.id;
@@ -1109,30 +1109,37 @@ function formatPrice(value) {
   return `≈ ${formatUSD(value)}`;
 }
 
+function setActionEstimate(value, priced=false) {
+ elements.priceValue.textContent=value;
+ document.querySelector('#priceSeparator').textContent=priced?' for ':' — ';
+}
+
 function updatePrice() {
- if(currentConsoleSection==='templates'){elements.priceCard.hidden=true;return;}
- elements.priceCard.hidden = !window.GenerationKey.value() || !selectedModel();
  clearTimeout(quoteTimer);
  const sequence=++quoteSequence;
- const request=estimateRequest(); if(!request) return;
- if(durationChoice&&!durationChoice.valid()){elements.priceValue.textContent='Choose a valid duration';elements.priceCard.classList.add('unknown');FormUI.message(elements.priceDetails,'Use the duration values shown in the field label.');return;}
- if(voiceLanguageControl&&!voiceLanguageControl.valid()){elements.priceValue.textContent='Choose voice and language';elements.priceCard.classList.add('unknown');FormUI.message(elements.priceDetails,'Choose an available voice and language to get a verified estimate.');return;}
- if(playgroundResources&&!playgroundResources.valid()){elements.priceValue.textContent='Complete resource inputs';elements.priceCard.classList.add('unknown');FormUI.message(elements.priceDetails,'Complete the resource fields to get a verified estimate.');return;}
- if(modelParameterEditor&&!modelParameterEditor.valid()){elements.priceValue.textContent='Complete model parameters';elements.priceCard.classList.add('unknown');FormUI.message(elements.priceDetails,'Complete the parameter fields to get a verified estimate.');return;}
- elements.priceValue.textContent='Calculating…';
+ setActionEstimate('Calculating…');
+ if(currentConsoleSection==='templates'){elements.priceCard.hidden=true;return;}
+ elements.priceCard.hidden = !window.GenerationKey.value() || !selectedModel();
+ FormUI.message(elements.priceDetails,'');
+ const request=estimateRequest(); if(!request){setActionEstimate('Choose a model');return;}
+ if(durationChoice&&!durationChoice.valid()){setActionEstimate('Choose a valid duration');elements.priceCard.classList.add('unknown');FormUI.message(elements.priceDetails,'Use the duration values shown in the field label.');return;}
+ if(voiceLanguageControl&&!voiceLanguageControl.valid()){setActionEstimate('Choose voice and language');elements.priceCard.classList.add('unknown');FormUI.message(elements.priceDetails,'Choose an available voice and language to get a verified estimate.');return;}
+ if(playgroundResources&&!playgroundResources.valid()){setActionEstimate('Complete resource inputs');elements.priceCard.classList.add('unknown');FormUI.message(elements.priceDetails,'Complete the resource fields to get a verified estimate.');return;}
+ if(modelParameterEditor&&!modelParameterEditor.valid()){setActionEstimate('Complete model parameters');elements.priceCard.classList.add('unknown');FormUI.message(elements.priceDetails,'Complete the parameter fields to get a verified estimate.');return;}
+ setActionEstimate('Calculating…');
  FormUI.message(elements.priceDetails,'');
  quoteTimer=setTimeout(async()=>{
   try {
    const quote=await fetchEstimate(request);
    if(sequence!==quoteSequence) return;
    const amount=quote.cost?.customer_expected_usd??quote.cost?.expected_usd;if(quote.cost?.quantity_unknown||!Number.isFinite(amount)||amount<0)throw Error('Verified estimate unavailable.');
-   elements.priceValue.textContent=formatPrice(amount);
+   setActionEstimate(formatPrice(amount),true);
    elements.priceCard.classList.toggle('unknown',!quote.can_generate);
    FormUI.message(elements.priceDetails,quote.can_generate ? (quote.cost.pricing?.estimate_description || 'Final generation cost may differ.') : `Exceeds the available organization or weekly allowance (${formatUSD(quote.remaining_usd)}).`,quote.can_generate?'':'error');
   } catch(error) {
    if(sequence!==quoteSequence) return;
    const hasInput=request.prompt || selectedModel()?.prompt_optional || selectedModel()?.no_prompt;
-   elements.priceValue.textContent=hasInput ? 'Estimate unavailable' : 'Enter a prompt';
+   setActionEstimate(hasInput ? 'Estimate unavailable' : 'Enter a prompt');
    FormUI.message(elements.priceDetails,hasInput ? error.message : '',hasInput?'error':'');
    elements.priceCard.classList.add('unknown');
   }
@@ -1251,7 +1258,7 @@ window.addEventListener('gateway-key-change', () => {
   elements.taskList.replaceChildren(); elements.model.replaceChildren(new Option('Enter an API key first', ''));
   elements.model.disabled = true;
   clearTimeout(quoteTimer); ++quoteSequence;
-  elements.priceValue.textContent = 'Key required'; elements.priceDetails.textContent = '';
+  setActionEstimate('Key required'); elements.priceDetails.textContent = '';
   const ready = !!window.GenerationKey.value(); elements.submit.disabled = !ready;
   document.querySelector('#generationFields').hidden = !ready;
   document.querySelector('#generationSettings').hidden = true;if(playgroundSound)playgroundSound.root.hidden=true;

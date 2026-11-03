@@ -248,13 +248,12 @@
               <p id="connectionState" role="status" hidden></p>
               <div id="generationKeyBudget" aria-live="polite" hidden></div>
             </section>
-            <div class="price-card" id="priceCard" hidden>
-                <div><span>Estimated cost</span><strong id="priceValue">Key required</strong></div>
+            <div id="priceCard" class="estimate-feedback" aria-live="polite" hidden>
                 <p id="priceDetails"></p>
             </div>
 
             <button class="primary" id="submitButton" type="submit" hidden>
-              <span id="submitLabel">Generate</span>
+              <span><span id="submitLabel">Generate</span><span id="priceSeparator"> — </span><span id="priceValue">Key required</span></span>
               <span aria-hidden="true">→</span>
             </button>
             <p class="form-message" id="formMessage" aria-live="polite"></p>

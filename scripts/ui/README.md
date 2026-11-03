@@ -974,3 +974,8 @@ regressions. `UI_BASELINE=1` records the earlier behavior without asserting
 immediate paint. The ordinary fixture remains the full compatibility/retention
 suite. Evidence includes response delay, frame/preview/deselection timings and
 cancellation, superseding, rejection, stale-context and ordered-role checks.
+
+`UI_ESTIMATE_ACTION_ONLY=1 node scripts/ui/provider-capabilities.cjs` checks the
+Generate action's verified/free/pending/unavailable/error/allowance states and
+excludes late old quotes with synthetic responses. Repeat in WebKit; screenshots
+cover both themes at 1440/390/320px without admitting a generation.
