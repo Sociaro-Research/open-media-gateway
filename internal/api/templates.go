@@ -321,7 +321,12 @@ func (s *Server) templateInfer(w http.ResponseWriter, r *http.Request) {
 		templateError(w, e)
 		return
 	}
-	s.writeViewerJSON(w, r, 200, map[string]any{"syntax": syntax, "slots": slots})
+	result := map[string]any{"syntax": syntax, "slots": slots}
+	d.Slots = slots
+	if warning := d.ReferenceCountWarning(model); warning != "" {
+		result["warning"] = warning + " Reduce slots before publishing. You can still save this draft."
+	}
+	s.writeViewerJSON(w, r, 200, result)
 }
 func templateStorageContext(ctx context.Context) context.Context {
 	ctx = identity.WithDataOwnerID(ctx, identity.SharedOwnerID)

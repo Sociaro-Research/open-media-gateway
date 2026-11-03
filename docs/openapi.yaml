@@ -7993,7 +7993,17 @@ paths:
           application/json:
             schema: {$ref: '#/components/schemas/TemplateDefinition'}
       responses:
-        '200': {description: syntax and ordered slots for Administrator review; repeated mentions bind once}
+        '200':
+          description: Syntax and ordered slots for Administrator review; repeated mentions bind once. An optional warning reports excess slot counts without discarding inferred slots or preventing unpublished draft saving. Publication independently validates all limits.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [syntax, slots]
+                properties:
+                  syntax: {type: string}
+                  slots: {$ref: '#/components/schemas/TemplateDefinition/properties/slots'}
+                  warning: {type: string, description: Advisory actual and maximum slot counts for the selected model.}
         '400': {description: Unsupported workflow, missing references, or invalid, unsafe or gapped numeric marker}
   /v1/system/templates/{template}/assets:
     parameters:

@@ -368,13 +368,46 @@ func (d Definition) OptionsFor(model core.MediaModel) (core.MediaOptions, error)
 	return d.GenerationOptionsFor(model), nil
 }
 
+// ReferenceCountWarning describes excess declared slots, including fixed slots.
+// It is advisory during inference: drafts retain every slot. Publication still
+// runs Compatible and the complete native workflow/media validation.
+func (d Definition) ReferenceCountWarning(model core.MediaModel) string {
+	mode, ok := Mode(model, d.Options.ReferenceMode)
+	if !ok {
+		return ""
+	}
+	counts := map[string]int{}
+	for _, slot := range d.Slots {
+		counts[slot.Type]++
+	}
+	messages := []string{}
+	for _, limit := range []struct {
+		kind string
+		max  int
+	}{{"image", mode.MaxImages}, {"video", mode.MaxVideos}, {"audio", mode.MaxAudios}} {
+		if counts[limit.kind] > limit.max {
+			messages = append(messages, fmt.Sprintf("%d %s slots, maximum %d for the selected model", counts[limit.kind], limit.kind, limit.max))
+		}
+	}
+	if count := counts["image"] + counts["video"]; mode.MaxVisuals > 0 && count > mode.MaxVisuals {
+		messages = append(messages, fmt.Sprintf("%d image and video slots combined, maximum %d", count, mode.MaxVisuals))
+	}
+	if limits := model.ReferenceMediaLimits; limits != nil && limits.MaxFiles > 0 && len(d.Slots) > limits.MaxFiles {
+		messages = append(messages, fmt.Sprintf("%d reference slots in total, maximum %d", len(d.Slots), limits.MaxFiles))
+	}
+	if len(messages) == 0 {
+		return ""
+	}
+	return strings.Join(messages, "; ") + "."
+}
+
 func (d Definition) Compatible(model core.MediaModel) error {
 	options, err := d.OptionsFor(model)
 	if err != nil {
 		return err
 	}
-	if limits := model.ReferenceMediaLimits; limits != nil && limits.MaxFiles > 0 && len(d.Slots) > limits.MaxFiles {
-		return fmt.Errorf("%w: too many reference files", ErrInvalid)
+	if warning := d.ReferenceCountWarning(model); warning != "" {
+		return fmt.Errorf("%w: %s", ErrInvalid, warning)
 	}
 	if model.MediaType != d.MediaType || model.NoPrompt || d.Syntax != UIReferenceSyntax && PromptSyntax(model, d.Options.ReferenceMode) != d.Syntax {
 		return fmt.Errorf("%w: output or prompt grammar differs", ErrInvalid)
