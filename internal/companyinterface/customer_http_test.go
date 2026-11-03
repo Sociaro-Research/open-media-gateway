@@ -24,7 +24,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func customerHandler(t *testing.T, f *activeHTTPFixture, authority ci.CustomerAuthority) http.Handler {
+func customerHandler(t *testing.T, f *activeHTTPFixture, authority ci.CustomerAuthority, services ...api.Service) http.Handler {
 	t.Helper()
 	a, e := auth.New(context.Background(), postgres.NewAuthRepository(f.centralDB), auth.Config{SessionSecret: fixtureMaster, PublicURL: fixtureCentral})
 	if e != nil {
@@ -39,7 +39,11 @@ func customerHandler(t *testing.T, f *activeHTTPFixture, authority ci.CustomerAu
 	if e != nil {
 		t.Fatal(e)
 	}
-	h, e := api.WithPublicAPI(api.NewGateway(api.Dependencies{CompanyInterface: lifecycle, CompanyCustomer: authority, CompanyCentralOrigin: fixtureCentral, Auth: a, System: postgres.NewSystemRepository(f.centralDB), Keys: keys, PlaygroundKeys: managed}), "", fixtureCentral, "")
+	var service api.Service
+	if len(services) > 0 {
+		service = services[0]
+	}
+	h, e := api.WithPublicAPI(api.NewGateway(api.Dependencies{Service: service, CompanyInterface: lifecycle, CompanyCustomer: authority, CompanyCentralOrigin: fixtureCentral, Auth: a, System: postgres.NewSystemRepository(f.centralDB), Keys: keys, PlaygroundKeys: managed}), "", fixtureCentral, "")
 	if e != nil {
 		t.Fatal(e)
 	}

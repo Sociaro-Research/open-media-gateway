@@ -220,6 +220,7 @@ func (s *Server) handler() http.Handler {
 	s.registerCompanyInterfaceRoutes(mux)
 	s.registerCompanyCustomerRoutes(mux)
 	s.registerCompanyInterfaceLocalRoutes(mux)
+	s.registerCompanyFacadeRoutes(mux)
 	s.registerTemplateRoutes(mux)
 	mux.Handle("POST /v1/playground-key/restore", s.authenticate(http.HandlerFunc(s.playgroundKey)))
 	mux.Handle("POST /v1/playground-key/create", s.authenticate(http.HandlerFunc(s.playgroundKey)))

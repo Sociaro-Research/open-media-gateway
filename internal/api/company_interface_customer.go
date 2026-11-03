@@ -25,6 +25,8 @@ func companyCustomerFromContext(ctx context.Context) (ci.Principal, bool) {
 // These server-hop routes choose browser versus SDK authentication in trusted
 // composition. Caller identity headers never enter the inner handler context.
 func (s *Server) registerCompanyCustomerRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("PUT /auth/company-interface/v1/customer-browser/{path...}", func(w http.ResponseWriter, r *http.Request) { s.companyCustomerRequest(w, r, mux, true) })
+	mux.HandleFunc("PUT /auth/company-interface/v1/customer-sdk/{path...}", func(w http.ResponseWriter, r *http.Request) { s.companyCustomerRequest(w, r, mux, false) })
 	mux.HandleFunc("GET /auth/company-interface/v1/customer-browser/{path...}", func(w http.ResponseWriter, r *http.Request) { s.companyCustomerRequest(w, r, mux, true) })
 	mux.HandleFunc("HEAD /auth/company-interface/v1/customer-browser/{path...}", func(w http.ResponseWriter, r *http.Request) { s.companyCustomerRequest(w, r, mux, true) })
 	mux.HandleFunc("POST /auth/company-interface/v1/customer-browser/{path...}", func(w http.ResponseWriter, r *http.Request) { s.companyCustomerRequest(w, r, mux, true) })
@@ -45,7 +47,7 @@ func (s *Server) companyCustomerRequest(w http.ResponseWriter, r *http.Request, 
 		companyInterfaceError(w, ci.ErrProtocol)
 		return
 	}
-	for _, name := range []string{"Origin", "Cookie", "Referer", "Sec-Fetch-Site", "Sec-Fetch-Mode", "X-API-Key"} {
+	for _, name := range []string{"Origin", "Cookie", "Referer", "Sec-Fetch-Site", "Sec-Fetch-Mode", "Sec-Fetch-Dest", "Sec-Fetch-User", "X-API-Key"} {
 		if len(r.Header.Values(name)) != 0 {
 			companyInterfaceError(w, ci.ErrDenied)
 			return
@@ -85,9 +87,6 @@ func (s *Server) companyCustomerRequest(w http.ResponseWriter, r *http.Request, 
 	ctx, cancel := context.WithTimeout(r.Context(), ci.ProtocolTimeout)
 	defer cancel()
 	r = r.WithContext(ctx)
-	if !s.companyInterfaceRate(w, r, "customer") {
-		return
-	}
 	gate := ci.Gate{Authority: s.companyCustomer, Keys: s.companyCustomer, Recipients: s.companyCustomer, CentralOrigin: s.companyCentralOrigin}
 	authenticate := gate.AuthenticateSDK
 	if browser {
@@ -95,6 +94,11 @@ func (s *Server) companyCustomerRequest(w http.ResponseWriter, r *http.Request, 
 	}
 	principal, e := authenticate(ctx, c, time.Now())
 	if e != nil || r.Header.Get(ci.LocalOriginHeader) != principal.Grant.LocalOrigin {
+		// Failed credentials use the bounded failure counter. Valid company
+		// traffic retains its existing central operation/key/company policy.
+		if !s.companyInterfaceRate(w, r, "customer-invalid") {
+			return
+		}
 		companyInterfaceError(w, ci.ErrDenied)
 		return
 	}
@@ -158,7 +162,12 @@ func (s *Server) companyCustomerRequest(w http.ResponseWriter, r *http.Request, 
 	ctx = identity.WithOrganizationRole(ctx, principal.Grant.Company, effective.Role)
 	ctx = context.WithValue(ctx, companyCustomerKey{}, effective)
 	inner := r.Clone(ctx)
-	inner.URL = &url.URL{Path: path, RawQuery: r.URL.RawQuery}
+	decodedPath, err := url.PathUnescape(path)
+	if err != nil {
+		companyInterfaceError(w, ci.ErrDenied)
+		return
+	}
+	inner.URL = &url.URL{Path: decodedPath, RawPath: path, RawQuery: r.URL.RawQuery}
 	inner.RequestURI = inner.URL.RequestURI()
 	inner.Header = headers
 	inner.Body = io.NopCloser(bytes.NewReader(raw))

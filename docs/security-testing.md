@@ -133,3 +133,27 @@ contracts and does not advertise full-company-surface/v1. Local portal/SDK
 forwarding, complete route/response URL coverage, streaming media, uploads,
 payment returns and all fourteen complete runtime surfaces remain separate
 activation requirements. Passing these focused tests is not full mode acceptance.
+
+
+The reserved local customer facade now has separate actual-handler fixtures for
+original central SDK keys absent from local storage, malformed browser signals,
+spoofed transport headers, capability gating, lost customer mutations, committed
+refresh recovery and late local/global response fences. Company settings, members,
+invitations, key usage, projects and slash-bearing models exercise the existing
+central handlers and PostgreSQL repositories. Invitation tokens must resolve to
+the bound company before preview or acceptance; first-owner provisioning is never
+a delegated customer operation. Browser management uses its verified session
+actor, while key-backed project/content operations preserve recipient attribution.
+
+These tests call the reserved facade path. Ordinary external `/v1` routing and
+complete portal activation remain gated. Complete customer contract and typed URL
+coverage, original large-body/streaming budgets, uploads and payment return tests
+are still required; the bounded adapter must not silently become their limits.
+
+Valid customer traffic must not consume the authorization-attempt peer budget.
+The shared installation IP is not a user or company request-limit identity.
+Customer requests retain the existing central operation/key/company limits;
+failed customer credential checks use a separate failure counter. Authorization
+start/approval/redemption/local-control attempt limits remain unchanged. Exercise
+more than 120 valid requests from one installation peer and retain the ordinary
+protocol rate-limit regressions.

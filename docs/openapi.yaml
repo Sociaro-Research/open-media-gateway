@@ -35,6 +35,85 @@ tags:
 - name: Organizations
 - name: Payments
 paths:
+  /auth/company-interface/local/customer/{path}:
+    parameters:
+      - name: path
+        in: path
+        required: true
+        schema: {type: string}
+        description: Exact existing customer route; no arbitrary destination or broad prefix authority.
+    get:
+      operationId: localCompanyCustomerGet
+      summary: Reserved fixed-central company facade
+      security: []
+      description: "Complete local and central surface capabilities are required before refresh or dispatch. Browser Cookie/Origin/Referer/Sec-Fetch presence selects the verified per-user session requirement; malformed browser signals cannot fall back to SDK. SDK keys are validated centrally and never against local key records. Exact method/path/query/body contracts, fixed HTTPS central destination, no redirects or uncertain mutation retries, no local-data fallback. Local/global actor/family/version/revision fences apply before request intake and after response body. Current bounded management/project adapter is not ordinary external /v1 activation or complete streaming/media parity; 8192-byte request, 8388608-byte response and 15-second interim budgets do not advertise the full surface."
+      responses:
+        '200': {description: Existing central response after local body fence}
+        '201': {description: Existing central creation result}
+        '204': {description: Existing central mutation completed}
+        '403': {description: Browser, tenant, key or exact route contract rejected}
+        '409': {description: Complete capability unavailable or context changed}
+        '503': {description: Uncertain remote result retained; no mutation redispatch}
+    head:
+      operationId: localCompanyCustomerHead
+      summary: Reserved fixed-central company facade
+      security: []
+      description: "Complete local and central surface capabilities are required before refresh or dispatch. Browser Cookie/Origin/Referer/Sec-Fetch presence selects the verified per-user session requirement; malformed browser signals cannot fall back to SDK. SDK keys are validated centrally and never against local key records. Exact method/path/query/body contracts, fixed HTTPS central destination, no redirects or uncertain mutation retries, no local-data fallback. Local/global actor/family/version/revision fences apply before request intake and after response body. Current bounded management/project adapter is not ordinary external /v1 activation or complete streaming/media parity; 8192-byte request, 8388608-byte response and 15-second interim budgets do not advertise the full surface."
+      responses:
+        '200': {description: Existing central response after local body fence}
+        '201': {description: Existing central creation result}
+        '204': {description: Existing central mutation completed}
+        '403': {description: Browser, tenant, key or exact route contract rejected}
+        '409': {description: Complete capability unavailable or context changed}
+        '503': {description: Uncertain remote result retained; no mutation redispatch}
+    post:
+      operationId: localCompanyCustomerPost
+      summary: Reserved fixed-central company facade
+      security: []
+      description: "Complete local and central surface capabilities are required before refresh or dispatch. Browser Cookie/Origin/Referer/Sec-Fetch presence selects the verified per-user session requirement; malformed browser signals cannot fall back to SDK. SDK keys are validated centrally and never against local key records. Exact method/path/query/body contracts, fixed HTTPS central destination, no redirects or uncertain mutation retries, no local-data fallback. Local/global actor/family/version/revision fences apply before request intake and after response body. Current bounded management/project adapter is not ordinary external /v1 activation or complete streaming/media parity; 8192-byte request, 8388608-byte response and 15-second interim budgets do not advertise the full surface."
+      responses:
+        '200': {description: Existing central response after local body fence}
+        '201': {description: Existing central creation result}
+        '204': {description: Existing central mutation completed}
+        '403': {description: Browser, tenant, key or exact route contract rejected}
+        '409': {description: Complete capability unavailable or context changed}
+        '503': {description: Uncertain remote result retained; no mutation redispatch}
+    put:
+      operationId: localCompanyCustomerPut
+      summary: Reserved fixed-central company facade
+      security: []
+      description: "Complete local and central surface capabilities are required before refresh or dispatch. Browser Cookie/Origin/Referer/Sec-Fetch presence selects the verified per-user session requirement; malformed browser signals cannot fall back to SDK. SDK keys are validated centrally and never against local key records. Exact method/path/query/body contracts, fixed HTTPS central destination, no redirects or uncertain mutation retries, no local-data fallback. Local/global actor/family/version/revision fences apply before request intake and after response body. Current bounded management/project adapter is not ordinary external /v1 activation or complete streaming/media parity; 8192-byte request, 8388608-byte response and 15-second interim budgets do not advertise the full surface."
+      responses:
+        '200': {description: Existing central response after local body fence}
+        '201': {description: Existing central creation result}
+        '204': {description: Existing central mutation completed}
+        '403': {description: Browser, tenant, key or exact route contract rejected}
+        '409': {description: Complete capability unavailable or context changed}
+        '503': {description: Uncertain remote result retained; no mutation redispatch}
+    patch:
+      operationId: localCompanyCustomerPatch
+      summary: Reserved fixed-central company facade
+      security: []
+      description: "Complete local and central surface capabilities are required before refresh or dispatch. Browser Cookie/Origin/Referer/Sec-Fetch presence selects the verified per-user session requirement; malformed browser signals cannot fall back to SDK. SDK keys are validated centrally and never against local key records. Exact method/path/query/body contracts, fixed HTTPS central destination, no redirects or uncertain mutation retries, no local-data fallback. Local/global actor/family/version/revision fences apply before request intake and after response body. Current bounded management/project adapter is not ordinary external /v1 activation or complete streaming/media parity; 8192-byte request, 8388608-byte response and 15-second interim budgets do not advertise the full surface."
+      responses:
+        '200': {description: Existing central response after local body fence}
+        '201': {description: Existing central creation result}
+        '204': {description: Existing central mutation completed}
+        '403': {description: Browser, tenant, key or exact route contract rejected}
+        '409': {description: Complete capability unavailable or context changed}
+        '503': {description: Uncertain remote result retained; no mutation redispatch}
+    delete:
+      operationId: localCompanyCustomerDelete
+      summary: Reserved fixed-central company facade
+      security: []
+      description: "Complete local and central surface capabilities are required before refresh or dispatch. Browser Cookie/Origin/Referer/Sec-Fetch presence selects the verified per-user session requirement; malformed browser signals cannot fall back to SDK. SDK keys are validated centrally and never against local key records. Exact method/path/query/body contracts, fixed HTTPS central destination, no redirects or uncertain mutation retries, no local-data fallback. Local/global actor/family/version/revision fences apply before request intake and after response body. Current bounded management/project adapter is not ordinary external /v1 activation or complete streaming/media parity; 8192-byte request, 8388608-byte response and 15-second interim budgets do not advertise the full surface."
+      responses:
+        '200': {description: Existing central response after local body fence}
+        '201': {description: Existing central creation result}
+        '204': {description: Existing central mutation completed}
+        '403': {description: Browser, tenant, key or exact route contract rejected}
+        '409': {description: Complete capability unavailable or context changed}
+        '503': {description: Uncertain remote result retained; no mutation redispatch}
   /auth/company-interface/v1/customer-browser/{path}:
     parameters:
       - name: path
@@ -97,6 +176,17 @@ paths:
         '409': {description: Authority changed before body release}
         '429': {description: Rate limit; Retry-After 60}
         '503': {description: Unavailable or response budget exceeded}
+    put:
+      operationId: customerbrowserPut
+      summary: Reserved bounded central company adapter
+      security: []
+      description: "Reserved server-to-server customer adapter. Installation grant and stored approved frontend origin are required. Browser entry requires separately verified central session and local-context binding; management uses that session actor, generation uses the independently verified original key recipient. SDK entry requires the original central key. Invalid explicit keys never fall back. Original central middleware and object/role checks remain authoritative under one-company ceiling. Browser cookies, Origin, Referer and Sec-Fetch are rejected. Exact method/path/query/body allowlist; 8192-byte request and 8388608-byte buffered response limits; 15-second total deadline including body read. Authority rechecked after body before release. No credentials in URLs and no capability or full-mode activation. Local portal/SDK forwarding and streaming media remain unavailable."
+      responses:
+        '200': {description: Existing central handler response under the company ceiling}
+        '403': {description: Exact contract or separately verified authority rejected}
+        '409': {description: Authority changed before body release}
+        '429': {description: Rate limit; Retry-After 60}
+        '503': {description: Unavailable or response budget exceeded}
   /auth/company-interface/v1/customer-sdk/{path}:
     parameters:
       - name: path
@@ -150,6 +240,17 @@ paths:
         '503': {description: Unavailable or response budget exceeded}
     delete:
       operationId: customersdkDelete
+      summary: Reserved bounded central company adapter
+      security: []
+      description: "Reserved server-to-server customer adapter. Installation grant and stored approved frontend origin are required. Browser entry requires separately verified central session and local-context binding; management uses that session actor, generation uses the independently verified original key recipient. SDK entry requires the original central key. Invalid explicit keys never fall back. Original central middleware and object/role checks remain authoritative under one-company ceiling. Browser cookies, Origin, Referer and Sec-Fetch are rejected. Exact method/path/query/body allowlist; 8192-byte request and 8388608-byte buffered response limits; 15-second total deadline including body read. Authority rechecked after body before release. No credentials in URLs and no capability or full-mode activation. Local portal/SDK forwarding and streaming media remain unavailable."
+      responses:
+        '200': {description: Existing central handler response under the company ceiling}
+        '403': {description: Exact contract or separately verified authority rejected}
+        '409': {description: Authority changed before body release}
+        '429': {description: Rate limit; Retry-After 60}
+        '503': {description: Unavailable or response budget exceeded}
+    put:
+      operationId: customersdkPut
       summary: Reserved bounded central company adapter
       security: []
       description: "Reserved server-to-server customer adapter. Installation grant and stored approved frontend origin are required. Browser entry requires separately verified central session and local-context binding; management uses that session actor, generation uses the independently verified original key recipient. SDK entry requires the original central key. Invalid explicit keys never fall back. Original central middleware and object/role checks remain authoritative under one-company ceiling. Browser cookies, Origin, Referer and Sec-Fetch are rejected. Exact method/path/query/body allowlist; 8192-byte request and 8388608-byte buffered response limits; 15-second total deadline including body read. Authority rechecked after body before release. No credentials in URLs and no capability or full-mode activation. Local portal/SDK forwarding and streaming media remain unavailable."

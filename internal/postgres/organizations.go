@@ -475,8 +475,12 @@ func (r *SystemRepository) OrganizationInvitation(ctx context.Context, actor, to
 	}
 	hash := sha256.Sum256([]byte(token))
 	var firstOwner bool
-	if e := r.db.QueryRowContext(ctx, `SELECT first_owner FROM organization_invites WHERE token_hash=$1 OR previous_token_hash=$1`, hash[:]).Scan(&firstOwner); e != nil && !errors.Is(e, sql.ErrNoRows) {
+	var invitationCompany string
+	if e := r.db.QueryRowContext(ctx, `SELECT first_owner,organization_id::text FROM organization_invites WHERE token_hash=$1 OR previous_token_hash=$1`, hash[:]).Scan(&firstOwner, &invitationCompany); e != nil && !errors.Is(e, sql.ErrNoRows) {
 		return i, e
+	}
+	if bound := identity.CompanyBoundary(ctx); bound != "" && (invitationCompany != bound || firstOwner) {
+		return i, org.ErrForbidden
 	}
 	if firstOwner {
 		return r.firstOwnerInvitation(ctx, actor, token, accept)

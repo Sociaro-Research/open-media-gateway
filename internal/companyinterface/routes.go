@@ -40,6 +40,7 @@ type Contract struct {
 	Scope             string
 	ResponseURLs      string
 	RequestBody       string
+	QueryFields       string
 	BrowserManagement bool
 	Binary            bool
 }
@@ -56,6 +57,9 @@ func Classify(method, path string) Contract {
 	return c
 }
 func classifyCustomerRoute(method, path string) Contract {
+	if c := extendedCustomerContract(method, path); c.Class == CentralCustomer {
+		return c
+	}
 	if strings.ContainsAny(path, "%\\?#\r\n") || strings.Contains(path, "//") || strings.Contains(path, "..") {
 		return Contract{Class: Disallowed}
 	}
@@ -111,6 +115,9 @@ func classifyCustomerRoute(method, path string) Contract {
 // decoding and cleaning an attacker path before this check is not permitted.
 // Body is bounded/read by the caller; reads require an empty body.
 func RequestContract(method, escapedPath, rawQuery string, body []byte, p Principal) (Contract, error) {
+	if strings.ContainsAny(rawQuery, "#\r\n\x00") {
+		return Contract{}, ErrDenied
+	}
 	c := Classify(method, escapedPath)
 	if c.Class != CentralCustomer || len(body) > 8192 || (c.RequestBody == "" && len(body) != 0) {
 		return Contract{}, ErrDenied
@@ -129,11 +136,13 @@ func RequestContract(method, escapedPath, rawQuery string, body []byte, p Princi
 				return Contract{}, ErrDenied
 			}
 		case "company-list":
-			if name != "all" || values[0] != "false" {
+			if !containsField("all view from to timezone", name) || name == "all" && values[0] != "false" {
 				return Contract{}, ErrDenied
 			}
 		default:
-			return Contract{}, ErrDenied
+			if !containsField(c.QueryFields, name) || name == "organization_id" && values[0] != p.Grant.Company {
+				return Contract{}, ErrDenied
+			}
 		}
 	}
 	if rawQuery != "" && len(query) == 0 {
@@ -289,7 +298,7 @@ func validateCustomerBody(c Contract, raw []byte, company string) error {
 			}
 		}
 	default:
-		return ErrDenied
+		return extendedCustomerBody(c.RequestBody, raw)
 	}
 	return nil
 }

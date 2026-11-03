@@ -252,7 +252,7 @@ func TestReadContractsDenyUnknownMethodsTenantFieldsAndBodies(t *testing.T) {
 			t.Fatal("read body accepted")
 		}
 	}
-	for _, path := range []string{"/v1/system/templates/library", "/v1/system/providers", "/v1/system/storage", "/v1/system/templates", "/v1/models/vendor/model", "/v1/models/../providers", "/v1/%70roviders", "/v1//providers", content + "/", strings.Replace(content, id, "%2e%2e", 1)} {
+	for _, path := range []string{"/v1/system/templates/library", "/v1/system/providers", "/v1/system/storage", "/v1/system/templates", "/v1/models/../providers", "/v1/%70roviders", "/v1//providers", content + "/", strings.Replace(content, id, "%2e%2e", 1)} {
 		if Classify("GET", path).Class != Disallowed {
 			t.Fatal(path)
 		}
