@@ -278,8 +278,11 @@ func TestReadContractsDenyUnknownMethodsTenantFieldsAndBodies(t *testing.T) {
 	if _, err := RequestContract("HEAD", content, "", nil, p); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := RequestContract("GET", "/v1/me", "", nil, p); err == nil {
-		t.Fatal("key became browser session")
+	if _, err := RequestContract("GET", "/v1/me", "", nil, p); err != nil {
+		t.Fatal("ordinary central key profile read denied", err)
+	}
+	if _, err := RequestContract("PATCH", "/v1/me", "", []byte(`{"name":"fixture"}`), p); err == nil {
+		t.Fatal("key became browser profile-write authority")
 	}
 }
 

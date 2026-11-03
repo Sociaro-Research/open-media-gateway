@@ -11,7 +11,7 @@ import (
 	"github.com/Sociaro-Research/open-media-gateway/internal/installation"
 )
 
-const companyFacadePrefix = "/auth/company-interface/local/customer/"
+const companyFacadePrefix = ci.LocalCustomerPrefix
 
 // Reserved facade exercises the real central endpoint composition without
 // changing the existing portal mode. Complete capability negotiation still

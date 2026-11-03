@@ -40,7 +40,11 @@ func extendedCustomerContract(method, path string) Contract {
 		return customerContract("company-key-usage", "", "organization_id month timezone", "usage", "keys:manage", true)
 	}
 	if method == "POST" && (path == "/v1/invitations/preview" || path == "/v1/invitations/accept") {
-		return customerContract("company-invitation-token", "invite-token", "", "invitation", "organizations:manage", true)
+		scope := "generation"
+		if path == "/v1/invitations/accept" {
+			scope = "organizations:manage"
+		}
+		return customerContract("company-invitation-token", "invite-token", "", "invitation", scope, true)
 	}
 	if path == "/v1/projects" {
 		if read {
@@ -85,7 +89,11 @@ func extendedCustomerContract(method, path string) Contract {
 			}
 		case "credits", "balance-history":
 			if read {
-				return customerContract("company-"+parts[4], "", "offset", "company-history", "organizations:manage", true)
+				scope := "organizations:manage"
+				if parts[4] == "credits" && method == "GET" {
+					scope = "generation"
+				}
+				return customerContract("company-"+parts[4], "", "offset", "company-history", scope, true)
 			}
 		case "invitations":
 			if method == "POST" {
@@ -128,6 +136,11 @@ func extendedCustomerBody(kind string, raw []byte) error {
 	}
 	allowed, required := "", ""
 	switch kind {
+	case "generation-json":
+		allowed = "model prompt options webhook_url max_expected_cost_usd project_id timeout_seconds input voice instructions response_format output_format quality background size seconds stream n image input_reference"
+		required = "model"
+	case "reference-validation":
+		allowed = "validation reference_ids"
 	case "template-input":
 		allowed = "expected_resolution revision provider model inputs project_id max_expected_cost_usd"
 		required = "revision provider model"

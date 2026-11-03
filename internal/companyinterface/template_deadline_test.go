@@ -51,6 +51,7 @@ func TestCompanyFacadeTemplateValidationBudget(t *testing.T) {
 		status                   int
 	}{
 		{"inspection", "/v1/templates/" + uuid.NewString() + "/validate-media", "POST", `{"revision":2,"provider":"mock","model":"fixture"}`, 150 * time.Second, 404},
+		{"reference inspection", "/v1/references/validate", "POST", `{"reference_ids":[]}`, 150 * time.Second, 404},
 		{"ordinary", "/v1/me", "GET", "", ci.ProtocolTimeout, 200},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

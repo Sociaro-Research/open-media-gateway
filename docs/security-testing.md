@@ -177,3 +177,23 @@ client or transport timeout. Typed template/media URL rewriting, large response
 streaming, direct-storage redirects and complete browser integration remain
 separate pending contracts. Small shared-reference GET/HEAD fixture coverage is
 not full media transport acceptance.
+
+
+Generation JSON fixtures exercise the existing central admission handlers for
+video, image and audio aliases, exact idempotent replay/conflict behavior, reference
+validation/list/deletion and foreign-company isolation. Generation and reference
+validation JSON retain 64 KiB; reference inspection retains 150 seconds on both
+hops. Multipart generation and direct upload remain separate bridge requirements.
+Only the typed single-generation `status_url` and matching `Location` map to the
+reserved facade. Bind UUID, object kind and optional company; reject foreign,
+encoded or mismatched locations without retry. Arbitrary prompt/parameter JSON
+must remain unchanged. HEAD detail remains bodyless without a hidden GET or an
+invented representation length; central entity validators do not describe rewritten
+local JSON. Lists, artifact/media URLs and complete streaming remain pending.
+
+Compare actual central and reserved-facade handlers with normally issued
+`generation` and `generation,organizations:manage` keys. Preserve the central
+GET credits versus balance-history distinction, invitation preview versus accept,
+GET/HEAD profile versus browser-only PATCH, and organization HEAD scope rules.
+Current key issuance requires generation scope; an organizations-only issuance
+failure is not evidence of a supported key or a reason to widen issuance policy.

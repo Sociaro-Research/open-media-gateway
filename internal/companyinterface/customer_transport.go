@@ -139,7 +139,7 @@ func (c *Client) customer(ctx context.Context, prepared CustomerContext, method,
 	}
 	ctx, cancel := context.WithTimeout(ctx, CustomerTimeout(method, path))
 	defer cancel()
-	req, e := http.NewRequestWithContext(ctx, method, destination, bytes.NewReader(body))
+	req, e := newCustomerRequest(ctx, method, destination, body)
 	if e != nil {
 		return empty, ErrDenied
 	}
@@ -173,8 +173,20 @@ func (c *Client) customer(ctx context.Context, prepared CustomerContext, method,
 	if e != nil || len(raw) > MaxCustomerResponse {
 		return empty, ErrUnavailable
 	}
+	raw, location, e := generationStatusResponse(contract, response.StatusCode, method, path, binding.Company, response.Header, raw)
+	if e != nil {
+		return empty, e
+	}
 	out := CustomerResponse{Status: response.StatusCode, Header: http.Header{}, Body: raw}
+	if location != "" {
+		out.Header.Set("Location", location)
+	}
 	for _, name := range []string{"Content-Type", "Content-Disposition", "Content-Range", "Accept-Ranges", "ETag", "Last-Modified", "Retry-After"} {
+		// Original entity validators describe central JSON bytes, which differ
+		// after the typed status URL mapping (including the paired HEAD view).
+		if name == "ETag" && (contract.ResponseURLs == "generation" || contract.ResponseURLs == "template-generations") {
+			continue
+		}
 		values := response.Header.Values(name)
 		if len(values) > 1 {
 			return empty, ErrUnavailable
@@ -187,4 +199,20 @@ func (c *Client) customer(ctx context.Context, prepared CustomerContext, method,
 		}
 	}
 	return out, nil
+}
+
+// A stable idempotency key supports an explicit caller retry; it must not make
+// net/http automatically resend an uncertain mutation. A non-rewindable body is
+// retained even for zero bytes: nil/http.NoBody plus an idempotency header would
+// also make an empty request replayable. Reads keep ordinary transport behavior.
+func newCustomerRequest(ctx context.Context, method, destination string, body []byte) (*http.Request, error) {
+	if method == http.MethodGet || method == http.MethodHead {
+		return http.NewRequestWithContext(ctx, method, destination, bytes.NewReader(body))
+	}
+	request, e := http.NewRequestWithContext(ctx, method, destination, io.NopCloser(bytes.NewReader(body)))
+	if e != nil {
+		return nil, e
+	}
+	request.ContentLength = int64(len(body))
+	return request, nil
 }

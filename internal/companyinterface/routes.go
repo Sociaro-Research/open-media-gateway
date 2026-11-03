@@ -58,9 +58,21 @@ func Classify(method, path string) Contract {
 	case "central-profile", "central-profile-update", "company-list", "company-detail", "company-members", "company-invitations", "company-keys", "company-key-create", "company-key-revoke", "playground-key/create", "playground-key/restore":
 		c.BrowserManagement = true
 	}
+	// Preserve the existing central non-GET organization scope selection.
+	// Only these already admitted object contracts are affected; artifact HEAD
+	// has a separate central exception and is not classified by this list.
+	if method == "HEAD" {
+		switch c.ID {
+		case "company-list", "company-detail", "company-members", "company-invitations", "company-references", "company-generation-list", "company-generation-detail":
+			c.Scope = "organizations:manage"
+		}
+	}
 	return c
 }
 func classifyCustomerRoute(method, path string) Contract {
+	if c := workflowCustomerContract(method, path); c.Class == CentralCustomer {
+		return c
+	}
 	if c := templateCustomerContract(method, path); c.Class == CentralCustomer {
 		return c
 	}
@@ -92,7 +104,7 @@ func classifyCustomerRoute(method, path string) Contract {
 		case "/v1/api-keys":
 			return Contract{ID: "company-keys", Class: CentralCustomer, Auth: []AuthKind{CentralSession, CentralKey}, Scope: "keys:manage", ResponseURLs: "keys"}
 		case "/v1/me":
-			return Contract{ID: "central-profile", Class: CentralCustomer, Auth: []AuthKind{CentralSession}, ResponseURLs: "profile"}
+			return Contract{ID: "central-profile", Class: CentralCustomer, Auth: []AuthKind{CentralSession, CentralKey}, Scope: "generation", ResponseURLs: "profile"}
 		case "/v1/key":
 			return Contract{ID: "central-key", Class: CentralCustomer, Auth: []AuthKind{CentralKey}, ResponseURLs: "none"}
 		case "/v1/providers", "/v1/models":
