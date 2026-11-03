@@ -16,14 +16,15 @@ import (
 )
 
 type Attempt struct {
-	Owner        string    `json:"-"`
-	ID           string    `json:"id"`
-	Origin       string    `json:"origin"`
-	Name         string    `json:"client_name"`
-	ClientOrigin string    `json:"client_origin"`
-	Cipher       []byte    `json:"-"`
-	Version      int64     `json:"base_version"`
-	Expires      time.Time `json:"expires_at"`
+	ConnectionRevision int64     `json:"connection_revision"`
+	Owner              string    `json:"-"`
+	ID                 string    `json:"id"`
+	Origin             string    `json:"origin"`
+	Name               string    `json:"client_name"`
+	ClientOrigin       string    `json:"client_origin"`
+	Cipher             []byte    `json:"-"`
+	Version            int64     `json:"base_version"`
+	Expires            time.Time `json:"expires_at"`
 }
 type AuthorizationRepository interface {
 	AuthorizationAttempt(context.Context, string) (Attempt, error)
@@ -31,6 +32,8 @@ type AuthorizationRepository interface {
 	ClearAuthorizationAttempt(context.Context, string, string) error
 }
 type AuthorizationView struct {
+	CurrentRevision int64 `json:"current_connection_revision"`
+	RecoveryAllowed bool  `json:"recovery_allowed"`
 	Attempt
 	Code            string `json:"user_code,omitempty"`
 	VerificationURI string `json:"verification_uri,omitempty"`
@@ -58,7 +61,18 @@ func (m *Manager) Authorization(ctx context.Context, owner string) (Authorizatio
 		return AuthorizationView{}, err
 	}
 	code := wa.UserCode(string(raw))
-	return AuthorizationView{Attempt: attempt, Code: code, VerificationURI: attempt.Origin + "/#workspace_authorize=" + code, Interval: 5}, nil
+	view := AuthorizationView{Attempt: attempt, Code: code, VerificationURI: attempt.Origin + "/#workspace_authorize=" + code, Interval: 5, CurrentRevision: attempt.ConnectionRevision}
+	if _, ok := m.Repo.(interface {
+		LegacyRecoveryStatus(context.Context, string) (RecoveryStatus, error)
+	}); ok {
+		status, e := m.RecoveryStatus(ctx, owner)
+		if e != nil {
+			return AuthorizationView{}, e
+		}
+		view.CurrentRevision = status.Revision
+		view.RecoveryAllowed = status.RecoveryAllowed
+	}
+	return view, nil
 }
 func (m *Manager) authorizationRequest(ctx context.Context, origin, path string, value any) (*http.Response, error) {
 	data, err := json.Marshal(value)
@@ -186,7 +200,14 @@ func (m *Manager) BeginAuthorization(ctx context.Context, owner, origin, name, c
 	if json.Unmarshal(data, &reply) != nil || reply.Code != wa.UserCode(string(raw)) {
 		return AuthorizationView{}, ErrUnavailable
 	}
-	return m.Authorization(ctx, owner)
+	view, e := m.Authorization(ctx, owner)
+	if e != nil {
+		return AuthorizationView{}, e
+	}
+	if view.ID != attempt.ID || view.Origin != attempt.Origin || view.Version != attempt.Version || view.ConnectionRevision != attempt.ConnectionRevision {
+		return AuthorizationView{}, ErrConflict
+	}
+	return view, nil
 }
 func (m *Manager) PollAuthorization(ctx context.Context, owner, id string) (Record, error) {
 	repo, err := m.authorizationRepo()
@@ -278,7 +299,17 @@ func (m *Manager) PollAuthorization(ctx context.Context, owner, id string) (Reco
 	} else if e != nil && !errors.Is(e, ErrNotFound) {
 		return Record{}, e
 	}
-	saved, err := m.connect(ctx, owner, attempt.Origin, reply.Token, reply.Company, attempt.Version, "dedicated")
+	verified, err := m.verifyConnection(ctx, owner, attempt.Origin, reply.Token, reply.Company, "dedicated")
+	if err != nil {
+		return Record{}, err
+	}
+	committer, ok := m.Repo.(interface {
+		CommitRemoteAuthorization(context.Context, Record, Attempt) (Record, error)
+	})
+	if !ok {
+		return Record{}, ErrUnavailable
+	}
+	saved, err := committer.CommitRemoteAuthorization(ctx, verified, attempt)
 	if err != nil {
 		return Record{}, err
 	}

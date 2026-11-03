@@ -86,7 +86,12 @@ func (s *Server) remoteWorkspace(w http.ResponseWriter, r *http.Request) {
 	}
 	if current.Version != in.Version {
 		if current.Version == in.Version+1 && subtle.ConstantTimeCompare(current.TokenHash, apikey.Hash(in.Token)) == 1 {
-			s.writeViewerJSON(w, r, 200, current)
+			saved, e := s.remoteWorkspaceManager.Repo.SaveRemoteWorkspace(r.Context(), current, in.Version)
+			if e != nil {
+				remoteError(w, e)
+				return
+			}
+			s.writeViewerJSON(w, r, 200, saved)
 			return
 		}
 		remoteError(w, remote.ErrConflict)

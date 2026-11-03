@@ -10,7 +10,10 @@ import (
 	"github.com/google/uuid"
 )
 
-type SystemRepository struct{ db *sql.DB }
+type SystemRepository struct {
+	db                  *sql.DB
+	legacyRecoveryFault func(string) error
+}
 
 func NewSystemRepository(db *sql.DB) *SystemRepository { return &SystemRepository{db: db} }
 func (r *SystemRepository) IsAdmin(ctx context.Context, id string) (bool, error) {

@@ -713,7 +713,7 @@ paths:
       summary: Read this local administrator's pending connection request
       description: Local read only. No remote request or device secret is returned.
       responses:
-        '200': {description: 'Pending id/origin/base_version/user_code/verification_uri/expiry, or pending false'}
+        '200': {description: 'Pending id/origin/base_version/historical connection_revision/current_connection_revision/recovery_allowed/user_code/verification_uri/expiry, or pending false'}
     post:
       operationId: beginLocalInstallationAuthorization
       summary: Connect this installation to Sociaro with explicit approval
@@ -763,6 +763,59 @@ paths:
         '428': {description: Awaiting browser consent}
         '429': {description: Retry after the requested interval}
         '502': {description: Remote response uncertain; retry the same request}
+  /v1/system/remote-workspace/authorization/recovery:
+    get:
+      operationId: listLocalLegacyRecoveryCustody
+      summary: Read bounded unresolved legacy recovery history
+      description: Verified local Administrator browser session only. Returns current_connection_revision separately from historical attempt revisions, recovery_allowed, secret-free items and next_cursor. Follow the stable opaque cursor to discover older pending custody; each page contains at most 100 records. No proof, credential or saved private snapshot is returned. A live full-company binding prohibits new quarantine but does not erase terminal cleanup custody.
+      parameters:
+        - {name: cursor, in: query, schema: {type: string, maxLength: 256}}
+      responses:
+        '200': {description: Bounded owner-specific recovery history and current revision}
+        '400': {description: Invalid or repeated cursor}
+        '401': {description: Verified local browser sign-in required}
+        '403': {description: Local Administrator required}
+  /v1/system/remote-workspace/authorization/recover:
+    post:
+      operationId: quarantineLocalLegacyAuthorization
+      summary: Preserve unresolved legacy access and free its exact pending slot
+      description: Explicit verified local Administrator consent. Atomically archives the exact pending device proof and its own origin identity, separately preserves any saved connection under that connection's own binding, advances legacy and global fences and removes only the matching active attempt. A valid saved connection remains active; a different active destination still requires explicit local disconnect. No remote revocation or full company-mode activation is implied. Destination comes only from trusted server configuration. Exact operation replay returns the committed result even after later company activation; changed binding conflicts. New quarantine is denied while a full-company grant is active. JSON is limited to 8192 bytes; authorization/body/cleanup share a 15-second total deadline.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [id, operation_id, version, connection_revision, consent]
+              properties:
+                id: {type: string, format: uuid}
+                operation_id: {type: string, format: uuid}
+                version: {type: integer, minimum: 0}
+                connection_revision: {type: integer, minimum: 0}
+                consent: {type: boolean, const: true}
+      responses:
+        '200': {description: Immutable transition id, original origin, resulting version/revision and unresolved state}
+        '400': {description: Invalid request or missing explicit consent}
+        '401': {description: Verified local browser sign-in required}
+        '403': {description: Local Administrator required}
+        '409': {description: Attempt/revision changed or active full-company binding prevents a new transition}
+  /v1/system/remote-workspace/authorization/recovery/cleanup:
+    post:
+      operationId: cleanupLocalLegacyAuthorizationCustody
+      summary: Confirm terminal cleanup only at the archived original host
+      description: Uses the owner-specific archived device proof and original destination server-side. Never uses a separately saved snapshot key as cancellation authority. A positive original-host acknowledgement is required; timeout, expiry or lost response retains unresolved proof. Exact retry is idempotent and cannot activate an archive or revoke a successor. Terminal history is retained after confirmation. No browser-supplied destination, proof or credential is accepted.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, additionalProperties: false, required: [id], properties: {id: {type: string, format: uuid}}}
+      responses:
+        '200': {description: Original device request cancellation confirmed}
+        '401': {description: Verified local browser sign-in required}
+        '403': {description: Local Administrator required}
+        '404': {description: Recovery record not owned by this administrator}
+        '502': {description: Original-host cleanup remains uncertain; retained custody can be retried}
   /v1/system/setup-profile:
     post:
       operationId: applySetupProfile

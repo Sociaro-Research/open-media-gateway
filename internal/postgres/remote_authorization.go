@@ -8,10 +8,10 @@ import (
 	"github.com/google/uuid"
 )
 
-const attemptColumns = `owner_id::text,id::text,origin,client_name,client_origin,device_ciphertext,base_version,expires_at`
+const attemptColumns = `owner_id::text,id::text,origin,client_name,client_origin,device_ciphertext,base_version,expires_at,connection_revision`
 
 func scanRemoteAuthorization(row interface{ Scan(...any) error }) (v remote.Attempt, err error) {
-	err = row.Scan(&v.Owner, &v.ID, &v.Origin, &v.Name, &v.ClientOrigin, &v.Cipher, &v.Version, &v.Expires)
+	err = row.Scan(&v.Owner, &v.ID, &v.Origin, &v.Name, &v.ClientOrigin, &v.Cipher, &v.Version, &v.Expires, &v.ConnectionRevision)
 	if errors.Is(err, sql.ErrNoRows) {
 		err = remote.ErrNotFound
 	}
@@ -29,6 +29,10 @@ func (r *SystemRepository) SaveAuthorizationAttempt(ctx context.Context, next re
 	if _, err = readSystemSettings(ctx, tx, true); err != nil {
 		return next, err
 	}
+	next.ConnectionRevision, err = legacyGlobalRevision(ctx, tx, false)
+	if err != nil {
+		return next, err
+	}
 	if _, err = systemActor(ctx, tx, next.Owner); err != nil {
 		return next, err
 	}
@@ -42,7 +46,7 @@ func (r *SystemRepository) SaveAuthorizationAttempt(ctx context.Context, next re
 	}
 	current, err := scanRemoteAuthorization(tx.QueryRowContext(ctx, `SELECT `+attemptColumns+` FROM remote_workspace_authorizations WHERE owner_id=$1 FOR UPDATE`, next.Owner))
 	if err == nil {
-		if current.Origin != next.Origin || current.Name != next.Name || current.ClientOrigin != next.ClientOrigin || current.Version != next.Version {
+		if current.Origin != next.Origin || current.Name != next.Name || current.ClientOrigin != next.ClientOrigin || current.Version != next.Version || current.ConnectionRevision != next.ConnectionRevision {
 			return next, remote.ErrConflict
 		}
 		return current, tx.Commit()
@@ -50,7 +54,7 @@ func (r *SystemRepository) SaveAuthorizationAttempt(ctx context.Context, next re
 	if !errors.Is(err, remote.ErrNotFound) {
 		return next, err
 	}
-	_, err = tx.ExecContext(ctx, `INSERT INTO remote_workspace_authorizations(owner_id,id,origin,client_name,client_origin,device_ciphertext,base_version,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(owner_id) DO UPDATE SET id=EXCLUDED.id,origin=EXCLUDED.origin,client_name=EXCLUDED.client_name,client_origin=EXCLUDED.client_origin,device_ciphertext=EXCLUDED.device_ciphertext,base_version=EXCLUDED.base_version,expires_at=EXCLUDED.expires_at`, next.Owner, next.ID, next.Origin, next.Name, next.ClientOrigin, next.Cipher, next.Version, next.Expires)
+	_, err = tx.ExecContext(ctx, `INSERT INTO remote_workspace_authorizations(owner_id,id,origin,client_name,client_origin,device_ciphertext,base_version,expires_at,connection_revision) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(owner_id) DO UPDATE SET id=EXCLUDED.id,origin=EXCLUDED.origin,client_name=EXCLUDED.client_name,client_origin=EXCLUDED.client_origin,device_ciphertext=EXCLUDED.device_ciphertext,base_version=EXCLUDED.base_version,expires_at=EXCLUDED.expires_at,connection_revision=EXCLUDED.connection_revision`, next.Owner, next.ID, next.Origin, next.Name, next.ClientOrigin, next.Cipher, next.Version, next.Expires, next.ConnectionRevision)
 	if err != nil {
 		return next, err
 	}
@@ -124,6 +128,10 @@ func (r *SystemRepository) FinishSavedAuthorization(ctx context.Context, owner, 
 	if _, err = systemActor(ctx, tx, owner); err != nil {
 		return remote.Record{}, false, err
 	}
+	revision, err := legacyGlobalRevision(ctx, tx, false)
+	if err != nil {
+		return remote.Record{}, false, err
+	}
 	saved, err := scanRemote(tx.QueryRowContext(ctx, `SELECT `+remoteColumns+` FROM remote_workspaces WHERE owner_id=$1 FOR UPDATE`, owner))
 	if errors.Is(err, remote.ErrNotFound) {
 		return remote.Record{}, false, nil
@@ -137,6 +145,12 @@ func (r *SystemRepository) FinishSavedAuthorization(ctx context.Context, owner, 
 	}
 	if attempt.ID != id {
 		return remote.Record{}, false, remote.ErrConflict
+	}
+	if attempt.ConnectionRevision != revision || saved.ConnectionRevision != revision {
+		return remote.Record{}, false, remote.ErrConflict
+	}
+	if err = legacyRecoveryFence(ctx, tx, owner, attempt.Version); err != nil {
+		return remote.Record{}, false, err
 	}
 	if saved.Version == attempt.Version {
 		return remote.Record{}, false, nil

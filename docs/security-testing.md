@@ -197,3 +197,31 @@ GET credits versus balance-history distinction, invitation preview versus accept
 GET/HEAD profile versus browser-only PATCH, and organization HEAD scope rules.
 Current key issuance requires generation scope; an organizations-only issuance
 failure is not evidence of a supported key or a reason to widen issuance policy.
+
+
+Legacy recovery fixtures must create pending state through the actual legacy
+producer and PostgreSQL persistence. The current public begin API rejects a new
+wrong origin; historical wrong-origin persistence is reproduced through the
+producer, not attributed to a current public destination bypass. Cover first
+start failure, approved/issued lost replies, an actually saved host becoming
+unreachable, and valid saved connection coexistence. Restart, explicitly archive,
+use supported current-revision reads, then complete a correct-origin successor.
+A local disconnect does not imply remote revocation. Snapshot saved credentials
+under their own origin and identity, independently of the pending attempt.
+
+Quarantine and verified-save transactions must fail atomically at every write.
+Check the exact active attempt and global/legacy fences before idempotent save;
+delayed Start, Poll, credential verification and Cancel replies cannot overwrite a
+successor. Positive original-host terminal cleanup alone may settle custody; a
+lost cleanup reply retains proof and an identical retry revokes only the exact
+old request key. Include saved-before-Clear recovery and same-origin renewal.
+
+Migration091 keeps immutable legacy-only custody and exact-save receipts through
+rollback/re-upgrade. Bounded stable pages must retain access to the oldest pending
+record behind newer terminal history. New quarantine fails closed with an active
+full-company binding, while an already committed exact operation remains
+recoverable without changing that binding. Assert secret-free owner-scoped API
+responses, invalid/duplicate cursor and cross-origin rejection, live local browser
+identity, and a bounded stalled-body response. These backend fixtures do not
+establish a reachable pilot/full portal recovery action or complete company mode;
+that UI integration and all fourteen runtime rows remain separate acceptance gates.

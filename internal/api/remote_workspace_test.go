@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -27,7 +28,12 @@ func (f *remoteFixture) RemoteWorkspace(_ context.Context, owner string) (remote
 	return r, nil
 }
 func (f *remoteFixture) SaveRemoteWorkspace(_ context.Context, r remote.Record, v int64) (remote.Record, error) {
-	if f.records[r.Owner].Version != v {
+	current := f.records[r.Owner]
+	if current.Version != v {
+		// Production retry validation now lives in the repository transaction.
+		if current.Active && current.Version == v+1 && current.Origin == r.Origin && current.OrganizationID == r.OrganizationID && current.UserID == r.UserID && bytes.Equal(current.TokenHash, r.TokenHash) {
+			return current, nil
+		}
 		return r, remote.ErrConflict
 	}
 	f.writes++

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
 	"github.com/Sociaro-Research/open-media-gateway/internal/installation"
@@ -8,6 +9,7 @@ import (
 	wa "github.com/Sociaro-Research/open-media-gateway/internal/workspaceauth"
 	"net/http"
 	"net/url"
+	"time"
 )
 
 func remoteAuthorizationError(w http.ResponseWriter, err error) {
@@ -128,4 +130,117 @@ func (s *Server) pollRemoteAuthorization(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	writeJSON(w, 200, record)
+}
+
+// Explicit local control only. The configured central destination is server
+// derived; browser-supplied proofs/credentials/destinations are never accepted.
+func (s *Server) recoverRemoteAuthorization(w http.ResponseWriter, r *http.Request) {
+	if !s.legacyRecoveryBrowser(w, r) {
+		return
+	}
+	if s.remoteWorkspaceManager == nil {
+		remoteError(w, remote.ErrUnavailable)
+		return
+	}
+	if centralInstallation(r) {
+		centralModeError(w)
+		return
+	}
+	var in struct {
+		ID          string `json:"id"`
+		OperationID string `json:"operation_id"`
+		Version     int64  `json:"version"`
+		Revision    int64  `json:"connection_revision"`
+		Consent     bool   `json:"consent"`
+	}
+	if !decodeSystem(w, r, &in) {
+		return
+	}
+	if !in.Consent {
+		writeError(w, 400, "consent_required", "Confirm preserving unresolved access while continuing at the configured central service")
+		return
+	}
+	value, e := s.remoteWorkspaceManager.QuarantineAuthorization(r.Context(), identity.ActorID(r.Context()), remote.RecoveryInput{OperationID: in.OperationID, AttemptID: in.ID, Version: in.Version, Revision: in.Revision, Destination: installation.FromContext(r.Context()).CentralOrigin})
+	if e != nil {
+		remoteAuthorizationError(w, e)
+		return
+	}
+	writeJSON(w, 200, value)
+}
+func (s *Server) cleanupRemoteAuthorizationRecovery(w http.ResponseWriter, r *http.Request) {
+	if !s.legacyRecoveryBrowser(w, r) {
+		return
+	}
+	if s.remoteWorkspaceManager == nil {
+		remoteError(w, remote.ErrUnavailable)
+		return
+	}
+	var in struct {
+		ID string `json:"id"`
+	}
+	if !decodeSystem(w, r, &in) {
+		return
+	}
+	if e := s.remoteWorkspaceManager.CleanupLegacyRecovery(r.Context(), identity.ActorID(r.Context()), in.ID); e != nil {
+		remoteAuthorizationError(w, e)
+		return
+	}
+	writeJSON(w, 200, map[string]bool{"cancelled": true})
+}
+
+func (s *Server) legacyRecoveryBrowser(w http.ResponseWriter, r *http.Request) bool {
+	if s.auth == nil || identity.APIKeyID(r.Context()) != nil {
+		writeError(w, 401, "unauthorized", "Sign-in is required")
+		return false
+	}
+	user, e := s.auth.Authenticate(r)
+	if e != nil || user.ID != identity.ActorID(r.Context()) {
+		writeError(w, 401, "unauthorized", "Sign-in is required")
+		return false
+	}
+	return true
+}
+
+func (s *Server) remoteAuthorizationRecoveryStatus(w http.ResponseWriter, r *http.Request) {
+	if !s.legacyRecoveryBrowser(w, r) {
+		return
+	}
+	if s.remoteWorkspaceManager == nil {
+		remoteError(w, remote.ErrUnavailable)
+		return
+	}
+	query, parseErr := url.ParseQuery(r.URL.RawQuery)
+	if parseErr != nil {
+		writeError(w, 400, "invalid_request", "Use a valid recovery cursor")
+		return
+	}
+	for name, values := range query {
+		if name != "cursor" || len(values) != 1 {
+			writeError(w, 400, "invalid_request", "Use one recovery cursor")
+			return
+		}
+	}
+	status, e := s.remoteWorkspaceManager.RecoveryPage(r.Context(), identity.ActorID(r.Context()), query.Get("cursor"))
+	if e != nil {
+		remoteAuthorizationError(w, e)
+		return
+	}
+	s.writeViewerJSON(w, r, 200, status)
+}
+
+// Bound authorization, body intake and original-host cleanup under one total
+// deadline. Byte limits alone cannot stop a stalled authenticated upload body.
+func legacyRecoveryControl(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+		defer cancel()
+		deadline, _ := ctx.Deadline()
+		controller := http.NewResponseController(w)
+		_ = controller.SetReadDeadline(deadline)
+		_ = controller.SetWriteDeadline(deadline.Add(5 * time.Second))
+		defer controller.SetReadDeadline(time.Time{})
+		defer controller.SetWriteDeadline(time.Time{})
+		w.Header().Set("Cache-Control", "no-store")
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
 }

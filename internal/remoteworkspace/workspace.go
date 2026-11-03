@@ -30,20 +30,21 @@ const Prefix = "/v1/system/remote-workspace/proxy"
 const MaxJSON = 4 << 20
 
 type Record struct {
-	Provisioning     string     `json:"provisioning,omitempty"`
-	Context          string     `json:"context,omitempty"`
-	OperationScope   string     `json:"operation_scope,omitempty"`
-	Owner            string     `json:"-"`
-	Version          int64      `json:"version"`
-	Active           bool       `json:"connected"`
-	Origin           string     `json:"origin"`
-	OrganizationID   string     `json:"organization_id"`
-	OrganizationName string     `json:"organization_name"`
-	UserID           string     `json:"-"`
-	KeyID            string     `json:"-"`
-	TokenHash        []byte     `json:"-"`
-	Ciphertext       []byte     `json:"-"`
-	VerifiedAt       *time.Time `json:"verified_at,omitempty"`
+	ConnectionRevision int64      `json:"-"`
+	Provisioning       string     `json:"provisioning,omitempty"`
+	Context            string     `json:"context,omitempty"`
+	OperationScope     string     `json:"operation_scope,omitempty"`
+	Owner              string     `json:"-"`
+	Version            int64      `json:"version"`
+	Active             bool       `json:"connected"`
+	Origin             string     `json:"origin"`
+	OrganizationID     string     `json:"organization_id"`
+	OrganizationName   string     `json:"organization_name"`
+	UserID             string     `json:"-"`
+	KeyID              string     `json:"-"`
+	TokenHash          []byte     `json:"-"`
+	Ciphertext         []byte     `json:"-"`
+	VerifiedAt         *time.Time `json:"verified_at,omitempty"`
 }
 
 // SnapshotID is an optimistic dispatch precondition, not an authorization token.
@@ -116,6 +117,24 @@ func (m *Manager) Connect(ctx context.Context, owner, origin, token, company str
 	return m.connect(ctx, owner, origin, token, company, version, "legacy")
 }
 func (m *Manager) connect(ctx context.Context, owner, origin, token, company string, version int64, provisioning string) (Record, error) {
+	var revision int64
+	if repo, ok := m.Repo.(interface {
+		ConnectionRevision(context.Context, string, int64) (int64, error)
+	}); ok {
+		var e error
+		revision, e = repo.ConnectionRevision(ctx, owner, version)
+		if e != nil {
+			return Record{}, e
+		}
+	}
+	next, e := m.verifyConnection(ctx, owner, origin, token, company, provisioning)
+	if e != nil {
+		return Record{}, e
+	}
+	next.ConnectionRevision = revision
+	return m.Repo.SaveRemoteWorkspace(ctx, next, version)
+}
+func (m *Manager) verifyConnection(ctx context.Context, owner, origin, token, company, provisioning string) (Record, error) {
 	origin, err := Origin(origin)
 	if err != nil {
 		return Record{}, err
@@ -154,7 +173,7 @@ func (m *Manager) connect(ctx context.Context, owner, origin, token, company str
 	}
 	hash := sha256.Sum256([]byte(token))
 	now := time.Now().UTC()
-	return m.Repo.SaveRemoteWorkspace(ctx, Record{Provisioning: provisioning, Owner: owner, Active: true, Origin: origin, OrganizationID: company, OrganizationName: info.Organization.Name, UserID: info.Key.UserID, KeyID: info.Key.ID, TokenHash: hash[:], Ciphertext: encrypted, VerifiedAt: &now}, version)
+	return Record{Provisioning: provisioning, Owner: owner, Active: true, Origin: origin, OrganizationID: company, OrganizationName: info.Organization.Name, UserID: info.Key.UserID, KeyID: info.Key.ID, TokenHash: hash[:], Ciphertext: encrypted, VerifiedAt: &now}, nil
 }
 func (m *Manager) request(ctx context.Context, origin, token, method, path string, body io.Reader, idempotency string) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, method, origin+path, body)

@@ -8,10 +8,10 @@ import (
 	remote "github.com/Sociaro-Research/open-media-gateway/internal/remoteworkspace"
 )
 
-const remoteColumns = `owner_id::text,version,active,origin,organization_id,organization_name,remote_user_id,remote_key_id,token_hash,token_ciphertext,verified_at,provisioning`
+const remoteColumns = `owner_id::text,version,active,origin,organization_id,organization_name,remote_user_id,remote_key_id,token_hash,token_ciphertext,verified_at,provisioning,connection_revision`
 
 func scanRemote(row interface{ Scan(...any) error }) (r remote.Record, err error) {
-	err = row.Scan(&r.Owner, &r.Version, &r.Active, &r.Origin, &r.OrganizationID, &r.OrganizationName, &r.UserID, &r.KeyID, &r.TokenHash, &r.Ciphertext, &r.VerifiedAt, &r.Provisioning)
+	err = row.Scan(&r.Owner, &r.Version, &r.Active, &r.Origin, &r.OrganizationID, &r.OrganizationName, &r.UserID, &r.KeyID, &r.TokenHash, &r.Ciphertext, &r.VerifiedAt, &r.Provisioning, &r.ConnectionRevision)
 	if errors.Is(err, sql.ErrNoRows) {
 		err = remote.ErrNotFound
 	}
@@ -27,6 +27,23 @@ func (r *SystemRepository) SaveRemoteWorkspace(ctx context.Context, next remote.
 	}
 	defer tx.Rollback()
 	if _, err = readSystemSettings(ctx, tx, true); err != nil {
+		return remote.Record{}, err
+	}
+	revision, err := legacyGlobalRevision(ctx, tx, false)
+	if err != nil {
+		return remote.Record{}, err
+	}
+	if revision != next.ConnectionRevision {
+		return remote.Record{}, remote.ErrConflict
+	}
+	saved, err := saveRemoteWorkspaceTx(ctx, tx, next, version, r.legacyRecoveryStep)
+	if err != nil {
+		return remote.Record{}, err
+	}
+	return saved, tx.Commit()
+}
+func saveRemoteWorkspaceTx(ctx context.Context, tx *sql.Tx, next remote.Record, version int64, after func(string) error) (remote.Record, error) {
+	if err := legacyRecoveryFence(ctx, tx, next.Owner, version); err != nil {
 		return remote.Record{}, err
 	}
 	name, err := systemActor(ctx, tx, next.Owner)
@@ -53,7 +70,7 @@ func (r *SystemRepository) SaveRemoteWorkspace(ctx context.Context, next remote.
 	}
 	if version != current.Version {
 		if current.Active && current.Version == version+1 && current.Origin == next.Origin && current.OrganizationID == next.OrganizationID && bytes.Equal(current.TokenHash, next.TokenHash) {
-			return current, tx.Commit()
+			return current, nil
 		}
 		return remote.Record{}, remote.ErrConflict
 	}
@@ -67,18 +84,27 @@ func (r *SystemRepository) SaveRemoteWorkspace(ctx context.Context, next remote.
 		next.Provisioning = current.Provisioning
 	}
 	next.Version = current.Version + 1
-	_, err = tx.ExecContext(ctx, `INSERT INTO remote_workspaces(owner_id,version,active,origin,organization_id,organization_name,remote_user_id,remote_key_id,token_hash,token_ciphertext,verified_at,provisioning) VALUES($1,$2,TRUE,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT(owner_id) DO UPDATE SET version=EXCLUDED.version,active=TRUE,origin=EXCLUDED.origin,organization_id=EXCLUDED.organization_id,organization_name=EXCLUDED.organization_name,remote_user_id=EXCLUDED.remote_user_id,remote_key_id=EXCLUDED.remote_key_id,token_hash=EXCLUDED.token_hash,token_ciphertext=EXCLUDED.token_ciphertext,verified_at=EXCLUDED.verified_at,provisioning=EXCLUDED.provisioning`, next.Owner, next.Version, next.Origin, next.OrganizationID, next.OrganizationName, next.UserID, next.KeyID, next.TokenHash, next.Ciphertext, next.VerifiedAt, next.Provisioning)
+	_, err = tx.ExecContext(ctx, `INSERT INTO remote_workspaces(owner_id,version,active,origin,organization_id,organization_name,remote_user_id,remote_key_id,token_hash,token_ciphertext,verified_at,provisioning,connection_revision) VALUES($1,$2,TRUE,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT(owner_id) DO UPDATE SET version=EXCLUDED.version,active=TRUE,origin=EXCLUDED.origin,organization_id=EXCLUDED.organization_id,organization_name=EXCLUDED.organization_name,remote_user_id=EXCLUDED.remote_user_id,remote_key_id=EXCLUDED.remote_key_id,token_hash=EXCLUDED.token_hash,token_ciphertext=EXCLUDED.token_ciphertext,verified_at=EXCLUDED.verified_at,provisioning=EXCLUDED.provisioning,connection_revision=EXCLUDED.connection_revision`, next.Owner, next.Version, next.Origin, next.OrganizationID, next.OrganizationName, next.UserID, next.KeyID, next.TokenHash, next.Ciphertext, next.VerifiedAt, next.Provisioning, next.ConnectionRevision)
 	if err != nil {
 		return remote.Record{}, err
 	}
+	if err = after("saved-record"); err != nil {
+		return remote.Record{}, err
+	}
 	if err = auditSystem(ctx, tx, name, "remote_workspace_connected", next.Owner, map[string]any{"origin": next.Origin, "organization_id": next.OrganizationID, "version": next.Version}); err != nil {
+		return remote.Record{}, err
+	}
+	if err = after("saved-audit"); err != nil {
 		return remote.Record{}, err
 	}
 	// Connecting remote work never changes local provider/funding policy.
 	if _, err = tx.ExecContext(ctx, `UPDATE system_settings SET setup_pending=FALSE WHERE id=TRUE`); err != nil {
 		return remote.Record{}, err
 	}
-	return next, tx.Commit()
+	if err = after("saved-settings"); err != nil {
+		return remote.Record{}, err
+	}
+	return next, nil
 }
 func (r *SystemRepository) DisconnectRemoteWorkspace(ctx context.Context, owner string, version int64) (remote.Record, error) {
 	tx, err := beginAuditTx(ctx, r.db)
