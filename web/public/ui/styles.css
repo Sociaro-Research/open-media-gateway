@@ -360,7 +360,7 @@ audio.task-media { height: 54px; border: 0; background: transparent; }
 .nav-button { position: relative; padding: 0 4px; border-radius: 0; font-size: 14px; font-weight: 600; }
 .nav-button.active { color: var(--text); background: none; }
 .nav-button.active::after { content: ''; position: absolute; right: 0; bottom: -1px; left: 0; height: 2px; background: var(--accent); }
-#generationView { padding-top: 32px; }
+#generationView { padding-top: 32px; padding-bottom: 80px; }
 .field-meta { justify-content: flex-end; }
 .toggle-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .form-message:empty { display: none; }
