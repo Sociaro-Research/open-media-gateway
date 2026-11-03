@@ -401,3 +401,42 @@ func (r *CompanyInterfaceLifecycle) reconcile(ctx context.Context, in ci.Redempt
 	}
 	return result, installation, tx.Commit()
 }
+
+// RevokeIssuedFamily is terminal cleanup only. The exact original pending proof
+// authorizes revocation of its own issued family even after access expiry or
+// membership removal; it never renews user authority or revokes the installation.
+func (r *CompanyInterfaceLifecycle) RevokeIssuedFamily(ctx context.Context, in ci.Redemption) error {
+	if !validRedemption(in) {
+		return ci.ErrDenied
+	}
+	tx, e := beginAuditTx(ctx, r.db)
+	if e != nil {
+		return e
+	}
+	defer tx.Rollback()
+	if e = r.host(ctx, tx); e != nil {
+		return e
+	}
+	a, e := scanCIAttempt(tx.QueryRowContext(ctx, `SELECT `+ciAttemptColumns+` FROM company_interface_attempts WHERE id=$1 FOR UPDATE`, in.AttemptID))
+	if e != nil || !matchesRedemption(a.binding, in) || a.binding.CentralOrigin != r.central || a.state != "approved" || !time.Now().Before(a.recovery) {
+		return ci.ErrDenied
+	}
+	g, e := ciReadGrant(ctx, tx, a.grant)
+	if e != nil || g.InstallationHash != a.binding.InstallationHash || g.CentralOrigin != a.binding.CentralOrigin || g.LocalOrigin != a.binding.LocalOrigin {
+		return ci.ErrDenied
+	}
+	f, e := readCIFamily(ctx, tx, a.session, true)
+	if e != nil || f.grant != g.ID || f.company != g.Company || f.actor != a.actor || f.source != a.source || !bytes.Equal(f.local, a.binding.LocalSessionHash[:]) || f.grantEpoch < 1 || (!g.Revoked && f.grantEpoch != g.Epoch) {
+		return ci.ErrDenied
+	}
+	if f.revoked {
+		return tx.Commit()
+	}
+	if _, e = tx.ExecContext(ctx, `UPDATE company_interface_sessions SET revoked_at=clock_timestamp(),session_epoch=session_epoch+1 WHERE id=$1 AND grant_id=$2 AND revoked_at IS NULL`, f.id, g.ID); e != nil {
+		return e
+	}
+	if e = r.checkpoint("cleanup_family"); e != nil {
+		return e
+	}
+	return tx.Commit()
+}

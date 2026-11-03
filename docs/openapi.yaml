@@ -35,6 +35,290 @@ tags:
 - name: Organizations
 - name: Payments
 paths:
+  /auth/company-interface/v1/revoke-issued-family:
+    post:
+      operationId: companyInterfaceRevokeIssuedFamily
+      summary: Revoke only an uncertain attempt’s issued family
+      security: []
+      description: "Reserved company-interface v1 protocol composition. Full company-interface mode remains unavailable while any required capability, including full-company-surface/v1, is missing. No local-data fallback. No query parameters; strict JSON bodies up to 32768 bytes, unknown fields and trailing JSON rejected; 15-second request budget. Error bodies are sanitized and contain no remote response or credential. Terminally revoke only the exact original approved attempt\u2019s issued family within its finite seven-day recovery window. Requires matching installation/device/local-browser proofs, stored origin and revision; does not require live user access or membership. Does not revoke the permanent grant, a successor family or independent keys, and returns no renewed user authority. Backend-to-backend only at the trusted configured central destination; browser Origin/Cookie/Referer/Sec-Fetch headers and bearer/API-key headers are rejected. Proofs/credentials travel only in the HTTPS request body, never in URLs or logs. Installation authentication never supplies user identity. No automatic mutation retry; reuse the exact persisted operation after an uncertain reply."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/CompanyInterfaceRedemption"}
+      responses:
+        '200': {description: "revoked boolean; exact replay does not advance the terminal epoch"}
+        '403': {description: "Proof, exact binding or finite recovery window rejected"}
+        '409': {description: "Exact operation conflict; retain proof"}
+        '429': {description: "Rate limit; Retry-After 60"}
+        '503': {description: "Unknown cleanup outcome; retain proof and retry the exact operation"}
+  /auth/company-interface/v1/capabilities:
+    get:
+      operationId: companyInterfaceCapabilities
+      summary: "Returns only implemented capabilities; HEAD has the same read semantics and no response body."
+      security: []
+      description: "Reserved company-interface v1 protocol composition. Full company-interface mode remains unavailable while any required capability, including full-company-surface/v1, is missing. No local-data fallback. No query parameters; strict JSON bodies up to 32768 bytes, unknown fields and trailing JSON rejected; 15-second request budget. Error bodies are sanitized and contain no remote response or credential. Returns only implemented capabilities; HEAD has the same read semantics and no response body."
+      responses:
+        '200': {description: "Protocol purpose, version and implemented capabilities; no full surface advertised yet"}
+        '403': {description: "Identity, origin, proof or strict request validation rejected"}
+        '409': {description: "Update required or exact operation/context conflict; retain original proof"}
+        '428': {description: "Explicit central approval pending"}
+        '429': {description: "Rate limit; Retry-After: 60"}
+        '503': {description: "Unavailable or uncertain response; retain original operation and custody"}
+  /auth/company-interface/v1/start:
+    post:
+      operationId: companyInterfaceStart
+      summary: "Start or recover the exact pending approval attempt."
+      security: []
+      description: "Reserved company-interface v1 protocol composition. Full company-interface mode remains unavailable while any required capability, including full-company-surface/v1, is missing. No local-data fallback. No query parameters; strict JSON bodies up to 32768 bytes, unknown fields and trailing JSON rejected; 15-second request budget. Error bodies are sanitized and contain no remote response or credential. Start or recover the exact pending approval attempt. Backend-to-backend only at the trusted configured central destination; browser Origin/Cookie/Referer/Sec-Fetch headers and bearer/API-key headers are rejected. Proofs/credentials travel only in the HTTPS request body, never in URLs or logs. Installation authentication never supplies user identity. No automatic mutation retry; reuse the exact persisted operation after an uncertain reply."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/CompanyInterfaceStart"}
+      responses:
+        '200': {description: "ID, Code, State and ExpiresAt; no credential"}
+        '403': {description: "Identity, origin, proof or strict request validation rejected"}
+        '409': {description: "Update required or exact operation/context conflict; retain original proof"}
+        '428': {description: "Explicit central approval pending"}
+        '429': {description: "Rate limit; Retry-After: 60"}
+        '503': {description: "Unavailable or uncertain response; retain original operation and custody"}
+  /auth/company-interface/v1/redeem:
+    post:
+      operationId: companyInterfaceRedeem
+      summary: "Recover the exact committed redemption operation, including after a lost reply."
+      security: []
+      description: "Reserved company-interface v1 protocol composition. Full company-interface mode remains unavailable while any required capability, including full-company-surface/v1, is missing. No local-data fallback. No query parameters; strict JSON bodies up to 32768 bytes, unknown fields and trailing JSON rejected; 15-second request budget. Error bodies are sanitized and contain no remote response or credential. Recover the exact committed redemption operation, including after a lost reply. Backend-to-backend only at the trusted configured central destination; browser Origin/Cookie/Referer/Sec-Fetch headers and bearer/API-key headers are rejected. Proofs/credentials travel only in the HTTPS request body, never in URLs or logs. Installation authentication never supplies user identity. No automatic mutation retry; reuse the exact persisted operation after an uncertain reply."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/CompanyInterfaceRedemption"}
+      responses:
+        '200': {description: "Server-private encrypted-local-storage tokens; never a browser response"}
+        '403': {description: "Identity, origin, proof or strict request validation rejected"}
+        '409': {description: "Update required or exact operation/context conflict; retain original proof"}
+        '428': {description: "Explicit central approval pending"}
+        '429': {description: "Rate limit; Retry-After: 60"}
+        '503': {description: "Unavailable or uncertain response; retain original operation and custody"}
+  /auth/company-interface/v1/refresh:
+    post:
+      operationId: companyInterfaceRefresh
+      summary: "Rotate one verified family version; same operation recovers the exact committed result, different stale operations conflict without revoking a healthy family."
+      security: []
+      description: "Reserved company-interface v1 protocol composition. Full company-interface mode remains unavailable while any required capability, including full-company-surface/v1, is missing. No local-data fallback. No query parameters; strict JSON bodies up to 32768 bytes, unknown fields and trailing JSON rejected; 15-second request budget. Error bodies are sanitized and contain no remote response or credential. Rotate one verified family version; same operation recovers the exact committed result, different stale operations conflict without revoking a healthy family. Backend-to-backend only at the trusted configured central destination; browser Origin/Cookie/Referer/Sec-Fetch headers and bearer/API-key headers are rejected. Proofs/credentials travel only in the HTTPS request body, never in URLs or logs. Installation authentication never supplies user identity. No automatic mutation retry; reuse the exact persisted operation after an uncertain reply."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/CompanyInterfaceRefresh"}
+      responses:
+        '200': {description: "Server-private replacement access/refresh tokens"}
+        '403': {description: "Identity, origin, proof or strict request validation rejected"}
+        '409': {description: "Update required or exact operation/context conflict; retain original proof"}
+        '428': {description: "Explicit central approval pending"}
+        '429': {description: "Rate limit; Retry-After: 60"}
+        '503': {description: "Unavailable or uncertain response; retain original operation and custody"}
+  /auth/company-interface/v1/cancel:
+    post:
+      operationId: companyInterfaceCancel
+      summary: "Cancel only this pending attempt; an approved outcome requires reconciliation."
+      security: []
+      description: "Reserved company-interface v1 protocol composition. Full company-interface mode remains unavailable while any required capability, including full-company-surface/v1, is missing. No local-data fallback. No query parameters; strict JSON bodies up to 32768 bytes, unknown fields and trailing JSON rejected; 15-second request budget. Error bodies are sanitized and contain no remote response or credential. Cancel only this pending attempt; an approved outcome requires reconciliation. Backend-to-backend only at the trusted configured central destination; browser Origin/Cookie/Referer/Sec-Fetch headers and bearer/API-key headers are rejected. Proofs/credentials travel only in the HTTPS request body, never in URLs or logs. Installation authentication never supplies user identity. No automatic mutation retry; reuse the exact persisted operation after an uncertain reply."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/CompanyInterfaceRedemption"}
+      responses:
+        '200': {description: "cancelled boolean"}
+        '403': {description: "Identity, origin, proof or strict request validation rejected"}
+        '409': {description: "Update required or exact operation/context conflict; retain original proof"}
+        '428': {description: "Explicit central approval pending"}
+        '429': {description: "Rate limit; Retry-After: 60"}
+        '503': {description: "Unavailable or uncertain response; retain original operation and custody"}
+  /auth/company-interface/v1/reconcile:
+    post:
+      operationId: companyInterfaceReconcile
+      summary: "Read exact proof-bound operation state and distinguish family revocation from permanent-grant revocation."
+      security: []
+      description: "Reserved company-interface v1 protocol composition. Full company-interface mode remains unavailable while any required capability, including full-company-surface/v1, is missing. No local-data fallback. No query parameters; strict JSON bodies up to 32768 bytes, unknown fields and trailing JSON rejected; 15-second request budget. Error bodies are sanitized and contain no remote response or credential. Read exact proof-bound operation state and distinguish family revocation from permanent-grant revocation. Backend-to-backend only at the trusted configured central destination; browser Origin/Cookie/Referer/Sec-Fetch headers and bearer/API-key headers are rejected. Proofs/credentials travel only in the HTTPS request body, never in URLs or logs. Installation authentication never supplies user identity. No automatic mutation retry; reuse the exact persisted operation after an uncertain reply."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/CompanyInterfaceRedemption"}
+      responses:
+        '200': {description: "Server-private binding/fingerprint and state; no user/session/key secrets"}
+        '403': {description: "Identity, origin, proof or strict request validation rejected"}
+        '409': {description: "Update required or exact operation/context conflict; retain original proof"}
+        '428': {description: "Explicit central approval pending"}
+        '429': {description: "Rate limit; Retry-After: 60"}
+        '503': {description: "Unavailable or uncertain response; retain original operation and custody"}
+  /auth/company-interface/v1/recover-installation:
+    post:
+      operationId: companyInterfaceRecoverInstallation
+      summary: "Recover only the permanent installation credential under the original proof; never activate a user."
+      security: []
+      description: "Reserved company-interface v1 protocol composition. Full company-interface mode remains unavailable while any required capability, including full-company-surface/v1, is missing. No local-data fallback. No query parameters; strict JSON bodies up to 32768 bytes, unknown fields and trailing JSON rejected; 15-second request budget. Error bodies are sanitized and contain no remote response or credential. Recover only the permanent installation credential under the original proof; never activate a user. Backend-to-backend only at the trusted configured central destination; browser Origin/Cookie/Referer/Sec-Fetch headers and bearer/API-key headers are rejected. Proofs/credentials travel only in the HTTPS request body, never in URLs or logs. Installation authentication never supplies user identity. No automatic mutation retry; reuse the exact persisted operation after an uncertain reply."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/CompanyInterfaceRedemption"}
+      responses:
+        '200': {description: "Server-private installation credential and immutable binding"}
+        '403': {description: "Identity, origin, proof or strict request validation rejected"}
+        '409': {description: "Update required or exact operation/context conflict; retain original proof"}
+        '428': {description: "Explicit central approval pending"}
+        '429': {description: "Rate limit; Retry-After: 60"}
+        '503': {description: "Unavailable or uncertain response; retain original operation and custody"}
+  /auth/company-interface/v1/logout:
+    post:
+      operationId: companyInterfaceLogout
+      summary: "Revoke only the verified delegated family; preserve permanent grant, independent SDK keys and unrelated central browser sessions."
+      security: []
+      description: "Reserved company-interface v1 protocol composition. Full company-interface mode remains unavailable while any required capability, including full-company-surface/v1, is missing. No local-data fallback. No query parameters; strict JSON bodies up to 32768 bytes, unknown fields and trailing JSON rejected; 15-second request budget. Error bodies are sanitized and contain no remote response or credential. Revoke only the verified delegated family; preserve permanent grant, independent SDK keys and unrelated central browser sessions. Backend-to-backend only at the trusted configured central destination; browser Origin/Cookie/Referer/Sec-Fetch headers and bearer/API-key headers are rejected. Proofs/credentials travel only in the HTTPS request body, never in URLs or logs. Installation authentication never supplies user identity. No automatic mutation retry; reuse the exact persisted operation after an uncertain reply."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"$ref": "#/components/schemas/CompanyInterfaceLogout"}
+      responses:
+        '200': {description: "logged_out boolean"}
+        '403': {description: "Identity, origin, proof or strict request validation rejected"}
+        '409': {description: "Update required or exact operation/context conflict; retain original proof"}
+        '428': {description: "Explicit central approval pending"}
+        '429': {description: "Rate limit; Retry-After: 60"}
+        '503': {description: "Unavailable or uncertain response; retain original operation and custody"}
+  /v1/company-interface/authorizations/inspect:
+    post:
+      operationId: inspectCompanyInterfaceApproval
+      summary: "Review matching code, stored installation origin and disclosed purpose."
+      security: []
+      description: "Reserved company-interface v1 protocol composition. Full company-interface mode remains unavailable while any required capability, including full-company-surface/v1, is missing. No local-data fallback. No query parameters; strict JSON bodies up to 32768 bytes, unknown fields and trailing JSON rejected; 15-second request budget. Error bodies are sanitized and contain no remote response or credential. Review matching code, stored installation origin and disclosed purpose. Verified central browser cookie and exact configured frontend Origin required, with the existing CSRF gate. An API key cannot replace the browser session. Inspect pins the actual central actor and private source session; approval requires matching code and explicit consent. Local administrator status grants no central authority."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"type": "object", "additionalProperties": false, "properties": {"user_code": {"type": "string"}}, "required": ["user_code"]}
+      responses:
+        '200': {description: "Nonsecret attempt ID/code/state/expiry and disclosed binding"}
+        '403': {description: "Identity, origin, proof or strict request validation rejected"}
+        '409': {description: "Update required or exact operation/context conflict; retain original proof"}
+        '428': {description: "Explicit central approval pending"}
+        '429': {description: "Rate limit; Retry-After: 60"}
+        '503': {description: "Unavailable or uncertain response; retain original operation and custody"}
+  /v1/company-interface/authorizations/approve:
+    post:
+      operationId: approveCompanyInterfaceApproval
+      summary: "Atomically approve the bound intention; additional-user login requires existing membership and does not auto-issue a generation key."
+      security: []
+      description: "Reserved company-interface v1 protocol composition. Full company-interface mode remains unavailable while any required capability, including full-company-surface/v1, is missing. No local-data fallback. No query parameters; strict JSON bodies up to 32768 bytes, unknown fields and trailing JSON rejected; 15-second request budget. Error bodies are sanitized and contain no remote response or credential. Atomically approve the bound intention; additional-user login requires existing membership and does not auto-issue a generation key. Verified central browser cookie and exact configured frontend Origin required, with the existing CSRF gate. An API key cannot replace the browser session. Inspect pins the actual central actor and private source session; approval requires matching code and explicit consent. Local administrator status grants no central authority."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"type": "object", "additionalProperties": false, "properties": {"user_code": {"type": "string"}, "operation_id": {"type": "string", "format": "uuid"}, "consent": {"type": "boolean", "const": true}}, "required": ["user_code", "operation_id", "consent"]}
+      responses:
+        '200': {description: "attempt_id and state; no credential"}
+        '403': {description: "Identity, origin, proof or strict request validation rejected"}
+        '409': {description: "Update required or exact operation/context conflict; retain original proof"}
+        '428': {description: "Explicit central approval pending"}
+        '429': {description: "Rate limit; Retry-After: 60"}
+        '503': {description: "Unavailable or uncertain response; retain original operation and custody"}
+  /v1/company-interface/grants/{id}:
+    delete:
+      operationId: revokeCompanyInterfaceGrant
+      summary: "The current central company Supermanager may revoke this grant."
+      security: []
+      description: "Reserved company-interface v1 protocol composition. Full company-interface mode remains unavailable while any required capability, including full-company-surface/v1, is missing. No local-data fallback. No query parameters; strict JSON bodies up to 32768 bytes, unknown fields and trailing JSON rejected; 15-second request budget. Error bodies are sanitized and contain no remote response or credential. The current central company Supermanager may revoke this grant. Verified central browser cookie and exact configured frontend Origin required, with the existing CSRF gate. An API key cannot replace the browser session. Inspect pins the actual central actor and private source session; approval requires matching code and explicit consent. Local administrator status grants no central authority."
+      parameters:
+      - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"type": "object", "additionalProperties": false, "properties": {}}
+      responses:
+        '200': {description: "revoked boolean"}
+        '403': {description: "Identity, origin, proof or strict request validation rejected"}
+        '409': {description: "Update required or exact operation/context conflict; retain original proof"}
+        '428': {description: "Explicit central approval pending"}
+        '429': {description: "Rate limit; Retry-After: 60"}
+        '503': {description: "Unavailable or uncertain response; retain original operation and custody"}
+  /auth/company-interface/local/session:
+    post:
+      operationId: localCompanyInterfaceSession
+      summary: "Create or reuse the separate opaque browser context before Begin."
+      security: []
+      description: "Reserved company-interface v1 protocol composition. Full company-interface mode remains unavailable while any required capability, including full-company-surface/v1, is missing. No local-data fallback. No query parameters; strict JSON bodies up to 32768 bytes, unknown fields and trailing JSON rejected; 15-second request budget. Error bodies are sanitized and contain no remote response or credential. Create or reuse the separate opaque browser context before Begin. Local browser cookie is an opaque HttpOnly context, not a central credential. Exact configured frontend Origin and CSRF checks required. Central destination, proof, current grant and revision come only from trusted server storage. No browser may post a reconciliation result or central actor. Begin and Poll require complete local and central capabilities before connection writes; Cancel retains exact uncertain proof and may reconcile without full capabilities."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"type": "object", "additionalProperties": false, "properties": {}}
+      responses:
+        '200': {description: "ready boolean; opaque HttpOnly/Secure-on-HTTPS SameSite=Lax cookie"}
+        '403': {description: "Identity, origin, proof or strict request validation rejected"}
+        '409': {description: "Update required or exact operation/context conflict; retain original proof"}
+        '428': {description: "Explicit central approval pending"}
+        '429': {description: "Rate limit; Retry-After: 60"}
+        '503': {description: "Unavailable or uncertain response; retain original operation and custody"}
+  /auth/company-interface/local/begin:
+    post:
+      operationId: localCompanyInterfaceBegin
+      summary: "Start or recover this exact browser attempt; setup/upgrade/rebind additionally require a verified local administrator. Additional-user login uses the durable installation grant."
+      security: []
+      description: "Reserved company-interface v1 protocol composition. Full company-interface mode remains unavailable while any required capability, including full-company-surface/v1, is missing. No local-data fallback. No query parameters; strict JSON bodies up to 32768 bytes, unknown fields and trailing JSON rejected; 15-second request budget. Error bodies are sanitized and contain no remote response or credential. Start or recover this exact browser attempt; setup/upgrade/rebind additionally require a verified local administrator. Additional-user login uses the durable installation grant. Local browser cookie is an opaque HttpOnly context, not a central credential. Exact configured frontend Origin and CSRF checks required. Central destination, proof, current grant and revision come only from trusted server storage. No browser may post a reconciliation result or central actor. Begin and Poll require complete local and central capabilities before connection writes; Cancel retains exact uncertain proof and may reconcile without full capabilities."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"type": "object", "additionalProperties": false, "properties": {"mode": {"type": "string", "enum": ["connect", "login", "legacy-upgrade", "rebind"]}, "consent": {"type": "boolean", "const": true}}, "required": ["mode", "consent"]}
+      responses:
+        '200': {description: "Nonsecret attempt_id/user_code/state/expires_at/central_origin"}
+        '403': {description: "Identity, origin, proof or strict request validation rejected"}
+        '409': {description: "Update required or exact operation/context conflict; retain original proof"}
+        '428': {description: "Explicit central approval pending"}
+        '429': {description: "Rate limit; Retry-After: 60"}
+        '503': {description: "Unavailable or uncertain response; retain original operation and custody"}
+  /auth/company-interface/local/poll:
+    post:
+      operationId: localCompanyInterfacePoll
+      summary: "Redeem only the stored matching attempt, then activate its user context with exact local epoch/revision CAS."
+      security: []
+      description: "Reserved company-interface v1 protocol composition. Full company-interface mode remains unavailable while any required capability, including full-company-surface/v1, is missing. No local-data fallback. No query parameters; strict JSON bodies up to 32768 bytes, unknown fields and trailing JSON rejected; 15-second request budget. Error bodies are sanitized and contain no remote response or credential. Redeem only the stored matching attempt, then activate its user context with exact local epoch/revision CAS. Local browser cookie is an opaque HttpOnly context, not a central credential. Exact configured frontend Origin and CSRF checks required. Central destination, proof, current grant and revision come only from trusted server storage. No browser may post a reconciliation result or central actor. Begin and Poll require complete local and central capabilities before connection writes; Cancel retains exact uncertain proof and may reconcile without full capabilities."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"type": "object", "additionalProperties": false, "properties": {"attempt_id": {"type": "string", "format": "uuid"}}, "required": ["attempt_id"]}
+      responses:
+        '200': {description: "authorized state; does not enable full portal mode"}
+        '403': {description: "Identity, origin, proof or strict request validation rejected"}
+        '409': {description: "Update required or exact operation/context conflict; retain original proof"}
+        '428': {description: "Explicit central approval pending"}
+        '429': {description: "Rate limit; Retry-After: 60"}
+        '503': {description: "Unavailable or uncertain response; retain original operation and custody"}
+  /auth/company-interface/local/cancel:
+    post:
+      operationId: localCompanyInterfaceCancel
+      summary: "Quarantine local pending proof first. Obtain typed central confirmation; preserve permanent grant custody before settling an approved cancelled family. Unknown/conflicting outcomes retain proof."
+      security: []
+      description: "Reserved company-interface v1 protocol composition. Full company-interface mode remains unavailable while any required capability, including full-company-surface/v1, is missing. No local-data fallback. No query parameters; strict JSON bodies up to 32768 bytes, unknown fields and trailing JSON rejected; 15-second request budget. Error bodies are sanitized and contain no remote response or credential. Quarantine local pending proof first. Obtain typed central confirmation; preserve permanent grant custody before settling an approved cancelled family. Unknown/conflicting outcomes retain proof. Local browser cookie is an opaque HttpOnly context, not a central credential. Exact configured frontend Origin and CSRF checks required. Central destination, proof, current grant and revision come only from trusted server storage. No browser may post a reconciliation result or central actor. Begin and Poll require complete local and central capabilities before connection writes; Cancel retains exact uncertain proof and may reconcile without full capabilities."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {"type": "object", "additionalProperties": false, "properties": {"attempt_id": {"type": "string", "format": "uuid"}}, "required": ["attempt_id"]}
+      responses:
+        '200': {description: "cancelled state after confirmed exact cleanup"}
+        '403': {description: "Identity, origin, proof or strict request validation rejected"}
+        '409': {description: "Update required or exact operation/context conflict; retain original proof"}
+        '428': {description: "Explicit central approval pending"}
+        '429': {description: "Rate limit; Retry-After: 60"}
+        '503': {description: "Unavailable or uncertain response; retain original operation and custody"}
   /auth/workspace/start:
     post:
       operationId: startInstallationAuthorization
@@ -8277,6 +8561,10 @@ components:
           schema:
             "$ref": "#/components/schemas/ErrorResponse"
   schemas:
+    CompanyInterfaceStart: {"type": "object", "additionalProperties": false, "properties": {"InstallationProof": {"type": "string", "minLength": 43, "maxLength": 43, "writeOnly": true}, "Proof": {"type": "string", "minLength": 43, "maxLength": 43, "writeOnly": true}, "LocalSession": {"type": "string", "minLength": 43, "maxLength": 43, "writeOnly": true}, "AttemptID": {"type": "string", "format": "uuid"}, "LocalOrigin": {"type": "string", "format": "uri"}, "Label": {"type": "string", "maxLength": 120}, "Mode": {"type": "string", "enum": ["connect", "login", "legacy-upgrade", "rebind"]}, "PreviousGrantID": {"type": "string"}, "GrantCredential": {"type": "string", "minLength": 43, "maxLength": 43, "writeOnly": true}, "ConnectionRevision": {"type": "integer", "minimum": 0}, "Protocol": {"type": "object", "additionalProperties": false, "properties": {"purpose": {"type": "string"}, "version": {"type": "integer"}, "capabilities": {"type": "array", "items": {"type": "string"}}}, "required": ["purpose", "version", "capabilities"]}}, "required": ["AttemptID", "InstallationProof", "Proof", "LocalSession", "LocalOrigin", "Mode", "ConnectionRevision", "Protocol"]}
+    CompanyInterfaceRedemption: {"type": "object", "additionalProperties": false, "properties": {"InstallationProof": {"type": "string", "minLength": 43, "maxLength": 43, "writeOnly": true}, "Proof": {"type": "string", "minLength": 43, "maxLength": 43, "writeOnly": true}, "LocalSession": {"type": "string", "minLength": 43, "maxLength": 43, "writeOnly": true}, "AttemptID": {"type": "string", "format": "uuid"}, "OperationID": {"type": "string", "format": "uuid"}, "LocalOrigin": {"type": "string", "format": "uri"}, "ConnectionRevision": {"type": "integer", "minimum": 0}}, "required": ["AttemptID", "OperationID", "InstallationProof", "Proof", "LocalSession", "LocalOrigin", "ConnectionRevision"]}
+    CompanyInterfaceRefresh: {"type": "object", "additionalProperties": false, "properties": {"GrantCredential": {"type": "string", "minLength": 43, "maxLength": 43, "writeOnly": true}, "RefreshToken": {"type": "string", "minLength": 43, "maxLength": 43, "writeOnly": true}, "LocalSession": {"type": "string", "minLength": 43, "maxLength": 43, "writeOnly": true}, "OperationID": {"type": "string", "format": "uuid"}, "LocalOrigin": {"type": "string", "format": "uri"}, "SessionID": {"type": "string", "format": "uuid"}, "Version": {"type": "integer", "minimum": 1}}}
+    CompanyInterfaceLogout: {"type": "object", "additionalProperties": false, "properties": {"Installation": {"type": "string", "minLength": 43, "maxLength": 43, "writeOnly": true}, "Session": {"type": "string", "minLength": 43, "maxLength": 43, "writeOnly": true}, "LocalSessionHash": {"type": "array", "minItems": 32, "maxItems": 32, "items": {"type": "integer", "minimum": 0, "maximum": 255}}, "KeyPresent": {"type": "boolean"}, "Key": {"type": "string", "writeOnly": true}}, "required": ["Installation", "Session", "LocalSessionHash"]}
     WorkspaceDeviceProof:
       type: object
       additionalProperties: false

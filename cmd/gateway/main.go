@@ -14,9 +14,11 @@ import (
 	"github.com/Sociaro-Research/open-media-gateway/internal/api"
 	userauth "github.com/Sociaro-Research/open-media-gateway/internal/auth"
 	"github.com/Sociaro-Research/open-media-gateway/internal/catalogsync"
+	ci "github.com/Sociaro-Research/open-media-gateway/internal/companyinterface"
 	"github.com/Sociaro-Research/open-media-gateway/internal/config"
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
 	"github.com/Sociaro-Research/open-media-gateway/internal/httpclient"
+	"github.com/Sociaro-Research/open-media-gateway/internal/installation"
 	"github.com/Sociaro-Research/open-media-gateway/internal/monitoring"
 	"github.com/Sociaro-Research/open-media-gateway/internal/organization"
 	"github.com/Sociaro-Research/open-media-gateway/internal/payments"
@@ -159,7 +161,38 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	companyInterface, err := postgres.NewCompanyInterfaceLifecycle(db, cfg.ProviderCredentialsKey, installation.DefaultCentralOrigin)
+	if err != nil {
+		return fmt.Errorf("configure company authorization: %w", err)
+	}
+	var companyCoordinator *ci.Coordinator
+	companyLocalOrigin := cfg.UIPublicURL
+	if companyLocalOrigin == "" {
+		companyLocalOrigin = cfg.AuthPublicURL
+	}
+	if companyLocalOrigin != "" {
+		normalized, err := installation.NormalizeOrigin(companyLocalOrigin)
+		if err != nil {
+			return fmt.Errorf("configure company browser origin: %w", err)
+		}
+		metadata, err := installation.Describe(normalized)
+		if err != nil {
+			return err
+		}
+		if metadata.Role != "central" {
+			client, err := ci.NewClient(metadata.CentralOrigin)
+			if err != nil {
+				return err
+			}
+			companyCoordinator, err = ci.NewCoordinator(companyInterface, client, normalized)
+			if err != nil {
+				return err
+			}
+		}
+	}
 	handler := api.NewGateway(api.Dependencies{
+		CompanyCoordinator: companyCoordinator,
+		CompanyInterface:   companyInterface, CompanyCentralOrigin: installation.DefaultCentralOrigin,
 		ResourceRepository: postgres.NewProviderResourceRepository(db), ResourceScopes: providerManager.ResolveResourceConnection, ResourceDirectory: providerManager,
 		PlaygroundKeys:         playgroundKeys,
 		CatalogSync:            catalogRepository,

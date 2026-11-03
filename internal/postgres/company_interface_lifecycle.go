@@ -16,17 +16,19 @@ import (
 	"github.com/Sociaro-Research/open-media-gateway/internal/installation"
 	org "github.com/Sociaro-Research/open-media-gateway/internal/organization"
 	"github.com/Sociaro-Research/open-media-gateway/internal/playgroundkey"
+	"github.com/Sociaro-Research/open-media-gateway/internal/providerconfig"
 	"github.com/google/uuid"
 )
 
-// CompanyInterfaceLifecycle is an isolated central protocol repository. It has
-// no HTTP routes, capability advertisement or connection-mode activation yet.
+// CompanyInterfaceLifecycle implements central protocol persistence and encrypted
+// local custody. HTTP adapters do not enable the unfinished full company mode.
 // central is trusted deployment configuration, never a request-selected URL.
 type CompanyInterfaceLifecycle struct {
-	db         *sql.DB
-	central    string
-	cipher     *ci.ReceiptCipher
-	playground *playgroundkey.Manager
+	db          *sql.DB
+	central     string
+	cipher      *ci.ReceiptCipher
+	playground  *playgroundkey.Manager
+	proofCipher *providerconfig.Cipher
 	// Test-only fault injection, deliberately not exported to transport/config.
 	failWrite func(string) error
 }
@@ -45,7 +47,11 @@ func NewCompanyInterfaceLifecycle(db *sql.DB, master, central string) (*CompanyI
 	if e != nil {
 		return nil, e
 	}
-	return &CompanyInterfaceLifecycle{db: db, central: central, cipher: c, playground: p}, nil
+	proofCipher, e := providerconfig.NewCipher(master)
+	if e != nil {
+		return nil, e
+	}
+	return &CompanyInterfaceLifecycle{db: db, central: central, cipher: c, playground: p, proofCipher: proofCipher}, nil
 }
 func (r *CompanyInterfaceLifecycle) host(ctx context.Context, tx *sql.Tx) error {
 	m := installation.FromContext(ctx)
@@ -483,4 +489,8 @@ func (r *CompanyInterfaceLifecycle) Approve(ctx context.Context, in ci.Approval)
 	}
 	a.state = "approved"
 	return a.challenge(), nil
+}
+
+func (r *CompanyInterfaceLifecycle) AllowAttempt(ctx context.Context, bucket []byte, limit int, window time.Duration) (bool, error) {
+	return NewAuthRepository(r.db).AllowEmailAttempt(ctx, bucket, limit, window)
 }

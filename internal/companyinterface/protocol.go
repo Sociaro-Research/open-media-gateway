@@ -1,6 +1,6 @@
 // Package companyinterface defines the separate company-interface protocol.
 // It is not an extension of workspaceauth's generation credential. This package
-// supplies admission primitives; no portal route or connection mode uses it yet.
+// supplies admission and authorization transport; full portal mode remains gated.
 package companyinterface
 
 import (

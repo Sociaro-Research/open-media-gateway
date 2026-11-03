@@ -14,6 +14,7 @@ import (
 	"github.com/Sociaro-Research/open-media-gateway/internal/audit"
 	"github.com/Sociaro-Research/open-media-gateway/internal/auth"
 	"github.com/Sociaro-Research/open-media-gateway/internal/catalogsync"
+	ci "github.com/Sociaro-Research/open-media-gateway/internal/companyinterface"
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
 	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
 	"github.com/Sociaro-Research/open-media-gateway/internal/modelaccess"
@@ -61,6 +62,9 @@ type BrowserAuth interface {
 }
 
 type Server struct {
+	companyCoordinator     *ci.Coordinator
+	companyInterface       ci.Lifecycle
+	companyCentralOrigin   string
 	resourceRepository     providerresources.Repository
 	resourceScopes         providerresources.ScopeResolver
 	resourceLifecycle      *providerresources.Lifecycle
@@ -122,6 +126,9 @@ func NewWithPayments(service Service, health HealthChecker, apiKey string, media
 
 // Dependencies keeps management services independent of browser authentication.
 type Dependencies struct {
+	CompanyCoordinator     *ci.Coordinator
+	CompanyInterface       ci.Lifecycle
+	CompanyCentralOrigin   string
 	ResourceRepository     providerresources.Repository
 	ResourceScopes         providerresources.ScopeResolver
 	ResourceDirectory      core.ProviderDirectory
@@ -153,6 +160,9 @@ func NewGateway(d Dependencies) http.Handler {
 	service, health, apiKey, mediaStorage, signingSecret, mediaURLTTL := d.Service, d.Health, d.APIKey, d.Storage, d.SigningSecret, d.MediaURLTTL
 	providerAdmin, authManager, library, sys, funding := d.ProviderAdmin, d.Auth, d.References, d.System, d.Payments
 	s := &Server{service: service, health: health, apiKey: apiKey, storage: mediaStorage, providerAdmin: providerAdmin, payments: funding}
+	s.companyCoordinator = d.CompanyCoordinator
+	s.companyInterface = d.CompanyInterface
+	s.companyCentralOrigin = d.CompanyCentralOrigin
 	s.remoteWorkspaceManager = d.RemoteWorkspace
 	s.workspaceAuthorization = d.WorkspaceAuthorization
 	s.references = library
@@ -204,6 +214,8 @@ func NewGateway(d Dependencies) http.Handler {
 
 func (s *Server) handler() http.Handler {
 	mux := http.NewServeMux()
+	s.registerCompanyInterfaceRoutes(mux)
+	s.registerCompanyInterfaceLocalRoutes(mux)
 	s.registerTemplateRoutes(mux)
 	mux.Handle("POST /v1/playground-key/restore", s.authenticate(http.HandlerFunc(s.playgroundKey)))
 	mux.Handle("POST /v1/playground-key/create", s.authenticate(http.HandlerFunc(s.playgroundKey)))
