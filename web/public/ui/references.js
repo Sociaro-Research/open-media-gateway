@@ -68,7 +68,7 @@ function hashReferenceFile(file,signal){
   const dragType = 'application/x-gateway-reference-'+kind;
   let items = [], offset = 0, hasMore = false, busy = false, loading = false, epoch = 0;
   let controller = new AbortController();
-  let checkedSignature='',checking=false,validationError='';
+  let checkedSignature='',checking=false,validationError='',pendingSelection=null;
   const validationTarget=()=>{const model=selectedModel();const t=model?ReferenceValidation.target(selectedProvider()?.id,model.id,requestOptions(model)):null;if(t&&kind==='audio'&&voiceTarget)t.role='reference_voice';return t;};
   const selectionSignature=()=>JSON.stringify([selectionVersion,validationTarget(),urls(),field.value,kind==='audio'?activeVoices():null]);
   const candidateIDs=values=>[...new Set([...(validationTarget()?.reference_ids||[]).filter(id=>!ReferenceValidation.ids(urls()).includes(id)),...ReferenceValidation.ids(values)])];
@@ -84,7 +84,8 @@ function hashReferenceFile(file,signal){
   const libraryStatus = library.querySelector('[data-status]');
   const more = library.querySelector('[data-more]');
   let sparse=false,missingTarget=null,roleEntries=[];
-  function syncRoles(values){const remaining=[...roleEntries];roleEntries=values.map((url,index)=>{const found=remaining.findIndex(e=>e.url===url);return {url,role:found>=0?remaining.splice(found,1)[0].role:roleEntries[index]?.url===''?roleEntries[index].role:undefined};});}
+  function rolesFor(values){const remaining=[...roleEntries];return values.map((url,index)=>{const found=remaining.findIndex(e=>e.url===url);return {url,role:found>=0?remaining.splice(found,1)[0].role:roleEntries[index]?.url===''?roleEntries[index].role:undefined};});}
+  function syncRoles(values){roleEntries=rolesFor(values);}
   const readRoles=()=>Object.fromEntries(roleEntries.map((e,i)=>[kind+'_'+(i+1),ModelControls.role(selectedModel(),kind,e.role)]));
   let acceptedValues=[],lastDraft=null,urlDraftError='';
   function parseDraft(){if(field.value===lastDraft)return;lastDraft=field.value;const values=field.value.split('\n').map(s=>s.trim());const next=sparse?values:[...new Set(values.filter(Boolean))];urlDraftError='';
@@ -95,13 +96,13 @@ function hashReferenceFile(file,signal){
   const insert = (values,url) => {if(limit()===1)return [url];const next=[...values],hole=sparse?(missingTarget!==null&&next[missingTarget]===''?missingTarget:next.indexOf('')):-1;if(hole>=0)next[hole]=url;else next.push(url);return next;};
   const absolute = url => new URL(url, location.origin).href;
   function limit(){return mode()?.['max_'+plural] ?? (image ? selectedModel()?.max_image_inputs || Infinity : 1);}
-  const pickerUI=ReferenceUpload.create({label:kind[0].toUpperCase()+kind.slice(1)+' references',kinds:[kind],multiple:()=>limit()!==1,maxCount:limit,maxBytes,limits:()=>selectedModel()?.reference_media_limits?.[kind]||{},locked:()=>busy||loading,onFiles:upload,onLibrary:()=>{returnFocus=pickerUI.library;previousFocus=document.activeElement;library.showModal();renderLibrary();load();}});
+  const pickerUI=ReferenceUpload.create({label:kind[0].toUpperCase()+kind.slice(1)+' references',kinds:[kind],multiple:()=>limit()!==1,maxCount:limit,maxBytes,limits:()=>selectedModel()?.reference_media_limits?.[kind]||{},locked:()=>busy||loading||!!pendingSelection,onFiles:upload,onLibrary:()=>{returnFocus=pickerUI.library;previousFocus=document.activeElement;library.showModal();renderLibrary();load();}});
   const oldDrop=dropzone,oldFiles=files,oldSelected=selected,oldStatus=status,heading=oldDrop.previousElementSibling;
   oldDrop.before(pickerUI.root);if(heading?.tagName==='LABEL'&&!heading.contains(field))heading.remove();
   pickerUI.drop.id=oldDrop.id;pickerUI.input.id=oldFiles.id;pickerUI.previews.id=oldSelected.id;pickerUI.status.id=oldStatus.id;pickerUI.upload.id=image?'uploadReference':kind+'UploadReference';pickerUI.library.id=image?'chooseReferences':kind+'ChooseReferences';
   oldDrop.remove();oldFiles.remove();oldSelected.remove();oldStatus.remove();dropzone=pickerUI.drop;files=pickerUI.input;selected=pickerUI.previews;status=pickerUI.status;
   const manual=field.closest('.reference-manual');pickerUI.root.append(manual);const urlLabel=manual.querySelector('label');if(urlLabel){const text=urlLabel.querySelector('.floating-label')||urlLabel;if(text===urlLabel&&text.contains(field)){for(const n of [...text.childNodes])if(n.nodeType===3)n.remove();text.prepend(document.createTextNode('URLs (one per line)'));}else text.textContent='URLs (one per line)';}FormUI.disclosure(manual.querySelector('summary'),'Use URLs');
-  const libraryUI=ReferenceUpload.create({label:kind[0].toUpperCase()+kind.slice(1)+' references',kinds:[kind],multiple:true,maxBytes,limits:()=>selectedModel()?.reference_media_limits?.[kind]||{},locked:()=>busy||loading,onFiles:upload});
+  const libraryUI=ReferenceUpload.create({label:kind[0].toUpperCase()+kind.slice(1)+' references',kinds:[kind],multiple:true,maxBytes,limits:()=>selectedModel()?.reference_media_limits?.[kind]||{},locked:()=>busy||loading||!!pendingSelection,onFiles:upload});
   const oldLibraryDrop=library.querySelector('#libraryDropzone');oldLibraryDrop.replaceWith(libraryUI.root);libraryUI.drop.id='libraryDropzone';libraryUI.upload.dataset.upload='';
   const selectedCards=new Map();
   function message(text = '', error = false) {
@@ -129,38 +130,42 @@ function hashReferenceFile(file,signal){
   }
   function updateCaption(card,name,index){const roleName=mode()?.image_roles?.[image?index:-1],spec=window.ReferencePrompts?.contract(selectedModel(),{reference_mode:modeSelect.value}),offset=image&&mode()?.id==='first_frame_references'?1:0,address=spec?.types.includes(kind)&&index>=offset?ReferencePrompts.label(spec.syntax,kind,index-offset):'';card.querySelector('.reference-name').textContent=(address?address+' · ':roleName?roleName+': ':'')+name;}
 
+  const displayedValues=()=>pendingSelection?.values||urls();
+  function currentSelection(pending){return pending.epoch===epoch&&pending.key===generationKeyVersion&&pending.voice===voiceTarget&&pending.intent===ReferenceValidation.signature(validationTarget())&&pending.selection===selectionSignature();}
+  function discardSelection(){if(pendingSelection){pendingSelection.controller.abort();pendingSelection=null;}}
   function render() {
+    if(pendingSelection&&!currentSelection(pendingSelection)){discardSelection();checkedSignature='';message('Selection, model or workflow changed. Choose the file again.',true);}
     pickerUI.sync();libraryUI.sync();const label=manual.querySelector('label');if(label&&!label.contains(field))label.textContent=limit()===1?'URL':'one per line';parseDraft();if(urlDraftError)message(urlDraftError,true);
     syncFileInput();files.accept=accept();
-    if(!urlDraftError)recheck();
+    if(!urlDraftError&&!pendingSelection)recheck();
     for(const node of document.querySelectorAll(`[data-reference-cancel="${kind}"]`))node.hidden=!busy;
-    const values = urls();syncRoles(values);selected.classList.toggle('has-reference-roles',(ModelControls.schema(selectedModel(),kind)?.roles.length||0)>1);
+    const values = displayedValues();if(!pendingSelection)syncRoles(values);selected.classList.toggle('has-reference-roles',(ModelControls.schema(selectedModel(),kind)?.roles.length||0)>1);
     const occurrences=new Map();const nodes=values.map((url,index)=>{
-      const info=metadata.get(url),identity=info?.id?JSON.stringify([info.scope||'organization',info.id]):url||'empty:'+index,occurrence=occurrences.get(identity)||0;occurrences.set(identity,occurrence+1);const key=identity+'#'+occurrence;let card=selectedCards.get(key);if(card){if(info)card.update({name:info.name||card.querySelector('.reference-name').textContent,type:kind+'/unknown',url:url.startsWith('asset://')?ProviderReferenceLibrary.safeURL(info.preview_url):absolute(info.url||url),version:info.version,revision:info.revision});card.currentIndex=index;card.draggable=!busy;card.querySelector('.reference-selection-remove').disabled=busy;if(card.decoration===JSON.stringify([selectionVersion,voices[url],roleEntries[index]?.role,index])){updateCaption(card,!url?'Choose reference':info?.name||(url.startsWith('asset://')?url.slice(8):`Reference ${index+1}`),index);return card;}card.querySelectorAll('.reference-role,.reference-voice,.reference-clear-voice').forEach(n=>n.remove());}
+      const info=metadata.get(url),identity=info?.id?JSON.stringify([info.scope||'organization',info.id]):url||'empty:'+index,occurrence=occurrences.get(identity)||0;occurrences.set(identity,occurrence+1);const key=identity+'#'+occurrence;let card=selectedCards.get(key);if(card){if(info)card.update({name:info.name||card.querySelector('.reference-name').textContent,type:kind+'/unknown',url:url.startsWith('asset://')?ProviderReferenceLibrary.safeURL(info.preview_url):absolute(info.url||url),version:info.version,revision:info.revision});card.currentIndex=index;card.draggable=!busy&&!pendingSelection;card.querySelector('.reference-selection-remove').disabled=busy;if(card.decoration===JSON.stringify([selectionVersion,voices[url],roleEntries[index]?.role,index,!!pendingSelection])){updateCaption(card,!url?'Choose reference':info?.name||(url.startsWith('asset://')?url.slice(8):`Reference ${index+1}`),index);return card;}card.querySelectorAll('.reference-role,.reference-voice,.reference-clear-voice').forEach(n=>n.remove());}
       const name = !url?'Choose reference':metadata.get(url)?.name || (url.startsWith('asset://') ? url.slice(8) : `Reference ${index + 1}`);
       let previewURL='';try{const u=new URL(url);if(u.origin===location.origin&&u.pathname.startsWith('/references/'))previewURL=url;}catch{}if(url.startsWith('asset://'))previewURL=ProviderReferenceLibrary.safeURL(metadata.get(url)?.preview_url)||'';
-      if(!card){card=ReferenceUpload.mediaCard({url:previewURL,name,type:kind+'/unknown',placeholder:url.startsWith('asset://')?'Registered asset':kind+' URL'},{onRemove:()=>{if(busy)return;const i=card.currentIndex;write(urls().filter((_,n)=>n!==i),false,roleEntries.filter((_,n)=>n!==i));pickerUI.upload.focus();}});selectedCards.set(key,card);card.currentIndex=index;
+      if(!card){card=ReferenceUpload.mediaCard({url:previewURL,name,type:kind+'/unknown',placeholder:url.startsWith('asset://')?'Registered asset':kind+' URL'},{onRemove:()=>{if(busy)return;const i=card.currentIndex;if(pendingSelection)chooseValues(displayedValues().filter((_,n)=>n!==i));else write(urls().filter((_,n)=>n!==i),false,roleEntries.filter((_,n)=>n!==i));pickerUI.upload.focus();}});selectedCards.set(key,card);card.currentIndex=index;
       if(!url){const choose=button('Choose reference',`Choose ${kind} reference ${index+1}`,()=>{missingTarget=card.currentIndex;returnFocus=choose;previousFocus=document.activeElement;library.showModal();renderLibrary();load();});card.querySelector('.media-picker-media').append(choose);}
       card.removeButton.setAttribute('aria-label','Remove '+name+' from generation');
       const remove=card.removeButton;remove.disabled=busy;
-      card.draggable = !busy; card.tabIndex = 0; card.title = 'Drag to reorder. Use Alt + Left or Right Arrow with the keyboard.';
+      card.draggable = !busy&&!pendingSelection; card.tabIndex = 0; card.title = 'Drag to reorder. Use Alt + Left or Right Arrow with the keyboard.';
       card.addEventListener('dragstart', event => {
-        if (busy || event.target.closest('button,input,select')) { event.preventDefault(); return; }
+        if (busy || pendingSelection || event.target.closest('button,input,select')) { event.preventDefault(); return; }
         draggedURL = String(card.currentIndex); event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData(dragType, String(card.currentIndex)); card.classList.add('dragging');
       });
       card.addEventListener('dragend', () => { draggedURL = null; card.classList.remove('dragging'); document.querySelectorAll('.dragover').forEach(el => el.classList.remove('dragover')); });
       card.addEventListener('keydown', event => {
-        if (!event.altKey || !['ArrowLeft','ArrowRight'].includes(event.key) || busy) return;
+        if (!event.altKey || !['ArrowLeft','ArrowRight'].includes(event.key) || busy || pendingSelection) return;
         event.preventDefault(); reorder(card.currentIndex, card.currentIndex + (event.key === 'ArrowLeft' ? -1 : 1),true);
       });
 
       bindDrop(card,()=>card.currentIndex);}
-      card.currentIndex=index;card.draggable=!busy;card.decoration=JSON.stringify([selectionVersion,voices[url],roleEntries[index]?.role,index]);
+      card.currentIndex=index;card.draggable=!busy&&!pendingSelection;card.decoration=JSON.stringify([selectionVersion,voices[url],roleEntries[index]?.role,index,!!pendingSelection]);
       updateCaption(card,name,index);
-      const role=ModelControls.roleField(selectedModel(),kind,index+1,roleEntries[index]?.role,value=>{roleEntries[card.currentIndex].role=value;checkedSignature='';recheck();window.dispatchEvent(new Event('gateway-reference-change'));updatePrice();});if(role){role.classList.add('reference-role');card.append(role);}
+      const role=ModelControls.roleField(selectedModel(),kind,index+1,roleEntries[index]?.role,value=>{roleEntries[card.currentIndex].role=value;checkedSignature='';recheck();window.dispatchEvent(new Event('gateway-reference-change'));updatePrice();});if(role){role.classList.add('reference-role');if(pendingSelection)for(const control of role.querySelectorAll('input,select,button'))control.disabled=true;card.append(role);}
       if(url&&kind!=='audio'&&mode()?.supports_reference_voice&&!(image&&index<(mode()?.voice_image_start||0))){
-        const voice=button(voices[url]?'Change voice reference':'Add voice reference',`Voice reference for ${name}`,()=>{voiceTarget={url};pickers[2].open(voice);});voice.classList.add('reference-voice');card.append(voice);
-        if(voices[url]){const clear=button('Clear voice',`Clear voice for ${name}`,()=>{delete voices[url];render();updatePrice();});clear.classList.add('reference-clear-voice');card.append(clear);}
+        const voice=button(voices[url]?'Change voice reference':'Add voice reference',`Voice reference for ${name}`,()=>{voiceTarget={url};pickers[2].open(voice);});voice.disabled=!!pendingSelection;voice.classList.add('reference-voice');card.append(voice);
+        if(voices[url]){const clear=button('Clear voice',`Clear voice for ${name}`,()=>{delete voices[url];render();updatePrice();});clear.disabled=!!pendingSelection;clear.classList.add('reference-clear-voice');card.append(clear);}
       }
       return card;
     });
@@ -170,11 +175,12 @@ function hashReferenceFile(file,signal){
     window.dispatchEvent(new Event('gateway-reference-change'));
   }
   async function select(item) {
-    const values=urls(),canonical=absolute(item.url),url=values.find(value=>{const known=metadata.get(value);return known?.id===item.id&&(known.scope||'organization')===(item.scope||'organization');})||canonical,voiceIntent=kind==='audio'?voiceTarget:null;
+    const values=displayedValues(),canonical=absolute(item.url),url=values.find(value=>{const known=metadata.get(value);return known?.id===item.id&&(known.scope||'organization')===(item.scope||'organization');})||canonical,voiceIntent=kind==='audio'?voiceTarget:null;
     if(busy)return;
-    if(!voiceIntent&&values.includes(url)&&!(sparse&&values.includes(''))){write(values.filter(value=>value!==url));message();return;}
+    if(!voiceIntent&&values.includes(url)&&!(sparse&&values.includes(''))){chooseValues(values.filter(value=>value!==url));return;}
     if(busy)return;
     if(!voiceIntent&&limit()!==1&&values.length>=limit()&&!(sparse&&values.includes(''))){message(`This model accepts up to ${limit()} ${plural}. Remove one first.`,true);return;}
+    if(!voiceIntent){metadata.set(url,item);return chooseValues(insert(values,url));}
     const token=epoch,validation=validationTarget(),intent=ReferenceValidation.signature(validation),selection=selectionSignature();
     busy=true;message(`Checking ${item.name}…`);renderLibrary();
     try{
@@ -186,23 +192,48 @@ function hashReferenceFile(file,signal){
     }catch(error){if(token===epoch&&error.name!=='AbortError')message(error.message,true);}
     finally{if(token===epoch){busy=false;render();}}
   }
+  async function chooseValues(values){
+    discardSelection();
+    if(JSON.stringify(values)===JSON.stringify(urls())){checkedSignature='';render();message();return;}
+    // Paint the intended selection immediately, but do not put uninspected
+    // references in the request or enable generation while validation is pending.
+    const intent=ReferenceValidation.signature(validationTarget()),validation=validationTarget(),parent=controller.signal,abort=new AbortController(),pending={values:[...values],controller:abort,epoch,key:generationKeyVersion,voice:voiceTarget,intent,selection:selectionSignature()};
+    if(validation){
+      const roles={...validation.options.reference_roles};for(const address of Object.keys(roles))if(address.startsWith(kind+'_'))delete roles[address];
+      rolesFor(values).forEach((entry,index)=>{roles[kind+'_'+(index+1)]=entry.role;});
+      const normalized=ModelControls.roles(selectedModel(),roles,Object.keys(roles));
+      if(normalized)validation.options.reference_roles=normalized;else delete validation.options.reference_roles;
+    }
+    const cancel=()=>abort.abort();parent.addEventListener('abort',cancel,{once:true});if(parent.aborted)cancel();
+    pendingSelection=pending;checkedSignature='';checking=false;message('Checking reference compatibility…');render();let failure='';
+    try{
+      await ReferenceValidation.check(candidateIDs(values),validation,{signal:abort.signal});
+      if(pendingSelection!==pending)return;
+      if(!currentSelection(pending)){failure='Selection, model or workflow changed. Choose the file again.';return;}
+      pendingSelection=null;write(values,true);missingTarget=null;message();
+    }catch(error){if(pendingSelection===pending&&error.name!=='AbortError')failure=error.message;}
+    finally{
+      parent.removeEventListener('abort',cancel);
+      if(pendingSelection===pending){pendingSelection=null;render();if(failure)message(failure,true);}
+    }
+  }
   function recheck(){
     const stamp=selectionSignature();if(stamp===checkedSignature)return;
     checkedSignature=stamp;const previousIssue=validationError;validationError='';const referenceIDs=candidateIDs(urls()),voiceIDs=kind==='audio'&&mode()?.supports_reference_voice?ReferenceValidation.ids(Object.values(activeVoices())):[];
     if(!referenceIDs.length&&!voiceIDs.length){checking=false;if(status.textContent==='Checking reference compatibility…'||previousIssue&&status.textContent===previousIssue)message();return;}
     const token=epoch;checking=true;message('Checking reference compatibility…');
     Promise.all([ReferenceValidation.check(referenceIDs,validationTarget(),{signal:controller.signal}),...voiceIDs.map(id=>ReferenceValidation.check([id],{...validationTarget(),role:'reference_voice'},{signal:controller.signal}))]).then(()=>{
-      if(token===epoch&&stamp===selectionSignature()){checking=false;if(status.textContent==='Checking reference compatibility…')message();}
+      if(token===epoch&&stamp===selectionSignature()&&!pendingSelection){checking=false;if(status.textContent==='Checking reference compatibility…')message();}
     }).catch(error=>{
-      if(token===epoch&&stamp===selectionSignature()){checking=false;if(error.name!=='AbortError'){validationError=error.message;message(validationError,true);}}
+      if(token===epoch&&stamp===selectionSignature()&&!pendingSelection){checking=false;if(error.name!=='AbortError'){validationError=error.message;message(validationError,true);}}
     });
   }
   function renderLibrary() {
     if(remote?.active()){remote.render();return;}
-    const values = urls();
+    const values = displayedValues();
     libraryView.render(items.filter(item=>(item.content_type||'image/png').startsWith(kind+'/')).map(item=>({...item,url:absolute(item.url)})),{
       selected:item=>values.some(url=>url===item.url||metadata.get(url)?.id===item.id&&(metadata.get(url)?.scope||'organization')===(item.scope||'organization')),onSelect:select,busy,
-      scope:sharedLibrary?'template':'organization',onDelete:sharedLibrary?null:deleteItem
+      canDelete:()=>!pendingSelection,scope:sharedLibrary?'template':'organization',onDelete:sharedLibrary?null:deleteItem
     });
     more.hidden = !hasMore; more.disabled = busy || loading;
   }
@@ -223,7 +254,7 @@ function hashReferenceFile(file,signal){
     finally { if (currentEpoch === epoch && sequence===listSequence) { loading = false; render(); } }
   }
   async function upload(list, replaceIndex = null) {
-    if ((library.open&&sharedLibrary) || busy || loading || !list.length) return;
+    if ((library.open&&sharedLibrary) || busy || loading || pendingSelection || !list.length) return;
     if(remote?.active()&&!remote.prepareUpload())return;
     const currentEpoch = epoch, modelID = selectedModel()?.id, validation=validationTarget(), intent=ReferenceValidation.signature(validation), signal = controller.signal, voiceIntent = kind==='audio'?voiceTarget:null, providerUpload=!!remote?.active();
     let expectedSelection=selectionSignature();
@@ -296,12 +327,13 @@ function hashReferenceFile(file,signal){
   });
   function reorder(source, targetIndex,focus=false) {
     const values = urls();source=Number(source);
-    if (busy || !Number.isInteger(source) || source >= values.length || source < 0 || targetIndex < 0 || targetIndex >= values.length || source === targetIndex) return;
+    if (busy || pendingSelection || !Number.isInteger(source) || source >= values.length || source < 0 || targetIndex < 0 || targetIndex >= values.length || source === targetIndex) return;
     const [value]=values.splice(source, 1);values.splice(targetIndex,0,value);const entries=[...roleEntries],[entry]=entries.splice(source,1);entries.splice(targetIndex,0,entry);write(values,false,entries);if(focus)selected.children[targetIndex]?.focus();message('Reference order updated.');
     selected.children[targetIndex]?.focus();
   }
   function bindDrop(target, index = null) {
     target.addEventListener('dragover', event => {
+      if(pendingSelection)return;
       const at=typeof index==='function'?index():index;
       const internal = draggedURL !== null || event.dataTransfer.types.includes(dragType);
       if (!internal && !event.dataTransfer.types.includes('Files')) return;
@@ -309,6 +341,7 @@ function hashReferenceFile(file,signal){
     });
     target.addEventListener('dragleave', event => { if (!target.contains(event.relatedTarget)) target.classList.remove('dragover'); });
     target.addEventListener('drop', event => {
+      if(pendingSelection){event.preventDefault();event.stopPropagation();message('Wait for reference validation to finish.',true);return;}
       const at=typeof index==='function'?index():index;
       event.preventDefault(); event.stopPropagation(); target.classList.remove('dragover');
       const source = draggedURL || event.dataTransfer.getData(dragType);
@@ -322,7 +355,7 @@ function hashReferenceFile(file,signal){
   function validate() {
     parseDraft();if(urlDraftError){message(urlDraftError,true);return false;}
     if(remote&&!remote.validate())return false;
-    if (checking) { message('Wait for reference validation to finish.',true);return false; }
+    if (pendingSelection||checking) { message('Wait for reference validation to finish.',true);return false; }
     if(validationError){message(validationError,true);return false;}
     if (busy) { message('Wait for the reference operation to finish.', true); return false; }
     const model = selectedModel(); if (!model?.[`supports_${kind}_input`]) return true;
@@ -334,7 +367,7 @@ function hashReferenceFile(file,signal){
     return true;
   }
   function reset() {
-    sparse=false;missingTarget=null;roleEntries=[];remote?.reset();
+    discardSelection();sparse=false;missingTarget=null;roleEntries=[];remote?.reset();
     draggedURL = null; epoch++; controller.abort(); controller = new AbortController(); busy = false; loading = false;
     checkedSignature='';checking=false;validationError='';
     items = []; metadata.clear(); offset = 0; hasMore = false; library.close(); files.value = ''; write([]); message();

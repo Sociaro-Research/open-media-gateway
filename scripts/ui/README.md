@@ -967,3 +967,10 @@ caller configurations in both themes at 1440/390/320px and checks two-step
 deletion, blur/close reset and permission/busy guards with disposable callbacks.
 Run it with each browser engine; `UI_EVIDENCE_DIR` retains screenshots/metrics.
 `UI_BASELINE=1` records old geometry without treating it as current acceptance.
+
+Run `UI_SELECTION_LATENCY_ONLY=1 node scripts/ui/reference-validation.cjs`
+with each engine for held-response selection latency and provisional-state
+regressions. `UI_BASELINE=1` records the earlier behavior without asserting
+immediate paint. The ordinary fixture remains the full compatibility/retention
+suite. Evidence includes response delay, frame/preview/deselection timings and
+cancellation, superseding, rejection, stale-context and ordered-role checks.

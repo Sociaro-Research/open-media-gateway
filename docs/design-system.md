@@ -800,6 +800,13 @@ accent border. Remove/Delete/Play overlays are neutral translucent controls.
 Image actions appear on hover or keyboard focus; touch requires a completed
 reveal gesture before a later action gesture, including a first tap on the action.
 
+Library selection paints immediately while compatibility is checked. Keep the
+request binding unchanged and generation blocked until the current check succeeds.
+Deselecting or superseding a pending choice updates immediately and cancels its
+old check. Rejection restores the committed selection; late responses never
+overwrite a newer model, key, URL draft or intent. Preserve role identities when
+validating a reordered subset.
+
 Library selection applies immediately; closing with ×, Escape or the backdrop
 retains it and restores focus. Single selections can be replaced without closing
 the library. Remove detaches the current binding; library Delete retains its
