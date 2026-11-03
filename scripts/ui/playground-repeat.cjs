@@ -1,3 +1,4 @@
+const {generationFixtureResponse}=require('./generation-page-fixture.cjs');
 const {useFixtureKey}=require('./fixture-key.cjs');
 // Playground repeat/retry regressions against localhost fixtures only.
 const {chromium, webkit} = require('playwright');
@@ -8,7 +9,7 @@ const assert = require('node:assert/strict');
 const {evidencePath} = require('./evidence.cjs');
 const root = process.env.UI_SOURCE_DIR || path.resolve(__dirname, '../../web/public/ui');
 const engine = process.env.UI_BROWSER_ENGINE || 'chromium';
-const output = evidencePath('/tmp/gateway-playground-repeat/' + engine + '/');
+const output = process.env.UI_EVIDENCE_DIR || evidencePath('/tmp/gateway-playground-repeat/' + engine + '/');
 fs.mkdirSync(output, {recursive:true});
 const server = http.createServer((req, res) => {
   const file = path.join(root, req.url === '/' ? 'index.html' : path.basename(req.url.split('?')[0]));
@@ -35,7 +36,7 @@ const history = [
   historical('history-parameters',parameterized,{prompt:'Historic parameters',options:{parameters:{strength:0}}}),
   historical('missing-prompt',video,{options:{}}),
   historical('missing-input',required,{prompt:'Historic missing input',options:{}}),
-  historical('missing-marker',markers,{prompt:'Use Image 2',options:{image_urls:['https://fixture.test/image.png']}}),
+  historical('missing-marker',markers,{prompt:'Use @Image2',options:{image_urls:['https://fixture.test/image.png']}}),
   historical('unavailable', {...video,id:'removed'}, {prompt:'Historic unavailable',options:{}})
 ];
 const deferred = () => { let resolve; const promise = new Promise(r => {resolve=r;}); return {promise,resolve}; };
@@ -47,6 +48,7 @@ const deferred = () => { let resolve; const promise = new Promise(r => {resolve=
   page.setDefaultTimeout(15000);
   const errors=[],notices=[],external=[],posts=[],estimates=[],results=[];
   let tasks=[...history], postGate, quoteGate, failure, quoteFailure, canGenerate=true, price=0.25;
+  let initialCatalogue=process.env.UI_CATALOGUE_ACTION_ONLY?deferred():null,actionCatalogue=null,catalogueCalls=0,catalogueFailure=false,catalogueMissing=false,catalogueRenamed=false;
   page.on('pageerror', error => {
     // WebKit reports this scheduling notice when shared ResizeObservers settle
     // after viewport changes; retain it separately, as in provider-assets.cjs.
@@ -57,14 +59,14 @@ const deferred = () => { let resolve; const promise = new Promise(r => {resolve=
     const req=route.request(),url=new URL(req.url());
     if(url.hostname!=='127.0.0.1') {external.push(req.url());return route.abort();}
     if(!url.pathname.startsWith('/v1/'))return route.continue();
-    const json=body=>route.fulfill({json:body});
+    const json=body=>route.fulfill({json:generationFixtureResponse(req,body)});
     if(url.pathname==='/v1/playground-key/restore')return route.fulfill({status:404,json:{error:{message:'No saved fixture key'}}});
     if(url.pathname==='/v1/info')return json({provider:'mock',auth_mode:'google'});
     if(url.pathname==='/v1/me')return json({id:'preview',name:'Preview',email:'preview@example.test',is_system_admin:true});
     if(url.pathname==='/v1/organizations')return json({data:[]});
     if(url.pathname==='/v1/api-keys'&&req.method()==='POST')return json({name:'Fixture key',secret:'fixture-generation-key'});
     if(url.pathname==='/v1/key')return json({key:{name:'Fixture key',resource_mode:'personal'}});
-    if(url.pathname==='/v1/providers')return json({data:providers});
+    if(url.pathname==='/v1/providers'){catalogueCalls++;const gate=catalogueCalls===1?initialCatalogue:actionCatalogue;if(gate)await gate.promise;if(catalogueFailure)return route.fulfill({status:503,json:{error:{message:'Synthetic catalogue offline'}}});return json({data:catalogueMissing?[]:catalogueRenamed?[{...providers[0],models:providers[0].models.map(m=>({...m,display_name:'Renamed '+m.display_name}))}]:providers});}
     if(url.pathname==='/v1/generations/estimate'){
       assert.equal(req.headers().authorization,'Bearer fixture-generation-key');
       const body=req.postDataJSON();estimates.push(body);
@@ -90,12 +92,35 @@ const deferred = () => { let resolve; const promise = new Promise(r => {resolve=
   const record=name=>{results.push(name);console.log('PASS:',name);};
   const hidden=()=>page.locator('#confirmDialog').waitFor({state:'hidden'});
   const ready=()=>page.waitForFunction(()=>document.querySelector('#confirmDialog').open&&!document.querySelector('#confirmSubmit').disabled);
-  const retry=async id=>{const card=page.locator(`[data-task-id="${id}"]`);await card.locator('.task-menu summary').click();await card.locator('.retry-task').click();};
+  const retry=async id=>{const card=page.locator(`[data-task-id="${id}"]`);await card.locator('.task-menu summary').click();await card.locator('.retry-task').click();await page.waitForFunction(id=>document.querySelector(`[data-task-id="${id}"] .retry-task`)?.getAttribute('aria-busy')!=='true',id);};
   const confirm=async()=>{await ready();await page.locator('#confirmSubmit').click();await hidden();};
   try {
     await page.goto(`http://127.0.0.1:${server.address().port}`);
     await page.locator('#managedGenerationHelp').waitFor({state:'visible'});
     await useFixtureKey(page,'fixture-generation-key');
+    if(process.env.UI_CATALOGUE_ACTION_ONLY){
+      const card=page.locator('[data-task-id="history-video"]');await card.waitFor();
+      const snapshot=JSON.stringify(history[0]),node=await card.elementHandle();
+      const open=async()=>{if(!await card.locator('.task-menu').evaluate(n=>n.open))await card.locator('.task-menu summary').click();};
+      const activate=async kind=>{await open();await card.locator(kind).focus();await card.locator(kind).press('Enter');};
+      const settled=kind=>page.waitForFunction(kind=>document.querySelector('[data-task-id="history-video"] '+kind).getAttribute('aria-busy')!=='true',kind);
+      await open();assert.equal(await card.locator('.reuse-task').isVisible(),true);assert.equal(await card.locator('.retry-task').isVisible(),true);assert.equal(await page.evaluate(()=>providerCatalog.length),0);
+      await page.locator('#prompt').evaluate(n=>{n.value='Existing draft';});actionCatalogue=deferred();await activate('.reuse-task');assert.equal(await card.locator('.reuse-task').isDisabled(),true);assert.equal(await page.locator('#prompt').inputValue(),'Existing draft');assert.ok(!(await page.locator('#formMessage').innerText()).includes('unavailable'));
+      actionCatalogue.resolve();actionCatalogue=null;await settled('.reuse-task');await page.waitForFunction(()=>document.querySelector('#prompt').value==='Historic video');
+      assert.equal(await page.locator('#seed').inputValue(),'0');assert.equal(await page.locator('#videoURL').inputValue(),history[0].options.video_urls.join('\n'));const copied=await state();initialCatalogue.resolve();await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));assert.deepEqual(await state(),copied);assert.equal(await card.evaluate((n,old)=>n===old,node),true);record('Tasks-first actions visible; click waits current catalogue; old startup response cannot remount or overwrite copy');
+      for(const mode of ['failure','missing']){catalogueFailure=mode==='failure';catalogueMissing=mode==='missing';const before=await state();await activate('.reuse-task');await settled('.reuse-task');assert.deepEqual(await state(),before);assert.match(await page.locator('#formMessage').innerText(),mode==='failure'?/Could not check model availability/:/no longer available/);assert.equal(await card.locator('.reuse-task').evaluate(n=>n===document.activeElement),true);}
+      catalogueFailure=false;catalogueMissing=false;record('Catalogue read failure and genuine absence are distinct; draft/settings/references/focus preserved');
+      actionCatalogue=deferred();await activate('.reuse-task');await page.locator('#prompt').fill('Newer edit wins');const newer=await state();actionCatalogue.resolve();actionCatalogue=null;await settled('.reuse-task');assert.deepEqual(await state(),newer);record('Draft edited during availability read wins over late copy');
+      catalogueRenamed=true;await activate('.reuse-task');await settled('.reuse-task');assert.equal(await page.locator('#prompt').inputValue(),'Historic video');assert.equal(await page.evaluate(()=>selectedModel().display_name),'Renamed Test Video');record('Display name changes preserve exact saved provider/model identity');
+      const beforeRetry=await state();await retry('history-video');await ready();assert.deepEqual(await state(),beforeRetry);const quote=estimates.findLast(x=>x.prompt==='Historic video');assert.deepEqual(quote.options.video_urls,history[0].options.video_urls);assert.equal(quote.options.seed,0);await page.keyboard.press('Escape');await hidden();assert.deepEqual(await state(),beforeRetry);record('Try again reviews original settings/references without overwriting current draft or submitting');
+      catalogueMissing=true;await retry('history-video');assert.equal(await page.locator('#confirmDialog').isVisible(),false);assert.deepEqual(await state(),beforeRetry);catalogueMissing=false;
+      actionCatalogue=deferred();await activate('.reuse-task');await page.evaluate(()=>{showConsoleSection('templates');showConsoleSection('generation');});const afterNavigation=await state();actionCatalogue.resolve();actionCatalogue=null;await settled('.reuse-task');assert.deepEqual(await state(),afterNavigation);assert.equal(await page.locator('#confirmDialog').isVisible(),false);record('Navigation away and back invalidates an old action without changing the returning draft');
+      actionCatalogue=deferred();await activate('.reuse-task');await page.locator('#apiKey').fill('');await page.locator('#apiKey').press('Tab');await page.waitForFunction(()=>!GenerationKey.value());const afterKey=await state();actionCatalogue.resolve();actionCatalogue=null;await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));assert.deepEqual(await state(),afterKey);catalogueCalls=0;initialCatalogue=deferred();await useFixtureKey(page,'fixture-generation-key');await page.locator('[data-task-id="history-video"]').waitFor();await page.locator('#prompt').evaluate(n=>{n.value='Retained startup draft';});
+      for(const mode of ['failure','missing']){catalogueFailure=mode==='failure';catalogueMissing=mode==='missing';await activate('.reuse-task');await settled('.reuse-task');assert.equal(await page.locator('#prompt').inputValue(),'Retained startup draft');}
+      catalogueFailure=false;catalogueMissing=false;initialCatalogue.resolve();await page.waitForFunction(()=>selectedModel()?.id==='video');assert.equal(await page.locator('#prompt').inputValue(),'Retained startup draft');record('Failed or missing action does not suppress legitimate pending startup catalogue recovery');
+      assert.equal(JSON.stringify(history[0]),snapshot);assert.equal(posts.length,0);assert.deepEqual(errors,[]);assert.deepEqual(external,[]);record('Key context change rejects old action; saved task unchanged; no generation posts');
+      fs.writeFileSync(path.join(output,'catalogue-actions.json'),JSON.stringify({engine,results,errors,external,posts:posts.length},null,2));return;
+    }
     await page.waitForFunction(()=>selectedModel()?.id==='video');
     await page.locator('#prompt').fill('A repeatable draft');
     await page.locator('#duration').fill('8');await page.locator('#ratio').selectOption('9:16');
@@ -163,7 +188,7 @@ const deferred = () => { let resolve; const promise = new Promise(r => {resolve=
     assert.deepEqual(submitted('audio').options.audio_urls,['https://fixture.test/audio.wav']);assert.deepEqual(submitted('parameters').options.parameters,{strength:0});
     record('Video, speech, lyrics-only music, image, no-prompt audio and custom parameters use saved inputs and fresh customer costs without editing the draft');
 
-    for(const [id,message] of [['unavailable','provider or model is unavailable'],['missing-prompt','missing its prompt'],['missing-marker','Missing image references: Image 2']]){
+    for(const [id,message] of [['unavailable','provider or model is no longer available'],['missing-prompt','missing its prompt'],['missing-marker','Missing image references: @Image2']]){
       const before=posts.length;await retry(id);assert.equal(await page.locator('#confirmDialog').isVisible(),false);assert.match(await page.locator('#formMessage').innerText(),new RegExp(message));assert.equal(posts.length,before);assert.deepEqual(await state(),edited);
     }
     await retry('missing-input');await page.getByText('This model requires an image reference',{exact:true}).waitFor();assert.equal(await page.locator('#confirmSubmit').isDisabled(),true);await page.locator('#cancelConfirm').click();
@@ -191,6 +216,6 @@ const deferred = () => { let resolve; const promise = new Promise(r => {resolve=
     assert.deepEqual(errors,[]);assert.deepEqual(external,[]);
     if(notices.length)console.log(`WebKit ResizeObserver scheduling notices: ${notices.length}`);
     fs.writeFileSync(path.join(output,'results.json'),JSON.stringify({engine,results,posts:posts.length,estimates:estimates.length,pageErrors:errors,browserNotices:notices,externalRequests:external},null,2));
-  } catch(error){await page.screenshot({path:path.join(output,'failure.png'),fullPage:true});console.error({errors,external});throw error;}
-  finally {postGate?.resolve();quoteGate?.resolve();await browser.close();server.close();}
+  } catch(error){try{await page.screenshot({path:path.join(output,'failure.png'),fullPage:true,timeout:2000});}catch{}console.error({errors,external});throw error;}
+  finally {initialCatalogue?.resolve();actionCatalogue?.resolve();postGate?.resolve();quoteGate?.resolve();await browser.close();server.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;server.close();});

@@ -398,10 +398,9 @@ function renderTasks(tasks) {
     changeProject.addEventListener('pointerenter',event=>{if(event.pointerType==='mouse'&&changeProject.closest('.task-menu').open)window.GatewayProjects?.assign(article.taskData,changeProject,{focus:false});});
     changeProject.addEventListener('keydown',event=>{if(event.key==='ArrowRight'){event.preventDefault();window.GatewayProjects?.assign(article.taskData,changeProject);}});
     article.querySelector('.task-menu').addEventListener('toggle',event=>{if(!event.currentTarget.open)window.ControlPickers?.dismiss(changeProject);});
-    const resourceModel=providerCatalog.find(p=>p.id===task.provider)?.models.find(m=>m.id===task.model),replayable=ModelPicker.isMediaModel(resourceModel)&&resourceModel.media_type===task.media_type;
-    article.querySelector('.reuse-task').hidden=!replayable;article.querySelector('.retry-task').hidden=!replayable||!!task.options?.session_action;
-    article.querySelector('.reuse-task').addEventListener('click', () => reuseTask(article.taskData));
-    article.querySelector('.retry-task').addEventListener('click', event => retryTask(article.taskData, event.currentTarget));
+    article.querySelector('.reuse-task').hidden=false;article.querySelector('.retry-task').hidden=!!task.options?.session_action;
+    article.querySelector('.reuse-task').addEventListener('click', event => prepareTaskAction(article.taskData,'copy',event.currentTarget));
+    article.querySelector('.retry-task').addEventListener('click', event => prepareTaskAction(article.taskData,'retry',event.currentTarget));
     article.querySelector('.task-id').value=task.id;
     const parameters = [['Media type', mediaTypeLabel(task.media_type)], ['Provider', task.provider], ['Model', task.model], ...taskParameterRows(task.options || {})];
     if (task.api_key_id) parameters.push(['Gateway API key', task.api_key_id]);
@@ -1399,6 +1398,27 @@ function updateTimer(timer) {
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor(seconds % 3600 / 60);
   timer.textContent = `Time ${hours ? hours+'h ' : ''}${minutes ? minutes+'m ' : ''}${seconds % 60}s`;
+}
+let taskActionSequence=0, taskDraftRevision=0, taskActionRead=null;
+elements.form.addEventListener('input',()=>{taskDraftRevision++;});
+elements.form.addEventListener('change',()=>{taskDraftRevision++;});
+async function prepareTaskAction(task, action, trigger) {
+ if(submitting||dialog.open||trigger.getAttribute('aria-busy')==='true')return;
+ const key=GenerationKey.value(),version=generationKeyVersion,draft=taskDraftRevision,navigation=consoleNavigation;
+ if(!key){setMessage('Enter a valid Gateway API key above.','error');return;}
+ const saved=structuredClone(task),sequence=++taskActionSequence,catalogSequence=playgroundCatalogSequence;
+ taskActionRead?.abort();const controller=new AbortController();taskActionRead=controller;trigger.setAttribute('aria-busy','true');trigger.setAttribute('aria-disabled','true');
+ const current=()=>sequence===taskActionSequence&&version===generationKeyVersion&&key===GenerationKey.value()&&navigation===consoleNavigation&&draft===taskDraftRevision&&catalogSequence===playgroundCatalogSequence&&!submitting&&!dialog.open;
+ try{
+  const response=await api('/v1/providers',{expectedKey:key,signal:controller.signal});
+  if(!current())return;
+  const model=response.data?.find(p=>p.id===saved.provider)?.models.find(m=>m.id===saved.model);
+  if(!ModelPicker.isMediaModel(model)||model.media_type!==saved.media_type){setMessage('This provider or model is no longer available. Your draft and saved generation are unchanged.','error');return;}
+  ++playgroundCatalogSequence;providerCatalog=response.data;
+  if(action==='copy')reuseTask(saved);else retryTask(saved,trigger);
+ }catch(error){
+  if(error.name!=='AbortError'&&current())setMessage('Could not check model availability. Try again when the catalogue is available. '+error.message,'error');
+ }finally{trigger.removeAttribute('aria-busy');trigger.removeAttribute('aria-disabled');if(taskActionRead===controller)taskActionRead=null;}
 }
 function reuseTask(task, {sparse=false}={}) {
   const provider = providerCatalog.find(item => item.id === task.provider);

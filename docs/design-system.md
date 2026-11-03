@@ -827,3 +827,8 @@ Playground shows the current verified estimate in its primary Generate action,
 including a monetary approximation when applicable. Pending, invalid and unavailable
 estimates replace the amount immediately; allowance/errors remain adjacent feedback.
 The confirmation retains its separate review and authoritative admission checks.
+
+Journal Copy and Try again actions do not depend on catalogue load order. Check
+current availability on activation; keep the draft and saved generation unchanged
+when the check fails or the model is unavailable. Session mutation retries retain
+their separate explicit-review safeguard.

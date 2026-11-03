@@ -979,3 +979,8 @@ cancellation, superseding, rejection, stale-context and ordered-role checks.
 Generate action's verified/free/pending/unavailable/error/allowance states and
 excludes late old quotes with synthetic responses. Repeat in WebKit; screenshots
 cover both themes at 1440/390/320px without admitting a generation.
+
+`UI_CATALOGUE_ACTION_ONLY=1 node scripts/ui/playground-repeat.cjs` covers
+tasks-before-catalogue Copy/Try again, click-time reads, failed/missing catalogues,
+renamed display names and draft/key races. Repeat in WebKit. The normal suite
+retains full saved-request/confirmation/idempotency coverage with loopback data.
