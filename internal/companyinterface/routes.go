@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type Classification string
@@ -43,6 +44,9 @@ type Contract struct {
 	QueryFields       string
 	BrowserManagement bool
 	Binary            bool
+	MaxRequestBytes   int64
+	Timeout           time.Duration
+	Idempotency       bool
 }
 
 // Classify is deliberately exact. GET's Go ServeMux HEAD alias is spelled out.
@@ -57,6 +61,9 @@ func Classify(method, path string) Contract {
 	return c
 }
 func classifyCustomerRoute(method, path string) Contract {
+	if c := templateCustomerContract(method, path); c.Class == CentralCustomer {
+		return c
+	}
 	if c := extendedCustomerContract(method, path); c.Class == CentralCustomer {
 		return c
 	}
@@ -91,7 +98,7 @@ func classifyCustomerRoute(method, path string) Contract {
 		case "/v1/providers", "/v1/models":
 			return Contract{ID: "central-catalog", Class: CentralCustomer, Auth: []AuthKind{CentralSession, CentralKey}, Scope: "generation", ResponseURLs: "catalog"}
 		case "/v1/system/template-references":
-			return Contract{ID: "shared-template-library", Class: CentralCustomer, Auth: []AuthKind{CentralSession, CentralKey}, Scope: "generation", ResponseURLs: "reference-list"}
+			return Contract{ID: "shared-template-library", Class: CentralCustomer, Auth: []AuthKind{CentralSession, CentralKey}, Scope: "generation", ResponseURLs: "reference-list", QueryFields: "offset"}
 		}
 		parts := strings.Split(path, "/")
 		if len(parts) >= 4 && parts[0] == "" && parts[1] == "v1" && parts[2] == "organizations" && validID(parts[3]) {
@@ -119,7 +126,7 @@ func RequestContract(method, escapedPath, rawQuery string, body []byte, p Princi
 		return Contract{}, ErrDenied
 	}
 	c := Classify(method, escapedPath)
-	if c.Class != CentralCustomer || len(body) > 8192 || (c.RequestBody == "" && len(body) != 0) {
+	if c.Class != CentralCustomer || int64(len(body)) > CustomerBodyLimit(method, escapedPath) || (c.RequestBody == "" && len(body) != 0) {
 		return Contract{}, ErrDenied
 	}
 	query, err := url.ParseQuery(rawQuery)
@@ -204,7 +211,7 @@ func ForwardHeaders(c Contract, incoming http.Header) (http.Header, error) {
 	}
 	for k, values := range incoming {
 		name := http.CanonicalHeaderKey(k)
-		if name != "Accept" && !(c.RequestBody != "" && name == "Content-Type") && !(c.Binary && (name == "Range" || name == "If-Range")) {
+		if name != "Accept" && !(c.Idempotency && name == "Idempotency-Key") && !(c.RequestBody != "" && name == "Content-Type") && !(c.Binary && (name == "Range" || name == "If-Range")) {
 			continue
 		}
 		if connection[name] {

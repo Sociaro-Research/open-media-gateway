@@ -137,7 +137,7 @@ func (c *Client) customer(ctx context.Context, prepared CustomerContext, method,
 	if query != "" {
 		destination += "?" + query
 	}
-	ctx, cancel := context.WithTimeout(ctx, ProtocolTimeout)
+	ctx, cancel := context.WithTimeout(ctx, CustomerTimeout(method, path))
 	defer cancel()
 	req, e := http.NewRequestWithContext(ctx, method, destination, bytes.NewReader(body))
 	if e != nil {
@@ -155,7 +155,12 @@ func (c *Client) customer(ctx context.Context, prepared CustomerContext, method,
 	if keyPresent {
 		req.Header.Set("Authorization", "Bearer "+key)
 	}
-	response, e := c.http.Do(req)
+	// Copy only the client configuration; reuse the fixed public transport and
+	// redirect rejection. Its response-header timeout is not tied to the short
+	// protocol deadline. Never mutate a client shared by concurrent requests.
+	client := *c.http
+	client.Timeout = CustomerTimeout(method, path)
+	response, e := client.Do(req)
 	if e != nil {
 		return empty, ErrUnavailable
 	}

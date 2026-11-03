@@ -4,8 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	ci "github.com/Sociaro-Research/open-media-gateway/internal/companyinterface"
+	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
+	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
@@ -110,4 +114,109 @@ func TestCompanyFacadeManagementAndProjectsUseRealCentralHandlers(t *testing.T) 
 		}
 	}
 	expectFixture(t, facadeRequest(t, f, "GET", "/v1/models/%2e%2e%2fproviders", "", v.Tokens.PlaygroundKey, true, nil), 403)
+}
+
+// Compare the reserved facade with the actual Go central mux, retaining the
+// escaped URL until the delegation contract has accepted its interpretation.
+type pathDispatchAuthority struct {
+	ci.CustomerAuthority
+	projections atomic.Int32
+}
+
+func (a *pathDispatchAuthority) User(ctx context.Context, id string) (identity.User, error) {
+	a.projections.Add(1)
+	return a.CustomerAuthority.User(ctx, id)
+}
+func TestCompanyFacadeEscapedPathInterpretation(t *testing.T) {
+	f, wire := facadeHTTP(t)
+	v := f.current(t)
+	service := core.NewTaskService(postgres.NewTaskRepository(f.centralDB), nil, "mock", "model/with/slash")
+	authority := &pathDispatchAuthority{CustomerAuthority: postgres.NewCompanyInterfaceAuthority(f.centralDB)}
+	f.central = customerHandler(t, f, authority, service)
+	id := "mock/model/with/slash"
+	tests := []struct {
+		name, method, path string
+		want               int
+	}{
+		{"encoded slash", "GET", "/v1/models/" + url.PathEscape(id), 200},
+		{"double encoded slash", "GET", "/v1/models/mock%252Fmodel%252Fwith%252Fslash", 403},
+		{"encoded dot segment", "GET", "/v1/models/mock/%2e%2e/providers", 403},
+		{"encoded question", "GET", "/v1/models/mock%3Fmodel", 403},
+		{"encoded hash", "GET", "/v1/models/mock%23model", 403},
+		{"encoded backslash", "GET", "/v1/models/mock%5Cmodel", 403},
+		{"encoded organization", "GET", "/v1/organizations/%" + fmt.Sprintf("%02x", v.Tokens.Company[0]) + v.Tokens.Company[1:], 403},
+		{"encoded organization separator", "GET", "/v1/organizations%2F" + v.Tokens.Company, 403},
+		{"neighbor system", "GET", "/v1/models/%2e%2e%2Fsystem%2Ftemplates", 403},
+		{"neighbor organization", "GET", "/v1/models/%2e%2e%2Forganizations%2F" + v.Tokens.Company, 403},
+		{"system path", "GET", "/v1/system/templates", 403},
+		{"unknown model verb", "PUT", "/v1/models/" + url.PathEscape(id), 403},
+		{"unknown route", "GET", "/v1/not-a-customer-route", 403},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// Direct central response is diagnostic: the company grant intentionally
+			// rejects aliases which an ordinary central mux may interpret or redirect.
+			direct := httptest.NewRequest(tc.method, fixtureCentral+tc.path, nil)
+			direct.Header.Set("Authorization", "Bearer "+v.Tokens.PlaygroundKey)
+			dw := httptest.NewRecorder()
+			f.central.ServeHTTP(dw, direct)
+			authority.projections.Store(0)
+			central := customerRequest(t, f.central, v, true, tc.method, tc.path, "", v.Tokens.PlaygroundKey, nil)
+			before := wire.calls.Load()
+			local := facadeRequest(t, f, tc.method, tc.path, "", v.Tokens.PlaygroundKey, true, nil)
+			t.Logf("raw=%s direct-central=%d central-delegated=%d reserved-facade=%d", tc.path, dw.Code, central.Code, local.Code)
+			expectFixture(t, central, tc.want)
+			expectFixture(t, local, tc.want)
+			if tc.want == 403 && (authority.projections.Load() != 0 || wire.calls.Load() != before) {
+				t.Fatal("rejected path reached inner handler projection or remote hop")
+			}
+			if tc.want == 200 {
+				expectFixture(t, dw, 200)
+				for _, body := range []string{dw.Body.String(), central.Body.String(), local.Body.String()} {
+					var model struct{ ID string }
+					if json.Unmarshal([]byte(body), &model) != nil || model.ID != id {
+						t.Fatalf("model interpretation changed: %s", body)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestCompanyFacadePreparationPathSelectsSameCentralOperation(t *testing.T) {
+	f, _ := facadeHTTP(t)
+	v := f.current(t)
+	service := core.NewTaskService(postgres.NewTaskRepository(f.centralDB), nil, "mock", "model/with/slash")
+	f.central = customerHandler(t, f, postgres.NewCompanyInterfaceAuthority(f.centralDB), service)
+	for _, tc := range []struct {
+		path, contract, code string
+		status               int
+	}{
+		{"/v1/models/mock/model/with/slash/preparations", "central-model", "model_not_found", 404},
+		{"/v1/models/mock%2Fmodel%2Fwith%2Fslash/preparations", "model-preparations", "resource_service_unavailable", 503},
+	} {
+		t.Run(tc.contract, func(t *testing.T) {
+			if ci.Classify("GET", tc.path).ID != tc.contract {
+				t.Fatal("incorrect operation contract")
+			}
+			direct := httptest.NewRequest("GET", fixtureCentral+tc.path, nil)
+			direct.Header.Set("Authorization", "Bearer "+v.Tokens.PlaygroundKey)
+			dw := httptest.NewRecorder()
+			f.central.ServeHTTP(dw, direct)
+			central := customerRequest(t, f.central, v, true, "GET", tc.path, "", v.Tokens.PlaygroundKey, nil)
+			local := facadeRequest(t, f, "GET", tc.path, "", v.Tokens.PlaygroundKey, true, nil)
+			for _, out := range []*httptest.ResponseRecorder{dw, central, local} {
+				expectFixture(t, out, tc.status)
+				var body struct {
+					Error struct {
+						Code string `json:"code"`
+					} `json:"error"`
+				}
+				if json.Unmarshal(out.Body.Bytes(), &body) != nil || body.Error.Code != tc.code {
+					t.Fatalf("wrong selected operation: %s", out.Body.String())
+				}
+			}
+			t.Logf("raw=%s contract=%s operation-error=%s", tc.path, tc.contract, tc.code)
+		})
+	}
 }

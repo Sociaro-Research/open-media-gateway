@@ -41,7 +41,8 @@ func (s *Server) companyFacade(w http.ResponseWriter, r *http.Request) {
 		companyInterfaceError(w, ci.ErrProtocol)
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), ci.ProtocolTimeout)
+	path := "/" + strings.TrimPrefix(r.URL.EscapedPath(), companyFacadePrefix)
+	ctx, cancel := context.WithTimeout(r.Context(), ci.CustomerTimeout(r.Method, path))
 	defer cancel()
 	r = r.WithContext(ctx)
 	// Ordinary customer traffic uses the existing central company/key request
@@ -100,14 +101,14 @@ func (s *Server) companyFacade(w http.ResponseWriter, r *http.Request) {
 	// Capture the exact local/global fence before consuming even the request body.
 	deadline, _ := ctx.Deadline()
 	_ = http.NewResponseController(w).SetReadDeadline(deadline)
+	_ = http.NewResponseController(w).SetWriteDeadline(deadline.Add(5 * time.Second))
 	defer http.NewResponseController(w).SetReadDeadline(time.Time{})
 	defer r.Body.Close()
-	raw, e := io.ReadAll(http.MaxBytesReader(w, r.Body, ci.MaxCustomerBody))
+	raw, e := io.ReadAll(http.MaxBytesReader(w, r.Body, ci.CustomerBodyLimit(r.Method, path)))
 	if e != nil {
 		companyInterfaceError(w, ci.ErrDenied)
 		return
 	}
-	path := "/" + strings.TrimPrefix(r.URL.EscapedPath(), companyFacadePrefix)
 	response, e := s.companyCoordinator.Customer(ctx, prepared, r.Method, path, r.URL.RawQuery, raw, r.Header, keyPresent, key)
 	if e != nil {
 		companyInterfaceError(w, e)

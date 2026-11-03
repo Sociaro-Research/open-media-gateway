@@ -84,7 +84,12 @@ func (s *Server) companyCustomerRequest(w http.ResponseWriter, r *http.Request, 
 		companyInterfaceError(w, ci.ErrDenied)
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), ci.ProtocolTimeout)
+	prefix := ci.CustomerSDKPrefix
+	if browser {
+		prefix = ci.CustomerBrowserPrefix
+	}
+	path := "/" + strings.TrimPrefix(r.URL.EscapedPath(), prefix)
+	ctx, cancel := context.WithTimeout(r.Context(), ci.CustomerTimeout(r.Method, path))
 	defer cancel()
 	r = r.WithContext(ctx)
 	gate := ci.Gate{Authority: s.companyCustomer, Keys: s.companyCustomer, Recipients: s.companyCustomer, CentralOrigin: s.companyCentralOrigin}
@@ -102,16 +107,12 @@ func (s *Server) companyCustomerRequest(w http.ResponseWriter, r *http.Request, 
 		companyInterfaceError(w, ci.ErrDenied)
 		return
 	}
-	prefix := ci.CustomerSDKPrefix
-	if browser {
-		prefix = ci.CustomerBrowserPrefix
-	}
-	path := "/" + strings.TrimPrefix(r.URL.EscapedPath(), prefix)
 	deadline, _ := ctx.Deadline()
 	_ = http.NewResponseController(w).SetReadDeadline(deadline)
+	_ = http.NewResponseController(w).SetWriteDeadline(deadline.Add(5 * time.Second))
 	defer http.NewResponseController(w).SetReadDeadline(time.Time{})
 	defer r.Body.Close()
-	raw, e := io.ReadAll(http.MaxBytesReader(w, r.Body, 8192))
+	raw, e := io.ReadAll(http.MaxBytesReader(w, r.Body, ci.CustomerBodyLimit(r.Method, path)))
 	if e != nil {
 		companyInterfaceError(w, ci.ErrDenied)
 		return

@@ -128,6 +128,9 @@ func extendedCustomerBody(kind string, raw []byte) error {
 	}
 	allowed, required := "", ""
 	switch kind {
+	case "template-input":
+		allowed = "expected_resolution revision provider model inputs project_id max_expected_cost_usd"
+		required = "revision provider model"
 	case "company-settings":
 		allowed = "name default_weekly_limit_usd"
 		required = allowed

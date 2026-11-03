@@ -157,3 +157,23 @@ failed customer credential checks use a separate failure counter. Authorization
 start/approval/redemption/local-control attempt limits remain unchanged. Exercise
 more than 120 valid requests from one installation peer and retain the ordinary
 protocol rate-limit regressions.
+
+
+Template consumer contracts use the existing central published recipes; global
+Administrator authoring remains direct-central-only. The actual-handler fixture
+creates and publishes centrally, consumes through the reserved company facade,
+then edits and unpublishes centrally. Assert original admitted recipe ID,
+revision, prompt and fixed-reference snapshot retention, exact idempotent task
+identity, current-revision conflicts and absence of local template/task copies.
+The disposable fixture explicitly supplies a mock company budget and member
+allowance; it does not prove generation from a newly connected unfunded company.
+
+Preserve the central template JSON limit of 16 KiB on both hops and the 150-second
+`validate-media` inspection deadline through the local request, fixed client and
+central wrapper. Ordinary authorization/control and management requests retain
+15 seconds. Test the actual public transport's response-header behavior as well
+as propagated contexts; a longer context alone cannot override a shorter HTTP
+client or transport timeout. Typed template/media URL rewriting, large response
+streaming, direct-storage redirects and complete browser integration remain
+separate pending contracts. Small shared-reference GET/HEAD fixture coverage is
+not full media transport acceptance.
