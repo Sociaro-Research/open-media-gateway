@@ -818,3 +818,7 @@ The title and constraints start on the same header row. Keep the title uncapped
 and nowrap; constraints occupy half the available width, wrap and align right.
 Do not truncate or shrink the title. Asset/card content still fits its available
 width. File limits omit the approximate symbol; monetary estimates may retain it.
+
+Post-generation replacement audio uses the plain **Post-processing** section and
+shared **Override audio** picker, without an explanatory paragraph or nested panel.
+Its upload bindings and processing behavior remain unchanged.

@@ -1,11 +1,11 @@
 // Shared post-generation audio control. Uploads use the existing media transport.
 window.OverrideSound=(()=>{
  function create(config){
-  const section=document.createElement('section');section.dataset.overrideSound='';section.className='generation-settings override-sound-panel';
+  const section=document.createElement('section');section.dataset.overrideSound='';section.className='override-sound-panel';
 
-  const hint=document.createElement('p');hint.className='field-hint';hint.textContent='Replace the video’s original sound. Longer audio is trimmed; shorter audio leaves silence. Video quality and duration stay unchanged.';section.append(hint);
+  const heading=document.createElement('h3');heading.textContent='Post-processing';section.append(heading);
   let value=config.value||'',url='',busy=false;
-  const widget=ReferenceUpload.create({label:'Override Sound',title:'Drop an audio file here',uploadLabel:'Upload',kinds:['audio'],signal:config.signal,locked:()=>Boolean(config.locked?.()),onRemove:()=>clear(),onBusy:b=>{busy=b;sync();config.onBusy?.(b);},onFile:async(file,signal)=>{
+  const widget=ReferenceUpload.create({label:'Override audio',title:'Drop an audio file here',uploadLabel:'Upload',kinds:['audio'],signal:config.signal,locked:()=>Boolean(config.locked?.()),onRemove:()=>clear(),onBusy:b=>{busy=b;sync();config.onBusy?.(b);},onFile:async(file,signal)=>{
    const result=await config.upload(file,signal);signal.throwIfAborted();
    if(!result.content_type?.startsWith('audio/'))throw Error('Choose a supported audio file.');
    if(url)URL.revokeObjectURL(url);url=URL.createObjectURL(file);value=result.id;

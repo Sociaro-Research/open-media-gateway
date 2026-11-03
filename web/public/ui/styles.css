@@ -1633,7 +1633,7 @@ body:has(.detail-dialog[open]) { overflow:hidden; }
 .advanced-settings { border-top:0; }
 .advanced-settings .advanced-grid { margin-top:16px; }
 .override-sound-panel { display:grid; gap:16px; margin-top:var(--space-section); }
-.override-sound-panel > :is(h3,.field-hint) { margin:0; }
+#generationView .override-sound-panel > h3, .override-sound-panel > h3 { margin:0; }
 @media(max-width:600px) { .generation-settings { padding:20px; } }
 
 /* A single shared perimeter owns border paint. The existing transparent layout
