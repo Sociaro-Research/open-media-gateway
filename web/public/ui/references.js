@@ -73,7 +73,7 @@ function hashReferenceFile(file,signal){
   const selectionSignature=()=>JSON.stringify([selectionVersion,validationTarget(),urls(),field.value,kind==='audio'?activeVoices():null]);
   const candidateIDs=values=>[...new Set([...(validationTarget()?.reference_ids||[]).filter(id=>!ReferenceValidation.ids(urls()).includes(id)),...ReferenceValidation.ids(values)])];
  let remote,returnFocus=null,previousFocus=null;
-  const libraryView=ReferenceLibrary.create({id:image?'referenceLibrary':`${kind}ReferenceLibrary`,description:`Choose ${displayPlural} for this generation.`});
+  const libraryView=ReferenceLibrary.create({id:image?'referenceLibrary':`${kind}ReferenceLibrary`,description:''});
   const library=libraryView.dialog;
   libraryView.intro.insertAdjacentHTML('afterend',`<div class="reference-dropzone" id="libraryDropzone"><p>Drop ${displayPlural} to add them to your library</p><button type="button" class="secondary" data-upload>Upload ${displayPlural}</button><small>Up to ${limitText()} each</small></div>`);
   document.body.append(library);

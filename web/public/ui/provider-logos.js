@@ -107,7 +107,7 @@
   });
 
   async function validate(file) {
-    if (file.size > limit) throw new Error('Logo must be at most '+FileSize.megabytes(limit)+' ('+FileSize.exact(limit)+').');
+    if (file.size > limit) throw new Error('Logo must be at most '+ReferenceUpload.formatLimit(limit)+' ('+FileSize.exact(limit)+').');
     const bytes = new Uint8Array(await file.arrayBuffer());
     if (!/\.png$/i.test(file.name) || (file.type && file.type !== 'image/png') || !signature.every((b,i) => bytes[i] === b)) {
       throw new Error('Choose a PNG image. Other formats are unsupported.');

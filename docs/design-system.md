@@ -527,7 +527,17 @@ redirect to the reported address or use wildcard cross-window messaging.
 `reference-library.js` owns the common dialog, cards, selected state, media
 previews and permanent-delete confirmation, using the Playground design in
 `references.css`. Playground and Templates configure this component rather than
-copying its markup. Transport adapters retain their existing authorization and
+copying its markup. Picker headings remain uncapped and on one line. Restrictions
+start on the same row, wrap right aligned in half the available header width and
+show compact limits without an approximate symbol; exact-byte admission remains
+unchanged. Drop targets and adjacent actions share the 44px height. Library fields
+and sections use the shared 16px gap without a redundant selection explanation.
+Cards retain equal 12px corner rounding and the shared 2px selected perimeter.
+Remove/Delete use compact neutral translucent labels inside 44px gesture targets,
+without a white outline. Permanent deletion requires two activations of the same
+button: Delete, then Confirm Delete. Leaving its focus, Escape or closing the library
+resets confirmation. Permission, in-use and uncertain-completion protections remain
+caller-owned. Transport adapters retain their existing authorization and
 model/slot validation. Never reconstruct media paths from the current owner;
 render the URL returned by the authorized library response.
 
@@ -797,6 +807,7 @@ durable operation, confirmation and authorization checks. Upload and URL entry
 remain available while using the library. Routine success messages are announced
 accessibly; errors and warnings remain visible.
 
-The title and constraints share one header row, with no truncation, shrinking or
-artificial width cap. Rare collisions at narrow widths are an approved exception
-to the normal wrapping rule. Asset/card content still fits its available width.
+The title and constraints start on the same header row. Keep the title uncapped
+and nowrap; constraints occupy half the available width, wrap and align right.
+Do not truncate or shrink the title. Asset/card content still fits its available
+width. File limits omit the approximate symbol; monetary estimates may retain it.

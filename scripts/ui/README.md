@@ -838,7 +838,7 @@ coverage. These checks use synthetic files and do not mutate live libraries.
 
 `shared-reference-library.cjs` exercises the common image/audio/video card and
 native playback lifecycle directly, including preview retry, keyboard selection,
-Delete/Keep, Escape/reopen and both themes at 1440/390/320 px. Generate clips with
+two-step Delete/Confirm Delete, blur cancellation, Escape/reopen and both themes at 1440/390/320 px. Generate clips with
 `template-video-fixtures.py` first and set `GATEWAY_TEMPLATE_CLIP_DIR` as above.
 
 Run `node scripts/ui/template-editing.cjs` in Chromium and WebKit after generating
@@ -959,3 +959,11 @@ configured accent colors, true touch gestures and disposal during validation.
 `references.cjs` also checks raw URL keyboard drafts, caret/blank-line retention,
 last-valid cards and explicit card-to-URL synchronization. These tests use only
 synthetic local APIs and media.
+
+`media-picker-layout.cjs` measures the shared picker heading/restrictions row,
+half-width right-aligned wrapping, equal 44px drop/action heights, library field
+gaps, full selected perimeter and compact overlay geometry. It covers twelve
+caller configurations in both themes at 1440/390/320px and checks two-step
+deletion, blur/close reset and permission/busy guards with disposable callbacks.
+Run it with each browser engine; `UI_EVIDENCE_DIR` retains screenshots/metrics.
+`UI_BASELINE=1` records old geometry without treating it as current acceptance.
