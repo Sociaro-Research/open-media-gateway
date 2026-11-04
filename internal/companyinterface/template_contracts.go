@@ -50,7 +50,7 @@ func CustomerBodyLimit(method, path string) int64 {
 	return MaxCustomerBody
 }
 
-// Only inspection gets the existing central reference-inspection budget.
+// Exact operation contracts preserve their existing inspection or asset budget.
 // Authorization/control and ordinary JSON operations retain their short bound.
 func CustomerTimeout(method, path string) time.Duration {
 	if timeout := Classify(method, path).Timeout; timeout > 0 {

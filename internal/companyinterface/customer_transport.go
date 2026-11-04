@@ -184,7 +184,7 @@ func (c *Client) customer(ctx context.Context, prepared CustomerContext, method,
 	for _, name := range []string{"Content-Type", "Content-Disposition", "Content-Range", "Accept-Ranges", "ETag", "Last-Modified", "Retry-After"} {
 		// Original entity validators describe central JSON bytes, which differ
 		// after the typed status URL mapping (including the paired HEAD view).
-		if name == "ETag" && (contract.ResponseURLs == "generation" || contract.ResponseURLs == "template-generations") {
+		if name == "ETag" && (contract.ResponseURLs == "generation" || contract.ResponseURLs == "template-generations" || contract.ResponseURLs == "resource-generation") {
 			continue
 		}
 		values := response.Header.Values(name)

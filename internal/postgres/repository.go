@@ -45,6 +45,9 @@ func (r *TaskRepository) CreateOrGet(ctx context.Context, task core.Task, idempo
 		return core.Task{}, false, err
 	}
 	defer tx.Rollback()
+	if err = guardCompanyMutation(ctx, tx, task.OrganizationID); err != nil {
+		return core.Task{}, false, err
+	}
 	policy, err := lockAdmissionPolicy(ctx, tx)
 	if err != nil {
 		return core.Task{}, false, err

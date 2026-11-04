@@ -28,6 +28,9 @@ func (r *APIKeyRepository) CreatePlaygroundKey(ctx context.Context, owner, organ
 		return playgroundkey.Record{}, err
 	}
 	defer tx.Rollback()
+	if err = guardCompanyMutation(ctx, tx, organization, owner); err != nil {
+		return playgroundkey.Record{}, companyMutationDomainError(err, apikey.ErrForbidden)
+	}
 	current, err := createPlaygroundKey(ctx, tx, owner, organization, request, key, hash, encrypted)
 	if err != nil {
 		return current, err

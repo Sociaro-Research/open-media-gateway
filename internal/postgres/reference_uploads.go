@@ -75,6 +75,17 @@ func (r *ReferenceRepository) UseUpload(ctx context.Context, id string, remove b
 	if err = fn(context.WithValue(ctx, referenceTransactionKey{}, tx), &session, &ReferenceRepository{db: tx}); err != nil {
 		return err
 	}
+	// The digest lock does not serialize source deletion. After all inspection/
+	// storage I/O, hold the same source lock as deletion through ResultID commit.
+	if !remove && session.ResultID != "" && session.Rejected == "" {
+		if err = sourceAssetLock(ctx, tx, identity.OwnerID(ctx), session.ResultID); err != nil {
+			return err
+		}
+		var live string
+		if err = tx.QueryRowContext(ctx, `SELECT id::text FROM reference_images WHERE owner_id=$1 AND id=$2 AND NOT deleting AND ($3='' OR actor_id::text=$3) FOR SHARE`, identity.OwnerID(ctx), session.ResultID, identity.ContentAuthorFilter(ctx)).Scan(&live); err != nil {
+			return storage.ErrObjectNotFound
+		}
+	}
 	if remove {
 		_, err = tx.ExecContext(ctx, `DELETE FROM reference_uploads WHERE owner_id=$1 AND id=$2`, identity.OwnerID(ctx), id)
 	} else {

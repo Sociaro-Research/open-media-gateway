@@ -225,3 +225,41 @@ responses, invalid/duplicate cursor and cross-origin rejection, live local brows
 identity, and a bounded stalled-body response. These backend fixtures do not
 establish a reachable pilot/full portal recovery action or complete company mode;
 that UI integration and all fourteen runtime rows remain separate acceptance gates.
+
+
+Company media-workflow resource fixtures must exercise the actual preparations
+provider query, inspected reference input, estimates and idempotent admission
+through both direct central and reserved facade handlers. Face/session actions
+retain the precise selection revision and coordinates, provider connection
+identity, company and actual key recipient. Resource admission returns a typed
+status URL but the current central handlers omit Location; preserve that absence,
+validate any supplied Location against the exact object, and strip validators
+that describe the unmodified central JSON. Generation/template admissions retain
+their existing mandatory Location contract.
+
+Official preset tickets remain opaque and bound to company data owner, provider
+owner, workflow, connection and revision. Another permitted company content
+recipient may import/read the same official preset; do not impose a new importer
+identity restriction. Test tampering, another company, changed connection and
+ordinary role loss. Ordinary provider groups and asset registration use existing
+central reference IDs; callers cannot supply arbitrary source URLs. Test nonempty
+list/detail, detach without provider deletion, and zero global inventory/import
+calls. Preserve ContentOfficer GET-only behavior, including its HEAD rejection.
+
+Synthetic completed-resource fixtures use the existing repository lifecycle
+transitions and validate nonempty resource/job reads. They do not demonstrate a
+live provider worker completing media. Queued task admission, completed fixture
+records and actual provider completion are separate evidence. Asset JSON does not
+establish icon/blob delivery, signed-media redirects, Range/streaming, upload
+bridge or full portal acceptance. These remain required before mode activation.
+
+
+### Delegated mutation admission
+
+The company customer adapter rechecks authority after reading the bounded body and before dispatch, and retains its response fence. These checks do not replace transactional admission. A server-private immutable descriptor carries separately verified browser and key-recipient identities into explicit PostgreSQL write transactions. The guard locks current company membership, source session, installation grant, delegated family and original key before the business mutation or task/outbox admission commits. Current key use never borrows creator authority. Browser management retains the session actor. Key and member targets retain their existing domain policies.
+
+The lock order starts with the strongest settings mode required by the operation, then company, sorted relevant users, source session, grant, family and key; domain locks follow. Organization settings takes its existing exclusive settings lock first. Invitation acceptance follows company-before-user ordering. Provider and storage I/O takes place after local admission commits. Completed work retains its admission even when later revocation prevents new work.
+
+Reference deletion stores immutable owner/reference/physical-storage-owner/key/hash/size custody, releases source locks before removal, and settles only that exact deleting row. A trusted worker can resume the bounded cleanup after restart or originating-user revocation. Deleting sources cannot re-enter lazy deduplication, direct-upload ResultID persistence or new asset registration. Terminal history and unresolved custody survive migration rollback/re-upgrade. Provider group creation records a pre-call intent and settles a known result; recovery/discovery of an uncertain provider group outcome remains unfinished and must not be represented as full surface recovery.
+
+Focused tests cover actual handler-to-repository revocation after all HTTP checks, task/outbox no-write outcomes, current browser/recipient/key changes, valid SDK use after creator removal, concurrent held local commit versus revocation, historical cleanup-target parity, source deduplication races, exact cleanup leases and lost physical/settlement replies. These tests use disposable services and synthetic provider/storage behavior. They do not establish native provider execution, ordinary local API routing, signed-media streaming, upload bridge, payments or full portal activation.

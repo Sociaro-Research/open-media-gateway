@@ -21,6 +21,9 @@ func (r *ProviderResourceRepository) ImportPreset(ctx context.Context, b provide
 		return providerresources.Binding{}, err
 	}
 	defer tx.Rollback()
+	if err = guardCompanyMutation(ctx, tx, b.OwnerID); err != nil {
+		return providerresources.Binding{}, err
+	}
 	saved, err := scanResource(tx.QueryRowContext(ctx, `INSERT INTO provider_resources(id,owner_id,actor_id,provider_id,connection_id,provider_owner_id,revision,remote_id,kind,subtype,name,status,is_preset) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'succeeded',true) ON CONFLICT(owner_id,provider_owner_id,provider_id,connection_id,revision,kind,remote_id) WHERE status<>'deleted' DO NOTHING RETURNING `+resourceColumns,
 		b.ID, b.OwnerID, b.ActorID, b.ProviderID, b.ConnectionID, b.ProviderOwnerID, b.Revision, b.RemoteID, b.Kind, b.Subtype, b.Name))
 	if errors.Is(err, providerresources.ErrNotFound) {

@@ -34,6 +34,9 @@ func (r *AuthRepository) UpdateProfile(ctx context.Context, id string, in auth.P
 		return identity.User{}, err
 	}
 	defer tx.Rollback()
+	if err = guardCompanyMutation(ctx, tx, "", id); err != nil {
+		return identity.User{}, err
+	}
 	if err = setAuditActor(ctx, tx, id); err != nil {
 		return identity.User{}, err
 	}

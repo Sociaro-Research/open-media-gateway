@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -117,6 +118,13 @@ func (s *Server) companyCustomerRequest(w http.ResponseWriter, r *http.Request, 
 		companyInterfaceError(w, ci.ErrDenied)
 		return
 	}
+	// Body intake is not mutation admission. Recheck the original authority after
+	// all bytes arrive; a revoked family/grant must not reach an inner writer.
+	afterBody, e := authenticate(ctx, c, time.Now())
+	if e != nil || !sameCompanyPrincipal(principal, afterBody) {
+		companyInterfaceError(w, ci.ErrConflict)
+		return
+	}
 	// Browser management is performed by the verified session actor. A supplied
 	// key is still validated above, but its recipient cannot lend management
 	// authority to that browser. SDK and generation keep original-key identity.
@@ -158,6 +166,7 @@ func (s *Server) companyCustomerRequest(w http.ResponseWriter, r *http.Request, 
 		user.SessionID = hex.EncodeToString(sum[:])
 	}
 	user.SourceSessionID = ""
+	ctx = ci.WithMutationAuthority(ctx, principal, effective, c, contract.Scope, contract.ID)
 	ctx = identity.WithCompanyBoundary(ctx, principal.Grant.Company)
 	ctx = identity.WithUser(ctx, user)
 	ctx = identity.WithOrganizationRole(ctx, principal.Grant.Company, effective.Role)
@@ -177,9 +186,14 @@ func (s *Server) companyCustomerRequest(w http.ResponseWriter, r *http.Request, 
 	// revoked/rotated authority cannot release a late body. Large/streaming
 	// media integration remains a separate contract and is not advertised.
 	out := &companyCustomerResponse{header: http.Header{}}
+	beforeDispatch, e := authenticate(ctx, c, time.Now())
+	if e != nil || !sameCompanyPrincipal(principal, beforeDispatch) {
+		companyInterfaceError(w, ci.ErrConflict)
+		return
+	}
 	mux.ServeHTTP(out, inner)
 	latest, e := authenticate(ctx, c, time.Now())
-	if e != nil || latest.Grant.ID != principal.Grant.ID || latest.Grant.Epoch != principal.Grant.Epoch || latest.Actor != principal.Actor || latest.Role != principal.Role || latest.SessionID != principal.SessionID || latest.SessionEpoch != principal.SessionEpoch || latest.SessionVersion != principal.SessionVersion || latest.KeyID != principal.KeyID {
+	if e != nil || !sameCompanyPrincipal(principal, latest) {
 		companyInterfaceError(w, ci.ErrConflict)
 		return
 	}
@@ -238,4 +252,8 @@ func (w *companyCustomerResponse) Write(p []byte) (int, error) {
 		return 0, io.ErrShortBuffer
 	}
 	return w.body.Write(p)
+}
+
+func sameCompanyPrincipal(a, b ci.Principal) bool {
+	return a.Grant.ID == b.Grant.ID && a.Grant.Epoch == b.Grant.Epoch && a.Grant.Company == b.Grant.Company && a.Grant.LocalOrigin == b.Grant.LocalOrigin && a.Actor == b.Actor && a.BrowserActor == b.BrowserActor && a.BrowserRole == b.BrowserRole && a.Role == b.Role && a.SessionID == b.SessionID && a.SessionEpoch == b.SessionEpoch && a.SessionVersion == b.SessionVersion && a.KeyID == b.KeyID && a.Kind == b.Kind && slices.Equal(a.Scopes, b.Scopes)
 }

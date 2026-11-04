@@ -49,9 +49,9 @@ type Principal struct {
 	Kind  AuthKind
 	// Actor/Recipient/Role are the effective central subject, never key creator.
 	// BrowserActor separately preserves the verified browser initiator for audit.
-	Actor, Recipient, Role, BrowserActor, KeyID, SessionID string
-	SessionEpoch, SessionVersion                           int64
-	Scopes                                                 []string
+	Actor, Recipient, Role, BrowserActor, BrowserRole, KeyID, SessionID string
+	SessionEpoch, SessionVersion                                        int64
+	Scopes                                                              []string
 }
 
 // CentralOrigin comes from trusted central deployment configuration, never Host,
@@ -103,6 +103,7 @@ func (g Gate) authenticate(ctx context.Context, c Credentials, now time.Time, br
 			return deny()
 		}
 		p.Kind, p.Actor, p.Recipient, p.BrowserActor, p.Role, p.SessionID = CentralSession, s.Actor, s.Actor, s.Actor, role, s.ID
+		p.BrowserRole = role
 		p.SessionEpoch, p.SessionVersion = s.Epoch, s.Version
 	}
 	if c.KeyPresent {

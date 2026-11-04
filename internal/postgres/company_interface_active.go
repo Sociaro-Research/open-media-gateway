@@ -25,12 +25,16 @@ func (r *CompanyInterfaceLifecycle) RevokeFamilyProof(ctx context.Context, in ci
 	if e = r.host(ctx, tx); e != nil {
 		return result, e
 	}
-	f, e := readCIFamily(ctx, tx, in.SessionID, true)
+	f, e := readCIFamily(ctx, tx, in.SessionID, false)
 	if e != nil {
 		return result, e
 	}
 	g, e := ciReadGrant(ctx, tx, f.grant)
 	if e != nil || g.Company != f.company || g.CentralOrigin != r.central || g.LocalOrigin != in.LocalOrigin {
+		return result, ci.ErrDenied
+	}
+	f, e = readCIFamily(ctx, tx, in.SessionID, true)
+	if e != nil || f.grant != g.ID || f.company != g.Company {
 		return result, ci.ErrDenied
 	}
 	var credential []byte

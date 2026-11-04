@@ -58,6 +58,9 @@ func (r *TaskRepository) CreateProject(ctx context.Context, name string) (core.P
 		return core.Project{}, err
 	}
 	defer tx.Rollback()
+	if err = guardCompanyMutation(ctx, tx, identity.OrganizationFromContext(ctx).ID); err != nil {
+		return core.Project{}, err
+	}
 	if err = lockProjectName(ctx, tx, name); err != nil {
 		return core.Project{}, err
 	}
@@ -147,6 +150,9 @@ func (r *TaskRepository) RenameProject(ctx context.Context, id, name string, ver
 		return core.Project{}, err
 	}
 	defer tx.Rollback()
+	if err = guardCompanyMutation(ctx, tx, identity.OrganizationFromContext(ctx).ID); err != nil {
+		return core.Project{}, err
+	}
 	if err = lockProject(ctx, tx, id, version); err != nil {
 		return core.Project{}, err
 	}
@@ -177,6 +183,9 @@ func (r *TaskRepository) DeleteProject(ctx context.Context, id string, version i
 		return err
 	}
 	defer tx.Rollback()
+	if err = guardCompanyMutation(ctx, tx, identity.OrganizationFromContext(ctx).ID); err != nil {
+		return err
+	}
 	if err = lockProject(ctx, tx, id, version); err != nil {
 		return err
 	}
@@ -202,6 +211,9 @@ func (r *TaskRepository) AssignTaskProject(ctx context.Context, id, project stri
 		return core.ProjectAssignment{}, err
 	}
 	defer tx.Rollback()
+	if err = guardCompanyMutation(ctx, tx, identity.OrganizationFromContext(ctx).ID); err != nil {
+		return core.ProjectAssignment{}, err
+	}
 	// Never lock a task and then its destination project: deletion takes the
 	// project lock first. Hold the project lock until the assignment commits.
 	if project != "" {

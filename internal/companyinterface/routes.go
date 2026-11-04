@@ -70,6 +70,9 @@ func Classify(method, path string) Contract {
 	return c
 }
 func classifyCustomerRoute(method, path string) Contract {
+	if c := resourceCustomerContract(method, path); c.Class == CentralCustomer {
+		return c
+	}
 	if c := workflowCustomerContract(method, path); c.Class == CentralCustomer {
 		return c
 	}

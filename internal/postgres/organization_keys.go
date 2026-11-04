@@ -51,6 +51,9 @@ func (r *APIKeyRepository) RevokeForActor(ctx context.Context, actor, id string)
 	} else if err != nil {
 		return err
 	}
+	if err = guardCompanyMutation(ctx, tx, organization, owner); err != nil {
+		return companyMutationDomainError(err, apikey.ErrForbidden)
+	}
 	if organization == "" {
 		if owner != actor {
 			return apikey.ErrForbidden

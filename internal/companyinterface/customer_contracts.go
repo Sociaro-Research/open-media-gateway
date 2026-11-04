@@ -26,7 +26,9 @@ func extendedCustomerContract(method, path string) Contract {
 			}
 			if valid {
 				if strings.HasSuffix(model, "/preparations") && strings.Count(model, "/") == 1 {
-					return customerContract("model-preparations", "", "", "preparations", "generation", false)
+					c := customerContract("model-preparations", "", "provider", "preparations", "generation", false)
+					c.Auth = []AuthKind{CentralKey}
+					return c
 				}
 				return customerContract("central-model", "", "", "catalog", "generation", false)
 			}
@@ -136,6 +138,24 @@ func extendedCustomerBody(kind string, raw []byte) error {
 	}
 	allowed, required := "", ""
 	switch kind {
+	case "resource-create":
+		allowed = "workflow_model provider model kind subtype name description reference_ids generated_task_id generated_artifact_id bound_voice_binding_id tags max_expected_usd"
+		required = "workflow_model provider kind name"
+	case "face-preparation":
+		allowed = "provider workflow_model reference_id max_expected_usd"
+		required = "provider workflow_model reference_id"
+	case "resource-action":
+		allowed = "workflow_model model expected_revision frame recover max_expected_usd"
+		required = "expected_revision"
+	case "resource-preset-import":
+		allowed = "provider workflow_model ticket"
+		required = allowed
+	case "asset-group":
+		allowed = "name"
+		required = allowed
+	case "asset-register":
+		allowed = "reference_id group_id"
+		required = "reference_id"
 	case "generation-json":
 		allowed = "model prompt options webhook_url max_expected_cost_usd project_id timeout_seconds input voice instructions response_format output_format quality background size seconds stream n image input_reference"
 		required = "model"

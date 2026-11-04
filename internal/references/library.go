@@ -193,11 +193,24 @@ func (l *Library) findDuplicate(ctx context.Context, digest string, size int64) 
 			return Image{}, storage.ErrObjectNotFound
 		}
 		candidate.SHA256 = hex.EncodeToString(hash.Sum(nil))
-		if err = l.repo.SetHash(ctx, candidate.ID, candidate.SHA256); err != nil && !errors.Is(err, ErrDuplicate) {
+		if err = l.repo.SetHash(ctx, candidate.ID, candidate.SHA256); errors.Is(err, storage.ErrObjectNotFound) {
+			continue
+		} else if err != nil && !errors.Is(err, ErrDuplicate) {
 			return Image{}, err
 		}
 		if candidate.SHA256 == digest {
-			return candidate, nil
+			// Re-read the live row; hashing must not resurrect a concurrently deleting source.
+			live, e := l.repo.Get(ctx, candidate.ID)
+			if errors.Is(e, storage.ErrObjectNotFound) {
+				continue
+			}
+			if e != nil {
+				return Image{}, e
+			}
+			if live.SHA256 != digest {
+				return Image{}, storage.ErrObjectNotFound
+			}
+			return live, nil
 		}
 	}
 	return Image{}, storage.ErrObjectNotFound
@@ -228,6 +241,11 @@ func (l *Library) Delete(ctx context.Context, id string) error {
 			return err
 		}
 		return nil
+	}
+	if guarded, ok := l.repo.(interface {
+		DeleteImageWithGuard(context.Context, Image, func() error) error
+	}); ok {
+		return guarded.DeleteImageWithGuard(ctx, item, remove)
 	}
 	if guarded, ok := l.repo.(interface {
 		DeleteWithGuard(context.Context, string, func() error) error

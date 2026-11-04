@@ -231,7 +231,10 @@ func ciReadGrant(ctx context.Context, tx *sql.Tx, id string) (ci.Grant, error) {
 	var g ci.Grant
 	var hash []byte
 	e := tx.QueryRowContext(ctx, `SELECT id::text,installation_hash,organization_id::text,central_origin,approved_local_origin,purpose,protocol_version,revocation_epoch,expires_at,revoked_at IS NOT NULL FROM company_interface_grants WHERE id=$1 FOR UPDATE`, id).Scan(&g.ID, &hash, &g.Company, &g.CentralOrigin, &g.LocalOrigin, &g.Purpose, &g.Version, &g.Epoch, &g.ExpiresAt, &g.Revoked)
-	if e != nil || len(hash) != 32 {
+	if e != nil {
+		return g, e
+	}
+	if len(hash) != 32 {
 		return g, ci.ErrDenied
 	}
 	copy(g.InstallationHash[:], hash)

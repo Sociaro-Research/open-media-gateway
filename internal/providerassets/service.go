@@ -41,6 +41,23 @@ func (s *Service) CreateGroup(ctx context.Context, p, name string) (Group, error
 	if err != nil {
 		return Group{}, err
 	}
+	if identity.CompanyBoundary(ctx) != "" {
+		admission, ok := s.Repo.(GroupAdmission)
+		if !ok {
+			return Group{}, ErrUnavailable
+		}
+		id := uuid.NewString()
+		if err = admission.AdmitGroup(ctx, id, p, c.Scope(), name); err != nil {
+			return Group{}, err
+		}
+		g, e := c.CreateGroup(ctx, name)
+		if e != nil {
+			return g, e
+		}
+		complete, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+		defer cancel()
+		return g, admission.CompleteGroup(complete, id, p, c.Scope(), g)
+	}
 	g, err := c.CreateGroup(ctx, name)
 	if err != nil {
 		return g, err

@@ -70,3 +70,10 @@ type Repository interface {
 	BeginDelete(context.Context, string) (Record, error)
 	Detach(context.Context, string) error
 }
+
+// GroupAdmission separates short durable authorization from external provider I/O.
+// A failed/unknown call keeps its admission record; it is not a retry permit.
+type GroupAdmission interface {
+	AdmitGroup(context.Context, string, string, string, string) error
+	CompleteGroup(context.Context, string, string, string, Group) error
+}

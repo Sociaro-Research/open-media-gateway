@@ -31,6 +31,12 @@ func (r *SystemRepository) Ensure(ctx context.Context, refs []modelaccess.Ref) e
 		return err
 	}
 	defer tx.Rollback()
+	// Discovery inputs come from the trusted central provider catalog. When
+	// invoked by a delegated request, order this derived registry write against
+	// revocation as well; catalog/provider I/O has already finished before here.
+	if err = guardCompanyMutation(ctx, tx, identity.OrganizationFromContext(ctx).ID); err != nil {
+		return err
+	}
 	_, err = tx.ExecContext(ctx, `INSERT INTO model_settings(provider,model,name,public_id)
  SELECT DISTINCT ON (x.provider,x.model) x.provider,x.model,x.name,x.provider || '/' || x.model
  FROM jsonb_to_recordset($1::jsonb) x(provider text,model text,name text)

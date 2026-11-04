@@ -176,6 +176,9 @@ func (r *SystemRepository) OrganizationSettings(ctx context.Context, actor, id, 
 	if _, e = readSystemSettings(ctx, tx, true); e != nil {
 		return e
 	}
+	if e = guardCompanyMutation(ctx, tx, id); e != nil {
+		return e
+	}
 	role, e := orgLock(ctx, tx, actor, id)
 	if e != nil {
 		return e
@@ -212,6 +215,9 @@ func (r *SystemRepository) SetOrganizationRequestLogging(ctx context.Context, ac
 		return err
 	}
 	defer tx.Rollback()
+	if err = guardCompanyMutation(ctx, tx, id); err != nil {
+		return err
+	}
 	if _, err = orgLock(ctx, tx, actor, id); err != nil {
 		return err
 	}
@@ -266,6 +272,15 @@ func (r *SystemRepository) SetOrganizationMember(ctx context.Context, actor, id,
 		return e
 	}
 	defer tx.Rollback()
+	if identity.CompanyBoundary(ctx) != "" {
+		var targetID string
+		if e = tx.QueryRowContext(ctx, `SELECT u.id FROM users u JOIN organization_members m ON m.user_id=u.id WHERE m.organization_id=$1 AND (u.id::text=$2 OR lower(u.email)=lower($2)) AND NOT u.is_client_manager ORDER BY u.id LIMIT 1`, id, target).Scan(&targetID); e != nil {
+			return org.ErrNotFound
+		}
+		if e = guardCompanyMutation(ctx, tx, id, targetID); e != nil {
+			return e
+		}
+	}
 	access, e := orgLock(ctx, tx, actor, id)
 	if e != nil {
 		return e
@@ -440,6 +455,9 @@ func (r *SystemRepository) CreateOrganizationInvite(ctx context.Context, actor, 
 		return i, e
 	}
 	defer tx.Rollback()
+	if e = guardCompanyMutation(ctx, tx, id); e != nil {
+		return i, e
+	}
 	access, e := orgLock(ctx, tx, actor, id)
 	if e != nil {
 		return i, e
@@ -459,6 +477,9 @@ func (r *SystemRepository) RevokeOrganizationInvite(ctx context.Context, actor, 
 		return e
 	}
 	defer tx.Rollback()
+	if e = guardCompanyMutation(ctx, tx, id); e != nil {
+		return e
+	}
 	if _, e = orgLock(ctx, tx, actor, id); e != nil {
 		return e
 	}
@@ -490,6 +511,19 @@ func (r *SystemRepository) OrganizationInvitation(ctx context.Context, actor, to
 		return i, e
 	}
 	defer tx.Rollback()
+	if invitationCompany == "" {
+		return i, org.ErrNotFound
+	}
+	if accept {
+		if e = guardCompanyMutation(ctx, tx, invitationCompany); e != nil {
+			return i, e
+		}
+	}
+	// Direct and delegated invitation acceptance both take company before user.
+	var ignored string
+	if e = tx.QueryRowContext(ctx, `SELECT id FROM organizations WHERE id=$1 FOR NO KEY UPDATE`, invitationCompany).Scan(&ignored); e != nil {
+		return i, e
+	}
 	var manager bool
 	if e = tx.QueryRowContext(ctx, `SELECT is_client_manager FROM users WHERE id=$1 FOR UPDATE`, actor).Scan(&manager); e != nil {
 		return i, e
@@ -519,10 +553,6 @@ func (r *SystemRepository) OrganizationInvitation(ctx context.Context, actor, to
 		return i, nil
 	}
 	if e = setAuditActor(ctx, tx, actor); e != nil {
-		return i, e
-	}
-	var ignored string
-	if e = tx.QueryRowContext(ctx, `SELECT id FROM organizations WHERE id=$1 FOR NO KEY UPDATE`, i.OrganizationID).Scan(&ignored); e != nil {
 		return i, e
 	}
 	result, e := tx.ExecContext(ctx, `UPDATE organization_invites SET accepted_by=$2 WHERE id=$1 AND accepted_by IS NULL AND revoked_at IS NULL AND expires_at>NOW()`, i.ID, actor)

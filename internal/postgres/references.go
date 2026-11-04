@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"github.com/jackc/pgx/v5/pgconn"
+	"time"
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
 	"github.com/Sociaro-Research/open-media-gateway/internal/references"
@@ -73,7 +74,7 @@ func (r *ReferenceRepository) FindByHash(ctx context.Context, digest string) (re
 	return item, err
 }
 func (r *ReferenceRepository) UnhashedBySize(ctx context.Context, size int64) ([]references.Image, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT id,name,content_type,size_bytes,storage_key,created_at,COALESCE(storage_owner_id::text,owner_id::text) FROM reference_images WHERE owner_id=$1 AND size_bytes=$2 AND content_sha256 IS NULL AND ($3='' OR actor_id::text=$3) ORDER BY created_at,id`, identity.OwnerID(ctx), size, identity.ContentAuthorFilter(ctx))
+	rows, err := r.db.QueryContext(ctx, `SELECT id,name,content_type,size_bytes,storage_key,created_at,COALESCE(storage_owner_id::text,owner_id::text) FROM reference_images WHERE NOT deleting AND owner_id=$1 AND size_bytes=$2 AND content_sha256 IS NULL AND ($3='' OR actor_id::text=$3) ORDER BY created_at,id`, identity.OwnerID(ctx), size, identity.ContentAuthorFilter(ctx))
 	if err != nil {
 		return nil, err
 	}
@@ -89,12 +90,6 @@ func (r *ReferenceRepository) UnhashedBySize(ctx context.Context, size int64) ([
 	return items, rows.Err()
 }
 func (r *ReferenceRepository) SetHash(ctx context.Context, id, digest string) error {
-	_, err := r.db.ExecContext(ctx, `UPDATE reference_images SET content_sha256=$3 WHERE owner_id=$1 AND id=$2 AND content_sha256 IS NULL`, identity.OwnerID(ctx), id, digest)
-	return referenceWriteError(err)
-}
-
-// Keep the source available until asynchronous provider ingestion is resolved.
-func (r *ReferenceRepository) DeleteWithGuard(ctx context.Context, id string, remove func() error) error {
 	db, ok := r.db.(*sql.DB)
 	if !ok {
 		return references.ErrInUse
@@ -104,6 +99,43 @@ func (r *ReferenceRepository) DeleteWithGuard(ctx context.Context, id string, re
 		return err
 	}
 	defer tx.Rollback()
+	if err = guardCompanyMutation(ctx, tx, identity.OwnerID(ctx)); err != nil {
+		return err
+	}
+	if err = sourceAssetLock(ctx, tx, identity.OwnerID(ctx), id); err != nil {
+		return err
+	}
+	result, err := tx.ExecContext(ctx, `UPDATE reference_images SET content_sha256=$3 WHERE NOT deleting AND owner_id=$1 AND id=$2 AND (content_sha256 IS NULL OR content_sha256=$3)`, identity.OwnerID(ctx), id, digest)
+	if err != nil {
+		return referenceWriteError(err)
+	}
+	n, _ := result.RowsAffected()
+	if n != 1 {
+		return storage.ErrObjectNotFound
+	}
+	return tx.Commit()
+}
+
+// Keep the source available until asynchronous provider ingestion is resolved.
+func (r *ReferenceRepository) DeleteWithGuard(ctx context.Context, id string, remove func() error) error {
+	return r.deleteWithGuard(ctx, id, nil, remove)
+}
+func (r *ReferenceRepository) DeleteImageWithGuard(ctx context.Context, item references.Image, remove func() error) error {
+	return r.deleteWithGuard(ctx, item.ID, &item, remove)
+}
+func (r *ReferenceRepository) deleteWithGuard(ctx context.Context, id string, expected *references.Image, remove func() error) error {
+	db, ok := r.db.(*sql.DB)
+	if !ok {
+		return references.ErrInUse
+	}
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if err = guardCompanyMutation(ctx, tx, identity.OwnerID(ctx)); err != nil {
+		return err
+	}
 	if err = sourceAssetLock(ctx, tx, identity.OwnerID(ctx), id); err != nil {
 		return err
 	}
@@ -165,13 +197,19 @@ func (r *ReferenceRepository) DeleteWithGuard(ctx context.Context, id string, re
 		_, err = r.db.ExecContext(ctx, `DELETE FROM reference_images WHERE owner_id=$1 AND id=$2 AND deleting`, identity.OwnerID(ctx), id)
 		return err
 	}
-	if err = remove(); err != nil {
-		return err
+	d, e := admitReferenceDeletion(ctx, tx, id, expected)
+	if e != nil {
+		return e
 	}
-	if _, err = tx.ExecContext(ctx, `DELETE FROM reference_images WHERE NOT deleting AND owner_id=$1 AND id=$2 AND ($3='' OR actor_id::text=$3)`, identity.OwnerID(ctx), id, identity.ContentAuthorFilter(ctx)); err != nil {
-		return err
+	if e = tx.Commit(); e != nil {
+		return e
 	}
-	return tx.Commit()
+	// All private-source callers release source and authority locks before I/O.
+	removal := remove()
+	settle, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+	defer cancel()
+	completed := r.FinishDeletion(settle, d, removal == nil)
+	return errors.Join(removal, completed)
 }
 
 func (r *ReferenceRepository) Rename(ctx context.Context, id, name string) error {

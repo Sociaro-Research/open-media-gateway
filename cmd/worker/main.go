@@ -125,6 +125,9 @@ func run() error {
 	}()
 	go func() {
 		for {
+			if err := referenceLibrary.CleanupDeletions(workerCtx); err != nil {
+				slog.Warn("reference deletion cleanup", "error", err)
+			}
 			if err := referenceLibrary.CleanupUploads(workerCtx); err != nil {
 				slog.Warn("reference upload cleanup", "error", err)
 			}

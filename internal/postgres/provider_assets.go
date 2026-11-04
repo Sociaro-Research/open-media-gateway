@@ -68,12 +68,15 @@ func (r *ProviderAssetRepository) Reserve(ctx context.Context, a providerassets.
 		return a, false, err
 	}
 	defer tx.Rollback()
+	if err = guardCompanyMutation(ctx, tx, identity.OwnerID(ctx)); err != nil {
+		return a, false, err
+	}
 	if a.SourceID != "" {
 		if err = sourceAssetLock(ctx, tx, identity.OwnerID(ctx), a.SourceID); err != nil {
 			return a, false, err
 		}
 		var exists bool
-		err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM reference_images WHERE owner_id=$1 AND id=$2)`, identity.OwnerID(ctx), a.SourceID).Scan(&exists)
+		err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM reference_images WHERE owner_id=$1 AND id=$2 AND NOT deleting)`, identity.OwnerID(ctx), a.SourceID).Scan(&exists)
 		if err != nil {
 			return a, false, err
 		}
@@ -152,18 +155,29 @@ func (r *ProviderAssetRepository) BeginDelete(ctx context.Context, id string) (p
 	if err != nil {
 		return a, err
 	}
-	if a.Asset.ID == "" {
-		if a.Status != "Failed" {
-			return a, providerassets.ErrConflict
-		}
-		a.Status = "Deleted"
-		return a, r.Save(ctx, a)
-	}
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return a, err
 	}
 	defer tx.Rollback()
+	if err = guardCompanyMutation(ctx, tx, identity.OwnerID(ctx)); err != nil {
+		return a, err
+	}
+	if a.Asset.ID == "" {
+		if a.Status != "Failed" {
+			return a, providerassets.ErrConflict
+		}
+		result, e := tx.ExecContext(ctx, `UPDATE provider_assets SET status='Deleted',updated_at=now() WHERE id=$1 AND owner_id=$2 AND provider_owner_id=$3 AND status='Failed' AND asset_id=''`, id, identity.OwnerID(ctx), identity.ProviderOwnerID(ctx))
+		if e != nil {
+			return a, e
+		}
+		n, _ := result.RowsAffected()
+		if n != 1 {
+			return a, providerassets.ErrConflict
+		}
+		a.Status = "Deleted"
+		return a, tx.Commit()
+	}
 	if err = assetLock(ctx, tx, a.ProviderOwner, a.Provider, a.Asset.ID); err != nil {
 		return a, err
 	}
@@ -243,6 +257,9 @@ func (r *ProviderAssetRepository) Detach(ctx context.Context, id string) error {
 		return err
 	}
 	defer tx.Rollback()
+	if err = guardCompanyMutation(ctx, tx, identity.OwnerID(ctx)); err != nil {
+		return err
+	}
 	if err = assetLock(ctx, tx, a.ProviderOwner, a.Provider, a.Asset.ID); err != nil {
 		return err
 	}

@@ -12,7 +12,7 @@ const LocalCustomerPrefix = "/auth/company-interface/local/customer/"
 // mapped. Prompts, parameters, snapshots and arbitrary nested JSON are untouched.
 // Media/content URLs require their own typed transport and are not admitted here.
 func generationStatusResponse(contract Contract, status int, method, path, company string, headers http.Header, raw []byte) ([]byte, string, error) {
-	if status < 200 || status >= 300 || (contract.ResponseURLs != "generation" && contract.ResponseURLs != "template-generations") {
+	if status < 200 || status >= 300 || (contract.ResponseURLs != "generation" && contract.ResponseURLs != "template-generations" && contract.ResponseURLs != "resource-generation") {
 		return raw, "", nil
 	}
 	if method == http.MethodHead {
@@ -70,7 +70,7 @@ func generationStatusResponse(contract Contract, status int, method, path, compa
 		}
 	}
 	values := headers.Values("Location")
-	if len(values) > 1 || len(values) == 1 && values[0] != expected || status == http.StatusAccepted && len(values) != 1 {
+	if len(values) > 1 || len(values) == 1 && values[0] != expected || status == http.StatusAccepted && contract.ResponseURLs != "resource-generation" && len(values) != 1 {
 		return nil, "", ErrUnavailable
 	}
 	mapped := LocalCustomerPrefix + strings.TrimPrefix(expected, "/")

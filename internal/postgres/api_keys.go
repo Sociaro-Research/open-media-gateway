@@ -23,6 +23,9 @@ func (r *APIKeyRepository) Create(ctx context.Context, owner string, key apikey.
 		return err
 	}
 	defer tx.Rollback()
+	if err = guardCompanyMutation(ctx, tx, key.OrganizationID, owner, keyRecipient(owner, key)); err != nil {
+		return companyMutationDomainError(err, apikey.ErrForbidden)
+	}
 	if err = createAPIKey(ctx, tx, owner, key, hash); err != nil {
 		return err
 	}
