@@ -268,12 +268,12 @@ async function attachStoredMedia(article, task) {
         if (tab) {
           if (!tab.closed) {
             const link = tab.document.createElement('a');
-            link.href = fresh[field]; link.rel = 'noopener noreferrer';
+            link.href = window.CompanyConnection?.url(fresh[field])||fresh[field]; link.rel = 'noopener noreferrer';
             tab.document.body.append(link); link.click();
           }
         } else {
           const link = document.createElement('a');
-          link.href = fresh[field]; link.download = task.id; link.rel = 'noopener noreferrer';
+          link.href = window.CompanyConnection?.url(fresh[field])||fresh[field]; link.download = task.id; link.rel = 'noopener noreferrer';
           document.body.append(link); link.click(); link.remove();
         }
       } catch (error) {
@@ -291,8 +291,8 @@ async function attachStoredMedia(article, task) {
   try {
     const initial = await access();
     if (!current()) return;
-    player.src = initial.preview_url;
-    if (player.tagName === 'VIDEO' && (initial.last_frame_url || task.last_frame_url)) player.poster = initial.last_frame_url || task.last_frame_url;
+    player.src = window.CompanyConnection?.url(initial.preview_url)||initial.preview_url;
+    if (player.tagName === 'VIDEO' && (initial.last_frame_url || task.last_frame_url)) player.poster = window.CompanyConnection?.url(initial.last_frame_url || task.last_frame_url)||initial.last_frame_url||task.last_frame_url;
     if (initial.last_frame_url) addAction('Last frame ↗', 'last_frame_url');
   } catch (error) {
     if (current() && error.name !== 'AbortError') { player.remove(); failure(error); }
@@ -1653,12 +1653,13 @@ async function initialize() {
   setAuthState('checking');
   let user;
   try {
+    const company = await window.CompanyConnection?.initialize();
     const info = await authRequest('/v1/info');
     serviceInfo = info === authAbsent ? {auth_mode:'google'} : info;
     if (!['google','api_key'].includes(serviceInfo?.auth_mode)) throw new Error('Invalid authentication configuration');
-    authMode = serviceInfo.auth_mode;
-    consolePolicy = {...consolePolicy,...(serviceInfo.console||{})};
-    if (authMode === 'google' && info !== authAbsent) {
+    authMode = company ? 'api_key' : serviceInfo.auth_mode;
+    consolePolicy = {...consolePolicy,...(serviceInfo.console||{}),...(company?{personal_providers:false}:{})};
+    if ((authMode === 'google' || company) && info !== authAbsent) {
       const session = await authRequest('/v1/me');
       if (session !== authAbsent) {
         if (!session || typeof session.id !== 'string' || !session.id) throw new Error('Invalid session response');
@@ -1722,7 +1723,8 @@ async function initialize() {
   }
   if (clientManager) window.GenerationKey.forget(); else window.GenerationKey.initialize(user || null);
   window.RemoteWorkspace?.setActor(user);
-  if(!await window.WorkspaceAuthorization?.initialize(user))void window.SetupSelector?.initialize(user);
+  const companyControl=document.querySelector('#companyConnectionButton');companyControl.hidden=!window.CompanyConnection?.active();companyControl.onclick=()=>window.RemoteWorkspace.open();
+  if(!window.CompanyConnection?.active()&&!await window.WorkspaceAuthorization?.initialize(user))void window.SetupSelector?.initialize(user);
 }
 
 document.querySelector('#authRetry').addEventListener('click', initialize);

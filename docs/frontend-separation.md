@@ -89,6 +89,39 @@ and cookie-only profile changes. It does not disable key-based management or
 background payment notifications. Email and payment providers retain their
 external delivery, verification and settlement requirements.
 
+## Connect the existing UI to Sociaro
+
+The Sociaro setup choice uses the existing central sign-in and explicit device-code
+approval. It creates or recovers one dedicated company and obtains a normal
+company API key with `generation`, `organizations:manage` and `keys:manage`.
+New `company-api-v1` consent issues a revocable key without a fixed expiry. Existing
+`generation-v1` approvals retain their original scopes and expiry; they are not
+silently upgraded. Repeating the same approval/redemption returns its original
+company/key. A new reconnect requires explicit approval.
+
+The signed-in local administrator's existing interface uses that key through a
+fixed-central-origin proxy. The key is encrypted at rest and returned only to the
+local account that connected it; other local users do not inherit that account.
+The central APIs retain their ordinary company, membership, role and key checks.
+The connection key is an ordinary bearer credential, not an origin-restricted
+installation token. It is not sent to provider or storage destinations.
+
+The proxy preserves API methods, query bytes, multipart bodies, range responses
+and idempotency keys. Central failure is an error, never a local generation or
+storage fallback. Disconnect stops use by this interface and preserves central
+company data; remote key revocation remains available centrally.
+
+Profile writes, account support and browser-only managed Playground-key operations
+remain subject to their existing session-only guards. The connected interface
+already has its company key and does not invoke managed-key creation/restoration.
+No separate generator or copied local catalogue is used.
+
+Existing storage and payment transports are unchanged. Signed media uses the
+central origin. S3 uploads still use the existing signed browser upload plan and
+require the bucket's CORS policy to permit the browser origin; no CORS changes or
+relay are performed by connection. Central local-storage uploads use the existing
+multipart API. Payment interactions retain the central checkout/return behavior.
+
 ## Replace the UI
 
 A replacement frontend uses the documented OpenAPI contract and `/site.json`,

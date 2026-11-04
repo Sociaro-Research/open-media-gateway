@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -299,6 +300,17 @@ func TestWorkspaceSignupCompanyAndInstallationEndToEnd(t *testing.T) {
 	approval := map[string]any{"user_code": view.Code, "consent": false}
 	expect(call(hostHandler, "POST", "/v1/workspace-authorizations/approve", approval, customer, "", false), 403)
 	approval["consent"] = true
+	// The existing login/signup UI now asks for explicit company API consent.
+	// An old generation-only approval cannot authorize the new request.
+	expect(call(hostHandler, "POST", "/v1/workspace-authorizations/approve", approval, customer, "", false), 403)
+	var inspectedIntent struct {
+		Request wa.Challenge `json:"request"`
+	}
+	decode(inspected, &inspectedIntent)
+	if inspectedIntent.Request.Access != wa.CompanyAccess {
+		t.Fatal("wrong requested intent")
+	}
+	approval["access"] = inspectedIntent.Request.Access
 	expect(call(hostHandler, "POST", "/v1/workspace-authorizations/approve", approval, customer, "", true), 403)
 	approved := call(hostHandler, "POST", "/v1/workspace-authorizations/approve", approval, customer, "", false)
 	expect(approved, 200)
@@ -359,7 +371,7 @@ func TestWorkspaceSignupCompanyAndInstallationEndToEnd(t *testing.T) {
 	}
 	credential := string(raw)
 	keys, err := postgres.NewAPIKeyRepository(hostDB).List(ctx, user.ID)
-	if err != nil || len(keys) != 1 || len(keys[0].Scopes) != 1 || keys[0].Scopes[0] != apikey.Generation || keys[0].ResourceMode != "shared" || keys[0].ExpiresAt == nil {
+	if err != nil || len(keys) != 1 || !slices.Equal(keys[0].Scopes, []string{apikey.Generation, apikey.OrganizationsManage, apikey.KeysManage}) || keys[0].ResourceMode != "shared" || keys[0].ExpiresAt != nil {
 		t.Fatal("wrong installation authority", err)
 	}
 	expect(call(hostHandler, "POST", "/v1/workspace-authorizations/inspect", inspect, nil, credential, false), 403)

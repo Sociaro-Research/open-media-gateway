@@ -106,7 +106,7 @@ func (s *Server) remoteAuthorization(w http.ResponseWriter, r *http.Request) {
 		remoteAuthorizationError(w, e)
 		return
 	}
-	view, err := s.remoteWorkspaceManager.BeginAuthorization(r.Context(), owner, central, label, own, in.Version)
+	view, err := s.remoteWorkspaceManager.BeginCompanyAuthorization(r.Context(), owner, central, label, own, in.Version)
 	if err != nil {
 		remoteAuthorizationError(w, err)
 		return

@@ -35,6 +35,7 @@ type Recovery struct {
 // Explicit server-private DTO avoids Record.MarshalJSON's secret-free public
 // projection. Each credential is already encrypted by the legacy cipher.
 type RecoverySaved struct {
+	Access                                                  string
 	Owner                                                   string
 	Version                                                 int64
 	Active                                                  bool
@@ -46,7 +47,7 @@ type RecoverySaved struct {
 }
 
 func SavedCustody(v Record) RecoverySaved {
-	return RecoverySaved{v.Owner, v.Version, v.Active, v.Origin, v.OrganizationID, v.OrganizationName, v.UserID, v.KeyID, v.TokenHash, v.Ciphertext, v.VerifiedAt, v.Provisioning, v.ConnectionRevision}
+	return RecoverySaved{v.Access, v.Owner, v.Version, v.Active, v.Origin, v.OrganizationID, v.OrganizationName, v.UserID, v.KeyID, v.TokenHash, v.Ciphertext, v.VerifiedAt, v.Provisioning, v.ConnectionRevision}
 }
 
 type RecoveryInput struct {

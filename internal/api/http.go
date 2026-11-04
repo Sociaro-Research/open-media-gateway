@@ -217,6 +217,13 @@ func NewGateway(d Dependencies) http.Handler {
 
 func (s *Server) handler() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /auth/company-connection", s.companyConnection)
+	mux.HandleFunc("GET /auth/company-api/{path...}", s.companyKeyProxy)
+	mux.HandleFunc("HEAD /auth/company-api/{path...}", s.companyKeyProxy)
+	mux.HandleFunc("POST /auth/company-api/{path...}", s.companyKeyProxy)
+	mux.HandleFunc("PUT /auth/company-api/{path...}", s.companyKeyProxy)
+	mux.HandleFunc("PATCH /auth/company-api/{path...}", s.companyKeyProxy)
+	mux.HandleFunc("DELETE /auth/company-api/{path...}", s.companyKeyProxy)
 	s.registerCompanyInterfaceRoutes(mux)
 	s.registerCompanyCustomerRoutes(mux)
 	s.registerCompanyInterfaceLocalRoutes(mux)

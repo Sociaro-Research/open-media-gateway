@@ -10,11 +10,11 @@ import (
 	remote "github.com/Sociaro-Research/open-media-gateway/internal/remoteworkspace"
 )
 
-const recoveryColumns = `operation_id::text,owner_id::text,attempt_id::text,origin,client_name,client_origin,device_ciphertext,identity_ciphertext,base_version,expires_at,attempt_revision,expected_version,expected_revision,destination,result_version,result_revision,saved_present,saved_snapshot,saved_identity_ciphertext,state,created_at,confirmed_at`
+const recoveryColumns = `operation_id::text,owner_id::text,attempt_id::text,origin,client_name,client_origin,device_ciphertext,identity_ciphertext,base_version,expires_at,attempt_revision,expected_version,expected_revision,destination,result_version,result_revision,saved_present,saved_snapshot,saved_identity_ciphertext,state,created_at,confirmed_at,access_intent`
 
 func scanLegacyRecovery(row interface{ Scan(...any) error }) (v remote.Recovery, e error) {
 	var saved []byte
-	e = row.Scan(&v.OperationID, &v.Owner, &v.Attempt.ID, &v.Attempt.Origin, &v.Attempt.Name, &v.Attempt.ClientOrigin, &v.Attempt.Cipher, &v.IdentityCipher, &v.Attempt.Version, &v.Attempt.Expires, &v.Attempt.ConnectionRevision, &v.ExpectedVersion, &v.ExpectedRevision, &v.Destination, &v.Version, &v.Revision, &v.SavedPresent, &saved, &v.SavedIdentityCipher, &v.State, &v.Created, &v.Confirmed)
+	e = row.Scan(&v.OperationID, &v.Owner, &v.Attempt.ID, &v.Attempt.Origin, &v.Attempt.Name, &v.Attempt.ClientOrigin, &v.Attempt.Cipher, &v.IdentityCipher, &v.Attempt.Version, &v.Attempt.Expires, &v.Attempt.ConnectionRevision, &v.ExpectedVersion, &v.ExpectedRevision, &v.Destination, &v.Version, &v.Revision, &v.SavedPresent, &saved, &v.SavedIdentityCipher, &v.State, &v.Created, &v.Confirmed, &v.Attempt.Access)
 	if errors.Is(e, sql.ErrNoRows) {
 		return v, remote.ErrNotFound
 	}
@@ -148,7 +148,7 @@ func (r *SystemRepository) QuarantineAuthorization(ctx context.Context, owner st
 	if e != nil {
 		return empty, e
 	}
-	_, e = tx.ExecContext(ctx, `INSERT INTO remote_workspace_recovery(operation_id,owner_id,attempt_id,origin,client_name,client_origin,device_ciphertext,identity_ciphertext,base_version,expires_at,attempt_revision,expected_version,expected_revision,destination,result_version,result_revision,saved_present,saved_snapshot,saved_identity_ciphertext) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$12::bigint+1,$13::bigint+1,$15,$16,$17)`, in.OperationID, owner, attempt.ID, attempt.Origin, attempt.Name, attempt.ClientOrigin, attempt.Cipher, identity, attempt.Version, attempt.Expires, attempt.ConnectionRevision, in.Version, in.Revision, in.Destination, present, snapshot, savedIdentity)
+	_, e = tx.ExecContext(ctx, `INSERT INTO remote_workspace_recovery(operation_id,owner_id,attempt_id,origin,client_name,client_origin,device_ciphertext,identity_ciphertext,base_version,expires_at,attempt_revision,expected_version,expected_revision,destination,result_version,result_revision,saved_present,saved_snapshot,saved_identity_ciphertext,access_intent) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$12::bigint+1,$13::bigint+1,$15,$16,$17,$18)`, in.OperationID, owner, attempt.ID, attempt.Origin, attempt.Name, attempt.ClientOrigin, attempt.Cipher, identity, attempt.Version, attempt.Expires, attempt.ConnectionRevision, in.Version, in.Revision, in.Destination, present, snapshot, savedIdentity, attempt.Access)
 	if e != nil {
 		return empty, e
 	}
@@ -256,6 +256,14 @@ func (r *SystemRepository) SettleLegacyRecovery(ctx context.Context, owner strin
 // Verified network replies are committed only while the exact original attempt
 // and both captured revisions still hold. This check precedes idempotent save.
 func (r *SystemRepository) CommitRemoteAuthorization(ctx context.Context, next remote.Record, expected remote.Attempt) (remote.Record, error) {
+	// Older internal callers omitted the generation-only intent. This default
+	// can never authorize company-api-v1.
+	if next.Access == "" {
+		next.Access = "generation-v1"
+	}
+	if expected.Access == "" {
+		expected.Access = "generation-v1"
+	}
 	tx, e := beginAuditTx(ctx, r.db)
 	if e != nil {
 		return remote.Record{}, e
@@ -284,7 +292,7 @@ func (r *SystemRepository) CommitRemoteAuthorization(ctx context.Context, next r
 	if e != nil {
 		return remote.Record{}, e
 	}
-	if current.ID != expected.ID || current.Owner != expected.Owner || next.Owner != expected.Owner || current.Origin != expected.Origin || next.Origin != expected.Origin || current.Version != expected.Version || current.ConnectionRevision != expected.ConnectionRevision || !bytes.Equal(current.Cipher, expected.Cipher) {
+	if next.Access != expected.Access || current.Access != expected.Access || current.ID != expected.ID || current.Owner != expected.Owner || next.Owner != expected.Owner || current.Origin != expected.Origin || next.Origin != expected.Origin || current.Version != expected.Version || current.ConnectionRevision != expected.ConnectionRevision || !bytes.Equal(current.Cipher, expected.Cipher) {
 		return remote.Record{}, remote.ErrConflict
 	}
 	next.ConnectionRevision = revision

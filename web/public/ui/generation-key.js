@@ -18,6 +18,7 @@
     setStatus(message); forgetButton.disabled = true;syncActions(); notify();
   }
   function value() {
+    if(window.CompanyConnection?.active())return window.CompanyConnection.key();
     if (saved && Date.now() >= saved.expiresAt) forget('The 24-hour storage period ended. Paste a key or generate a new one.');
     return saved&&(!window.Workspace?.ready()||saved.workspaceID===Workspace.id())?saved.secret:'';
   }
@@ -47,6 +48,8 @@
   }
   function initialize(user) {
     validation++;saved=null;input.value='';clearTimeout(expiryTimer);checking=null;
+    if(window.CompanyConnection?.active()){google=false;binding='company:'+window.CompanyConnection.record().context;input.value=window.CompanyConnection.key();input.readOnly=true;create.hidden=restore.hidden=managedHelp.hidden=true;forgetButton.disabled=true;setStatus('');notify();return;}
+    input.readOnly=false;
     google = !!user; binding = user ? (user.session_id || user.id) : 'api-key-mode'; checkedAt = Date.now();
     create.hidden = !google;
     syncActions();

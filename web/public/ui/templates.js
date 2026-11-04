@@ -36,7 +36,7 @@
  function fail(error,token){if(fresh(token)&&error.name!=='AbortError')say(error.message,'error');}
  function field(form,label,type='text',value=''){const l=el('label',label),input=el(type==='textarea'?'textarea':type==='select'?'select':'input');if(input.tagName==='INPUT')input.type=type;input.setAttribute('aria-label',label);if(type!=='select')input.value=value??'';l.append(input);form.append(l);return input;}
  function media(url,type,label,{hover=false}={}){
-  const key=type+':'+url,card=el('div','','template-media'),asset=el(type.startsWith('video/')?'video':type.startsWith('audio/')?'audio':'img');card.dataset.updateKey='media:'+key;asset.src=url;asset.setAttribute('aria-label',label);
+  const key=type+':'+url,card=el('div','','template-media'),asset=el(type.startsWith('video/')?'video':type.startsWith('audio/')?'audio':'img');card.dataset.updateKey='media:'+key;asset.src=window.CompanyConnection?.url(url)||url;asset.setAttribute('aria-label',label);
   if(['VIDEO','AUDIO'].includes(asset.tagName)){asset.controls=true;asset.preload='metadata';asset.playsInline=true;}else asset.alt=label;
   const unavailable=()=>{failedMedia.add(key);asset.hidden=true;if(!card.querySelector('p'))card.append(el('p','Preview unavailable.'));};asset.addEventListener('error',unavailable,{once:true});card.append(asset);
   asset.addEventListener(['VIDEO','AUDIO'].includes(asset.tagName)?'loadedmetadata':'load',()=>{failedMedia.delete(key);asset.hidden=false;card.querySelector('p')?.remove();});if(failedMedia.has(key))unavailable();
@@ -212,7 +212,7 @@
     if(!['image','video'].includes(kind))continue;
     const cell=el('div','','template-fixed-media');
     if(!fixed?.url)cell.append(el('p','Preview unavailable.','field-hint'));
-    else{const asset=el(kind==='image'?'img':'video');asset.setAttribute('aria-label',slot.label);asset.src=fixed.url;
+    else{const asset=el(kind==='image'?'img':'video');asset.setAttribute('aria-label',slot.label);asset.src=window.CompanyConnection?.url(fixed.url)||fixed.url;
      if(kind==='image')asset.alt=slot.label;
      else{asset.muted=true;asset.autoplay=true;asset.loop=true;asset.playsInline=true;asset.preload='auto';asset.tabIndex=-1;asset.setAttribute('aria-description','Muted reference preview');}
      asset.onerror=()=>{if(asset.tagName==='VIDEO'){asset.pause();asset.removeAttribute('src');asset.load();}asset.remove();if(!cell.querySelector('p'))cell.append(el('p','Preview unavailable.','field-hint'));};cell.append(asset);

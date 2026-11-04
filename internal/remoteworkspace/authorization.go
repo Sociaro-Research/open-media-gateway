@@ -16,6 +16,7 @@ import (
 )
 
 type Attempt struct {
+	Access             string    `json:"access"`
 	ConnectionRevision int64     `json:"connection_revision"`
 	Owner              string    `json:"-"`
 	ID                 string    `json:"id"`
@@ -88,6 +89,12 @@ func (m *Manager) authorizationRequest(ctx context.Context, origin, path string,
 	return m.client.Do(request)
 }
 func (m *Manager) BeginAuthorization(ctx context.Context, owner, origin, name, clientOrigin string, version int64) (AuthorizationView, error) {
+	return m.beginAuthorization(ctx, owner, origin, name, clientOrigin, version, wa.GenerationAccess)
+}
+func (m *Manager) BeginCompanyAuthorization(ctx context.Context, owner, origin, name, clientOrigin string, version int64) (AuthorizationView, error) {
+	return m.beginAuthorization(ctx, owner, origin, name, clientOrigin, version, wa.CompanyAccess)
+}
+func (m *Manager) beginAuthorization(ctx context.Context, owner, origin, name, clientOrigin string, version int64, access string) (AuthorizationView, error) {
 	repo, err := m.authorizationRepo()
 	if err != nil {
 		return AuthorizationView{}, err
@@ -136,7 +143,7 @@ func (m *Manager) BeginAuthorization(ctx context.Context, owner, origin, name, c
 	if err != nil {
 		return AuthorizationView{}, err
 	}
-	attempt, err := repo.SaveAuthorizationAttempt(ctx, Attempt{Owner: owner, ID: uuid.NewString(), Origin: origin, Name: name, ClientOrigin: clientOrigin, Cipher: encrypted, Version: version, Expires: time.Now().UTC().Add(wa.Lifetime)})
+	attempt, err := repo.SaveAuthorizationAttempt(ctx, Attempt{Access: access, Owner: owner, ID: uuid.NewString(), Origin: origin, Name: name, ClientOrigin: clientOrigin, Cipher: encrypted, Version: version, Expires: time.Now().UTC().Add(wa.Lifetime)})
 	if err != nil {
 		return AuthorizationView{}, err
 	}
@@ -157,7 +164,11 @@ func (m *Manager) BeginAuthorization(ctx context.Context, owner, origin, name, c
 	} else if e != nil && !errors.Is(e, ErrNotFound) {
 		return AuthorizationView{}, e
 	}
-	response, err := m.authorizationRequest(ctx, origin, "/auth/workspace/start", map[string]any{"device_code": string(raw), "client_name": attempt.Name, "client_origin": attempt.ClientOrigin, "replace_key_id": replacement, "installation_proof": string(identityRaw)})
+	input := map[string]any{"device_code": string(raw), "client_name": attempt.Name, "client_origin": attempt.ClientOrigin, "replace_key_id": replacement, "installation_proof": string(identityRaw)}
+	if attempt.Access == wa.CompanyAccess {
+		input["access"] = wa.CompanyAccess
+	}
+	response, err := m.authorizationRequest(ctx, origin, "/auth/workspace/start", input)
 	if err != nil {
 		return AuthorizationView{}, ErrUnavailable
 	}
@@ -261,6 +272,7 @@ func (m *Manager) PollAuthorization(ctx context.Context, owner, id string) (Reco
 		return Record{}, ErrUnavailable
 	}
 	var reply struct {
+		Access         string `json:"access"`
 		Token          string `json:"token"`
 		Company        string `json:"organization_id"`
 		Provisioning   string `json:"provisioning"`
@@ -268,6 +280,9 @@ func (m *Manager) PollAuthorization(ctx context.Context, owner, id string) (Reco
 	}
 	if json.Unmarshal(data, &reply) != nil {
 		return Record{}, ErrUnavailable
+	}
+	if attempt.Access == wa.CompanyAccess && reply.Access != wa.CompanyAccess {
+		return Record{}, ErrCredential
 	}
 	// Never relabel a recovered legacy grant or accept another installation's reply.
 	if reply.Provisioning != "dedicated" {
@@ -299,7 +314,7 @@ func (m *Manager) PollAuthorization(ctx context.Context, owner, id string) (Reco
 	} else if e != nil && !errors.Is(e, ErrNotFound) {
 		return Record{}, e
 	}
-	verified, err := m.verifyConnection(ctx, owner, attempt.Origin, reply.Token, reply.Company, "dedicated")
+	verified, err := m.verifyConnectionAccess(ctx, owner, attempt.Origin, reply.Token, reply.Company, "dedicated", attempt.Access)
 	if err != nil {
 		return Record{}, err
 	}

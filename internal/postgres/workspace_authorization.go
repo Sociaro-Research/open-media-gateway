@@ -17,10 +17,10 @@ import (
 	"github.com/google/uuid"
 )
 
-const workspaceChallengeColumns = `user_code,client_name,client_origin,COALESCE(replace_key_id::text,''),status,expires_at,COALESCE(actor_id::text,''),COALESCE(organization_id::text,''),COALESCE(key_id::text,''),token_ciphertext,installation_hash`
+const workspaceChallengeColumns = `user_code,client_name,client_origin,COALESCE(replace_key_id::text,''),status,expires_at,COALESCE(actor_id::text,''),COALESCE(organization_id::text,''),COALESCE(key_id::text,''),token_ciphertext,installation_hash,access_intent`
 
 func scanWorkspaceChallenge(row interface{ Scan(...any) error }) (v wa.Challenge, err error) {
-	err = row.Scan(&v.Code, &v.Label, &v.Origin, &v.ReplaceKey, &v.State, &v.Expires, &v.Actor, &v.Company, &v.KeyID, &v.TokenCipher, &v.InstallationHash)
+	err = row.Scan(&v.Code, &v.Label, &v.Origin, &v.ReplaceKey, &v.State, &v.Expires, &v.Actor, &v.Company, &v.KeyID, &v.TokenCipher, &v.InstallationHash, &v.Access)
 	if errors.Is(err, sql.ErrNoRows) {
 		err = wa.ErrUnavailable
 	}
@@ -53,6 +53,12 @@ func (r *SystemRepository) AllowAttempt(ctx context.Context, bucket []byte, limi
 	return NewAuthRepository(r.db).AllowEmailAttempt(ctx, bucket, limit, window)
 }
 func (r *SystemRepository) Start(ctx context.Context, hash []byte, in wa.Challenge) (wa.Challenge, error) {
+	if in.Access == "" {
+		in.Access = wa.GenerationAccess
+	}
+	if in.Access != wa.GenerationAccess && in.Access != wa.CompanyAccess {
+		return in, wa.ErrForbidden
+	}
 	tx, err := beginAuditTx(ctx, r.db)
 	if err != nil {
 		return in, err
@@ -67,7 +73,7 @@ func (r *SystemRepository) Start(ctx context.Context, hash []byte, in wa.Challen
 	if _, err = tx.ExecContext(ctx, `DELETE FROM workspace_authorizations WHERE expires_at<=NOW() AND key_id IS NULL`); err != nil {
 		return in, err
 	}
-	_, err = tx.ExecContext(ctx, `INSERT INTO workspace_authorizations(device_hash,user_code,client_name,client_origin,replace_key_id,status,expires_at,installation_hash) VALUES($1,$2,$3,$4,NULLIF($5,'')::uuid,'pending',$6,$7) ON CONFLICT(device_hash) DO NOTHING`, hash, in.Code, in.Label, in.Origin, in.ReplaceKey, in.Expires, in.InstallationHash)
+	_, err = tx.ExecContext(ctx, `INSERT INTO workspace_authorizations(device_hash,user_code,client_name,client_origin,replace_key_id,status,expires_at,installation_hash,access_intent) VALUES($1,$2,$3,$4,NULLIF($5,'')::uuid,'pending',$6,$7,$8) ON CONFLICT(device_hash) DO NOTHING`, hash, in.Code, in.Label, in.Origin, in.ReplaceKey, in.Expires, in.InstallationHash, in.Access)
 	if err != nil {
 		return in, err
 	}
@@ -75,7 +81,7 @@ func (r *SystemRepository) Start(ctx context.Context, hash []byte, in wa.Challen
 	if err != nil {
 		return in, err
 	}
-	if current.Label != in.Label || current.Origin != in.Origin || current.ReplaceKey != in.ReplaceKey || !bytes.Equal(current.InstallationHash, in.InstallationHash) {
+	if current.Access != in.Access || current.Label != in.Label || current.Origin != in.Origin || current.ReplaceKey != in.ReplaceKey || !bytes.Equal(current.InstallationHash, in.InstallationHash) {
 		return in, wa.ErrConflict
 	}
 	return current, tx.Commit()
@@ -140,6 +146,10 @@ func (r *SystemRepository) Approve(ctx context.Context, actor, code string, in w
 	current, err := scanWorkspaceChallenge(tx.QueryRowContext(ctx, `SELECT `+workspaceChallengeColumns+` FROM workspace_authorizations WHERE user_code=$1 AND expires_at>clock_timestamp() FOR UPDATE`, wa.NormalizeCode(code)))
 	if err != nil {
 		return empty, err
+	}
+	// Consent from an older UI cannot approve wider company-key authority.
+	if !in.Deny && ((current.Access == wa.CompanyAccess && in.Access != wa.CompanyAccess) || (current.Access == wa.GenerationAccess && in.Access != "" && in.Access != wa.GenerationAccess)) {
+		return empty, wa.ErrForbidden
 	}
 	encoded, _ := json.Marshal(in)
 	fingerprint := wa.Digest(string(encoded))
@@ -276,13 +286,17 @@ func (r *SystemRepository) Redeem(ctx context.Context, hash []byte, key apikey.K
 		return v, wa.ErrForbidden
 	}
 	if v.State == "issued" {
-		if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM user_api_keys WHERE id=$1 AND revoked_at IS NULL AND expires_at>clock_timestamp())`, v.KeyID).Scan(&permitted); err != nil {
+		if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM user_api_keys WHERE id=$1 AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at>clock_timestamp()))`, v.KeyID).Scan(&permitted); err != nil {
 			return v, err
 		}
 		if !permitted {
 			return v, wa.ErrUnavailable
 		}
 		return v, tx.Commit()
+	}
+	if v.Access == wa.CompanyAccess {
+		key.Scopes = []string{apikey.Generation, apikey.OrganizationsManage, apikey.KeysManage}
+		key.ExpiresAt = nil
 	}
 	key.UserID = v.Actor
 	key.CreatedBy = v.Actor

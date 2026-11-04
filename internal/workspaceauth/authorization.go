@@ -27,11 +27,15 @@ var ErrLegacy = errors.New("legacy connection preserved; upgrade both installati
 var ErrKeyLimit = errors.New("the host active-key limit is reached; revoke unused installation grants and retry this request")
 var ErrConflict = errors.New("authorization changed; start again or review the existing choice")
 
+const GenerationAccess = "generation-v1"
+const CompanyAccess = "company-api-v1"
+
 const Lifetime = 10 * time.Minute
 const KeyLifetime = 30 * 24 * time.Hour
 const Interval = 5 * time.Second
 
 type Challenge struct {
+	Access            string    `json:"access"`
 	InstallationProof string    `json:"-"`
 	InstallationHash  []byte    `json:"-"`
 	Provisioning      string    `json:"provisioning,omitempty"`
@@ -52,6 +56,7 @@ type Company struct {
 	Name string `json:"name"`
 }
 type Approval struct {
+	Access  string `json:"access,omitempty"`
 	Company string `json:"organization_id"`
 	Consent bool   `json:"consent"`
 	Deny    bool   `json:"deny"`
@@ -64,7 +69,7 @@ type Grant struct {
 	Company      string     `json:"organization_id"`
 	Name         string     `json:"name"`
 	ClientOrigin string     `json:"client_origin"`
-	Expires      time.Time  `json:"expires_at"`
+	Expires      *time.Time `json:"expires_at"`
 	Revoked      *time.Time `json:"revoked_at,omitempty"`
 }
 type Repository interface {
@@ -101,6 +106,12 @@ func ValidDevice(device string) bool {
 	return err == nil && len(raw) == 32
 }
 func (m *Manager) Start(ctx context.Context, device string, in Challenge) (Challenge, error) {
+	if in.Access == "" {
+		in.Access = GenerationAccess
+	}
+	if in.Access != GenerationAccess && in.Access != CompanyAccess {
+		return Challenge{}, ErrForbidden
+	}
 	if !ValidDevice(in.InstallationProof) {
 		return Challenge{}, ErrLegacy
 	}

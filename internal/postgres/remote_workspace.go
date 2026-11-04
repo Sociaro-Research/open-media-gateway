@@ -8,10 +8,10 @@ import (
 	remote "github.com/Sociaro-Research/open-media-gateway/internal/remoteworkspace"
 )
 
-const remoteColumns = `owner_id::text,version,active,origin,organization_id,organization_name,remote_user_id,remote_key_id,token_hash,token_ciphertext,verified_at,provisioning,connection_revision`
+const remoteColumns = `owner_id::text,version,active,origin,organization_id,organization_name,remote_user_id,remote_key_id,token_hash,token_ciphertext,verified_at,provisioning,connection_revision,access_intent`
 
 func scanRemote(row interface{ Scan(...any) error }) (r remote.Record, err error) {
-	err = row.Scan(&r.Owner, &r.Version, &r.Active, &r.Origin, &r.OrganizationID, &r.OrganizationName, &r.UserID, &r.KeyID, &r.TokenHash, &r.Ciphertext, &r.VerifiedAt, &r.Provisioning, &r.ConnectionRevision)
+	err = row.Scan(&r.Owner, &r.Version, &r.Active, &r.Origin, &r.OrganizationID, &r.OrganizationName, &r.UserID, &r.KeyID, &r.TokenHash, &r.Ciphertext, &r.VerifiedAt, &r.Provisioning, &r.ConnectionRevision, &r.Access)
 	if errors.Is(err, sql.ErrNoRows) {
 		err = remote.ErrNotFound
 	}
@@ -68,8 +68,14 @@ func saveRemoteWorkspaceTx(ctx context.Context, tx *sql.Tx, next remote.Record, 
 		// Preserve the old spelling because it is part of the admitted retry namespace.
 		next.Origin = current.Origin
 	}
+	if next.Access == "" {
+		next.Access = "generation-v1"
+	}
+	if next.Access != "generation-v1" && next.Access != "company-api-v1" {
+		return remote.Record{}, remote.ErrCredential
+	}
 	if version != current.Version {
-		if current.Active && current.Version == version+1 && current.Origin == next.Origin && current.OrganizationID == next.OrganizationID && bytes.Equal(current.TokenHash, next.TokenHash) {
+		if current.Access == next.Access && current.Active && current.Version == version+1 && current.Origin == next.Origin && current.OrganizationID == next.OrganizationID && bytes.Equal(current.TokenHash, next.TokenHash) {
 			return current, nil
 		}
 		return remote.Record{}, remote.ErrConflict
@@ -84,7 +90,7 @@ func saveRemoteWorkspaceTx(ctx context.Context, tx *sql.Tx, next remote.Record, 
 		next.Provisioning = current.Provisioning
 	}
 	next.Version = current.Version + 1
-	_, err = tx.ExecContext(ctx, `INSERT INTO remote_workspaces(owner_id,version,active,origin,organization_id,organization_name,remote_user_id,remote_key_id,token_hash,token_ciphertext,verified_at,provisioning,connection_revision) VALUES($1,$2,TRUE,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT(owner_id) DO UPDATE SET version=EXCLUDED.version,active=TRUE,origin=EXCLUDED.origin,organization_id=EXCLUDED.organization_id,organization_name=EXCLUDED.organization_name,remote_user_id=EXCLUDED.remote_user_id,remote_key_id=EXCLUDED.remote_key_id,token_hash=EXCLUDED.token_hash,token_ciphertext=EXCLUDED.token_ciphertext,verified_at=EXCLUDED.verified_at,provisioning=EXCLUDED.provisioning,connection_revision=EXCLUDED.connection_revision`, next.Owner, next.Version, next.Origin, next.OrganizationID, next.OrganizationName, next.UserID, next.KeyID, next.TokenHash, next.Ciphertext, next.VerifiedAt, next.Provisioning, next.ConnectionRevision)
+	_, err = tx.ExecContext(ctx, `INSERT INTO remote_workspaces(owner_id,version,active,origin,organization_id,organization_name,remote_user_id,remote_key_id,token_hash,token_ciphertext,verified_at,provisioning,connection_revision,access_intent) VALUES($1,$2,TRUE,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) ON CONFLICT(owner_id) DO UPDATE SET version=EXCLUDED.version,active=TRUE,origin=EXCLUDED.origin,organization_id=EXCLUDED.organization_id,organization_name=EXCLUDED.organization_name,remote_user_id=EXCLUDED.remote_user_id,remote_key_id=EXCLUDED.remote_key_id,token_hash=EXCLUDED.token_hash,token_ciphertext=EXCLUDED.token_ciphertext,verified_at=EXCLUDED.verified_at,provisioning=EXCLUDED.provisioning,connection_revision=EXCLUDED.connection_revision,access_intent=EXCLUDED.access_intent`, next.Owner, next.Version, next.Origin, next.OrganizationID, next.OrganizationName, next.UserID, next.KeyID, next.TokenHash, next.Ciphertext, next.VerifiedAt, next.Provisioning, next.ConnectionRevision, next.Access)
 	if err != nil {
 		return remote.Record{}, err
 	}

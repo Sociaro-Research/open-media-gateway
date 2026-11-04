@@ -7,7 +7,7 @@ window.ReferenceValidation=(()=>{
   return {provider,model,options:clean,reference_ids};
  }
  const signature=value=>JSON.stringify(value?{...value,reference_ids:undefined}:null);
- function ids(values){return values.map(raw=>{try{const u=new URL(raw,location.origin);if(u.origin!==location.origin)return null;return /^\/references\/[^/]+\/([^/]+)$/.exec(u.pathname)?.[1]||null;}catch{return null;}}).filter(Boolean);}
+ function ids(values){return values.map(raw=>{try{const u=new URL(raw,location.origin);if(u.origin!==location.origin&&u.origin!==window.CompanyConnection?.record()?.origin)return null;return /^\/references\/[^/]+\/([^/]+)$/.exec(u.pathname)?.[1]||null;}catch{return null;}}).filter(Boolean);}
  async function check(referenceIDs,validation,options={}){
   if(!referenceIDs.length)return;
   await api('/v1/references/validate',{method:'POST',body:JSON.stringify({validation:validation?{...validation,reference_ids:validation.role==='reference_voice'?validation.reference_ids:[]}:null,reference_ids:referenceIDs}),...options});

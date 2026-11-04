@@ -3,6 +3,7 @@
 package remoteworkspace
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -16,7 +17,9 @@ import (
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/installation"
 	"github.com/Sociaro-Research/open-media-gateway/internal/providerconfig"
+	wa "github.com/Sociaro-Research/open-media-gateway/internal/workspaceauth"
 	"github.com/google/uuid"
+	"slices"
 )
 
 var ErrNotFound = errors.New("remote workspace is not connected")
@@ -30,6 +33,7 @@ const Prefix = "/v1/system/remote-workspace/proxy"
 const MaxJSON = 4 << 20
 
 type Record struct {
+	Access             string     `json:"access"`
 	ConnectionRevision int64      `json:"-"`
 	Provisioning       string     `json:"provisioning,omitempty"`
 	Context            string     `json:"context,omitempty"`
@@ -61,7 +65,11 @@ func (r Record) SnapshotID() string {
 	if !r.Active {
 		return ""
 	}
-	raw, _ := json.Marshal([]any{r.OperationScopeID(), r.Version, r.KeyID})
+	parts := []any{r.OperationScopeID(), r.Version, r.KeyID}
+	if r.Access == wa.CompanyAccess {
+		parts = append(parts, r.Access)
+	}
+	raw, _ := json.Marshal(parts)
 	sum := sha256.Sum256(raw)
 	return hex.EncodeToString(sum[:])
 }
@@ -135,6 +143,9 @@ func (m *Manager) connect(ctx context.Context, owner, origin, token, company str
 	return m.Repo.SaveRemoteWorkspace(ctx, next, version)
 }
 func (m *Manager) verifyConnection(ctx context.Context, owner, origin, token, company, provisioning string) (Record, error) {
+	return m.verifyConnectionAccess(ctx, owner, origin, token, company, provisioning, wa.GenerationAccess)
+}
+func (m *Manager) verifyConnectionAccess(ctx context.Context, owner, origin, token, company, provisioning, access string) (Record, error) {
 	origin, err := Origin(origin)
 	if err != nil {
 		return Record{}, err
@@ -158,7 +169,7 @@ func (m *Manager) verifyConnection(ctx context.Context, owner, origin, token, co
 		return Record{}, ErrUnavailable
 	}
 	var info KeyInfo
-	if json.Unmarshal(raw, &info) != nil || info.Key.OrganizationID != company || info.Organization.ID != company || info.Key.ResourceMode != "shared" || len(info.Key.Scopes) != 1 || info.Key.Scopes[0] != "generation" {
+	if json.Unmarshal(raw, &info) != nil || info.Key.OrganizationID != company || info.Organization.ID != company || info.Key.ResourceMode != "shared" || !connectionScopes(info.Key.Scopes, access) {
 		return Record{}, ErrCredential
 	}
 	if _, err = uuid.Parse(info.Key.ID); err != nil {
@@ -173,7 +184,7 @@ func (m *Manager) verifyConnection(ctx context.Context, owner, origin, token, co
 	}
 	hash := sha256.Sum256([]byte(token))
 	now := time.Now().UTC()
-	return Record{Provisioning: provisioning, Owner: owner, Active: true, Origin: origin, OrganizationID: company, OrganizationName: info.Organization.Name, UserID: info.Key.UserID, KeyID: info.Key.ID, TokenHash: hash[:], Ciphertext: encrypted, VerifiedAt: &now}, nil
+	return Record{Access: access, Provisioning: provisioning, Owner: owner, Active: true, Origin: origin, OrganizationID: company, OrganizationName: info.Organization.Name, UserID: info.Key.UserID, KeyID: info.Key.ID, TokenHash: hash[:], Ciphertext: encrypted, VerifiedAt: &now}, nil
 }
 func (m *Manager) request(ctx context.Context, origin, token, method, path string, body io.Reader, idempotency string) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, method, origin+path, body)
@@ -323,4 +334,86 @@ func (m *Manager) Download(ctx context.Context, raw, method string) (*http.Respo
 		return nil, ErrRoute
 	}
 	return m.download.Do(req)
+}
+
+func connectionScopes(scopes []string, access string) bool {
+	if access == "" || access == wa.GenerationAccess {
+		return len(scopes) == 1 && scopes[0] == "generation"
+	}
+	return access == wa.CompanyAccess && len(scopes) == 3 && slices.Contains(scopes, "generation") && slices.Contains(scopes, "organizations:manage") && slices.Contains(scopes, "keys:manage")
+}
+
+// CompanyConnection is read only by the authenticated local owner. The existing
+// central key remains that customer's key, never a shared installation admin.
+func (m *Manager) CompanyConnection(ctx context.Context, owner string) (Record, string, error) {
+	record, err := m.Repo.RemoteWorkspace(ctx, owner)
+	if err != nil {
+		return record, "", err
+	}
+	if !record.Active || record.Access != wa.CompanyAccess {
+		return record, "", ErrNotFound
+	}
+	raw, err := m.Cipher.Decrypt(record.Ciphertext)
+	if err != nil {
+		return record, "", ErrUnavailable
+	}
+	sum := sha256.Sum256(raw)
+	if !bytes.Equal(sum[:], record.TokenHash) {
+		return record, "", ErrCredential
+	}
+	return record, string(raw), nil
+}
+
+// CompanyRequest is an ordinary fixed-upstream HTTP request. Existing central
+// APIs enforce scopes, roles, company membership, prices and storage policy.
+func (m *Manager) CompanyRequest(ctx context.Context, record Record, token string, in *http.Request, path string) (*http.Response, error) {
+	origin, err := Origin(record.Origin)
+	if err != nil {
+		return nil, ErrCredential
+	}
+	u, err := url.Parse(origin)
+	if err != nil {
+		return nil, err
+	}
+	u.Path = path
+	u.RawPath = ""
+	u.RawQuery = in.URL.RawQuery
+	// The caller supplies the original escaped path separately through RawPath.
+	if raw := in.URL.RawPath; raw != "" {
+		prefix := "/auth/company-api"
+		if !strings.HasPrefix(raw, prefix) {
+			return nil, ErrRoute
+		}
+		u.RawPath = strings.TrimPrefix(raw, prefix)
+		if u.EscapedPath() != strings.TrimPrefix(raw, prefix) {
+			return nil, ErrRoute
+		}
+	}
+	body := in.Body
+	if body == nil || body == http.NoBody {
+		body = io.NopCloser(strings.NewReader(""))
+	}
+	request, err := http.NewRequestWithContext(ctx, in.Method, u.String(), body)
+	if err != nil {
+		return nil, err
+	}
+	request.GetBody = nil
+	request.ContentLength = in.ContentLength
+	for _, name := range []string{"Accept", "Content-Type", "Content-Encoding", "Idempotency-Key", "X-Idempotency-Key", "Range", "If-Range", "If-Match", "If-None-Match", "If-Modified-Since", "If-Unmodified-Since"} {
+		values := in.Header.Values(name)
+		if len(values) > 1 {
+			return nil, ErrRoute
+		}
+		if len(values) == 1 {
+			request.Header.Set(name, values[0])
+		}
+	}
+	request.Header.Set("Authorization", "Bearer "+token)
+	request.Header.Set("User-Agent", "Open-Media-Gateway company UI")
+	// Ordinary uploads follow the caller's cancellation, not the short control
+	// request timeout used for authorization/polling. Keep the checked transport
+	// and redirect policy unchanged.
+	client := *m.client
+	client.Timeout = 0
+	return client.Do(request)
 }

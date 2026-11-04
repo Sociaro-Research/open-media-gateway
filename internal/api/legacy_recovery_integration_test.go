@@ -171,7 +171,18 @@ func (f *legacyRecoveryFixture) approve(t *testing.T, view remote.AuthorizationV
 	if old {
 		handler, cookie = f.old, f.oldCookie
 	}
-	response := legacyRecoveryCall(t, handler, "POST", "/v1/workspace-authorizations/approve", map[string]any{"user_code": view.Code, "consent": true}, cookie)
+	inspected := legacyRecoveryCall(t, handler, "POST", "/v1/workspace-authorizations/inspect", map[string]any{"user_code": view.Code}, cookie)
+	var consent struct {
+		Request wa.Challenge `json:"request"`
+	}
+	if inspected.Code != 200 || json.Unmarshal(inspected.Body.Bytes(), &consent) != nil {
+		t.Fatalf("inspect approval: %d %s", inspected.Code, inspected.Body)
+	}
+	approval := map[string]any{"user_code": view.Code, "consent": true}
+	if consent.Request.Access == wa.CompanyAccess {
+		approval["access"] = wa.CompanyAccess
+	}
+	response := legacyRecoveryCall(t, handler, "POST", "/v1/workspace-authorizations/approve", approval, cookie)
 	if response.Code != 200 {
 		t.Fatalf("actual central approval=%d: %s", response.Code, response.Body)
 	}

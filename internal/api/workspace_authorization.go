@@ -65,6 +65,7 @@ func (s *Server) startWorkspaceAuthorization(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	var in struct {
+		Access            string `json:"access"`
 		Device            string `json:"device_code"`
 		Name              string `json:"client_name"`
 		Origin            string `json:"client_origin"`
@@ -85,7 +86,7 @@ func (s *Server) startWorkspaceAuthorization(w http.ResponseWriter, r *http.Requ
 			return
 		}
 	}
-	challenge, err := s.workspaceAuthorization.Start(r.Context(), in.Device, wa.Challenge{Label: strings.TrimSpace(in.Name), Origin: strings.TrimRight(u.String(), "/"), ReplaceKey: in.Replace, InstallationProof: in.InstallationProof})
+	challenge, err := s.workspaceAuthorization.Start(r.Context(), in.Device, wa.Challenge{Access: in.Access, Label: strings.TrimSpace(in.Name), Origin: strings.TrimRight(u.String(), "/"), ReplaceKey: in.Replace, InstallationProof: in.InstallationProof})
 	if err != nil {
 		workspaceAuthorizationError(w, err)
 		return
@@ -112,7 +113,7 @@ func (s *Server) pollWorkspaceAuthorization(w http.ResponseWriter, r *http.Reque
 	if len(challenge.InstallationHash) == 32 {
 		mode = "dedicated"
 	}
-	writeJSON(w, 200, map[string]any{"token": token, "organization_id": challenge.Company, "key_id": challenge.KeyID, "provisioning": mode, "installation_id": hex.EncodeToString(challenge.InstallationHash)})
+	writeJSON(w, 200, map[string]any{"access": challenge.Access, "token": token, "organization_id": challenge.Company, "key_id": challenge.KeyID, "provisioning": mode, "installation_id": hex.EncodeToString(challenge.InstallationHash)})
 }
 func (s *Server) cancelWorkspaceAuthorization(w http.ResponseWriter, r *http.Request) {
 	if !s.workspaceThrottle(w, r, "cancel", 30) {

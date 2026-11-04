@@ -391,6 +391,11 @@ func TestLegacyAuthorizationSaveAndReceiptRollback(t *testing.T) {
 	}
 	now := time.Now()
 	next := remote.Record{Owner: user.ID, Active: true, Origin: pending.Origin, OrganizationID: challenge.Company, OrganizationName: "Fixture", UserID: challenge.Actor, KeyID: challenge.KeyID, TokenHash: apikey.Hash(token), Ciphertext: encrypted, VerifiedAt: &now, Provisioning: "dedicated"}
+	wrong := next
+	wrong.Access = wa.CompanyAccess
+	if _, e = repo.CommitRemoteAuthorization(ctx, wrong, pending); !errors.Is(e, remote.ErrConflict) {
+		t.Fatal("legacy reply widened its consent", e)
+	}
 	for _, point := range []string{"saved-record", "saved-audit", "saved-settings", "authorization-save", "authorization-receipt"} {
 		t.Run(point, func(t *testing.T) {
 			fault := errors.New("synthetic save interruption")

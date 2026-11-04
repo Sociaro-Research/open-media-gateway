@@ -101,7 +101,12 @@ func TestProviderResources85CombinedCyclePreservesMetadataAndStoredBytes(t *test
 	}
 	assertResourceBindingsEmptyDefault(t, db)
 
-	// Exercise the existing real provisioning fixture, not a fake proof row.
+	// Current provisioning requires the current schema. Seed its real proof/key
+	// before returning to the historical window; do not run today's writer
+	// against a pristine schema85 or replace the proof with a fabricated row.
+	if err := goose.Up(db, "migrations"); err != nil {
+		t.Fatal(err)
+	}
 	exec(`UPDATE system_settings SET customer_workspaces=TRUE,shared_resources=TRUE`)
 	repo := NewSystemRepository(db)
 	proof, _ := wa.DeviceCode()
@@ -117,6 +122,10 @@ func TestProviderResources85CombinedCyclePreservesMetadataAndStoredBytes(t *test
 		t.Fatal("installation proof was not retained", err)
 	}
 	exec(`INSERT INTO organization_credits(id,organization_id,actor_id,amount_micros,kind,external_id) VALUES($1,$2,$3,7654321,'promo','cycle85-dedicated-credit')`, uuid.NewString(), grant.Company, user)
+	if err := goose.DownTo(db, "migrations", 85); err != nil {
+		t.Fatal(err)
+	}
+	assertVersion(85)
 	seed := seedResourcePreservationMetadata(t, db, company, identity.SharedOwnerID)
 	resourceCtx := identity.WithResourceOwners(storageCtx, identity.SharedOwnerID, company)
 	resourceRepo := NewProviderResourceRepository(db)
