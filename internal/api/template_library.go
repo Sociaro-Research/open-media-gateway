@@ -101,7 +101,7 @@ func (s *Server) sharedTemplateReferences(w http.ResponseWriter, r *http.Request
 			s.referenceError(w, err)
 			return
 		}
-		defer object.Reader.Close()
+		defer closeCompanyMedia(r.Context(), object.Reader)()
 		w.Header().Set("Content-Type", item.ContentType)
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Cache-Control", "private, no-store")

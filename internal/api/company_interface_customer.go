@@ -90,6 +90,10 @@ func (s *Server) companyCustomerRequest(w http.ResponseWriter, r *http.Request, 
 		prefix = ci.CustomerBrowserPrefix
 	}
 	path := "/" + strings.TrimPrefix(r.URL.EscapedPath(), prefix)
+	if ci.Classify(r.Method, path).Stream && (r.ContentLength != 0 || len(r.TransferEncoding) != 0) {
+		companyInterfaceError(w, ci.ErrDenied)
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), ci.CustomerTimeout(r.Method, path))
 	defer cancel()
 	r = r.WithContext(ctx)
@@ -98,11 +102,28 @@ func (s *Server) companyCustomerRequest(w http.ResponseWriter, r *http.Request, 
 	if browser {
 		authenticate = gate.AuthenticateBrowser
 	}
+	if ci.Classify(r.Method, path).Stream {
+		original := authenticate
+		authenticate = func(parent context.Context, credentials ci.Credentials, now time.Time) (ci.Principal, error) {
+			check, cancel := context.WithTimeout(parent, ci.MediaAuthorityTimeout)
+			defer cancel()
+			return original(check, credentials, now)
+		}
+	}
 	principal, e := authenticate(ctx, c, time.Now())
 	if e != nil || r.Header.Get(ci.LocalOriginHeader) != principal.Grant.LocalOrigin {
 		// Failed credentials use the bounded failure counter. Valid company
 		// traffic retains its existing central operation/key/company policy.
-		if !s.companyInterfaceRate(w, r, "customer-invalid") {
+		rateRequest := r
+		rateDone := func() {}
+		if ci.Classify(r.Method, path).Stream {
+			check, done := context.WithTimeout(ctx, ci.MediaAuthorityTimeout)
+			rateRequest = r.WithContext(check)
+			rateDone = done
+		}
+		allowed := s.companyInterfaceRate(w, rateRequest, "customer-invalid")
+		rateDone()
+		if !allowed {
 			return
 		}
 		companyInterfaceError(w, ci.ErrDenied)
@@ -130,7 +151,13 @@ func (s *Server) companyCustomerRequest(w http.ResponseWriter, r *http.Request, 
 	// authority to that browser. SDK and generation keep original-key identity.
 	effective := principal
 	if browser && ci.Classify(r.Method, path).BrowserManagement {
-		role, err := s.companyCustomer.Membership(ctx, principal.Grant.Company, principal.BrowserActor)
+		roleContext, roleDone := context.WithCancel(ctx)
+		if ci.Classify(r.Method, path).Stream {
+			roleDone()
+			roleContext, roleDone = context.WithTimeout(ctx, ci.MediaAuthorityTimeout)
+		}
+		role, err := s.companyCustomer.Membership(roleContext, principal.Grant.Company, principal.BrowserActor)
+		roleDone()
 		if err != nil {
 			companyInterfaceError(w, ci.ErrDenied)
 			return
@@ -154,7 +181,13 @@ func (s *Server) companyCustomerRequest(w http.ResponseWriter, r *http.Request, 
 	if effective.Kind == ci.CentralKey {
 		headers.Set("Authorization", "Bearer "+c.Key)
 	}
-	user, e := s.companyCustomer.User(ctx, effective.Actor)
+	userContext, userDone := context.WithCancel(ctx)
+	if contract.Stream {
+		userDone()
+		userContext, userDone = context.WithTimeout(ctx, ci.MediaAuthorityTimeout)
+	}
+	user, e := s.companyCustomer.User(userContext, effective.Actor)
+	userDone()
 	if e != nil || user.ID != effective.Actor {
 		companyInterfaceError(w, ci.ErrDenied)
 		return
@@ -182,6 +215,31 @@ func (s *Server) companyCustomerRequest(w http.ResponseWriter, r *http.Request, 
 	inner.Header = headers
 	inner.Body = io.NopCloser(bytes.NewReader(raw))
 	inner.ContentLength = int64(len(raw))
+	if contract.Stream {
+		fence := func(check context.Context) error {
+			latest, e := authenticate(check, c, time.Now())
+			if e != nil || !sameCompanyPrincipal(principal, latest) {
+				return ci.ErrConflict
+			}
+			if browser && contract.BrowserManagement {
+				latest.Kind, latest.Actor, latest.Recipient, latest.Role, latest.KeyID = effective.Kind, effective.Actor, effective.Recipient, effective.Role, ""
+			}
+			_, e = ci.RequestContract(r.Method, path, r.URL.RawQuery, nil, latest)
+			return e
+		}
+		stream, stop := ci.WatchMedia(ctx, fence)
+		defer stop()
+		out := ci.NewMediaWriter(stream, w, r.Method, true, fence, stop)
+		defer out.Close()
+		mux.ServeHTTP(out, inner.WithContext(stream))
+		if e := out.Finish(); e != nil {
+			if out.Started() {
+				panic(http.ErrAbortHandler)
+			}
+			companyInterfaceError(w, e)
+		}
+		return
+	}
 	// This bounded first adapter deliberately buffers its supported responses so
 	// revoked/rotated authority cannot release a late body. Large/streaming
 	// media integration remains a separate contract and is not advertised.

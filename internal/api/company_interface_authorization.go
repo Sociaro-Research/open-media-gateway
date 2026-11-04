@@ -33,6 +33,8 @@ func (s *Server) registerCompanyInterfaceRoutes(mux *http.ServeMux) {
 func companyInterfaceError(w http.ResponseWriter, e error) {
 	status, code, message := http.StatusServiceUnavailable, "company_interface_unavailable", "Company authorization is unavailable; retain the pending operation and try again."
 	switch {
+	case errors.Is(e, ci.ErrMediaHandoff):
+		status, code, message = 409, "company_interface_media_handoff_required", "Direct storage delivery requires the credential-free media handoff. This transfer is not available yet."
 	case errors.Is(e, ci.ErrProtocol):
 		status, code, message = 409, "company_interface_update_required", "Update both installations before enabling the full company interface."
 	case errors.Is(e, ci.ErrConflict):

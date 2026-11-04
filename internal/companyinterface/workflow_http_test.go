@@ -92,9 +92,9 @@ func TestCompanyFacadeGenerationJSONAndReferenceWorkflow(t *testing.T) {
 		{"/v1/videos", `{"model":"mock/mock-video-v1","prompt":"Video fixture","max_expected_cost_usd":0}`},
 		{"/v1/audio/speech", `{"model":"mock/mock-speech-v1","input":"Speech fixture","voice":"Mock","max_expected_cost_usd":0}`},
 		{"/v1/audio/generations", `{"model":"mock/mock-music-v1","prompt":"Music fixture","max_expected_cost_usd":0}`},
-		{"/v1/generations", `{"model":"mock/workflow-image","prompt":"Image 1","image":"` + fixtureCentral + refs.Data[0].URL + `","options":{"reference_mode":"references"},"max_expected_cost_usd":0}`},
-		{"/v1/images/generations", `{"model":"mock/workflow-image","prompt":"Image 1","image":"` + fixtureCentral + refs.Data[0].URL + `","options":{"reference_mode":"references"},"max_expected_cost_usd":0}`},
-		{"/v1/images/edits", `{"model":"mock/workflow-image","prompt":"Image 1","image":"` + fixtureCentral + refs.Data[0].URL + `","options":{"reference_mode":"references"},"max_expected_cost_usd":0}`},
+		{"/v1/generations", `{"model":"mock/workflow-image","prompt":"Image 1","image":"` + fixtureLocal + refs.Data[0].URL + `","options":{"reference_mode":"references"},"max_expected_cost_usd":0}`},
+		{"/v1/images/generations", `{"model":"mock/workflow-image","prompt":"Image 1","image":"` + fixtureLocal + refs.Data[0].URL + `","options":{"reference_mode":"references"},"max_expected_cost_usd":0}`},
+		{"/v1/images/edits", `{"model":"mock/workflow-image","prompt":"Image 1","image":"` + fixtureLocal + refs.Data[0].URL + `","options":{"reference_mode":"references"},"max_expected_cost_usd":0}`},
 	}
 	for i, tc := range bodies {
 		t.Run(tc.path, func(t *testing.T) {
@@ -128,10 +128,21 @@ func TestCompanyFacadeGenerationJSONAndReferenceWorkflow(t *testing.T) {
 			if repeated.ID != task.ID {
 				t.Fatal("mutation replay duplicated task")
 			}
-			changed := strings.Replace(tc.body, "fixture", "changed fixture", 1)
-			if changed == tc.body {
-				changed = strings.Replace(tc.body, "Image 1", "Image 1 changed", 1)
+			var changedFields map[string]json.RawMessage
+			if json.Unmarshal([]byte(tc.body), &changedFields) != nil {
+				t.Fatal("fixture JSON")
 			}
+			promptField := "prompt"
+			if tc.path == "/v1/audio/speech" {
+				promptField = "input"
+			}
+			var prompt string
+			if json.Unmarshal(changedFields[promptField], &prompt) != nil {
+				t.Fatal("fixture prompt")
+			}
+			changedFields[promptField], _ = json.Marshal(prompt + " changed")
+			changedBody, _ := json.Marshal(changedFields)
+			changed := string(changedBody)
 			expectFixture(t, facadeRequest(t, f, "POST", tc.path, changed, v.Tokens.PlaygroundKey, true, headers), 409)
 		})
 	}

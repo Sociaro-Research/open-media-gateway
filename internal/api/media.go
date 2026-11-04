@@ -16,6 +16,7 @@ import (
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
 	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
+	org "github.com/Sociaro-Research/open-media-gateway/internal/organization"
 	"github.com/Sociaro-Research/open-media-gateway/internal/storage"
 )
 
@@ -100,6 +101,15 @@ func (s *Server) serveAuthorizedLastFrame(w http.ResponseWriter, r *http.Request
 }
 
 func (s *Server) serveSignedMedia(w http.ResponseWriter, r *http.Request) {
+	if _, delegated := companyCustomerFromContext(r.Context()); delegated {
+		if !org.OwnContent(identity.OrganizationFromContext(r.Context()).Role) {
+			writeError(w, 403, "forbidden", "generation content is restricted for this role")
+			return
+		}
+		if _, ok := s.generationTask(w, r); !ok {
+			return
+		}
+	}
 	id := r.PathValue("id")
 	if s.mediaSigner == nil || !s.mediaSigner.valid(id, r.URL.Query().Get("expires"), r.URL.Query().Get("signature")) {
 		writeError(w, http.StatusForbidden, "invalid_media_url", "media URL is invalid or expired")
@@ -192,7 +202,7 @@ func (s *Server) serveTaskMedia(w http.ResponseWriter, r *http.Request, id strin
 		writeError(w, http.StatusServiceUnavailable, "service_unavailable", "stored media could not be opened")
 		return
 	}
-	defer object.Reader.Close()
+	defer closeCompanyMedia(r.Context(), object.Reader)()
 	contentType := object.ContentType
 	if !lastFrame && resultType != nil && *resultType != "" {
 		contentType = *resultType

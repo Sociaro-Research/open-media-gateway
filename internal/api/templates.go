@@ -907,7 +907,7 @@ func (s *Server) serveTemplateAssetContent(w http.ResponseWriter, r *http.Reques
 		templateError(w, e)
 		return
 	}
-	defer object.Reader.Close()
+	defer closeCompanyMedia(r.Context(), object.Reader)()
 	w.Header().Set("Content-Type", a.ContentType)
 	w.Header().Set("Content-Security-Policy", "default-src 'none'; sandbox")
 	w.Header().Set("X-Content-Type-Options", "nosniff")

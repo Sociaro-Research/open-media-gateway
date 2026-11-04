@@ -263,3 +263,37 @@ The lock order starts with the strongest settings mode required by the operation
 Reference deletion stores immutable owner/reference/physical-storage-owner/key/hash/size custody, releases source locks before removal, and settles only that exact deleting row. A trusted worker can resume the bounded cleanup after restart or originating-user revocation. Deleting sources cannot re-enter lazy deduplication, direct-upload ResultID persistence or new asset registration. Terminal history and unresolved custody survive migration rollback/re-upgrade. Provider group creation records a pre-call intent and settles a known result; recovery/discovery of an uncertain provider group outcome remains unfinished and must not be represented as full surface recovery.
 
 Focused tests cover actual handler-to-repository revocation after all HTTP checks, task/outbox no-write outcomes, current browser/recipient/key changes, valid SDK use after creator removal, concurrent held local commit versus revocation, historical cleanup-target parity, source deduplication races, exact cleanup leases and lost physical/settlement replies. These tests use disposable services and synthetic provider/storage behavior. They do not establish native provider execution, ordinary local API routing, signed-media streaming, upload bridge, payments or full portal activation.
+
+
+### Delegated media transport
+
+The reserved company facade admits exact typed read routes; it is not ordinary
+local API or portal activation. Compare real central and delegated GET/HEAD,
+Range/If-Range and standard conditional headers, including 206, 304 and 412.
+Shared-reference content and provider icons retain their existing lack of Range
+support. Preserve report financial/content roles and the actual bearer recipient
+independently of current browser membership. Previously published template asset
+custody can outlive recipe unpublication under the existing central policy.
+
+Binary server hops use adapter-owned length metadata and a completion trailer,
+with separate pre-header completion for HEAD/204/304. Each hop retains at most a
+64KiB tail until its final authority/context fence. Missing, forged or conflicting
+completion evidence, short bodies and unexpected encoding fail closed. Already
+delivered bytes cannot be recalled; clients must also fence completed UI/blob
+updates against their connection epoch. Startup/final/periodic authority reads
+have short independent deadlines; hard and idle transfer deadlines and reader
+Close on cancellation bound storage I/O without holding authority locks.
+
+Only known DTO media URL fields and named generation media inputs are mapped.
+Validate fixed central origin, exact object/owner/path and signed query; preserve
+prompt text, webhook URLs and arbitrary provider parameters. Test returned
+reference and edited-template URLs through actual estimate/admission/replay.
+Public errors are reconstructed from bounded protocol codes, never upstream
+secrets, and unframed successful media is not accepted.
+
+A central direct-storage redirect is currently an explicit partial outcome:
+the reserved facade returns a handoff-required conflict without Location and
+without following or relaying storage bytes. Browser credential-omitting handoff,
+SDK-compatible delivery, upload bridge, payments and ordinary portal/API routing
+remain required integration gates. Synthetic storage/HTTP fixtures do not prove
+live cloud CORS, native-provider execution, or complete fourteen-surface mode.

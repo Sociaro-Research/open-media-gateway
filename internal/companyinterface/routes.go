@@ -44,6 +44,7 @@ type Contract struct {
 	QueryFields       string
 	BrowserManagement bool
 	Binary            bool
+	Stream            bool
 	MaxRequestBytes   int64
 	Timeout           time.Duration
 	Idempotency       bool
@@ -70,6 +71,9 @@ func Classify(method, path string) Contract {
 	return c
 }
 func classifyCustomerRoute(method, path string) Contract {
+	if c := mediaCustomerContract(method, path); c.Class == CentralCustomer {
+		return c
+	}
 	if c := resourceCustomerContract(method, path); c.Class == CentralCustomer {
 		return c
 	}
@@ -176,6 +180,9 @@ func RequestContract(method, escapedPath, rawQuery string, body []byte, p Princi
 			return Contract{}, ErrDenied
 		}
 	}
+	if err = mediaQueryContract(c, escapedPath, query, p.Grant.Company); err != nil {
+		return Contract{}, err
+	}
 	if c.RequestBody != "" {
 		if err = validateCustomerBody(c, body, p.Grant.Company); err != nil {
 			return Contract{}, err
@@ -226,7 +233,7 @@ func ForwardHeaders(c Contract, incoming http.Header) (http.Header, error) {
 	}
 	for k, values := range incoming {
 		name := http.CanonicalHeaderKey(k)
-		if name != "Accept" && !(c.Idempotency && name == "Idempotency-Key") && !(c.RequestBody != "" && name == "Content-Type") && !(c.Binary && (name == "Range" || name == "If-Range")) {
+		if name != "Accept" && !(c.Idempotency && name == "Idempotency-Key") && !(c.RequestBody != "" && name == "Content-Type") && !(c.Binary && (name == "Range" || name == "If-Range" || name == "If-Match" || name == "If-None-Match" || name == "If-Modified-Since" || name == "If-Unmodified-Since")) {
 			continue
 		}
 		if connection[name] {

@@ -14,6 +14,7 @@ import (
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/api"
 	"github.com/Sociaro-Research/open-media-gateway/internal/auth"
+	ci "github.com/Sociaro-Research/open-media-gateway/internal/companyinterface"
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
 	"github.com/Sociaro-Research/open-media-gateway/internal/postgres"
 	"github.com/Sociaro-Research/open-media-gateway/internal/references"
@@ -108,6 +109,34 @@ func TestCompanyFacadePublishedTemplateWorkflow(t *testing.T) {
 		out := facadeRequest(t, f, "GET", path, "", v.Tokens.PlaygroundKey, true, nil)
 		expectFixture(t, out, 200)
 	}
+	// Exact published asset and shared-library capabilities are distinct policies.
+	var fixedView struct {
+		Fixed []struct{ URL string } `json:"fixed_references"`
+	}
+	fixedResponse := facadeRequest(t, f, "GET", base, "", v.Tokens.PlaygroundKey, true, nil)
+	if json.Unmarshal(fixedResponse.Body.Bytes(), &fixedView) != nil || len(fixedView.Fixed) != 1 || !strings.HasPrefix(fixedView.Fixed[0].URL, ci.LocalCustomerPrefix+"template-media/"+asset.ID+"?") {
+		t.Fatal("fixed asset URL not mapped", fixedResponse.Body.String())
+	}
+	var sharedView struct{ Data []struct{ ID, URL string } }
+	sharedResponse := facadeRequest(t, f, "GET", "/v1/system/template-references", "", v.Tokens.PlaygroundKey, true, nil)
+	if json.Unmarshal(sharedResponse.Body.Bytes(), &sharedView) != nil || len(sharedView.Data) != 1 || sharedView.Data[0].ID != asset.ID || !strings.HasPrefix(sharedView.Data[0].URL, ci.LocalCustomerPrefix+"references/"+templates.LibraryOwnerID+"/") {
+		t.Fatal("shared URL not mapped", sharedResponse.Body.String())
+	}
+	fixedPath := "/" + strings.TrimPrefix(fixedView.Fixed[0].URL, ci.LocalCustomerPrefix)
+	sharedPath := "/" + strings.TrimPrefix(sharedView.Data[0].URL, ci.LocalCustomerPrefix)
+	for _, path := range []string{fixedPath, sharedPath} {
+		for _, method := range []string{"GET", "HEAD"} {
+			request := httptest.NewRequest(method, fixtureCentral+path, nil)
+			directResult := httptest.NewRecorder()
+			f.central.ServeHTTP(directResult, request)
+			got := facadeRequest(t, f, method, path, "", v.Tokens.PlaygroundKey, true, nil)
+			expectFixture(t, directResult, 200)
+			expectFixture(t, got, 200)
+			if !bytes.Equal(got.Body.Bytes(), directResult.Body.Bytes()) || got.Header().Get("Content-Length") != directResult.Header().Get("Content-Length") || got.Header().Get("Content-Security-Policy") != directResult.Header().Get("Content-Security-Policy") {
+				t.Fatal("signed template/shared parity", method, path)
+			}
+		}
+	}
 	for _, method := range []string{"GET", "HEAD"} {
 		content := facadeRequest(t, f, method, "/v1/system/template-references/"+asset.ID+"/content", "", v.Tokens.PlaygroundKey, true, nil)
 		expectFixture(t, content, 200)
@@ -123,6 +152,17 @@ func TestCompanyFacadePublishedTemplateWorkflow(t *testing.T) {
 	padded := strings.Repeat(" ", 9000) + input
 	editing := facadeRequest(t, f, "POST", base+"/editing", padded, v.Tokens.PlaygroundKey, true, nil)
 	expectFixture(t, editing, 200)
+	var editable struct {
+		Options struct {
+			Images []string `json:"image_urls"`
+		} `json:"options"`
+	}
+	if json.Unmarshal(editing.Body.Bytes(), &editable) != nil || len(editable.Options.Images) != 1 || !strings.HasPrefix(editable.Options.Images[0], ci.LocalCustomerPrefix+"references/") {
+		t.Fatal("editable media input not mapped", editing.Body.String())
+	}
+	advanced, _ := json.Marshal(map[string]any{"model": "mock/workflow-image", "prompt": "Image 1", "image": fixtureLocal + editable.Options.Images[0], "size": "1024x1024", "options": map[string]string{"reference_mode": "references"}, "max_expected_cost_usd": 0})
+	expectFixture(t, facadeRequest(t, f, "POST", "/v1/generations/estimate", string(advanced), v.Tokens.PlaygroundKey, true, nil), 200)
+	expectFixture(t, facadeRequest(t, f, "POST", "/v1/generations", string(advanced), v.Tokens.PlaygroundKey, true, func(r *http.Request) { r.Header.Set("Idempotency-Key", "edited-template-media-roundtrip") }), 202)
 	if !strings.Contains(editing.Body.String(), asset.ID) {
 		t.Fatal("fixed asset missing from editable snapshot")
 	}
@@ -155,6 +195,23 @@ func TestCompanyFacadePublishedTemplateWorkflow(t *testing.T) {
 	expectFixture(t, facadeRequest(t, f, "GET", base+"?revision=2", "", v.Tokens.PlaygroundKey, true, nil), 409)
 	expectFixture(t, direct("PUT", "/v1/system/templates/"+id, map[string]any{"version": 3, "action": "unpublish"}), 200)
 	expectFixture(t, facadeRequest(t, f, "GET", base+"/metadata", "", v.Tokens.PlaygroundKey, true, nil), 404)
+	// Recipe visibility changes immediately; already-published asset custody is
+	// retained by central policy for accepted snapshots, independently of gallery state.
+	expectFixture(t, facadeRequest(t, f, "GET", base, "", v.Tokens.PlaygroundKey, true, nil), 404)
+	gallery := facadeRequest(t, f, "GET", "/v1/templates", "", v.Tokens.PlaygroundKey, true, nil)
+	expectFixture(t, gallery, 200)
+	if strings.Contains(gallery.Body.String(), id) {
+		t.Fatal("unpublished recipe remained in gallery")
+	}
+	directAsset := httptest.NewRecorder()
+	f.central.ServeHTTP(directAsset, httptest.NewRequest("GET", fixtureCentral+fixedPath, nil))
+	expectFixture(t, directAsset, 200)
+	kept := facadeRequest(t, f, "GET", fixedPath, "", v.Tokens.PlaygroundKey, true, nil)
+	expectFixture(t, kept, 200)
+	if !bytes.Equal(kept.Body.Bytes(), directAsset.Body.Bytes()) {
+		t.Fatal("accepted asset custody changed")
+	}
+	expectFixture(t, facadeRequest(t, f, "GET", sharedPath, "", v.Tokens.PlaygroundKey, true, nil), 200)
 	var snapshot []byte
 	e = f.centralDB.QueryRow(`SELECT template_snapshot FROM tasks WHERE id=$1`, result.ID).Scan(&snapshot)
 	var saved struct {

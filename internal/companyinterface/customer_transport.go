@@ -125,6 +125,10 @@ func (c *Client) customer(ctx context.Context, prepared CustomerContext, method,
 	if e != nil {
 		return empty, e
 	}
+	body, e = restoreMediaRequest(contract, body, binding.Company, c.origin, binding.LocalOrigin)
+	if e != nil {
+		return empty, e
+	}
 	forwarded, e := ForwardHeaders(contract, headers)
 	if e != nil {
 		return empty, e
@@ -177,6 +181,10 @@ func (c *Client) customer(ctx context.Context, prepared CustomerContext, method,
 	if e != nil {
 		return empty, e
 	}
+	raw, e = mediaJSONResponse(contract, response.StatusCode, method, path, binding.Company, c.origin, raw)
+	if e != nil {
+		return empty, e
+	}
 	out := CustomerResponse{Status: response.StatusCode, Header: http.Header{}, Body: raw}
 	if location != "" {
 		out.Header.Set("Location", location)
@@ -184,7 +192,7 @@ func (c *Client) customer(ctx context.Context, prepared CustomerContext, method,
 	for _, name := range []string{"Content-Type", "Content-Disposition", "Content-Range", "Accept-Ranges", "ETag", "Last-Modified", "Retry-After"} {
 		// Original entity validators describe central JSON bytes, which differ
 		// after the typed status URL mapping (including the paired HEAD view).
-		if name == "ETag" && (contract.ResponseURLs == "generation" || contract.ResponseURLs == "template-generations" || contract.ResponseURLs == "resource-generation") {
+		if name == "ETag" && contract.ResponseURLs != "none" {
 			continue
 		}
 		values := response.Header.Values(name)

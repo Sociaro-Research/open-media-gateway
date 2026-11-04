@@ -42,6 +42,10 @@ func (s *Server) companyFacade(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	path := "/" + strings.TrimPrefix(r.URL.EscapedPath(), companyFacadePrefix)
+	if ci.Classify(r.Method, path).Stream && (r.ContentLength != 0 || len(r.TransferEncoding) != 0) {
+		companyInterfaceError(w, ci.ErrDenied)
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), ci.CustomerTimeout(r.Method, path))
 	defer cancel()
 	r = r.WithContext(ctx)
@@ -93,7 +97,13 @@ func (s *Server) companyFacade(w http.ResponseWriter, r *http.Request) {
 		companyInterfaceError(w, ci.ErrDenied)
 		return
 	}
-	prepared, e := s.companyCoordinator.PrepareCustomer(ctx, local, browser)
+	prepareContext := ctx
+	done := func() {}
+	if ci.Classify(r.Method, path).Stream {
+		prepareContext, done = context.WithTimeout(ctx, ci.MediaAuthorityTimeout)
+	}
+	prepared, e := s.companyCoordinator.PrepareCustomer(prepareContext, local, browser)
+	done()
 	if e != nil {
 		companyInterfaceError(w, e)
 		return
@@ -107,6 +117,16 @@ func (s *Server) companyFacade(w http.ResponseWriter, r *http.Request) {
 	raw, e := io.ReadAll(http.MaxBytesReader(w, r.Body, ci.CustomerBodyLimit(r.Method, path)))
 	if e != nil {
 		companyInterfaceError(w, ci.ErrDenied)
+		return
+	}
+	if ci.Classify(r.Method, path).Stream {
+		if len(raw) != 0 {
+			companyInterfaceError(w, ci.ErrDenied)
+			return
+		}
+		if e := s.companyCoordinator.StreamCustomer(ctx, prepared, r.Method, path, r.URL.RawQuery, r.Header, keyPresent, key, w); e != nil {
+			companyInterfaceError(w, e)
+		}
 		return
 	}
 	response, e := s.companyCoordinator.Customer(ctx, prepared, r.Method, path, r.URL.RawQuery, raw, r.Header, keyPresent, key)

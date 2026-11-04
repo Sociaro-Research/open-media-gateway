@@ -15,6 +15,7 @@ import (
 	"github.com/Sociaro-Research/open-media-gateway/internal/references"
 	"github.com/Sociaro-Research/open-media-gateway/internal/referencevalidation"
 	"github.com/Sociaro-Research/open-media-gateway/internal/storage"
+	"github.com/Sociaro-Research/open-media-gateway/internal/templates"
 	"github.com/google/uuid"
 )
 
@@ -219,7 +220,23 @@ func (s *Server) serveReference(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 403, "invalid_reference_url", "reference URL is invalid")
 		return
 	}
-	direct, err := s.references.DirectURL(identity.WithOwnerID(r.Context(), owner), id, r.Method, 15*time.Minute)
+	refctx := identity.WithOwnerID(r.Context(), owner)
+	if principal, delegated := companyCustomerFromContext(r.Context()); delegated {
+		if e := references.CheckRead(r.Context()); e != nil {
+			s.referenceError(w, e)
+			return
+		}
+		switch owner {
+		case principal.Grant.Company:
+			refctx = r.Context()
+		case templates.LibraryOwnerID:
+			refctx = templateLibraryContext(r.Context())
+		default:
+			http.NotFound(w, r)
+			return
+		}
+	}
+	direct, err := s.references.DirectURL(refctx, id, r.Method, 15*time.Minute)
 	if err != nil {
 		s.referenceError(w, err)
 		return
@@ -234,12 +251,12 @@ func (s *Server) serveReference(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, direct, http.StatusTemporaryRedirect)
 		return
 	}
-	item, object, err := s.references.Open(identity.WithOwnerID(r.Context(), owner), id)
+	item, object, err := s.references.Open(refctx, id)
 	if err != nil {
 		s.referenceError(w, err)
 		return
 	}
-	defer object.Reader.Close()
+	defer closeCompanyMedia(r.Context(), object.Reader)()
 	w.Header().Set("Content-Type", item.ContentType)
 	w.Header().Set("Content-Disposition", "inline")
 	w.Header().Set("Content-Security-Policy", "default-src 'none'; sandbox")
