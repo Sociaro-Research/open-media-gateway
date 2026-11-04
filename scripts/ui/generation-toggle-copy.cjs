@@ -42,8 +42,8 @@ const server=http.createServer(async(req,res)=>{
    for(const [id,label]of controls){
     const input=page.locator('#'+id),parent=input.locator('..');await input.scrollIntoViewIfNeeded();
     if(!before){assert.equal(await page.getByRole('switch',{name:label,exact:true}).count(),1);assert.equal(await parent.locator('small').count(),0);assert.equal((await parent.innerText()).trim(),label);}
-    const geometry=await parent.evaluate(e=>{const label=e.querySelector('span').getBoundingClientRect(),input=e.querySelector('input').getBoundingClientRect(),box=e.getBoundingClientRect();return{gap:input.left-label.right,centers:Math.abs((label.top+label.bottom-input.top-input.bottom)/2),w:input.width,h:input.height,left:box.left,right:box.right};});
-    assert.ok(geometry.left>=0&&geometry.right<=width+1);assert.ok(geometry.centers<2);assert.ok(geometry.w>=41&&geometry.h>=23);
+    const geometry=await parent.evaluate(e=>{const label=e.querySelector('span').getBoundingClientRect(),input=e.querySelector('input').getBoundingClientRect(),box=e.getBoundingClientRect();return{gap:input.left-label.right,centers:Math.abs((label.top+label.bottom-input.top-input.bottom)/2),w:input.width,h:input.height,left:box.left,right:box.right,padding:getComputedStyle(e).paddingInlineStart,weight:getComputedStyle(e.querySelector('strong')).fontWeight};});
+    assert.ok(geometry.left>=0&&geometry.right<=width+1);assert.ok(geometry.centers<2);assert.ok(geometry.w>=41&&geometry.h>=23);if(!before){assert.equal(geometry.padding,'14px');assert.equal(geometry.weight,'400');assert.equal(await parent.evaluate(e=>getComputedStyle(e).columnGap),'12px');}
     await parent.screenshot({path:path.join(out,`${theme}-${width}-${id}.png`)});
    }
    if(!before)record(`${theme}/${width}: concise accessible labels, aligned switches, no subtitle nodes`);

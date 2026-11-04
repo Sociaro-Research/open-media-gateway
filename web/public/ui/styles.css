@@ -159,7 +159,7 @@ select:disabled { opacity: .55; }
 .number-field input { padding-right: 46px; }
 .number-field > span:not(.floating-field) { position: absolute; top: 50%; right: 12px; transform: translateY(-50%); color: var(--muted); font-size: 11px; pointer-events: none; }
 .toggle-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; }
-.toggle-option { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 56px; margin: 0; padding: 10px; border: 1px solid var(--line); border-radius: 11px; background: rgba(255,255,255,.015); cursor: pointer; }
+.toggle-option { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 56px; margin: 0; padding: 14px; border: 1px solid var(--line); border-radius: 11px; background: rgba(255,255,255,.015); cursor: pointer; }
 .toggle-option[hidden], .check-option[hidden] { display: none; }
 .toggle-option > span { min-width: 0; }
 .toggle-option strong, .toggle-option small { display: block; }
@@ -865,7 +865,7 @@ table .floating-field > .select-trigger { min-height:44px; padding:9px 42px 9px 
 :is(#configurationView,#systemView) .docs-table td { font-size:13px; line-height:1.5; font-weight:400; color:var(--text); }
 :is(#configurationView,#systemView) .docs-table th { font-size:var(--type-detail); font-weight:500; color:var(--muted); }
 :is(#configurationView,#systemView) :is(.field-explanation,.storage-description,.system-status,.form-message,.provider-message,.field-hint) { font-size:13px; line-height:1.5; }
-:is(#configurationView,#systemView) :is(.master-switch strong,.keys-form fieldset label,.system-toggle strong) { font-size:13px; font-weight:500; }
+:is(#configurationView,#systemView) :is(.master-switch strong,.keys-form fieldset label,.system-toggle strong) { font-size:13px; }
 :is(#configurationView,#systemView) :is(.master-switch small,.provider-facts span,.keys-form legend) { font-size:var(--type-detail); }
 :is(#configurationView,#systemView) .provider-facts strong { font-size:13px; font-weight:500; }
 .provider-facts span { text-transform:none; letter-spacing:0; }
@@ -900,7 +900,7 @@ table .floating-field > .select-trigger { min-height:44px; padding:9px 42px 9px 
 .system-table-wrap td:has(> .role-editor) { width:264px; }
 :is(#configurationView,#systemView) .personal-section .providers-hero h1 { font-size:var(--type-section); line-height:1.35; }
 .personal-section.providers-view { padding-top:0; }
-:is(.toggle-option,.check-option) strong { font-size:13px; font-weight:500; color:var(--text); }
+:is(.toggle-option,.check-option) strong { font-size:13px; color:var(--text); }
 :is(.toggle-option small,.settings-grid > div > small,.advanced-grid small,.price-card p,.task-meta,.task-time,.media-note,.provider-list-item small) { font-size:var(--type-detail); line-height:1.5; }
 .advanced-settings summary { font-size:var(--type-detail); font-weight:500; }
 .price-card span,.settings-kicker { font-size:var(--type-detail); }
@@ -1074,7 +1074,6 @@ button.save-confirmation { color:var(--success)!important; background:transparen
 .organization-summary dd > button { flex:none; white-space:nowrap; }
 .payment-provider-settings > .report-heading { flex-wrap:wrap; gap:12px; }
 .payment-provider-settings > .report-heading button { max-width:100%; white-space:normal; }
-.provider-settings-form > label:has(> input[type=checkbox]) { display:flex; align-items:center; gap:10px; }
 .provider-settings-form > p { overflow-wrap:anywhere; }
 .provider-settings-form, .topup-form { grid-template-columns:minmax(0,1fr); min-width:0; }
 .provider-settings-form > *, .topup-form > * { min-width:0; }
@@ -1196,7 +1195,8 @@ input[type=checkbox]:checked { background:var(--accent); box-shadow:inset 0 0 0 
 input[type=checkbox]:checked::before { transform:translateX(18px); background:var(--switch-thumb-on,var(--on-accent)); }
 
 input[type=checkbox]:disabled { opacity:.45; cursor:not-allowed; }
-label:has(> input[type=checkbox]) { display:flex; align-items:center; gap:12px; cursor:pointer; }
+label:has(> input[type=checkbox]) { display:flex; align-items:center; gap:12px; font-weight:400; cursor:pointer; }
+label:has(> input[type=checkbox]) strong { font-weight:400; }
 label:has(> input[type=checkbox]:disabled) { cursor:default; }
 .form-heading-actions > label:has(> input[type=checkbox]) { margin:0; min-height:44px; }
 #modelParameters label:has(> input[type=checkbox]), .payment-provider-availability { display:flex; align-items:center; gap:12px; margin:0; }

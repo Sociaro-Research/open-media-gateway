@@ -39,7 +39,10 @@ harmonious hierarchy between components using the existing values above and the
 shared CSS patterns; do not introduce a second spacing scale. Use `--space-section`
 for section separation, the existing heading-to-content distances for each heading
 level, and the shared field grids and panel padding for grouped content. Shared
-action groups and switch labels use 12px gaps. Keep the shared 42×24px switch and
+action groups and switch labels use 12px gaps. Switch labels use regular 400
+weight, including nested label text and dynamically added controls; do not inherit
+field-heading emphasis from `label` or `strong`. Shared framed toggle rows use the
+same 14px text inset as other bordered fields. Keep the shared 42×24px switch and
 its label vertically centered, with clear separation from neighboring actions.
 
 Prefer the parent's `gap` for sibling spacing. Avoid accumulating child margins
