@@ -1,7 +1,7 @@
 (() => {
  'use strict';
  const el=(tag,text,cls)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e;};
- const button=(text,fn)=>{const b=el('button',text,'secondary');b.type='button';b.onclick=fn;return b;};
+ const button=(text,fn,danger=false)=>{const b=el('button',text,danger?'secondary danger':'secondary');b.type='button';b.onclick=fn;return b;};
  const field=(parent,label,value='',required=true)=>{const l=el('label',label),i=el('input');i.value=value;i.required=required;i.maxLength=300;l.append(i);parent.append(l);return i;};
  const select=(parent,label,options,value)=>{const l=el('label',label),s=el('select');for(const [v,t]of options)s.append(new Option(t,v));if(value!==undefined)s.value=value;l.append(s);parent.append(l);return s;};
  const networks=[['ethereum','Ethereum'],['bsc','BNB Smart Chain'],['polygon','Polygon']];
@@ -65,7 +65,7 @@
    if(!p.settled&&!inactive)card.append(el('p','Send one transfer for the exact amount, without rounding, using the selected token and network. Pay your wallet or exchange withdrawal fee separately. Payments are checked automatically every minute.','field-explanation'));
    if(s.transaction_hash){const link=el('a','View transaction');link.href=s.explorer_url;link.target='_blank';link.rel='noopener noreferrer';card.append(link)}
    const actions=el('div',undefined,'control-row stablecoin-payment-actions');actions.append(button('Back to payments',onBack));if(p.invoice_mode==='local'&&InvoiceUI.available(p))actions.append(InvoiceUI.link(p,base,{api,status,current}));
-   if(p.status==='pending'&&!expired)actions.append(button('Delete payment',async()=>{const action=actions.lastElementChild;action.disabled=true;try{await api(base+'/payments/'+p.id,{method:'DELETE'});if(current())onBack()}catch(e){if(current())FormUI.message(status,e.message,'error');action.disabled=false}}));card.append(actions);parent.replaceChildren(card);FormUI.refresh();return card;
+   if(p.status==='pending'&&!expired)actions.append(button('Delete payment',async()=>{const action=actions.lastElementChild;action.disabled=true;try{await api(base+'/payments/'+p.id,{method:'DELETE'});if(current())onBack()}catch(e){if(current())FormUI.message(status,e.message,'error');action.disabled=false}},true));card.append(actions);parent.replaceChildren(card);FormUI.refresh();return card;
   },
   async requests(parent,{api,base,current,onView}){
    const section=el('section',undefined,'stablecoin-requests'),status=el('p'),rows=el('div'),paging=el('div',undefined,'control-row');status.role='status';section.append(el('h3','Payments'),status,rows,paging);parent.append(section);

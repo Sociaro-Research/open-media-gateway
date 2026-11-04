@@ -72,6 +72,9 @@ func Classify(method, path string) Contract {
 	return c
 }
 func classifyCustomerRoute(method, path string) Contract {
+	if c := paymentReadContract(method, path); c.Class == CentralCustomer {
+		return c
+	}
 	if c := companyReadContract(method, path); c.Class == CentralCustomer {
 		return c
 	}

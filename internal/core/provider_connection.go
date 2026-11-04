@@ -7,9 +7,11 @@ import "context"
 // request option. Adapter-owned handles must bind ID as well as owner/revision;
 // two connections with identical keys must remain different scopes.
 type ProviderConnectionScope struct {
-	ID       string
-	OwnerID  string
-	Revision string
+	SettingsVersion    int64
+	CatalogFingerprint string
+	ID                 string
+	OwnerID            string
+	Revision           string
 }
 type providerConnectionScopeKey struct{}
 

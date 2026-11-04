@@ -201,9 +201,17 @@ func (s *Server) organizationPayments(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 12*time.Second)
 	defer cancel()
-	if e = s.payments.ExpirePayments(ctx); e != nil {
-		paymentError(w, e)
+	if _, delegated := companyCustomerFromContext(ctx); delegated && readMethod(r.Method) && r.PathValue("id") != "" && r.URL.Path == "/v1/organizations/"+org+"/payments/"+r.PathValue("id") {
+		s.companyPaymentStatus(w, r.WithContext(ctx))
 		return
+	}
+	// Navigation, including automatic list/detail polling, never runs payment
+	// maintenance. Explicit mutations and the background reconciler own it.
+	if !readMethod(r.Method) {
+		if e = s.payments.ExpirePayments(ctx); e != nil {
+			paymentError(w, e)
+			return
+		}
 	}
 	if strings.HasSuffix(r.URL.Path, "/payment-methods") {
 		ps, e := s.payments.Providers(ctx)
@@ -284,6 +292,9 @@ func (s *Server) organizationPayments(w http.ResponseWriter, r *http.Request) {
 			w.Write(png)
 			return
 		}
+		if readMethod(r.Method) {
+			p = payments.StatusView(p, time.Now())
+		}
 		s.writeViewerJSON(w, r, 200, p)
 		return
 	}
@@ -304,7 +315,7 @@ func (s *Server) organizationPayments(w http.ResponseWriter, r *http.Request) {
 		visible := []payments.Payment{}
 		for _, p := range ps {
 			if p.Live || role == "system_admin" {
-				visible = append(visible, p)
+				visible = append(visible, payments.StatusView(p, time.Now()))
 			}
 		}
 		s.writeViewerJSON(w, r, 200, map[string]any{"data": visible, "has_more": more})

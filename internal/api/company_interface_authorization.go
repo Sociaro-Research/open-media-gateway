@@ -110,7 +110,17 @@ func (s *Server) companyInterfaceCapabilities(w http.ResponseWriter, r *http.Req
 		companyInterfaceError(w, ci.ErrDenied)
 		return
 	}
-	writeJSON(w, 200, ci.ImplementedProtocol())
+	writeJSON(w, 200, ci.ServerProtocol(r.Context()))
+}
+
+// Issuance requires this server's implementation readiness, not merely a client
+// claiming all capabilities. Existing-family maintenance/cleanup remains usable.
+func companyInterfaceIssuanceReady(w http.ResponseWriter, r *http.Request) bool {
+	if e := ci.Negotiate(ci.ServerProtocol(r.Context())); e != nil {
+		companyInterfaceError(w, e)
+		return false
+	}
+	return true
 }
 func (s *Server) companyInterfaceProof(w http.ResponseWriter, r *http.Request, operation string) {
 	if !s.companyInterfaceHost(w, r) {
@@ -136,6 +146,9 @@ func (s *Server) companyInterfaceProof(w http.ResponseWriter, r *http.Request, o
 	case "start":
 		var in ci.Start
 		if !decodeCompanyInterface(w, r, &in) {
+			return
+		}
+		if !companyInterfaceIssuanceReady(w, r) {
 			return
 		}
 		value, e = s.companyInterface.Start(ctx, in)
@@ -165,6 +178,9 @@ func (s *Server) companyInterfaceProof(w http.ResponseWriter, r *http.Request, o
 		}
 		switch operation {
 		case "redeem":
+			if !companyInterfaceIssuanceReady(w, r) {
+				return
+			}
 			value, e = s.companyInterface.Redeem(ctx, in)
 		case "cancel":
 			e = s.companyInterface.Cancel(ctx, in)
@@ -232,6 +248,9 @@ func (s *Server) companyInterfaceBrowser(w http.ResponseWriter, r *http.Request,
 			Consent     bool   `json:"consent"`
 		}
 		if !decodeCompanyInterface(w, r, &in) {
+			return
+		}
+		if !companyInterfaceIssuanceReady(w, r) {
 			return
 		}
 		challenge, err := s.companyInterface.Approve(ctx, ci.Approval{Code: in.Code, OperationID: in.OperationID, Consent: in.Consent})

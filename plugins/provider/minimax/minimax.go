@@ -264,7 +264,9 @@ func (a *Adapter) requestConnectionScope(ctx context.Context) string {
 		if scope.Revision == "" {
 			return ""
 		}
-		b, _ := json.Marshal(scope)
+		// Persisted handles use the original execution identity, not transient
+		// admission settings/catalogue metadata carried alongside it.
+		b, _ := json.Marshal(struct{ ID, OwnerID, Revision string }{scope.ID, scope.OwnerID, scope.Revision})
 		sum := sha256.Sum256(b)
 		return base64.RawURLEncoding.EncodeToString(sum[:])
 	}

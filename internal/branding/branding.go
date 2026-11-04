@@ -51,6 +51,7 @@ var Colors = []Color{
 	{"accent", "Primary accent", "Actions"}, {"accent-dark", "Accent background", "Actions"}, {"highlight", "Links and focus", "Actions"},
 	{"on-accent", "Text on accent", "Actions"}, {"on-highlight", "Text on highlighted actions", "Actions"},
 	{"accent-text", "Accent text", "Actions"},
+	{"danger", "Danger actions", "Actions"}, {"on-danger", "Text on danger actions", "Actions"},
 	{"bg", "Page background", "Surfaces"}, {"panel", "Panels", "Surfaces"}, {"panel-2", "Secondary panels and table headers", "Surfaces"},
 	{"field", "Fields", "Surfaces"}, {"popup", "Popups", "Surfaces"}, {"line", "Borders", "Surfaces"}, {"switch-off", "Switch off", "Surfaces"},
 	{"switch-thumb", "Switch off thumb", "Surfaces"}, {"switch-thumb-on", "Switch on thumb", "Surfaces"}, {"switch-on-border", "Switch on edge", "Surfaces"},

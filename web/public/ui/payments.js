@@ -121,7 +121,34 @@
     };
    }else{section.append(el('p','No payment provider is enabled. Contact an administrator.','field-explanation'));}
    section.append(viewer,requestList);requests=await StablecoinUI.requests(requestList,{api,base,current,onView:show});
-   if(returned?.org===org.id){const ret=returned;returned=null;sessionStorage.removeItem('gateway-topup-attempt-'+org.id);if(ret.invoice){sessionStorage.removeItem('gateway-invoice-payment');FormUI.message(status,'Opening Stripe payment…');try{const p=await api(base+'/payments/'+ret.id+'/checkout',{method:'POST'});if(!current())return;if(p.settled){FormUI.message(status,'This invoice has already been paid.');await onChanged()}else if(p.checkout_url){location.assign(p.checkout_url)}else{FormUI.message(status,'This payment cannot be opened right now. Try again later.','error')}}catch(e){if(current())FormUI.message(status,e.message,'error')}return;}FormUI.message(status,ret.cancelled?'Checkout was closed. No credit is added until Stripe confirms payment.':'Checking your payment with Stripe…');let attempts=0;async function poll(){if(!current())return;try{const p=await api(base+'/payments/'+ret.id+'/refresh',{method:'POST'});if(!current())return;if(p.settled){await onChanged();return}if(InvoiceUI.expired(p)){FormUI.message(status,'This payment request has expired. Create a new payment.');return}FormUI.message(status,'Payment is awaiting confirmation. You can leave this page; confirmation is processed automatically.')}catch{if(current())FormUI.message(status,'Confirmation is taking longer. Your payment will be checked automatically.')}if(current()&&++attempts<10&&!ret.cancelled)setTimeout(poll,6000)}await poll();}
+   if(!current()||!section.isConnected)return;
+   if(returned?.org===org.id){
+    const ret=returned;returned=null;
+    sessionStorage.removeItem('gateway-topup-attempt-'+org.id);
+    if(ret.invoice)sessionStorage.removeItem('gateway-invoice-payment');
+    // Return/query flags choose a view only. Checkout, reconciliation and invoice
+    // issuance require their existing explicit controls; settlement is central.
+    FormUI.message(status,'Checking payment…');let attempts=0;
+    const returnActions=el('div',undefined,'control-row payment-return-actions');status.after(returnActions);
+    async function poll(){
+     if(!current()||!section.isConnected)return;
+     try{
+      const p=await api(base+'/payments/'+ret.id);
+      if(!current()||!section.isConnected)return;
+      if(p.id!==ret.id||p.organization_id!==org.id)throw new Error('Payment details do not match this company.');
+      if(ret.invoice&&!p.stablecoin&&!p.settled&&p.status==='pending'&&!InvoiceUI.expired(p)){
+       if(!returnActions.firstChild)returnActions.append(InvoiceUI.payment(p,base,{api,status,current,onPaid:onChanged}));
+      }else{returnActions.replaceChildren()}
+      if(p.settled){FormUI.message(status,'Payment received.');await onChanged();return}
+      if(p.status==='cancelled'){FormUI.message(status,'Payment was cancelled.');return}
+      if(p.status==='failed'){FormUI.message(status,'Payment failed.','error');return}
+      if(p.status==='expired'){FormUI.message(status,'This payment request has expired.');return}
+      FormUI.message(status,'Payment is awaiting confirmation.');
+     }catch(e){if(current()&&section.isConnected){returnActions.replaceChildren();FormUI.message(status,e.message,'error')}}
+     if(current()&&section.isConnected&&++attempts<10)setTimeout(poll,6000);
+    }
+    await poll();
+   }
   }catch(e){if(current())FormUI.message(status,e.message,'error')}
  }};
 })();

@@ -4,7 +4,10 @@ import (
 	"context"
 	"maps"
 	"net/http"
+	"net/url"
+	"path"
 	"slices"
+	"strings"
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
 	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
@@ -140,6 +143,8 @@ func (s *Server) prepareGenerationReferences(r *http.Request, input *core.Create
 	// evidence below. Metadata in public options never becomes trusted evidence.
 	input.ReferenceEvidence = core.CloneInputMediaEvidence(input.ReferenceEvidence)
 	input.Options.ReferenceMediaEvidence = nil
+	input.Options.ReferenceSources = nil
+	input.ReferenceSources = slices.Clone(input.ReferenceSources)
 	if s.references == nil || s.mediaSigner == nil {
 		return nil
 	}
@@ -148,6 +153,18 @@ func (s *Server) prepareGenerationReferences(r *http.Request, input *core.Create
 	canonicalize := func(raw string) (string, error) {
 		owner, id, ok := references.ParseSignedReference(raw, s.mediaSigner.secret)
 		if !ok {
+			// A malformed local capability must not become an unchecked external
+			// URL. Encoded valid capabilities are also rejected before net/http
+			// can route their decoded path to the protected reference handler.
+			parsed, e := url.Parse(raw)
+			if e == nil {
+				decoded := *parsed
+				decoded.RawPath = ""
+				_, _, encodedCapability := references.ParseSignedReference(decoded.String(), s.mediaSigner.secret)
+				if encodedCapability || localReferencePath(parsed, s.assetPublicURL) {
+					return "", storage.ErrObjectNotFound
+				}
+			}
 			return raw, nil
 		}
 		if owner != identity.OwnerID(r.Context()) && owner != templates.LibraryOwnerID {
@@ -243,6 +260,9 @@ func (s *Server) prepareGenerationReferences(r *http.Request, input *core.Create
 		if file.Type != binding.kind {
 			return referencevalidation.Invalid(file.Name, "Detected "+file.Type+" media cannot be used in a "+binding.kind+" input. Select the matching file type.")
 		}
+		if file.Source != nil {
+			input.ReferenceSources = append(input.ReferenceSources, *file.Source)
+		}
 		file.ReferenceIndex = binding.index
 		files = append(files, file)
 		input.ReferenceEvidence[binding.raw] = core.InputMediaEvidence{AudioCodecs: core.CloneAudioCodecs(file.Info.AudioCodecs), Type: file.Type, Duration: file.Info.Duration, SHA256: file.SHA256, ReferenceID: id, ContentType: file.Info.ContentType, SizeBytes: file.Info.Size, Width: file.Info.Width, Height: file.Info.Height, FPS: file.Info.FPS, FrameCount: file.Info.FrameCount, AudioStreams: file.Info.AudioStreams, VideoStreams: file.Info.VideoStreams}
@@ -255,6 +275,9 @@ func (s *Server) prepareGenerationReferences(r *http.Request, input *core.Create
 		file, e := s.references.Inspect(referenceReadContext(r.Context(), owner), id)
 		if e != nil {
 			return e
+		}
+		if file.Source != nil {
+			input.ReferenceSources = append(input.ReferenceSources, *file.Source)
 		}
 		if e = s.referenceValidator(r)(r.Context(), &referencevalidation.Target{Provider: input.Provider, Model: input.Model, Options: input.Options, Role: "reference_voice"}, []referencevalidation.File{file}, false); e != nil {
 			return e
@@ -271,4 +294,32 @@ func referenceReadContext(ctx context.Context, owner string) context.Context {
 		return templateLibraryContext(ctx)
 	}
 	return ctx
+}
+
+// Classify only the trusted configured origin (or relative reference paths).
+// External URLs retain their existing contract; this performs no network lookup.
+func localReferencePath(value *url.URL, origin string) bool {
+	if !strings.HasPrefix(path.Clean(value.Path), "/references/") {
+		return false
+	}
+	if value.Host == "" {
+		return true
+	}
+	base, e := url.Parse(origin)
+	if e != nil || base.Host == "" {
+		return false
+	}
+	port := func(u *url.URL) string {
+		p := u.Port()
+		if p == "" {
+			if u.Scheme == "https" {
+				return "443"
+			}
+			if u.Scheme == "http" {
+				return "80"
+			}
+		}
+		return p
+	}
+	return strings.EqualFold(value.Scheme, base.Scheme) && strings.EqualFold(strings.TrimSuffix(value.Hostname(), "."), strings.TrimSuffix(base.Hostname(), ".")) && port(value) == port(base)
 }

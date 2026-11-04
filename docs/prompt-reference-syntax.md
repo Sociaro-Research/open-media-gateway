@@ -23,8 +23,14 @@ mismatched wrappers and other aliases are not UI reference forms. Native names
 such as `character1` remain ordinary prompt text and are still transmitted.
 
 The selected reference mode controls supported media, counts and frame roles.
-Missing files, invalid indexes and unsupported media produce a field message.
-Reordering/removing files updates previews and validation. In Wan
+Textual reference diagnostics produce a red advisory beside the prompt and in Review
+generation; they do not prevent submission or change the literal prompt. The Review
+warning belongs to the saved request and remains visible during estimation, sending
+and errors. Missing references, unsupported textual media and malformed textual
+indexes never block submission; the literal prompt remains unchanged. Required
+model inputs, supplied-file availability and ownership, and
+template slot bindings remain mandatory. Reordering/removing files updates previews
+and diagnostics. In Wan
 `first_frame_references`, image reference numbering follows the separate first
 frame; a per-asset voice is not a separately numbered Audio input.
 

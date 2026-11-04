@@ -140,7 +140,7 @@ func (r *ReferenceRepository) deleteWithGuard(ctx context.Context, id string, ex
 		return err
 	}
 	var activeSound bool
-	if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM tasks WHERE status IN ('queued','running') AND request_options->'_override_sound'->>'owner_id'=$1 AND request_options->'_override_sound'->>'reference_id'=$2)`, identity.OwnerID(ctx), id).Scan(&activeSound); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM tasks WHERE status IN ('queued','running') AND request_options->'_override_sound'->>'owner_id'=$1 AND request_options->'_override_sound'->>'reference_id'=$2 OR status IN ('queued','running') AND EXISTS(SELECT 1 FROM jsonb_array_elements(COALESCE(request_options->'_reference_sources','[]'::jsonb)) source WHERE source->>'owner_id'=$1 AND source->>'reference_id'=$2))`, identity.OwnerID(ctx), id).Scan(&activeSound); err != nil {
 		return err
 	}
 	if activeSound {

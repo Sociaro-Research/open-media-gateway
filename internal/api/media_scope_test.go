@@ -161,6 +161,9 @@ func TestMediaFacePreparationUsesInspectedOwnedVideoAndConsumerScope(t *testing.
 	if task.Model != kling.FaceDetection || task.PreparationConsumer != kling.LipSync || len(task.Options.Videos()) != 1 {
 		t.Fatal("face preparation dispatch/consumer lost")
 	}
+	if len(task.Options.ReferenceSources) != 1 || task.Options.ReferenceSources[0].ReferenceID != source.ID || task.Options.ReferenceSources[0].StorageKey == "" {
+		t.Fatal("face preparation lost admission/retention binding")
+	}
 	evidence := task.Options.ReferenceMediaEvidence[task.Options.Videos()[0]]
 	if evidence.ReferenceID != source.ID || evidence.SHA256 == "" || evidence.Duration != 6 || evidence.Width != 540 || evidence.Height != 960 {
 		t.Fatal("trusted inspected video evidence missing")

@@ -310,5 +310,5 @@ const providers = [{id:'mock',name:'Test provider',live:false,credentials_config
     assert.equal(await page.locator('.task[data-status="completed"] .progress, .task[data-status="failed"] .progress').count(),0,'Historical completions must not flash a progress bar');
     assert.deepEqual(errors,[]);
     console.log('PASS: desktop/mobile, compact confirmation, single POST, 2s minimum, slow request, retry idempotency, timers, task copying, provider view, S3 storage settings/check/save/errors/mobile, clipboard and reduced motion.');
-  } catch (error) { await page.screenshot({path:path.join(output,'failure.png'),fullPage:true}); throw error; } finally {await browser.close();server.close();}
+  } catch (error) { console.error('Original smoke failure:',error); try { await page.screenshot({path:path.join(output,'failure.png'),fullPage:true,timeout:3000}); } catch (captureError) { console.error('Failure screenshot unavailable:',captureError.message); } throw error; } finally {await browser.close();server.close();}
 })().catch(error=>{console.error(error);server.close();process.exitCode=1;});

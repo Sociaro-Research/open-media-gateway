@@ -52,6 +52,9 @@ func (r *TaskRepository) CreateOrGet(ctx context.Context, task core.Task, idempo
 	if err != nil {
 		return core.Task{}, false, err
 	}
+	if err = lockGenerationKey(ctx, tx, task.ProviderOwnerID); err != nil {
+		return core.Task{}, false, err
+	}
 	if task.OrganizationID != "" {
 		if err := tx.QueryRowContext(ctx, `SELECT minimize_request_logging FROM organizations WHERE id=$1 FOR SHARE`, task.OrganizationID).Scan(&task.MinimizeRequestLogging); err != nil {
 			return core.Task{}, false, fmt.Errorf("read organization logging policy: %w", err)
@@ -66,12 +69,12 @@ func (r *TaskRepository) CreateOrGet(ctx context.Context, task core.Task, idempo
 	result, err := tx.ExecContext(ctx, `
 		INSERT INTO tasks (
 			id, status, provider, model, media_type, prompt, request_options, webhook_url,
-			idempotency_key, request_hash, created_at, updated_at, owner_id, api_key_id, cost, provider_identity,provider_owner_id,storage_owner_id,actor_id,minimize_request_logging,had_image_input,project_id,template_snapshot
+			idempotency_key, request_hash, created_at, updated_at, owner_id, api_key_id, cost, provider_identity,provider_owner_id,storage_owner_id,actor_id,minimize_request_logging,had_image_input,project_id,template_snapshot,admission_intent
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,$17,$18,$19,$20,$21,$22,$23)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,$17,$18,$19,$20,$21,$22,$23,$24)
 		ON CONFLICT (owner_id, idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING`,
 		task.ID, task.Status, task.Provider, task.Model, task.MediaType, task.Prompt, optionsJSON, task.WebhookURL,
-		nullableString(idempotencyKey), requestHash, task.CreatedAt, task.UpdatedAt, identity.OwnerID(ctx), task.APIKeyID, encodedCost, task.ProviderIdentity, resourceOwner(task.ProviderOwnerID, identity.OwnerID(ctx)), resourceOwner(task.StorageOwnerID, identity.OwnerID(ctx)), nullableString(identity.ActorID(ctx)), task.MinimizeRequestLogging, task.HadImageInput, nullableString(task.ProjectID), nullableJSON(task.TemplateSnapshot),
+		nullableString(idempotencyKey), requestHash, task.CreatedAt, task.UpdatedAt, identity.OwnerID(ctx), task.APIKeyID, encodedCost, task.ProviderIdentity, resourceOwner(task.ProviderOwnerID, identity.OwnerID(ctx)), resourceOwner(task.StorageOwnerID, identity.OwnerID(ctx)), nullableString(identity.ActorID(ctx)), task.MinimizeRequestLogging, task.HadImageInput, nullableString(task.ProjectID), nullableJSON(task.TemplateSnapshot), nullableString(task.AdmissionIntent),
 	)
 	if err != nil {
 		var pg *pgconn.PgError
@@ -91,7 +94,15 @@ func (r *TaskRepository) CreateOrGet(ctx context.Context, task core.Task, idempo
 		if err := scanTaskWithHash(tx.QueryRowContext(ctx, query, identity.OwnerID(ctx), idempotencyKey), &stored, &storedHash); err != nil {
 			return core.Task{}, false, err
 		}
-		if storedHash != requestHash || (identity.ContentAuthorFilter(ctx) != "" && stored.ActorID != identity.ActorID(ctx)) {
+		var acceptedIntent sql.NullString
+		if err := tx.QueryRowContext(ctx, `SELECT admission_intent FROM tasks WHERE owner_id=$1 AND idempotency_key=$2`, identity.OwnerID(ctx), idempotencyKey).Scan(&acceptedIntent); err != nil {
+			return core.Task{}, false, err
+		}
+		same := storedHash == requestHash
+		if acceptedIntent.Valid && task.AdmissionIntent != "" {
+			same = (same || acceptedIntent.String == task.AdmissionIntent) && stored.ActorID == identity.ActorID(ctx)
+		}
+		if !same || (identity.ContentAuthorFilter(ctx) != "" && stored.ActorID != identity.ActorID(ctx)) {
 			return core.Task{}, false, core.ErrIdempotencyConflict
 		}
 		if err := tx.Commit(); err != nil {
@@ -100,17 +111,11 @@ func (r *TaskRepository) CreateOrGet(ctx context.Context, task core.Task, idempo
 		return stored, false, nil
 	}
 
-	if sound := task.Options.OverrideSound; sound != nil {
-		if err := sourceAssetLock(ctx, tx, sound.OwnerID, sound.ReferenceID); err != nil {
-			return core.Task{}, false, err
-		}
-		var valid bool
-		if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM reference_images WHERE owner_id::text=$1 AND id::text=$2 AND NOT deleting AND storage_key=$3 AND content_sha256=$4 AND size_bytes=$5)`, sound.OwnerID, sound.ReferenceID, sound.StorageKey, sound.SHA256, sound.SizeBytes).Scan(&valid); err != nil {
-			return core.Task{}, false, err
-		}
-		if !valid {
-			return core.Task{}, false, core.ErrOptionsInvalid
-		}
+	if err := checkPreparedProvider(ctx, tx, task); err != nil {
+		return core.Task{}, false, err
+	}
+	if err := checkPreparedReferences(ctx, tx, task); err != nil {
+		return core.Task{}, false, err
 	}
 	if task.ProjectID != "" {
 		if err := projectAccess(ctx, tx, task.ProjectID); err != nil {

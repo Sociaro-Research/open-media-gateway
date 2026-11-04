@@ -1474,7 +1474,7 @@ paths:
         - "Payments"
       "operationId": "get_v1_organizations_org_payments"
       "summary": "List payment history"
-      "description": "Manager only. Amounts are integer USD cents. credited_cents is the current net contribution after fees, refunds and disputed funds; test payments always show zero credited."
+      "description": "Manager only. Read-only: does not reconcile, settle or expire stored payments. Pending or confirming payments past their deadline are projected as expired. Amounts are integer USD cents. credited_cents is the current net contribution after fees, refunds and disputed funds; test payments always show zero credited."
       "responses":
         "200":
           "description": "Success"
@@ -1534,7 +1534,7 @@ paths:
         - "Payments"
       "operationId": "get_v1_organizations_org_payments_id"
       "summary": "Read a payment"
-      "description": "Checks current management rights and the organization binding of the supplied API key."
+      "description": "Checks current management rights and the organization binding of the supplied API key. Read-only: does not create a checkout, reconcile, settle or expire stored payments. Pending or confirming payments past their deadline are projected as expired; terminal states are preserved."
       "responses":
         "200":
           "description": "Success"

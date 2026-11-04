@@ -62,7 +62,7 @@ func TestCompanyFacadeFaceAndSessionActionUseInspectedCentralState(t *testing.T)
 			}
 			json.Unmarshal(direct.Body.Bytes(), &a)
 			json.Unmarshal(local.Body.Bytes(), &b)
-			if a.ID == "" || a.ID != b.ID || b.StatusURL != ci.LocalCustomerPrefix+"v1/generations/"+a.ID || direct.Header().Get("Location") != "" || local.Header().Get("Location") != "" || countFixture(t, f.centralDB, "tasks") != before+1 {
+			if a.ID == "" || a.ID != b.ID || b.StatusURL != ci.LocalCustomerPrefix+"v1/generations/"+a.ID || direct.Header().Get("Location") != "" || local.Header().Get("Location") != b.StatusURL || countFixture(t, f.centralDB, "tasks") != before+1 {
 				t.Fatal("resource admission/replay mapping changed")
 			}
 			task, e := postgres.NewTaskRepository(f.centralDB).Get(ctx, a.ID)

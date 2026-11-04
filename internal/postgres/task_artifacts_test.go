@@ -32,11 +32,35 @@ func taskArtifactsDatabase82(t *testing.T) *sql.DB {
 }
 func taskArtifactsCreate(t *testing.T, db *sql.DB, ctx context.Context) core.Task {
 	t.Helper()
-	now := time.Now().UTC()
-	task := core.Task{ID: uuid.NewString(), Status: core.TaskQueued, Provider: "mock", Model: "synthetic-artifact-video", MediaType: "video", Prompt: "Synthetic durable artifact contract", CreatedAt: now, UpdatedAt: now}
-	got, created, err := NewTaskRepository(db).CreateOrGet(ctx, task, "", "synthetic-artifact-request")
-	if err != nil || !created {
-		t.Fatalf("create owner task: created=%t err=%v", created, err)
+	// These fixtures deliberately exercise schema 82 and its schema-81 rollback.
+	// Seed with historical columns instead of invoking a newer admission INSERT.
+	version, err := goose.GetDBVersion(db)
+	if err != nil || version != 82 {
+		t.Fatalf("artifact fixture requires schema 82: %d %v", version, err)
+	}
+	var hasIntent bool
+	if err := db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM pg_catalog.pg_attribute WHERE attrelid='tasks'::regclass AND attname='admission_intent' AND attnum>0 AND NOT attisdropped)`).Scan(&hasIntent); err != nil || hasIntent {
+		t.Fatalf("artifact fixture unexpectedly contains later admission schema: %t %v", hasIntent, err)
+	}
+	now, id, owner := time.Now().UTC(), uuid.NewString(), identity.OwnerID(ctx)
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback()
+	_, err = tx.ExecContext(ctx, `INSERT INTO tasks(id,status,provider,model,media_type,prompt,request_options,owner_id,actor_id,provider_owner_id,storage_owner_id,created_at,updated_at,request_hash) VALUES($1,'queued','mock','synthetic-artifact-video','video','Synthetic durable artifact contract','{}'::jsonb,$2,$2,$2,$2,$3,$3,'synthetic-artifact-request')`, id, owner, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO task_queue_outbox(task_id) VALUES($1)`, id); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	got, err := NewTaskRepository(db).Get(ctx, id)
+	if err != nil {
+		t.Fatal(err)
 	}
 	return got
 }

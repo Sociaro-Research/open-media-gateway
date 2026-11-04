@@ -62,6 +62,7 @@ func activeHTTP(t *testing.T) *activeHTTPFixture {
 	if e != nil {
 		t.Fatal(e)
 	}
+	f.central = fixtureReadyCentral(f.central)
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == ci.ProtocolBase+"/capabilities" {
 			w.Header().Set("Content-Type", "application/json")

@@ -267,6 +267,9 @@ func (s *Server) resolveResourceCreation(r *http.Request, intent *core.ResourceI
 		if err != nil {
 			return nil, err
 		}
+		if inspected.Source != nil {
+			request.ReferenceSources = append(request.ReferenceSources, *inspected.Source)
+		}
 		if err := validateResourceSourceFile(model, intent.Subtype, inspected); err != nil {
 			return nil, err
 		}
@@ -359,6 +362,8 @@ func (s *Server) resolveResourceCreation(r *http.Request, intent *core.ResourceI
 
 func (s *Server) resourceAdmissionError(w http.ResponseWriter, err error) {
 	switch {
+	case errors.Is(err, core.ErrProviderChanged):
+		writeError(w, http.StatusConflict, "provider_changed", "The provider configuration changed. Review the request and try again.")
 	case errors.Is(err, core.ErrEstimateChanged):
 		writeError(w, 409, "estimate_changed", core.ErrEstimateChanged.Error())
 	case errors.Is(err, core.ErrPricingUnavailable):

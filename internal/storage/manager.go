@@ -21,6 +21,9 @@ type SettingsRecord struct {
 	Driver       string
 	ConnectionID string
 	Ciphertext   []byte
+	// Revisions are server-private configuration epochs, never upload authority.
+	Revision           int64 `json:"-"`
+	ConnectionRevision int64 `json:"-"`
 }
 
 type SettingsRepository interface {

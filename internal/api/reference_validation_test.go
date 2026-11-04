@@ -179,3 +179,29 @@ func TestGenerationReferenceValidationPreservesExternalURLsAndInputTypes(t *test
 		t.Fatal("wrong typed binding accepted", err)
 	}
 }
+
+func TestGenerationAdmissionMalformedGatewayCapabilitiesCannotBecomeExternal(t *testing.T) {
+	s, _, _, _ := templateFixture(t)
+	ctx := identity.WithPersonalData(identity.WithUser(context.Background(), identity.User{ID: "alice"}))
+	r := httptest.NewRequest("POST", "https://gateway.example.test/v1/generations", nil).WithContext(ctx)
+	ref, e := s.references.Upload(ctx, "synthetic.png", bytes.NewReader(referencePNG(t)))
+	if e != nil {
+		t.Fatal(e)
+	}
+	original := s.referenceAbsoluteURL(r, ref)
+	for _, raw := range []string{strings.Replace(original, "/references/", "/refer%65nces/", 1), original + "other", original + "&signature=other", strings.Replace(original, "https://gateway.example.test", "https://gateway.example.test:443", 1) + "other"} {
+		input := core.CreateMediaInput{Provider: "mock", Model: "dance", Options: core.MediaOptions{ReferenceMode: "references", ImageURLs: []string{raw}}}
+		if e := s.prepareGenerationReferences(r, &input); e == nil {
+			t.Fatal("malformed owned capability bypassed inspection", raw)
+		}
+	}
+	input := core.CreateMediaInput{Provider: "mock", Model: "dance", Options: core.MediaOptions{ReferenceMode: "references", ImageURLs: []string{original}}}
+	if e := s.prepareGenerationReferences(r, &input); e != nil || len(input.ReferenceSources) != 1 || input.ReferenceSources[0].ReferenceID != ref.ID {
+		t.Fatal("valid source not bound", e, input.ReferenceSources)
+	}
+	input.Options.ImageURLs = []string{"https://vendor.example/references/unrelated/file?signature=external"}
+	input.ReferenceSources = nil
+	if e := s.prepareGenerationReferences(r, &input); e != nil || len(input.ReferenceSources) != 0 {
+		t.Fatal("external URL contract changed", e)
+	}
+}

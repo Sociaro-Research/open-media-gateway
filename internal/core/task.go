@@ -24,6 +24,9 @@ var (
 )
 
 type Task struct {
+	AdmissionIntent            string `json:"-"`
+	ProviderCatalogFingerprint string `json:"-"`
+	ProviderSettingsVersion    int64  `json:"-"`
 	// Trusted ephemeral consumer identity, checked only for new input preparations.
 	PreparationConsumer       string              `json:"-"`
 	PreparationConsumerPublic string              `json:"-"`
@@ -105,6 +108,7 @@ type SoundOverride struct {
 }
 
 type MediaOptions struct {
+	ReferenceSources       []ReferenceBinding            `json:"_reference_sources,omitempty"`
 	SessionAction          *SessionActionIntent          `json:"session_action,omitempty"`
 	ResourceIntent         *ResourceIntent               `json:"resource_intent,omitempty"`
 	ResourceCreation       *ResourceCreateRequest        `json:"_resource_creation,omitempty"`
@@ -145,6 +149,7 @@ type MediaOptions struct {
 }
 
 type CreateMediaInput struct {
+	ReferenceSources  []ReferenceBinding            `json:"-"`
 	ResourceCreation  *ResourceCreateRequest        `json:"-"`
 	ReferenceEvidence map[string]InputMediaEvidence `json:"-"`
 	AdmissionError    error                         `json:"-"`
@@ -431,6 +436,7 @@ type RequestValidator interface {
 
 // ProviderOptions excludes gateway-only post-processing source identities.
 func (o MediaOptions) ProviderOptions() MediaOptions {
+	o.ReferenceSources = nil
 	o.OverrideSoundID = ""
 	o.OverrideSound = nil
 	return o

@@ -28,7 +28,7 @@ var roleFallbacks = map[string]string{
 
 func ValidPresetID(id string) bool { return id == "" || presetID.MatchString(id) }
 
-func completePalette(palette map[string]string) map[string]string {
+func completePalette(palette map[string]string, light bool) map[string]string {
 	out := maps.Clone(palette)
 	if out == nil {
 		return nil
@@ -36,6 +36,11 @@ func completePalette(palette map[string]string) map[string]string {
 	for role, source := range roleFallbacks {
 		if _, ok := out[role]; !ok {
 			out[role] = out[source]
+		}
+	}
+	for role, value := range dangerDefaults(light) {
+		if _, exists := out[role]; !exists {
+			out[role] = value
 		}
 	}
 	return out
@@ -50,8 +55,8 @@ func (s Settings) Normalize() Settings {
 	}
 	presets := make([]Preset, len(s.Presets))
 	for i, p := range s.Presets {
-		p.Dark = completePalette(p.Dark)
-		p.Light = completePalette(p.Light)
+		p.Dark = completePalette(p.Dark, false)
+		p.Light = completePalette(p.Light, true)
 		presets[i] = p
 	}
 	s.Presets = presets
@@ -84,6 +89,9 @@ func validatePalette(palette map[string]string) error {
 		value, exists := palette[c.Key]
 		if !exists {
 			if _, optional := roleFallbacks[c.Key]; optional {
+				continue
+			}
+			if c.Key == "danger" || c.Key == "on-danger" {
 				continue
 			}
 		}

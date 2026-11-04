@@ -24,7 +24,7 @@ func (s *Server) multipartGeneration(w http.ResponseWriter, r *http.Request) (ma
 		return nil, false
 	}
 	// Bound parsing and disk spooling before consuming the request body.
-	if s.references != nil {
+	if s.references != nil && r.Context().Value(multipartIntentKey{}) != true {
 		release, err := s.references.AdmitMultipart()
 		if err != nil {
 			s.referenceError(w, err)
@@ -158,6 +158,10 @@ func (s *Server) multipartGeneration(w http.ResponseWriter, r *http.Request) (ma
 // upload parser still runs only after storage/direct-upload admission. Multipart
 // readers may prefetch a small buffer, but no file is drained or spooled here.
 func videoMultipartFields(w http.ResponseWriter, r *http.Request) (map[string]json.RawMessage, bool, bool) {
+	if r.MultipartForm != nil {
+		fields, ok := multipartGenerationFields(w, r.MultipartForm.Value)
+		return fields, len(r.MultipartForm.File) > 0, ok
+	}
 	mediaType, params, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
 	if err != nil || mediaType != "multipart/form-data" || params["boundary"] == "" {
 		invalidParameter(w, "body", "invalid multipart request")
@@ -169,6 +173,7 @@ func videoMultipartFields(w http.ResponseWriter, r *http.Request) (map[string]js
 	for parts := 0; ; parts++ {
 		part, err := reader.NextPart()
 		if err == io.EOF {
+			r.MultipartForm = &multipart.Form{Value: values, File: map[string][]*multipart.FileHeader{}}
 			fields, ok := multipartGenerationFields(w, values)
 			return fields, false, ok
 		}

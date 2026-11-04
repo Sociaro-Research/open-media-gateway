@@ -491,6 +491,8 @@ func (s *Server) submitGeneration(w http.ResponseWriter, r *http.Request, input 
 		writeError(w, http.StatusPaymentRequired, "budget_exceeded", core.ErrBudgetExceeded.Error())
 	case errors.Is(err, core.ErrPricingUnavailable):
 		writeError(w, http.StatusUnprocessableEntity, "pricing_unavailable", core.ErrPricingUnavailable.Error())
+	case errors.Is(err, core.ErrProviderChanged):
+		writeError(w, http.StatusConflict, "provider_changed", "The provider configuration changed. Review the request and try again.")
 	case errors.Is(err, core.ErrEstimateChanged):
 		writeError(w, http.StatusConflict, "estimate_changed", core.ErrEstimateChanged.Error())
 	case errors.Is(err, core.ErrKeyUnavailable):
@@ -517,7 +519,7 @@ func (s *Server) healthz(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) authenticate(next http.Handler) http.Handler {
-	next = s.auditRequest(s.clientManagerPolicy(s.organizationPolicy(s.systemPolicy(s.requestLimits(s.modelCatalogPolicy(next))))))
+	next = s.auditRequest(s.clientManagerPolicy(s.organizationPolicy(s.systemPolicy(s.requestLimits(s.generationIntent(s.modelCatalogPolicy(next)))))))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
 		// An explicit credential must never silently fall back to a browser session.

@@ -79,13 +79,43 @@ func (s *TaskService) ValidateMediaRequest(ctx context.Context, input CreateMedi
 }
 
 func (s *TaskService) CreateMediaRequest(ctx context.Context, input CreateMediaInput, idempotencyKey string) (Task, error) {
+	intent := AdmissionIntent(ctx)
+	if intent == "" {
+		original := input
+		original.Options.OverrideSound = nil
+		original.Options.ReferenceSources = nil
+		original.Options.ReferenceMediaEvidence = nil
+		original.Options.ResourceSnapshots = nil
+		original.Options.ResourceCreation = nil
+		var e error
+		operation := "core-generation"
+		if workflow, ok := ctx.Value(preparationWorkflowKey{}).(preparationWorkflow); ok {
+			operation = requestHash(operation, workflow.provider, workflow.model, workflow.operation, workflow.subtype)
+		}
+		intent, e = FingerprintAdmissionIntent(ctx, operation, struct {
+			Input    CreateMediaInput
+			Template json.RawMessage
+		}{original, input.TemplateSnapshot})
+		if e != nil {
+			return Task{}, e
+		}
+	}
+	if accepted, found, e := s.RecoverAcceptedIntent(ctx, idempotencyKey, intent); e != nil || found {
+		return accepted, e
+	}
 	task, err := s.prepare(ctx, input, idempotencyKey)
 	if err != nil {
+		// Another request may have committed this exact intent while preparation ran.
+		if accepted, found, e := s.RecoverAcceptedIntent(ctx, idempotencyKey, intent); e != nil || found {
+			return accepted, e
+		}
 		return Task{}, err
 	}
+	task.AdmissionIntent = intent
 	hashOptions := task.Options
 	hashOptions.OverrideSound = nil // Resolved storage is not client request identity.
 	hashOptions.ReferenceMediaEvidence = nil
+	hashOptions.ReferenceSources = nil
 	hashOptions.ResourceSnapshots = nil
 	hashOptions.ResourceCreation = nil
 	encodedOptions, _ := json.Marshal(hashOptions)
@@ -147,6 +177,16 @@ func (s *TaskService) prepare(ctx context.Context, input CreateMediaInput, idemp
 			return Task{}, ErrProviderUnavailable
 		}
 	}
+	scope, hasScope, scopeErr := s.admissionConnection(ctx, provider)
+	if hasScope {
+		if scopeErr != nil || scope.ID != provider || scope.OwnerID != identity.ProviderOwnerID(ctx) || scope.Revision == "" {
+			if input.AdmissionError == nil {
+				input.AdmissionError = ErrProviderUnavailable
+			}
+		} else {
+			ctx = WithProviderConnectionScope(WithProviderRevision(ctx, scope.Revision), scope)
+		}
+	}
 	model := strings.TrimSpace(input.Model)
 	if model == "" {
 		model = s.providerDefaults[provider]
@@ -180,16 +220,6 @@ func (s *TaskService) prepare(ctx context.Context, input CreateMediaInput, idemp
 	if input.Options.OverrideSoundID != "" && mediaType != "video" {
 		return Task{}, fmt.Errorf("%w: Override Sound requires video output", ErrOptionsInvalid)
 	}
-	scope, hasScope, scopeErr := s.admissionConnection(ctx, provider)
-	if hasScope {
-		if scopeErr != nil || scope.ID != provider || scope.OwnerID != identity.ProviderOwnerID(ctx) || scope.Revision == "" {
-			if input.AdmissionError == nil {
-				input.AdmissionError = ErrProviderUnavailable
-			}
-		} else {
-			ctx = WithProviderConnectionScope(WithProviderRevision(ctx, scope.Revision), scope)
-		}
-	}
 	if err := ValidateResourceReferenceIntent(descriptor, input.Options); err != nil {
 		return Task{}, err
 	}
@@ -211,6 +241,10 @@ func (s *TaskService) prepare(ctx context.Context, input CreateMediaInput, idemp
 	}
 	input.Options.ResourceCreation = CloneResourceCreation(input.ResourceCreation)
 	input.Options.ReferenceMediaEvidence = nil
+	input.Options.ReferenceSources = slices.Clone(input.ReferenceSources)
+	if input.ResourceCreation != nil {
+		input.Options.ReferenceSources = append(input.Options.ReferenceSources, input.ResourceCreation.ReferenceSources...)
+	}
 	if input.ReferenceEvidence != nil {
 		input.Options.ReferenceMediaEvidence = CloneInputMediaEvidence(input.ReferenceEvidence)
 	}
@@ -244,16 +278,18 @@ func (s *TaskService) prepare(ctx context.Context, input CreateMediaInput, idemp
 		ActorID:          identity.ActorID(ctx),
 		OrganizationID:   identity.OrganizationFromContext(ctx).ID,
 		ProviderOwnerID:  identity.ProviderOwnerID(ctx), StorageOwnerID: identity.StorageOwnerID(ctx),
-		APIKeyID:         identity.APIKeyID(ctx),
-		Status:           TaskQueued,
-		ProviderIdentity: scope.Revision,
-		Provider:         provider,
-		Model:            model,
-		MediaType:        mediaType,
-		Prompt:           prompt,
-		Options:          options,
-		CreatedAt:        now,
-		UpdatedAt:        now,
+		APIKeyID:                   identity.APIKeyID(ctx),
+		Status:                     TaskQueued,
+		ProviderIdentity:           scope.Revision,
+		ProviderSettingsVersion:    scope.SettingsVersion,
+		ProviderCatalogFingerprint: scope.CatalogFingerprint,
+		Provider:                   provider,
+		Model:                      model,
+		MediaType:                  mediaType,
+		Prompt:                     prompt,
+		Options:                    options,
+		CreatedAt:                  now,
+		UpdatedAt:                  now,
 	}
 	if webhookURL != "" {
 		task.WebhookURL = &webhookURL
@@ -295,6 +331,13 @@ func (s *TaskService) prepare(ctx context.Context, input CreateMediaInput, idemp
 }
 
 func (s *TaskService) Estimate(ctx context.Context, input CreateMediaInput) (CostEstimate, error) {
+	if checker, ok := s.repo.(interface {
+		ValidateProject(context.Context, string) error
+	}); ok {
+		if e := checker.ValidateProject(ctx, input.ProjectID); e != nil {
+			return CostEstimate{}, e
+		}
+	}
 	task, err := s.prepare(ctx, input, "")
 	if err != nil {
 		return CostEstimate{}, err

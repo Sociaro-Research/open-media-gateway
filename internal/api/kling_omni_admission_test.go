@@ -169,11 +169,14 @@ func TestKlingOmniRejectsSpoofedEvidenceRolesAndForeignReferences(t *testing.T) 
 				expected = 404
 			case "invalid signature":
 				options["video_urls"] = []string{rawURL + "tampered"}
-				expected = 422
+				expected = 404
 			}
 			w := omniRequest(h, "/v1/generations/estimate", key, body, "")
 			if w.Code != expected || repo.creates != 0 {
 				t.Fatal(kind, w.Code, w.Body.String(), repo.creates)
+			}
+			if expected == 404 && !strings.Contains(w.Body.String(), `"code":"not_found"`) {
+				t.Fatal("reference rejection lost sanitized error code", w.Body.String())
 			}
 			if strings.Contains(w.Body.String(), "private.mp4") {
 				t.Fatal("foreign filename disclosed", w.Body.String())

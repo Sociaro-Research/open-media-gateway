@@ -82,7 +82,7 @@
  }
  function remove(project){
   let baseline={...project};const ui=open('Delete project?');if(!ui)return;
-  const text=document.createElement('p');text.textContent=`Delete “${project.name}”? Generations and result files will stay in the Journal. ${company?'This changes the shared project for everyone in this company. ':''}Only this project's tags will be cleared.`;ui.form.append(text);ui.save.textContent='Delete';
+  const text=document.createElement('p');text.textContent=`Delete “${project.name}”? Generations and result files will stay in the Journal. ${company?'This changes the shared project for everyone in this company. ':''}Only this project's tags will be cleared.`;ui.form.append(text);ui.save.textContent='Delete';ui.save.classList.add('danger');
   ui.submit(async options=>{await api('/v1/projects/'+baseline.id,options({method:'DELETE',body:JSON.stringify({version:baseline.version})}));projects=projects.filter(p=>p.id!==baseline.id);if(selected===baseline.id)selected='';},async error=>{
    const latest=projects.find(p=>p.id===baseline.id);
    if(error.status===409&&latest){baseline={...latest};text.textContent=`The project is now named “${latest.name}”. Delete it and clear its tags? Generations and result files will stay in the Journal.`;FormUI.message(ui.status,'Project changed. Review before confirming deletion again.','error');}
@@ -131,7 +131,7 @@
   };
  }
  select.addEventListener('change',()=>{if(select.value===NEW_PROJECT){render();editor();return;}selected=select.value;render();changed();});
- manageButton.onclick=event=>{event.preventDefault();event.stopPropagation();const project=current();if(!project||manageButton.disabled||!canManage)return;ControlPickers.menu(manageButton,{label:'Project actions',matchFieldWidth:true,items:[{label:'Rename',icon:'rename',onSelect:()=>editor(current())},{label:'Delete',icon:'delete',onSelect:()=>remove(current())}]});};
+ manageButton.onclick=event=>{event.preventDefault();event.stopPropagation();const project=current();if(!project||manageButton.disabled||!canManage)return;ControlPickers.menu(manageButton,{label:'Project actions',matchFieldWidth:true,items:[{label:'Rename',icon:'rename',onSelect:()=>editor(current())},{label:'Delete',icon:'delete',danger:true,onSelect:()=>remove(current())}]});};
  window.addEventListener('gateway-key-change',()=>{
   epoch++;reading=null;assignmentMenu?.popup.close(false);ControlPickers.dismiss(manageButton);write?.abort();write=null;if(dialog){dialog.close();dialog.remove();dialog=null;}projects=[];canManage=true;company=false;selected='';if(hasConnectedKey)remember();if(window.GenerationKey?.value())hasConnectedKey=true;feedback();render();load();
  });

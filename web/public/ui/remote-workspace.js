@@ -26,6 +26,7 @@
  function connected(parent,current){
   parent.append(node('h2','Connected'),node('p',connection.organization_name||'Your installation is connected to Sociaro.','field-explanation'));
   const actions=node('div',undefined,'dialog-actions'),open=node('button','Open workspace','primary compact'),reconnect=node('button',connection.provisioning==='dedicated'?'Reconnect':'Manage older connection','secondary');open.type=reconnect.type='button';actions.append(open,reconnect);parent.append(actions);
+  void window.RemoteAuthorization?.mountRecovery(parent,current);
   open.onclick=()=>{if(writing||!current())return;parent.replaceChildren();void workspace(parent,current);};
   reconnect.onclick=()=>{if(writing||!current())return;const popup=connection.provisioning==='dedicated'?window.RemoteAuthorization?.reservePopup():null;parent.replaceChildren();void connect(parent,current,connection.provisioning==='dedicated',popup);};
  }

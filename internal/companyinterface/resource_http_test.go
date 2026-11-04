@@ -159,8 +159,8 @@ func TestCompanyFacadeResourcePreparationAndAdmission(t *testing.T) {
 	if json.Unmarshal(direct.Body.Bytes(), &x) != nil || json.Unmarshal(delegated.Body.Bytes(), &y) != nil || x.ID == "" || x.ID != y.ID {
 		t.Fatal("resource replay changed admitted task")
 	}
-	if direct.Header().Get("Location") != "" || delegated.Header().Get("Location") != "" {
-		t.Fatal("resource handler must not invent Location")
+	if direct.Header().Get("Location") != "" || delegated.Header().Get("Location") != y.StatusURL {
+		t.Fatal("initial admission or accepted-replay Location changed")
 	}
 	if x.StatusURL != "/v1/generations/"+x.ID || y.StatusURL != ci.LocalCustomerPrefix+"v1/generations/"+x.ID {
 		t.Fatalf("resource status URL not mapped: direct=%q facade=%q", x.StatusURL, y.StatusURL)

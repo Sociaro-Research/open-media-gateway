@@ -147,6 +147,7 @@ func (v Generation) MarshalJSON() ([]byte, error) {
 	}
 	delete(options, "_override_sound")
 	delete(options, "_reference_media")
+	delete(options, "_reference_sources")
 	delete(options, "_reference_resources")
 	delete(options, "_resource_creation")
 	// Non-media jobs are historical jobs or generation-scoped input preparation.

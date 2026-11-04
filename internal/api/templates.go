@@ -745,6 +745,7 @@ func (s *Server) resolveTemplate(r *http.Request, item templates.Record, in temp
 			}
 			files = append(files, templates.InputMedia{Type: slot.Type, Info: info})
 			value = s.assetPublicURL + s.templateAssetURL(slot.AssetID)
+			input.ReferenceSources = append(input.ReferenceSources, core.ReferenceBinding{OwnerID: templates.LibraryOwnerID, ReferenceID: asset.ID, StorageOwnerID: asset.StorageOwnerID, StorageKey: asset.StorageKey, SHA256: asset.SHA256, SizeBytes: asset.SizeBytes})
 		} else {
 			id, exists := remaining[slot.ID]
 			if !exists || s.references == nil {

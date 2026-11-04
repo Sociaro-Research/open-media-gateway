@@ -6,7 +6,7 @@
   <title data-page-title="">Media gateway</title>
   <script src="/ui/theme.js"></script>
   <script src="/ui/console-entry.js?v=20261030-recovered-batch" defer></script>
-  <link rel="stylesheet" href="/ui/styles.css?v=20261103-footer">
+  <link rel="stylesheet" href="/ui/styles.css?v=20261104-legacy-recovery">
   <link rel="stylesheet" href="/ui/docs.css?v=20261030-recovered-batch">
   <link rel="stylesheet" href="/ui/references.css?v=20261102-unified-picker">
   <link rel="stylesheet" href="/ui/templates.css?v=20261102-unified-picker">
@@ -394,10 +394,11 @@
     </main>
   </div>
 
-  <dialog id="confirmDialog" class="confirm-dialog" aria-labelledby="confirmTitle">
+  <dialog id="confirmDialog" class="confirm-dialog" aria-labelledby="confirmTitle" aria-describedby="confirmReferenceWarning">
     <div class="confirm-heading"><h2 id="confirmTitle">Review generation</h2><button type="button" class="secondary icon-close" id="closeConfirm" aria-label="Close">✕</button></div>
     <div id="requestSummary" class="request-summary"><dl id="confirmFields"></dl></div>
     <div class="confirm-price"><span>Estimated cost</span><strong id="confirmPrice"></strong></div>
+    <p id="confirmReferenceWarning" class="form-message error" role="alert" hidden></p>
     <p id="confirmStatus" role="status" hidden></p>
     <div class="confirm-actions"><button type="button" class="secondary" id="cancelConfirm">Cancel</button><button type="button" class="primary" id="confirmSubmit">Confirm and generate <span aria-hidden="true">→</span></button></div>
   </dialog>
@@ -420,7 +421,7 @@
               <button type="button" class="reuse-task">Copy to new task</button>
               <button type="button" class="retry-task">Try again</button>
               <button type="button" class="change-project" aria-label="Project" aria-haspopup="menu" aria-expanded="false">Project <span aria-hidden="true">›</span></button>
-              <button type="button" class="delete-result">Delete result files</button>
+              <button type="button" class="delete-result danger">Delete result files</button>
             </div>
           </details>
         </div>
@@ -468,8 +469,9 @@
   <script src="/ui/email-login.js?v=20261030-recovered-batch" defer></script>
   <script src="/ui/provider-connections.js?v=20261030-recovered-batch" defer></script>
   <script src="/ui/playground-projects.js?v=20261031-gw234" defer></script>
-  <script src="/ui/workspace-authorization.js?v=20261102-sociaro-connect" defer></script><script src="/ui/remote-authorization.js?v=20261102-sociaro-connect" defer></script><script src="/ui/setup-selector.js?v=20261102-sociaro-connect" defer></script>
-  <script src="/ui/remote-workspace.js?v=20261102-sociaro-connect" defer></script>
+  <script src="/ui/sha256-vendor.js?v=0.11.1" defer></script>
+  <script src="/ui/workspace-authorization.js?v=20261102-sociaro-connect" defer></script><script src="/ui/remote-authorization.js?v=20261104-legacy-recovery" defer></script><script src="/ui/setup-selector.js?v=20261102-sociaro-connect" defer></script>
+  <script src="/ui/remote-workspace.js?v=20261104-legacy-recovery" defer></script>
   <script src="/ui/reference-validation.js?v=20261031-model-upload" defer></script>
   <script src="/ui/reference-prompts.js?v=20261030-recovered-batch" defer></script>
   <script src="/ui/prompt-reference-editor.js?v=20261031-gw250" defer></script>

@@ -9,5 +9,12 @@ assert.match(r.error('@Audio1',{supports_image_input:true},options),/Unsupported
 assert.equal(r.error('@Image1',{...typed,no_prompt:true},options),'');
 const frameModel={...typed,reference_modes:[{id:'first_frame',max_images:1,max_videos:0,max_audios:0}]};assert.match(r.error('@Audio1',frameModel,{...options,reference_mode:'first_frame'}),/Unsupported/);
 assert.equal(r.error('@Image1',typed,{image_urls:['first','ref'],reference_mode:'first_frame_references'}),'');assert.match(r.error('@Image2',typed,{image_urls:['first','ref'],reference_mode:'first_frame_references'}),/@Image2/);
+assert.equal(r.error('@Image3 @Image3 @Video2 @Audio2',typed,options),'Missing references: @Image3, @Video2, @Audio2.');
+assert.match(r.error('@Image0 @Image3',typed,options),/Invalid reference/);
+assert.match(r.error('@Video1 @Image3',{supports_image_input:true},options),/Unsupported reference type/);
+assert.equal(r.error('Image 3 @Image 3',typed,options),'');
+assert.equal(r.error('@Image1',{...typed,no_prompt:true},{}),'');
+assert.equal(r.error('@Image1',typed,{image_urls:['first'],reference_mode:'first_frame_references'}),'Missing image references: @Image1.');
+const mixed=r.warning('@Image0 @Image2 @Audio1',{supports_image_input:true},{image_urls:['one']});assert.match(mixed,/Invalid reference: @Image0/);assert.match(mixed,/Unsupported reference type: @Audio1/);assert.match(mixed,/Missing image references: @Image2/);assert.match(r.warning('@Image1 @Audio1',{supports_image_input:false,supports_audio_input:false},{}),/Unsupported reference type/);
 assert.equal(JSON.stringify(options),before);assert.equal(r.label('anything','image',0),'@Image1');
 console.log('PASS: '+fixtures.length+' shared recognition fixtures; provider-independent grammar, supported types/modes, missing files, offsets and immutable options');

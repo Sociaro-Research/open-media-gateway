@@ -9,6 +9,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/Sociaro-Research/open-media-gateway/internal/core"
 	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
 	"github.com/Sociaro-Research/open-media-gateway/internal/mediafile"
 	"github.com/Sociaro-Research/open-media-gateway/internal/organization"
@@ -81,6 +82,11 @@ func (l *Library) inspectItem(ctx context.Context, item Image) (referencevalidat
 		return referencevalidation.File{}, err
 	}
 	file.SHA256 = hex.EncodeToString(sum[:])
+	storageOwner := item.StorageOwnerID
+	if storageOwner == "" {
+		storageOwner = identity.OwnerID(ctx)
+	}
+	file.Source = &core.ReferenceBinding{OwnerID: identity.OwnerID(ctx), ReferenceID: item.ID, StorageOwnerID: storageOwner, StorageKey: item.StorageKey, SHA256: item.SHA256, SizeBytes: item.SizeBytes}
 	return file, nil
 }
 

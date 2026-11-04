@@ -1539,6 +1539,9 @@ async function openGenerationConfirmation(source, trigger) {
   if(request.resource_create)rows.push(['Resource name',request.resource_create.name],['Resource type',request.resource_create.subtype],['Source files',String(request.resource_create.reference_ids?.length||0)],['Completed generation source',request.resource_create.generated_task_id?'Selected':'None']);
   rows.push(...taskParameterRows(request.options, optionDefaults(model)));
   fillSummary(document.querySelector('#confirmFields'), rows);
+  const referenceWarning=document.querySelector('#confirmReferenceWarning');
+  referenceWarning.textContent=request.template?'':(window.PromptReferences?.requestWarning(request,model)||'');
+  referenceWarning.hidden=!referenceWarning.textContent;
   document.querySelector('#confirmPrice').textContent = 'Calculating…';
   confirmButton.disabled=true;
   confirmStatus.hidden = true; confirmStatus.className = '';
@@ -1553,9 +1556,9 @@ async function openGenerationConfirmation(source, trigger) {
    submission.request.max_expected_cost_usd=(quote.cost.customer_expected_usd ?? quote.cost.expected_usd);
    submission.canGenerate = quote.can_generate === true;
    confirmButton.disabled=!submission.canGenerate;
-   confirmStatus.hidden=false;
+   confirmStatus.hidden=quote.can_generate && amount===0;
    confirmStatus.className=quote.can_generate ? '' : 'error';
-   confirmStatus.textContent=quote.can_generate ? ((quote.cost.customer_expected_usd ?? quote.cost.expected_usd)===0 ? 'This test generation is free.' : 'Cost is recorded after generation.') : `Your budget is exhausted (${formatUSD(quote.remaining_usd)} remaining).`;
+   confirmStatus.textContent=quote.can_generate ? (amount===0 ? '' : 'Cost is recorded after generation.') : `Your budget is exhausted (${formatUSD(quote.remaining_usd)} remaining).`;
   } catch(error) {
    if(pendingSubmission!==submission) return;
    if(request.template&&error.code==='template_conflict'){dialog.close();pendingSubmission=null;await window.GatewayTemplates?.currentChanged(request.template.id,request.template.revision);return;}
@@ -1748,7 +1751,7 @@ async function loadStorageSettings(){
 
 function confirmResultDeletion(task){
  const dialog=document.createElement('dialog');dialog.className='keys-revoke-dialog';dialog.setAttribute('aria-labelledby','deleteResultTitle');
- dialog.innerHTML='<h2 id="deleteResultTitle">Delete stored result files?</h2><p>This deletes the saved result and last-frame files from storage. The generation, prompt, parameters and accounting history stay in your journal. The provider link will remain available, but it may expire.</p><p role="status"></p><div class="docs-actions"><button type="button" class="secondary" data-cancel>Cancel</button><button type="button" class="secondary docs-danger" data-confirm>Delete files</button></div>';
+ dialog.innerHTML='<h2 id="deleteResultTitle">Delete stored result files?</h2><p>This deletes the saved result and last-frame files from storage. The generation, prompt, parameters and accounting history stay in your journal. The provider link will remain available, but it may expire.</p><p role="status"></p><div class="docs-actions"><button type="button" class="secondary" data-cancel>Cancel</button><button type="button" class="secondary danger" data-confirm>Delete files</button></div>';
  document.body.append(dialog);dialog.querySelector('[data-cancel]').onclick=()=>dialog.close();dialog.addEventListener('close',()=>dialog.remove());
  const confirm=dialog.querySelector('[data-confirm]');confirm.onclick=async()=>{confirm.disabled=true;FormUI.message(dialog.querySelector('[role=status]'),'Deleting…');try{await api(`/v1/generations/${task.id}/content`,{method:'DELETE'});dialog.close();await loadTasks(true);window.dispatchEvent(new Event('gateway-storage-change'));}catch(error){FormUI.message(dialog.querySelector('[role=status]'),error.message,'error');confirm.disabled=false;}};dialog.showModal();dialog.querySelector('[data-cancel]').focus();
 }

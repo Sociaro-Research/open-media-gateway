@@ -19,6 +19,7 @@
   --inset-background: rgba(0,0,0,.12);
   --blue: #6ca8ff;
   --red: #f08088;
+  --danger: #f08088; --on-danger: #171717;
   --success: #79d6a0;
   --yellow: #f3c45b;
   --card-background: linear-gradient(145deg,color-mix(in srgb,var(--panel-2) 96%,transparent),color-mix(in srgb,var(--panel) 96%,transparent));
@@ -39,6 +40,7 @@
   --field: #ffffff; --popup: #ffffff; --line: #d4d4d4;
   --text: #171717; --muted: #525252; --switch-off: #737373;
   --on-accent: #ffffff; --accent: #262626; --accent-dark: #f0f0f0; --highlight: #444444;
+  --danger: #b42336; --on-danger: #ffffff;
   --blue: #235dba; --red: #b42336; --success: #147844; --yellow: #916000;
 }
 
@@ -400,6 +402,7 @@ body:has(.confirm-dialog[open]) { overflow: hidden; }
 .confirm-actions .secondary { padding: 12px 20px; }
 #confirmStatus { display: flex; gap: 10px; align-items: center; margin: 10px 0 20px; font-size: 12px; color: var(--muted); line-height: 1.5; }
 #confirmStatus.error { color: var(--red); }
+#confirmReferenceWarning { margin: 0 0 16px; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
 .sending::before { content: ''; flex-shrink: 0; width: 13px; height: 13px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
 button:disabled { cursor: default; opacity: .5; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 0; }
@@ -865,6 +868,10 @@ table .floating-field > .select-trigger { min-height:44px; padding:9px 42px 9px 
 .form-heading:has(> .form-heading-actions) { flex-wrap:wrap; }
 .form-heading-actions { display:flex; flex:0 0 auto; align-items:center; gap:12px; margin-left:auto; }
 .stable-action[hidden] { display:inline-flex!important; visibility:hidden; pointer-events:none; }
+@media(max-width:360px) {
+ .form-heading:has(> .form-heading-actions) { display:grid; grid-template-columns:minmax(0,1fr); }
+ .form-heading-actions { justify-self:end; }
+}
 .form-actions:not(:has(button)):has(> [role=status]:empty) { display:none; }
 .form-actions:empty,.form-actions:not(:has(> :not([hidden]))) { display:none; }
 .providers-hero > div:has(.form-heading) { width:100%; }
@@ -1767,6 +1774,7 @@ input[type=color]:focus-visible { outline:none; box-shadow:none; border:2px soli
 .generation-output { display:grid; gap:12px; min-width:0; }
 .generation-output > :is(h4,p) { margin:0; }
 .selected-references.has-reference-roles { grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr)); gap:12px; }
+.selected-references.has-reference-roles > .media-picker-card { min-width:min(100%,180px); }
 .reference-role { display:block; margin:12px 0 0; }
 
 .prompt-policy-group { display:grid; gap:12px; min-width:0; }
@@ -1844,4 +1852,30 @@ input[type=color]:focus-visible { outline:none; box-shadow:none; border:2px soli
 .organization-model-access { width:100%; max-width:none; min-width:0; }
 @media (max-width:760px) {
  :is(#configurationView,#systemView) .keys-form.organization-settings-grid { grid-template-columns:minmax(0,1fr); }
+}
+
+/* Legacy authorization recovery reuses the existing dialog and action styles. */
+.remote-recovery-list{display:grid;gap:12px;margin-top:12px}
+.remote-recovery-item{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.remote-recovery-item p{margin:0;min-width:0;flex:1 1 180px;overflow-wrap:anywhere}
+
+/* Destructive intent is independent of primary actions and error feedback.
+   Forced colors retain the existing system-color controls and focus perimeter. */
+@media (forced-colors: none) {
+ .primary.danger { background:var(--danger); color:var(--on-danger); }
+ .primary.danger:hover:not(:disabled) { background:color-mix(in srgb,var(--danger) 90%,var(--on-danger)); color:var(--on-danger); }
+ .primary.danger:active:not(:disabled) { background:color-mix(in srgb,var(--danger) 82%,var(--on-danger)); color:var(--on-danger); }
+ .secondary.danger { color:var(--danger); --interaction-border-color:var(--danger); }
+ .secondary.danger:hover:not(:disabled),.secondary.danger:active:not(:disabled) { color:var(--danger); background:color-mix(in srgb,var(--danger) 9%,var(--field)); --interaction-border-color:var(--danger); }
+ :is(.primary,.secondary).danger:focus-visible { --interaction-border-color:var(--danger); }
+ .primary.danger:focus-visible,.primary.danger:focus-visible:hover,.primary.danger:focus-visible:active { background:var(--field); color:var(--danger); }
+ :is(.action-menu .picker-option,.task-menu button).danger { color:var(--danger); }
+ :is(.action-menu .picker-option,.task-menu button).danger:disabled { background:none; }
+ :is(.action-menu .picker-option,.task-menu button).danger:hover:not(:disabled),:is(.action-menu .picker-option,.task-menu button).danger:focus-visible { color:var(--danger); background:color-mix(in srgb,var(--danger) 9%,var(--field)); outline-color:var(--danger); }
+}
+@media (forced-colors: active) {
+ .primary.danger,.secondary.danger { background:Canvas; color:CanvasText; }
+ :is(.action-menu .picker-option,.task-menu button).danger { forced-color-adjust:none; color:CanvasText; background:Canvas; }
+ :is(.action-menu .picker-option,.task-menu button).danger:focus-visible { outline-color:Highlight; }
+ :is(.primary,.secondary).danger:disabled,:is(.action-menu .picker-option,.task-menu button).danger:disabled { color:GrayText; }
 }

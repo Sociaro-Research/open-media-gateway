@@ -70,7 +70,7 @@ const deferred = () => { let resolve; const promise = new Promise(r => {resolve=
     if(url.pathname==='/v1/generations/estimate'){
       assert.equal(req.headers().authorization,'Bearer fixture-generation-key');
       const body=req.postDataJSON();estimates.push(body);
-      if(quoteGate&&body.prompt==='Historic video')await quoteGate.promise;
+      if(quoteGate&&['Historic video','Use @Image2'].includes(body.prompt))await quoteGate.promise;
       if(quoteFailure)return route.fulfill({status:403,json:{error:{message:quoteFailure}}});
       // The real estimate API runs prepare/normalizeOptions; fixture its validation failure.
       if(body.model==='mock/required'&&!body.input_reference?.length&&!body.options.image_urls?.length)return route.fulfill({status:400,json:{error:{message:'This model requires an image reference'}}});
@@ -161,13 +161,13 @@ const deferred = () => { let resolve; const promise = new Promise(r => {resolve=
     record('Cancel, Close and Escape submit nothing and preserve the full draft');
 
     // A cancelled estimate cannot enable or replace a subsequently opened confirmation.
-    quoteGate=deferred();const beforeQuote=posts.length;await retry('history-video');
+    quoteGate=deferred();const beforeQuote=posts.length;await retry('missing-marker');assert.equal(await page.locator('#confirmReferenceWarning').innerText(),'Missing image references: @Image2.');
     await page.locator('#confirmSubmit').evaluate(button=>button.click());assert.equal(posts.length,beforeQuote);
     await page.waitForFunction(()=>document.querySelector('#confirmPrice').textContent==='Calculating…');
     await page.locator('#cancelConfirm').click();await retry('history-speech');await ready();
     const speechSummary=await page.locator('#confirmFields').innerText();quoteGate.resolve();quoteGate=null;
     await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
-    assert.equal(await page.locator('#confirmFields').innerText(),speechSummary);await page.locator('#cancelConfirm').click();
+    assert.equal(await page.locator('#confirmFields').innerText(),speechSummary);assert.equal(await page.locator('#confirmReferenceWarning').isVisible(),false);await page.locator('#cancelConfirm').click();
     record('Cancelled quote response cannot overwrite a newer confirmation');
 
     for(const [id,model] of [['history-video',video],['history-speech',speech],['history-music',music],['history-image',image],['history-audio',audio],['history-parameters',parameterized]]){
@@ -188,11 +188,14 @@ const deferred = () => { let resolve; const promise = new Promise(r => {resolve=
     assert.deepEqual(submitted('audio').options.audio_urls,['https://fixture.test/audio.wav']);assert.deepEqual(submitted('parameters').options.parameters,{strength:0});
     record('Video, speech, lyrics-only music, image, no-prompt audio and custom parameters use saved inputs and fresh customer costs without editing the draft');
 
-    for(const [id,message] of [['unavailable','provider or model is no longer available'],['missing-prompt','missing its prompt'],['missing-marker','Missing image references: @Image2']]){
+    for(const [id,message] of [['unavailable','provider or model is no longer available'],['missing-prompt','missing its prompt']]){
       const before=posts.length;await retry(id);assert.equal(await page.locator('#confirmDialog').isVisible(),false);assert.match(await page.locator('#formMessage').innerText(),new RegExp(message));assert.equal(posts.length,before);assert.deepEqual(await state(),edited);
     }
     await retry('missing-input');await page.getByText('This model requires an image reference',{exact:true}).waitFor();assert.equal(await page.locator('#confirmSubmit').isDisabled(),true);await page.locator('#cancelConfirm').click();
-    record('Unavailable models, missing prompts, missing prompt references and estimate input validation block generation clearly');
+    record('Unavailable models, missing prompts and mandatory estimate input validation block generation clearly');
+
+    const warningBefore=posts.length;postGate=deferred();failure={status:503,message:'Temporary advisory fixture failure'};await retry('missing-marker');await ready();const warningText='Missing image references: @Image2.';assert.equal(await page.locator('#confirmReferenceWarning').innerText(),warningText);assert.deepEqual(await state(),edited);await page.locator('#confirmSubmit').click();await page.waitForFunction(()=>document.querySelector('#confirmDialog').getAttribute('aria-busy')==='true');assert.equal(await page.locator('#confirmReferenceWarning').innerText(),warningText);postGate.resolve();postGate=null;await page.waitForFunction(()=>document.querySelector('#confirmStatus').textContent.includes('Temporary advisory fixture failure')&&!document.querySelector('#confirmSubmit').disabled);assert.equal(await page.locator('#confirmReferenceWarning').isVisible(),true);assert.deepEqual(await state(),edited);failure=null;await page.locator('#confirmSubmit').evaluate(e=>{e.click();e.click();});await hidden();assert.equal(posts.length,warningBefore+2);assert.equal(posts[warningBefore].key,posts[warningBefore+1].key);assert.deepEqual(posts[warningBefore].body,posts[warningBefore+1].body);assert.equal(posts.at(-1).body.prompt,'Use @Image2');assert.deepEqual(posts.at(-1).body.image,['https://fixture.test/image.png']);assert.deepEqual(await state(),edited);await retry('history-video');await ready();assert.equal(await page.locator('#confirmReferenceWarning').isVisible(),false);await page.locator('#cancelConfirm').click();
+    record('Missing historical mentions warn through quote, pending, failure and exact retry; duplicate confirm is suppressed and a different draft remains unchanged');
 
     for(const error of ['Permission denied','Pricing unavailable']){
       quoteFailure=error;const before=posts.length;await retry('history-video');await page.locator('#confirmStatus').getByText(error,{exact:true}).waitFor();assert.equal(await page.locator('#confirmSubmit').isDisabled(),true);await page.locator('#cancelConfirm').click();assert.equal(posts.length,before);

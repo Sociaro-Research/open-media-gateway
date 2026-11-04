@@ -31,17 +31,22 @@
   const spec=contract(model,options);if(!spec)return [];
   return markers(value).map(marker=>({...marker,reason:!marker.valid?'invalid':!spec.types.includes(marker.kind)?'unsupported':!urls(options,marker.kind)[marker.index+offset(options,marker.kind)]?'missing':''}));
  }
- function error(value,model,options={}){
-  const spec=contract(model,options);if(!spec)return '';
-  const invalid=inspect(value,model,options).filter(m=>m.reason);
-  if(!invalid.length)return '';
-  const malformed=invalid.filter(m=>m.reason==='invalid');if(malformed.length)return 'Invalid reference: '+[...new Set(malformed.map(m=>m.label))].join(', ')+'. Use the displayed reference identifier and a positive whole number.';
-  const unsupported=invalid.filter(m=>m.reason==='unsupported');if(unsupported.length)return 'Unsupported reference type: '+[...new Set(unsupported.map(m=>m.label))].join(', ')+'. This model accepts '+(spec.types.join(', ')||'no')+' references.';
-  const unique=[...new Map(invalid.map(m=>[m.kind+':'+m.index,m])).values()].sort((a,b)=>kinds.indexOf(a.kind)-kinds.indexOf(b.kind)||a.index-b.index);
-  const imageOnly=unique.every(m=>m.kind==='image'),labels=unique.map(m=>label(spec.syntax,m.kind,m.index));
-  return `Missing ${imageOnly?'image references':'references'}: ${labels.join(', ')}. Add the ${imageOnly?'images':'files'} or correct the prompt before generating.`;
+ function diagnostics(value,model,options={}){
+  const spec=contract(model,options);if(!spec)return [];
+  const invalid=inspect(value,model,options).filter(m=>m.reason),messages=[];
+  const malformed=invalid.filter(m=>m.reason==='invalid');if(malformed.length)messages.push('Invalid reference: '+[...new Set(malformed.map(m=>m.label))].join(', ')+'. Use the displayed reference identifier and a positive whole number.');
+  const unsupported=invalid.filter(m=>m.reason==='unsupported');if(unsupported.length)messages.push('Unsupported reference type: '+[...new Set(unsupported.map(m=>m.label))].join(', ')+'. This model accepts '+(spec.types.join(', ')||'no')+' references.');
+  const missing=invalid.filter(m=>m.reason==='missing');
+  if(missing.length){
+   const unique=[...new Map(missing.map(m=>[m.kind+':'+m.index,m])).values()].sort((a,b)=>kinds.indexOf(a.kind)-kinds.indexOf(b.kind)||a.index-b.index);
+   const imageOnly=unique.every(m=>m.kind==='image'),labels=unique.map(m=>label(spec.syntax,m.kind,m.index));
+   messages.push(`Missing ${imageOnly?'image references':'references'}: ${labels.join(', ')}.`);
+  }
+  return messages;
  }
- const api={syntax,contract,label,markers,urls,offset,inspect,error};
+ function error(value,model,options={}){return diagnostics(value,model,options)[0]||'';}
+ function warning(value,model,options={}){return diagnostics(value,model,options).join(' ');}
+ const api={syntax,contract,label,markers,urls,offset,inspect,error,warning};
  if(typeof window!=='undefined')window.ReferencePrompts=api;
  if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })();

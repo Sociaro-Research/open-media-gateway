@@ -180,6 +180,7 @@ func TestCompanyHTTPCompositionLostReplyAndCapabilityGates(t *testing.T) {
 		t.Fatal(e)
 	}
 	var complete, old atomic.Bool
+	centralHandler = ci.FixtureServerReadiness(centralHandler, complete.Load)
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == ci.ProtocolBase+"/capabilities" {
 			if old.Load() {
@@ -453,6 +454,7 @@ func TestCompanyHTTPCancelApprovedWithoutLiveUserAuthority(t *testing.T) {
 			if e != nil {
 				t.Fatal(e)
 			}
+			central = fixtureReadyCentral(central)
 			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if r.URL.Path == ci.ProtocolBase+"/capabilities" {
 					w.Header().Set("Content-Type", "application/json")
@@ -651,4 +653,8 @@ func TestCompanyHTTPCancelApprovedWithoutLiveUserAuthority(t *testing.T) {
 			}
 		})
 	}
+}
+
+func fixtureReadyCentral(h http.Handler) http.Handler {
+	return ci.FixtureServerReadiness(h, func() bool { return true })
 }

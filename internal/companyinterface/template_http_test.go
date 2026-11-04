@@ -72,6 +72,7 @@ func TestCompanyFacadePublishedTemplateWorkflow(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
+	f.central = fixtureReadyCentral(f.central)
 	direct := func(method, path string, value any) *httptest.ResponseRecorder {
 		raw, _ := json.Marshal(value)
 		r := httptest.NewRequest(method, fixtureCentral+path, bytes.NewReader(raw))

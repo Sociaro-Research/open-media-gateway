@@ -14,6 +14,7 @@ import (
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
 	"github.com/Sociaro-Research/open-media-gateway/internal/referencevalidation"
+	"github.com/Sociaro-Research/open-media-gateway/internal/storage"
 	"github.com/Sociaro-Research/open-media-gateway/internal/testmedia"
 )
 
@@ -48,14 +49,31 @@ func TestGW253UnverifiedSourcesCannotInheritSpoofedInspectionEvidence(t *testing
 	}
 	request := httptest.NewRequest("POST", "https://untrusted-request-host.invalid", nil).WithContext(ctx)
 	canonical := s.assetPublicURL + s.referenceView(request, item).URL
-	for _, raw := range []string{"https://vendor.example/video.mp4", canonical + "invalid", canonical + "&signature=other", strings.Replace(canonical, item.ID, "469eda6a-8f12-4b5b-b5f7-b505e3cea208", 1), strings.Replace(canonical, "/references/", "/%72eferences/", 1)} {
-		input := core.CreateMediaInput{Provider: "mock", Model: "dance", Options: core.MediaOptions{ReferenceMode: "references", Duration: 10, VideoURLs: []string{raw}, ReferenceMediaEvidence: map[string]core.InputMediaEvidence{raw: {Type: "video", Duration: .01}}}}
-		if err := s.prepareGenerationReferences(request, &input); err != nil {
-			t.Fatal(err)
-		}
-		if input.Options.VideoURLs[0] != raw || len(input.ReferenceEvidence) != 0 || len(input.Options.ReferenceMediaEvidence) != 0 {
-			t.Fatal("unverified URL inherited trusted evidence", input)
-		}
+	cases := []struct {
+		name, raw string
+		rejected  bool
+	}{
+		{"external", "https://vendor.example/video.mp4", false},
+		{"tampered signature", canonical + "invalid", true},
+		{"duplicate signature", canonical + "&signature=other", true},
+		{"substituted ID invalidates signature", strings.Replace(canonical, item.ID, "469eda6a-8f12-4b5b-b5f7-b505e3cea208", 1), true},
+		{"encoded Gateway path", strings.Replace(canonical, "/references/", "/%72eferences/", 1), true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			input := core.CreateMediaInput{Provider: "mock", Model: "dance", Options: core.MediaOptions{ReferenceMode: "references", Duration: 10, VideoURLs: []string{tc.raw}, ReferenceMediaEvidence: map[string]core.InputMediaEvidence{tc.raw: {Type: "video", Duration: .01}}}}
+			err := s.prepareGenerationReferences(request, &input)
+			if tc.rejected {
+				if !errors.Is(err, storage.ErrObjectNotFound) {
+					t.Fatalf("malformed Gateway capability was not rejected: %v", err)
+				}
+			} else if err != nil {
+				t.Fatal(err)
+			}
+			if input.Options.VideoURLs[0] != tc.raw || len(input.ReferenceEvidence) != 0 || len(input.Options.ReferenceMediaEvidence) != 0 || len(input.ReferenceSources) != 0 || len(input.Options.ReferenceSources) != 0 {
+				t.Fatal("unverified URL changed or inherited trusted evidence/source binding", input)
+			}
+		})
 	}
 }
 

@@ -107,6 +107,21 @@ func ttsReuploadServices(t *testing.T) (context.Context, *sql.DB, *queue.RedisQu
 	t.Cleanup(func() { q.Close() })
 	return ctx, db, q
 }
+
+// Keep the actual repository error visible when the HTTP boundary sanitizes it.
+type ttsReuploadObservedService struct {
+	*core.TaskService
+	t *testing.T
+}
+
+func (s ttsReuploadObservedService) GetTask(ctx context.Context, id string) (core.Task, error) {
+	task, err := s.TaskService.GetTask(ctx, id)
+	if err != nil {
+		s.t.Logf("synthetic task read failed: type=%T error=%v context=%v", err, err, ctx.Err())
+	}
+	return task, err
+}
+
 func ttsReuploadJSON(body any) *http.Response {
 	raw, _ := json.Marshal(body)
 	return &http.Response{StatusCode: 200, Header: http.Header{"Content-Type": {"application/json"}}, ContentLength: int64(len(raw)), Body: io.NopCloser(bytes.NewReader(raw))}
@@ -351,7 +366,7 @@ func TestKlingTTSPostgresArchiveDownloadReuploadSoundFile(t *testing.T) {
 	scope := func(c context.Context, _ string) (core.ProviderConnectionScope, error) {
 		return core.ProviderConnectionScope{ID: "kling", OwnerID: identity.ProviderOwnerID(c), Revision: "tts-reupload-private-revision"}, nil
 	}
-	h := api.NewGateway(api.Dependencies{Service: service, Health: ttsReuploadHealth{}, APIKey: "tts-reupload-gateway-fixture", Storage: store, SigningSecret: "tts-reupload-signing-fixture", MediaURLTTL: time.Hour, References: library, AssetPublicURL: "https://gateway.fixture", ResourceRepository: resources, ResourceScopes: scope})
+	h := api.NewGateway(api.Dependencies{Service: ttsReuploadObservedService{TaskService: service, t: t}, Health: ttsReuploadHealth{}, APIKey: "tts-reupload-gateway-fixture", Storage: store, SigningSecret: "tts-reupload-signing-fixture", MediaURLTTL: time.Hour, References: library, AssetPublicURL: "https://gateway.fixture", ResourceRepository: resources, ResourceScopes: scope})
 	host = h
 	speech := ttsReuploadRequest(h, "POST", "/v1/audio/speech", map[string]any{"model": "kling/" + kling.TextToSpeech, "input": "Synthetic fixture speech", "voice": "oversea_male1", "options": map[string]any{"language": "en"}}, true)
 	ttsReuploadPrivate(t, speech.Body.String())
@@ -362,7 +377,7 @@ func TestKlingTTSPostgresArchiveDownloadReuploadSoundFile(t *testing.T) {
 	}
 	status := ttsReuploadRequest(h, "GET", "/v1/generations/"+speechID, nil, true)
 	if status.Code != 200 {
-		t.Fatal("archived TTS status unavailable", status.Code)
+		t.Fatal("archived TTS status unavailable", status.Code, status.Body.String())
 	}
 	t.Run("private-output-identities", func(t *testing.T) { ttsReuploadPrivate(t, status.Body.String()) })
 	var public struct {

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/Sociaro-Research/open-media-gateway/internal/apikey"
+	"github.com/Sociaro-Research/open-media-gateway/internal/core"
 	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
 	"github.com/Sociaro-Research/open-media-gateway/internal/money"
 	"github.com/Sociaro-Research/open-media-gateway/internal/system"
@@ -79,7 +80,16 @@ func (s *Server) systemPolicy(next http.Handler) http.Handler {
 		// Completion consumes an already admitted upload; quota changes must not
 		// prevent finalization or a retry of a successful completion response.
 		startingUpload := path == "/v1/references" || path == "/v1/references/uploads"
-		if (generation || startingUpload) && r.Method == "POST" && !s.storageAdmission(w, r) {
+		deferQuota := false
+		if generation && r.Method == "POST" && r.Header.Get("Idempotency-Key") != "" && !strings.HasSuffix(path, "/estimate") {
+			_, deferQuota = s.service.(interface {
+				RecoverAcceptedIntent(context.Context, string, string) (core.Task, bool, error)
+			})
+		}
+		if deferQuota {
+			r = r.WithContext(context.WithValue(r.Context(), generationStorageAdmissionKey{}, true))
+		}
+		if (generation || startingUpload) && r.Method == "POST" && !deferQuota && !s.storageAdmission(w, r) {
 			return
 		}
 		if (generation || upload) && identity.ActorID(r.Context()) != identity.SystemOwnerID {

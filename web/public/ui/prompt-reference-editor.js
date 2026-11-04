@@ -28,10 +28,12 @@
  }
  function markers(){return ReferencePrompts.inspect(input.value,model(),options());}
  function check(){
-  const length=FormUI.updatePrompt(input,model()),reference=enabled()?(config.message?.()??ReferencePrompts.error(input.value,model(),options())):'',message=length.error||reference;
-  input.setCustomValidity(config.validate===false?length.error:message);if(warning.textContent!==message)warning.textContent=message;warning.hidden=!message;return !message;
+  const length=FormUI.updatePrompt(input,model()),reference=enabled()?(config.message?.()??ReferencePrompts.warning(input.value,model(),options())):'',message=length.error||reference;
+  const blocking=length.error;
+  input.setCustomValidity(blocking);if(warning.textContent!==message)warning.textContent=message;warning.hidden=!message;return !blocking;
  }
- function requestError(request,model){return FormUI.promptState(request.prompt,model).error||ReferencePrompts.error(request.prompt,model,request.options||{});}
+ function requestError(request,model){return FormUI.promptState(request.prompt,model).error;}
+ function requestWarning(request,model){return ReferencePrompts.warning(request.prompt,model,request.options||{});}
  function validate(){const valid=check();if(!valid){input.focus();input.reportValidity();}return valid;}
  function requestRefresh(){if(life.signal.aborted)return;check();if(!scheduled){scheduled=true;requestAnimationFrame(refresh);}}
  function reference(kind,index){
@@ -67,7 +69,7 @@
  const hint=document.createElement('span');hint.className='sr-only';hint.id=id+'Help';hint.textContent='For supported reference models, hover or tap a reference for a preview. With the caret in a reference, press Alt plus Down Arrow. Escape closes the preview.';input.after(hint);input.setAttribute('aria-describedby',[input.getAttribute('aria-describedby'),hint.id,providerHint.id,warning.id].filter(Boolean).join(' '));
  function destroy(){hide();life.abort();observer.disconnect();mutations.disconnect();structure.disconnect();mirror.remove();warning.remove();providerHint.remove();hint.remove();input.classList.remove('prompt-reference-input','reference-hover');if(config.validate!==false)input.setCustomValidity('');}
  config.signal?.addEventListener('abort',destroy,{once:true});
- const api={refresh:requestRefresh,close:hide,validate,requestError,destroy};requestRefresh();return api;
+ const api={refresh:requestRefresh,close:hide,validate,requestError,requestWarning,destroy};requestRefresh();return api;
  }
  window.PromptReferenceEditor={attach};
 })();

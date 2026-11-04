@@ -67,6 +67,7 @@ func generationWorkflowFixture(t *testing.T) (*activeHTTPFixture, *references.Li
 	if e != nil {
 		t.Fatal(e)
 	}
+	f.central = fixtureReadyCentral(f.central)
 	ctx = identity.WithOrganizationRole(identity.WithUser(ctx, identity.User{ID: v.Tokens.Actor}), v.Tokens.Company, "supermanager")
 	ctx = identity.WithResourceOwners(ctx, identity.SharedOwnerID, identity.SharedOwnerID)
 	return f, library, ctx

@@ -41,6 +41,7 @@ func CloneResourceCreation(in *ResourceCreateRequest) *ResourceCreateRequest {
 		}
 		return out
 	}
+	out.ReferenceSources = slices.Clone(in.ReferenceSources)
 	out.FileSources = clone(in.FileSources)
 	out.Images = clone(in.Images)
 	out.Videos = clone(in.Videos)

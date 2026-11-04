@@ -124,6 +124,9 @@ func (s *Server) prepareFaceInput(w http.ResponseWriter, r *http.Request) {
 	info := inspected.Info
 	evidence := core.InputMediaEvidence{ReferenceID: ref.ID, Type: "video", ContentType: info.ContentType, SizeBytes: info.Size, Width: info.Width, Height: info.Height, Duration: info.Duration, SHA256: inspected.SHA256, FrameCount: info.FrameCount, FPS: info.FPS, AudioStreams: info.AudioStreams, VideoStreams: info.VideoStreams, AudioCodecs: core.CloneAudioCodecs(info.AudioCodecs)}
 	input := core.CreateMediaInput{Provider: body.Provider, Model: preparation.ID, MediaType: preparation.MediaType, MaxExpectedUSD: body.MaxExpectedUSD, Options: core.MediaOptions{VideoURLs: []string{url}}, ReferenceEvidence: map[string]core.InputMediaEvidence{url: evidence}}
+	if inspected.Source != nil {
+		input.ReferenceSources = append(input.ReferenceSources, *inspected.Source)
+	}
 	r = r.WithContext(core.WithMediaPreparationWorkflow(r.Context(), body.Provider, consumer.ID, preparation.ID, "", consumer.PublicID))
 	if r.URL.Path == "/v1/media-inputs/faces/estimate" {
 		s.estimateMediaPreparation(w, r, input)

@@ -99,7 +99,7 @@
         const revoked=!!key.revoked_at, expired=key.expires_at && Date.parse(key.expires_at)<=Date.now();
         const identity=node('div');identity.append(node('strong',key.name),node('code',key.prefix+'…'),node('small',key.id));if(key.purpose==='playground_templates')identity.append(node('small','Created by Playground · Templates'));
         const activity=node('div');activity.append(node('small','Created '+new Date(key.created_at).toLocaleDateString()),node('small',key.last_used_at ? 'Used '+new Date(key.last_used_at).toLocaleString() : 'Not used yet'),node('small',key.expires_at ? 'Expires '+new Date(key.expires_at).toLocaleDateString() : 'No expiration'));
-        const revoke=node('button',revoked?'Revoked':'Revoke','secondary');revoke.type='button';revoke.disabled=revoked;
+        const revoke=node('button',revoked?'Revoked':'Revoke','secondary danger');revoke.type='button';revoke.disabled=revoked;
         revoke.addEventListener('click',()=>confirmRevoke(key,revoke));
         const spend=node('div'),item=loadedMonth===month.value?usage.find(item=>item.api_key_id===key.id):null;
         spend.append(node('strong',item ? dollars(item.consumed_usd) : '—'));
@@ -114,7 +114,7 @@
       const dialog=node('dialog',undefined,'keys-revoke-dialog');dialog.setAttribute('aria-labelledby','revokeKeyTitle');
       const title=node('h2','Revoke this API key?');title.id='revokeKeyTitle';
       const message=node('p',`Applications using “${key.name}” will lose access. Accepted tasks will keep running. This cannot be undone.`);
-      const actions=node('div',undefined,'docs-actions'),cancel=node('button','Cancel','secondary'),confirm=node('button','Revoke key','secondary docs-danger');cancel.type=confirm.type='button';
+      const actions=node('div',undefined,'docs-actions'),cancel=node('button','Cancel','secondary'),confirm=node('button','Revoke key','secondary danger');cancel.type=confirm.type='button';
       actions.append(cancel,confirm);dialog.append(title,message,actions);document.body.append(dialog);
       cancel.addEventListener('click',()=>dialog.close());dialog.addEventListener('close',()=>dialog.remove());
       confirm.addEventListener('click',async()=>{

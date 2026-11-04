@@ -391,6 +391,9 @@ func TestProviderResourcesVoiceAdmissionCanonicalEvidenceAndReplay(t *testing.T)
 			if intent == nil || intent.Kind != "voice" || intent.Subtype != "custom" || intent.Name != "My voice" || len(intent.ReferenceIDs) != 1 || intent.ReferenceIDs[0] != ref.ID {
 				t.Fatalf("immutable public intent lost: %#v", intent)
 			}
+			if len(task.Options.ReferenceSources) != 1 || task.Options.ReferenceSources[0].ReferenceID != ref.ID || task.Options.ReferenceSources[0].StorageKey == "" {
+				t.Fatal("resource preparation lost admission/retention binding")
+			}
 			creation := task.Options.ResourceCreation
 			if creation == nil || len(creation.VoiceSources) != 1 {
 				t.Fatal("missing host-resolved source", creation)

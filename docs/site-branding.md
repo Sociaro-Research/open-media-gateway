@@ -79,6 +79,18 @@ remain installation-wide. Additional optional roles are `accent-text`, `chart-1`
 `switch-thumb`, `switch-thumb-on` and `switch-on-border`; legacy fallback values
 preserve the previous appearance exactly.
 
+Danger actions and Text on danger actions are independent palette settings for
+permanent deletion and access/key revocation. Dark defaults are #f08088/#171717;
+light defaults are #b42336/#ffffff. They do not inherit a customized primary accent
+or Error color. The isolated preview includes a danger action beside the primary
+action. Check both modes and their interaction states before saving.
+
+Legacy palettes without these roles receive the red defaults when read, without
+a database write. Updates from older clients preserve omitted danger roles by the
+existing preset ID; explicit valid values change them, and explicit invalid values
+are rejected. New presets receive the defaults when the roles are absent. Renaming,
+reordering, changing the default and deleting presets retain their existing behavior.
+
 New installations have no site name, contact address, description or brand images.
 These fields can stay empty. Browser titles use the functional label “Media gateway”
 until a name is configured; legal text refers to “This service”. The shared base

@@ -110,6 +110,16 @@ never produce spendable credits, regardless of mode.
    credit is appended to `organization_credits`, in the same transaction as the
    payment update. Existing generation accounting uses this ledger immediately.
 
+Returning from checkout, opening an invoice link, reloading and going Back only
+read authenticated payment status. Query flags are not payment evidence. Payment
+methods, list, detail and QR reads do not run expiry maintenance, reconcile or
+settle payments. Expired pending/confirming payments are projected as expired
+without changing stored state; cancelled, failed and settled states are retained.
+The existing **Pay invoice** / **Continue payment** buttons explicitly resume a
+checkout, including an invoice outside the first history page. Downloading a
+local invoice remains an explicit document-issuance action. The background loop
+and signed callbacks continue financial maintenance independently of navigation.
+
 A redirect is never proof of payment. Repeated and out-of-order webhooks are safe:
 callbacks fetch current remote state under a database payment lock, and posting
 uses a unique payment/revision pair. Failed validation or database work rolls back
@@ -578,3 +588,9 @@ metadata before permitting another attempt. Ambiguous/incomplete provider data
 fails closed. Stale events from a superseded session cannot overwrite the new
 one or add credit. After the 30-day deadline, resuming returns HTTP 410
 `payment_expired`; expiration is never extended by opening or retrying a link.
+
+The isolated `node scripts/ui/payment-return.cjs` regression uses the production
+payment components with synthetic loopback responses in Chromium and WebKit.
+It covers return/reload/Back, read polling, terminal states, explicit invoice
+payment outside the current list, late context changes and narrow layouts. It
+does not exercise a live PSP or establish complete delegated-company transport.

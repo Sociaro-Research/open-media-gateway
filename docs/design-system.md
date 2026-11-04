@@ -66,6 +66,16 @@ Before accepting any UI change:
 
 **Themes:** Profile offers Dark, Light and System (default). System follows live OS changes. The independent **Color theme** field chooses an administrator-published preset or **Site default**. Each preset contains both palettes; switching the display mode retains the preset. Both preferences are saved per user. The separate Color themes section creates, names, edits and deletes presets. Its Color theme dropdown initially selects the default, marks it with (default), and ends with + Create new theme. The selected preset has its name, shared Default switch and Delete in one desktop row, with the name occupying half the row and equal flexible gaps of at least 32px, distributed across the full content width, wrapping on narrow screens. The isolated preview contains its heading on the left and shared Dark/Light switch aligned to the right edge in one row. Keep these controls self-explanatory without introductory help text. One versioned Save in that section heading publishes the entire catalog independently of identity, images and layout; both sections preserve the other section's pending edits. Delete is reversible until Save, and the last preset remains the default. Fresh installations ship only **Original**, selected as the default. Legacy colors become **Original** without changing their values. Saved catalogs and user selections are preserved; administrators can create additional presets. Identity, images and layout are shared across presets. Apply the selected palette to every surface, control, table and popup. Light tokens live in `:root[data-theme="light"]`; never add screen-specific theme overrides. Media previews preserve their original colors. Provider logos use their original pixels in dark mode and black RGB with unchanged alpha in light mode.
 
+Destructive actions use the independent `--danger` and `--on-danger` roles,
+editable in both palettes. They default to red with contrasting text, independently
+of customized primary accents or Error feedback. Use the shared `.danger` modifier
+for permanent Delete and access/key revocation controls, including confirmation
+and menu actions. Ordinary input/selection removal and reversible draft edits keep
+their normal action roles. Preserve explicit labels and confirmation text; color
+is never the only warning. Hover, keyboard focus and pending/disabled states retain
+the destructive role and the existing single perimeter. Forced colors retain the
+shared system-color controls and focus indicators.
+
 Use `--accent` for filled actions and on switches, `--accent-text` for accent
 foreground text; focus/selection edges use `--accent`, and `--chart-1` for the first chart
 series. The latter two inherit `--accent` in legacy palettes. Switch off/on
@@ -528,12 +538,14 @@ redirect to the reported address or use wildcard cross-window messaging.
 previews and permanent-delete confirmation, using the Playground design in
 `references.css`. Playground and Templates configure this component rather than
 copying its markup. Picker headings remain uncapped and on one line. Restrictions
-start on the same row, wrap right aligned in half the available header width and
-show compact limits without an approximate symbol; exact-byte admission remains
+start on the same row and wrap right aligned in half the available header width.
+Only when the unwrapped heading plus the 12px gap cannot fit beside that half,
+shrink the restriction column to the remaining width instead of overlapping.
+Show compact limits without an approximate symbol; exact-byte admission remains
 unchanged. Drop targets and adjacent actions share the 44px height. Library fields
 and sections use the shared 16px gap without a redundant selection explanation.
 Cards retain equal 12px corner rounding and the shared 2px selected perimeter.
-Remove/Delete use compact neutral translucent labels inside 44px gesture targets,
+Selection Remove uses a compact neutral translucent label; permanent Delete uses danger colors. Both retain compact labels inside 44px gesture targets,
 without a white outline. Permanent deletion requires two activations of the same
 button: Delete, then Confirm Delete. Leaving its focus, Escape or closing the library
 resets confirmation. Permission, in-use and uncertain-completion protections remain
@@ -796,7 +808,7 @@ native proportional widths at a common 150px height, reduced uniformly when the
 widest item needs it, with wrapped rows and no horizontal media scrolling.
 Captions use 12px text with left/bottom spacing. Selected library cards have an
 integral full-width bottom strip whose color and opacity match the configured
-accent border. Remove/Delete/Play overlays are neutral translucent controls.
+accent border. Selection Remove and Play overlays are neutral translucent controls; permanent Delete uses the configured danger action colors.
 Image actions appear on hover or keyboard focus; touch requires a completed
 reveal gesture before a later action gesture, including a first tap on the action.
 
@@ -815,7 +827,8 @@ remain available while using the library. Routine success messages are announced
 accessibly; errors and warnings remain visible.
 
 The title and constraints start on the same header row. Keep the title uncapped
-and nowrap; constraints occupy half the available width, wrap and align right.
+and nowrap; constraints prefer half the available width, wrap and align right.
+On narrow headers they shrink only as needed to keep the 12px heading gap.
 Do not truncate or shrink the title. Asset/card content still fits its available
 width. File limits omit the approximate symbol; monetary estimates may retain it.
 

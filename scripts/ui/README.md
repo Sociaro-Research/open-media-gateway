@@ -984,3 +984,15 @@ cover both themes at 1440/390/320px without admitting a generation.
 tasks-before-catalogue Copy/Try again, click-time reads, failed/missing catalogues,
 renamed display names and draft/key races. Repeat in WebKit. The normal suite
 retains full saved-request/confirmation/idempotency coverage with loopback data.
+
+### Legacy connection recovery
+
+`node scripts/ui/legacy-connection-recovery.cjs` exercises the existing connection
+dialog against two synthetic loopback origins. Set `UI_BROWSER_ENGINE=webkit`
+for WebKit and `UI_SCREENSHOT_DIR` for local evidence. It covers explicit recovery
+consent, frozen-operation retries, preserved original cancellation custody,
+expired/offline attempts, restart/reload, later connection races, archive pagination
+and mutation interlocks. It never creates real grants or invokes storage cleanup.
+The real handler, authorization and transactional restart contracts are covered
+separately by `TestLegacyRecovery*` in the API and PostgreSQL suites. A recovered
+legacy attempt does not activate full-company mode or confirm remote revocation.

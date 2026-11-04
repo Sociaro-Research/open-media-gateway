@@ -65,9 +65,13 @@ func facadeHTTP(t *testing.T) (*activeHTTPFixture, *facadeWire) {
 	wire := &facadeWire{}
 	wire.complete.Store(true)
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == ci.ProtocolBase+"/capabilities" && wire.complete.Load() {
+		if r.URL.Path == ci.ProtocolBase+"/capabilities" {
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(ci.Protocol{Purpose: ci.Purpose, Version: ci.Version, Capabilities: ci.RequiredCapabilities()})
+			protocol := ci.ImplementedProtocol()
+			if wire.complete.Load() {
+				protocol = ci.Protocol{Purpose: ci.Purpose, Version: ci.Version, Capabilities: ci.RequiredCapabilities()}
+			}
+			json.NewEncoder(w).Encode(protocol)
 			return
 		}
 		f.central.ServeHTTP(w, r)

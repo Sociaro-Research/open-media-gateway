@@ -19,7 +19,7 @@
     if(c.status!=='accepted'){
      const resend=action(c.status==='send_failed'?'Retry email':'Resend invitation',()=>change(c,'resend'));
      resend.disabled=busy||c.status==='sending';buttons.append(resend);
-     if(c.status!=='revoked'){const revoke=action('Revoke',()=>confirmRevoke(c));revoke.disabled=busy;buttons.append(revoke);}
+     if(c.status!=='revoked'){const revoke=action('Revoke',()=>confirmRevoke(c));revoke.classList.add('danger');revoke.disabled=busy;buttons.append(revoke);}
     }
     row.append(buttons);body.append(row);
    }
@@ -40,7 +40,7 @@
   }
   function confirmRevoke(c){
    const dialog=node('dialog',null,'keys-revoke-dialog organization-dialog'),cancel=action('Cancel',()=>dialog.close()),confirm=action('Revoke',async()=>{dialog.close();await change(c,'revoke');}),actions=node('div',null,'form-actions');
-   actions.append(cancel,confirm);dialog.append(node('h2','Revoke invitation?'),(()=>{const message=node('p');message.append('The link sent to ',UserUI.identity({email:c.email,name:c.contact_name},{label:c.email}),' will stop working. The company will remain.');return message;})(),actions);document.body.append(dialog);dialog.onclose=()=>dialog.remove();dialog.showModal();cancel.focus();
+   confirm.classList.add('danger');actions.append(cancel,confirm);dialog.append(node('h2','Revoke invitation?'),(()=>{const message=node('p');message.append('The link sent to ',UserUI.identity({email:c.email,name:c.contact_name},{label:c.email}),' will stop working. The company will remain.');return message;})(),actions);document.body.append(dialog);dialog.onclose=()=>dialog.remove();dialog.showModal();cancel.focus();
   }
   function createDialog(){
    const dialog=node('dialog',null,'keys-revoke-dialog organization-dialog'),form=node('form',null,'connection-editor'),message=node('p'),submit=node('button','Create and invite','primary compact'),cancel=action('Cancel',()=>dialog.close()),actions=node('div',null,'form-actions');message.setAttribute('role','status');submit.type='submit';

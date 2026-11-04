@@ -47,7 +47,7 @@ func customerHandler(t *testing.T, f *activeHTTPFixture, authority ci.CustomerAu
 	if e != nil {
 		t.Fatal(e)
 	}
-	return h
+	return fixtureReadyCentral(h)
 }
 func customerRequest(t *testing.T, h http.Handler, v ci.ActiveContext, browser bool, method, path, body, key string, mutate func(*http.Request)) *httptest.ResponseRecorder {
 	t.Helper()

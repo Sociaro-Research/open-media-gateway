@@ -6,7 +6,7 @@
  // Callers own authorization and durable deletion; this controller only arms a
  // compact confirmation and preserves the completed-gesture/focus boundary.
  function deleteConfirmation(card,{allowed,name,from,onConfirm}){
-  const control=card.removeButton;
+  const control=card.removeButton;control.classList.add('danger');
   function reset(){if(card.dataset.confirmDelete!=='true')return;delete card.dataset.confirmDelete;control.querySelector('.media-picker-action-label').textContent='Delete';control.setAttribute('aria-label','Delete '+name()+' from '+from);}
   control.addEventListener('blur',reset);
   // WebKit can blur the focused target on another press of that same button.

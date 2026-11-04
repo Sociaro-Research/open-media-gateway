@@ -2,6 +2,7 @@ package providers
 
 import (
 	"context"
+	"github.com/Sociaro-Research/open-media-gateway/internal/catalogsync"
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
 	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
 )
@@ -55,17 +56,33 @@ func (m *Manager) ResolveResourceConnection(ctx context.Context, id string) (cor
 // ResolveAdmissionConnection saves the same canonical credential revision used
 // by priced jobs, even when accounting is disabled or an estimate is unknown.
 func (m *Manager) ResolveAdmissionConnection(ctx context.Context, id string) (core.ProviderConnectionScope, error) {
-	adapter, err := m.resolve(ctx, id, true)
+	record, err := m.loadRecord(ctx, id)
 	if err != nil {
 		return core.ProviderConnectionScope{}, err
 	}
-	connection, ok := adapter.(*connectionAdapter)
-	if !ok {
+	if !record.Enabled || record.Archived {
 		return core.ProviderConnectionScope{}, core.ErrProviderUnavailable
 	}
-	revision, err := m.pin(ctx, id, connection.credentials)
+	credentials, err := m.decryptCredentials(record.CredentialsCiphertext)
 	if err != nil {
 		return core.ProviderConnectionScope{}, err
 	}
-	return core.ProviderConnectionScope{ID: id, OwnerID: identity.ProviderOwnerID(ctx), Revision: revision}, nil
+	credentials = m.withDefaults(id, credentials)
+	spec, ok := m.findSpec(id)
+	if !ok || !spec.Configured(credentials) {
+		return core.ProviderConnectionScope{}, core.ErrProviderUnavailable
+	}
+	revision, err := m.pin(ctx, id, credentials)
+	if err != nil {
+		return core.ProviderConnectionScope{}, err
+	}
+	catalogFingerprint := ""
+	if m.catalog != nil && identity.ProviderOwnerID(ctx) == identity.SharedOwnerID {
+		state, e := m.catalog.State(ctx, id)
+		if e != nil {
+			return core.ProviderConnectionScope{}, e
+		}
+		catalogFingerprint = catalogsync.AdmissionFingerprint(state)
+	}
+	return core.ProviderConnectionScope{ID: id, OwnerID: identity.ProviderOwnerID(ctx), Revision: revision, SettingsVersion: record.Version, CatalogFingerprint: catalogFingerprint}, nil
 }

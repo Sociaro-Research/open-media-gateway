@@ -59,7 +59,7 @@ func (r *SystemRepository) SaveBranding(ctx context.Context, actor string, next 
 			}
 		}
 	}
-	next = next.Normalize()
+	next = branding.PreserveDangerColors(next, before).Normalize()
 	if err = next.Validate(); err != nil {
 		return next, err
 	}

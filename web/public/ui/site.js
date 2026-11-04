@@ -37,8 +37,9 @@
   let presetPreference='';
   if(!systemOnly){try{presetPreference=localStorage.getItem('gateway-color-preset')||'';}catch{}}
   const colorRoles={'accent-text':'accent','chart-1':'accent','switch-thumb':'on-accent','switch-thumb-on':'on-accent','switch-on-border':'accent'};
-  function paletteColors(palette){const result={...palette};for(const [role,source]of Object.entries(colorRoles))if(!result[role])result[role]=result[source];return result;}
-  function normalize(settings){const value={...settings};value.presets=settings.presets?.length?settings.presets.map(p=>({...p,dark:paletteColors(p.dark),light:paletteColors(p.light)})):[{id:'original',name:'Original',dark:paletteColors(settings.dark),light:paletteColors(settings.light)}];value.default_preset=settings.default_preset||value.presets[0].id;return value;}
+  const dangerDefaults={dark:{danger:'#f08088','on-danger':'#171717'},light:{danger:'#b42336','on-danger':'#ffffff'}};
+  function paletteColors(palette,mode='dark'){const result={...palette};for(const [role,source]of Object.entries(colorRoles))if(!result[role])result[role]=result[source];for(const [role,value]of Object.entries(dangerDefaults[mode==='light'?'light':'dark']))if(!Object.prototype.hasOwnProperty.call(result,role))result[role]=value;return result;}
+  function normalize(settings){const value={...settings};value.presets=settings.presets?.length?settings.presets.map(p=>({...p,dark:paletteColors(p.dark,'dark'),light:paletteColors(p.light,'light')})):[{id:'original',name:'Original',dark:paletteColors(settings.dark,'dark'),light:paletteColors(settings.light,'light')}];value.default_preset=settings.default_preset||value.presets[0].id;return value;}
   function selectPreset(id){presetPreference=systemOnly?'':id||'';if(!systemOnly){try{localStorage.setItem('gateway-color-preset',presetPreference);}catch{}}if(appearance)apply(appearance);}
   const pageTitle=document.querySelector('title')?.dataset.pageTitle||'';
   // Resolve only uploaded assets. Empty installations never request a bundled logo.

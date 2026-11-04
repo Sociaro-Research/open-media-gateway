@@ -49,6 +49,7 @@ func ValidateVoiceFiles(model core.MediaModel, options core.MediaOptions, files 
 }
 
 type File struct {
+	Source         *core.ReferenceBinding `json:"-"`
 	ReferenceIndex int
 	SHA256         string
 	Type           string

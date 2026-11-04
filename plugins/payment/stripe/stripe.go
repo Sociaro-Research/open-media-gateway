@@ -144,6 +144,23 @@ func checkoutURL(s string) bool {
 	return e == nil && u.Scheme == "https" && u.Host == "checkout.stripe.com" && u.User == nil
 }
 func (c *Client) Checkout(ctx context.Context, pr payments.Provider, credentials payments.Credentials, p payments.Payment, publicURL string) (payments.Snapshot, error) {
+	// Preserve the existing standalone checkout destination exactly.
+	success := publicURL + "/organizations?payment=" + p.ID + "&organization=" + p.OrganizationID
+	return c.checkout(ctx, pr, credentials, p, success, success+"&cancelled=1")
+}
+
+// CheckoutWithReturn receives an explicit trusted target, never a publicURL
+// prefix to which the adapter appends another path. Return-intent authorization
+// and durable replay live in the central caller, not this provider adapter.
+func (c *Client) CheckoutWithReturn(ctx context.Context, pr payments.Provider, credentials payments.Credentials, p payments.Payment, target payments.CheckoutReturn) (payments.Snapshot, error) {
+	success, cancel, err := target.URLs()
+	if err != nil {
+		return payments.Snapshot{}, err
+	}
+	return c.checkout(ctx, pr, credentials, p, success, cancel)
+}
+
+func (c *Client) checkout(ctx context.Context, pr payments.Provider, credentials payments.Credentials, p payments.Payment, successURL, cancelURL string) (payments.Snapshot, error) {
 	expires := p.CheckoutStart().Add(24 * time.Hour)
 	if p.ExpiresAt != nil && p.ExpiresAt.Before(expires) {
 		expires = *p.ExpiresAt
@@ -154,7 +171,7 @@ func (c *Client) Checkout(ctx context.Context, pr payments.Provider, credentials
 	if expires.Before(c.now().Add(31 * time.Minute)) {
 		return payments.Snapshot{}, payments.ErrCheckoutWindow
 	}
-	v := url.Values{"adaptive_pricing[enabled]": {"false"}, "mode": {"payment"}, "payment_method_types[0]": {"card"}, "client_reference_id": {p.ID}, "line_items[0][price_data][currency]": {"usd"}, "line_items[0][price_data][unit_amount]": {strconv.FormatInt(p.AmountCents, 10)}, "line_items[0][price_data][product_data][name]": {"Sociaro organization balance"}, "line_items[0][quantity]": {"1"}, "success_url": {publicURL + "/organizations?payment=" + p.ID + "&organization=" + p.OrganizationID}, "cancel_url": {publicURL + "/organizations?payment=" + p.ID + "&organization=" + p.OrganizationID + "&cancelled=1"}, "expires_at": {strconv.FormatInt(expires.Unix(), 10)}}
+	v := url.Values{"adaptive_pricing[enabled]": {"false"}, "mode": {"payment"}, "payment_method_types[0]": {"card"}, "client_reference_id": {p.ID}, "line_items[0][price_data][currency]": {"usd"}, "line_items[0][price_data][unit_amount]": {strconv.FormatInt(p.AmountCents, 10)}, "line_items[0][price_data][product_data][name]": {"Sociaro organization balance"}, "line_items[0][quantity]": {"1"}, "success_url": {successURL}, "cancel_url": {cancelURL}, "expires_at": {strconv.FormatInt(expires.Unix(), 10)}}
 	var billing *payments.Billing
 	if p.InvoiceMode == "local" {
 		if p.Billing == nil || p.VAT == nil {

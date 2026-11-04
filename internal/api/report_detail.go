@@ -102,6 +102,7 @@ func (s *Server) reportDetail(w http.ResponseWriter, r *http.Request) {
 			options := task.Options
 			options.OverrideSound = nil
 			options.ReferenceMediaEvidence = nil
+			options.ReferenceSources = nil
 			options.ResourceSnapshots = nil
 			options.ResourceCreation = nil
 			data["request"] = map[string]any{"prompt": task.Prompt, "options": options, "webhook_url": task.WebhookURL}

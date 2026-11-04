@@ -215,6 +215,10 @@ func (r *CatalogRepository) Commit(ctx context.Context, schedule catalogsync.Sch
 		return err
 	}
 	defer tx.Rollback()
+	// Also serializes creation of the first catalogue row against admission.
+	if _, err = tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1,0))`, "catalog-admission:"+schedule.Provider); err != nil {
+		return err
+	}
 	// Compare the configuration again, so edits while fetching cannot publish
 	// an obsolete set of sources or overwrite the newly selected schedule.
 	var zone string

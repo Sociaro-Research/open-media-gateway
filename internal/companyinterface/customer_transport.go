@@ -185,6 +185,13 @@ func (c *Client) customer(ctx context.Context, prepared CustomerContext, method,
 	if e != nil {
 		return empty, e
 	}
+	raw, e = paymentJSONResponse(contract, response.StatusCode, method, path, binding.Company, raw)
+	if e != nil {
+		return empty, e
+	}
+	if e = paymentBinaryResponse(contract, response.StatusCode, method, response.Header, raw); e != nil {
+		return empty, e
+	}
 	out := CustomerResponse{Status: response.StatusCode, Header: http.Header{}, Body: raw}
 	if location != "" {
 		out.Header.Set("Location", location)

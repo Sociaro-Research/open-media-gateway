@@ -34,7 +34,7 @@ body:has(.reference-library[open]) { overflow: hidden; }
 .selected-references .reference-card.dragging { opacity: .45; cursor: grabbing; }
 .reference-card .reference-remove, .reference-card .reference-delete { position: absolute; top: 6px; right: 6px; z-index: 1; min-width: 26px; height: 26px; padding: 0 7px; border-radius: 5px; border: 1px solid var(--line); background: var(--panel); color: var(--text); font-size: 11px; }
 .reference-card .reference-remove { width: 26px; padding: 0; font-size: 20px; line-height: 1; }
-.reference-card .reference-remove:hover, .reference-card .reference-delete:hover { color: var(--red); border-color: var(--red); }
+.reference-card .reference-remove:hover { color: var(--text); border-color: var(--muted); }
 .reference-library-grid .reference-card { padding: 0; }
 .reference-choice { display: block; width: 100%; padding: 8px; border: 0; border-radius: inherit; background: transparent; color: var(--text); text-align: left; cursor: pointer; }
 .reference-choice:hover { background: var(--panel-2); }
@@ -129,8 +129,9 @@ textarea.reference-hover { cursor:pointer; }
 /* Native video controls remain above the independent library selection layer. */
 .media-picker-card .media-picker-media > video { position:relative; z-index:2; }
 
-/* The heading stays uncapped; restrictions wrap in their half of the row. */
-.media-picker-heading { display:grid; grid-template-columns:minmax(0,1fr) 50%; align-items:start; }
+/* Prefer half-width restrictions; shrink only to preserve the heading gap. */
+.media-picker-heading { display:flex; align-items:flex-start; }
+.media-picker-heading > .media-picker-requirements { flex:0 1 50%; margin:0; }
 .media-picker-heading > :first-child { width:max-content; }
 .media-picker-heading > :first-child,.media-picker-requirements { line-height:24px; }
 .reference-library[open] { display:flex; flex-direction:column; gap:16px; }
@@ -161,3 +162,28 @@ textarea.reference-hover { cursor:pointer; }
 .media-picker { display:flex; flex-direction:column; }
 .media-picker > .reference-status { flex:none; }
 .media-picker-card { touch-action:manipulation; }
+
+/* A library delete is destructive; removing a selected reference is not. */
+@media (forced-colors: none) {
+ .reference-card .reference-delete.danger { color:var(--danger); --interaction-border-color:var(--danger); }
+ .reference-card .reference-delete.danger:hover:not(:disabled),.reference-card .reference-delete.danger:focus-visible { color:var(--danger); background:color-mix(in srgb,var(--danger) 9%,var(--panel)); --interaction-border-color:var(--danger); }
+}
+@media (forced-colors: active) {
+ .reference-card .reference-delete.danger { color:CanvasText; background:Canvas; --interaction-border-color:CanvasText; }
+ .reference-card .reference-delete.danger:focus-visible { --interaction-border-color:Highlight; }
+ .reference-card .reference-delete.danger:disabled { color:GrayText; }
+}
+
+/* Keep the accepted overlay hit target and compact label geometry. */
+@media (forced-colors: none) {
+ .media-picker-card .reference-delete.danger,.media-picker-card .reference-delete.danger:hover:not(:disabled),.media-picker-card .reference-delete.danger:focus-visible { background:transparent; }
+ .media-picker-card .reference-delete.danger .media-picker-action-label { background:var(--danger); color:var(--on-danger); }
+ .media-picker-card .reference-delete.danger:hover:not(:disabled) .media-picker-action-label { background:color-mix(in srgb,var(--danger) 90%,var(--on-danger)); color:var(--on-danger); }
+ .media-picker-card .reference-delete.danger:active:not(:disabled) .media-picker-action-label { background:color-mix(in srgb,var(--danger) 82%,var(--on-danger)); color:var(--on-danger); }
+ .media-picker-card .reference-delete.danger:focus-visible .media-picker-action-label,.media-picker-card .reference-delete.danger:focus-visible:hover .media-picker-action-label,.media-picker-card .reference-delete.danger:focus-visible:active .media-picker-action-label { background:var(--field); color:var(--danger); outline-color:var(--danger); }
+}
+@media (forced-colors: active) {
+ .media-picker-card .reference-delete.danger .media-picker-action-label { background:Canvas; color:CanvasText; }
+ .media-picker-card .reference-delete.danger:focus-visible .media-picker-action-label { outline-color:Highlight; }
+ .media-picker-card .reference-delete.danger:disabled .media-picker-action-label { color:GrayText; }
+}

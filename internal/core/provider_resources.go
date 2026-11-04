@@ -43,19 +43,20 @@ type GeneratedResourceSource struct {
 	Duration    *float64
 }
 type ResourceCreateRequest struct {
-	ExternalTaskID string
-	Kind           string
-	Subtype        string
-	Name           string
-	Description    string
-	FileSources    []ResourceSourceInput
-	Images         []ResourceSourceInput
-	Videos         []ResourceSourceInput
-	VoiceSources   []ResourceSourceInput
-	GeneratedVideo *GeneratedResourceSource
-	GeneratedMedia *GeneratedResourceSource
-	BoundVoice     *ResourceSnapshot
-	Tags           []string
+	ReferenceSources []ReferenceBinding `json:"-"`
+	ExternalTaskID   string
+	Kind             string
+	Subtype          string
+	Name             string
+	Description      string
+	FileSources      []ResourceSourceInput
+	Images           []ResourceSourceInput
+	Videos           []ResourceSourceInput
+	VoiceSources     []ResourceSourceInput
+	GeneratedVideo   *GeneratedResourceSource
+	GeneratedMedia   *GeneratedResourceSource
+	BoundVoice       *ResourceSnapshot
+	Tags             []string
 }
 
 // ProviderResource IDs and preview sources are private adapter evidence. Public
