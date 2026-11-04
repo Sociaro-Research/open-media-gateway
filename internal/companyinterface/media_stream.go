@@ -123,8 +123,15 @@ type MediaWriter struct {
 }
 
 func NewMediaWriter(ctx context.Context, w http.ResponseWriter, method string, internal bool, fence func(context.Context) error, cancel context.CancelFunc) *MediaWriter {
+	return NewMediaWriterWithPreparation(ctx, w, method, internal, fence, cancel, MediaIdleTimeout)
+}
+
+// Preparation is selected by the exact server-owned route. Report spooling may
+// use its existing longer calculation budget; actual byte progress resets the
+// ordinary idle timer, and the parent request still bounds the whole operation.
+func NewMediaWriterWithPreparation(ctx context.Context, w http.ResponseWriter, method string, internal bool, fence func(context.Context) error, cancel context.CancelFunc, preparation time.Duration) *MediaWriter {
 	m := &MediaWriter{target: w, ctx: ctx, method: method, internal: internal, fence: MediaFence(fence), header: http.Header{}, tail: make([]byte, 0, MediaChunkSize), expected: -1}
-	m.idle = time.AfterFunc(MediaIdleTimeout, cancel)
+	m.idle = time.AfterFunc(preparation, cancel)
 	return m
 }
 func (m *MediaWriter) Close()              { m.idle.Stop() }

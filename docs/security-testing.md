@@ -297,3 +297,30 @@ without following or relaying storage bytes. Browser credential-omitting handoff
 SDK-compatible delivery, upload bridge, payments and ordinary portal/API routing
 remain required integration gates. Synthetic storage/HTTP fixtures do not prove
 live cloud CORS, native-provider execution, or complete fourteen-surface mode.
+
+### Delegated company read contracts
+
+The reserved facade also admits the exact company audit list/detail/revoked-key,
+report JSON/summary/CSV, company storage read, storage usage and central-info
+contracts. Compare their existing central role, recipient, scope and tenant
+policies using populated records. Browser management uses its verified session
+actor; a selected generation key neither lends management authority nor changes
+that actor. SDK calls retain the original key's scopes, including the existing
+GET/HEAD report distinction. Global audit, storage administration and storage
+mutations remain outside these read contracts.
+
+Keep audit redaction and customer-only financial columns even for an underlying
+central administrator. CSV keeps its existing formula protection and spool-before-
+headers behavior. Its trusted report-only preparation/header/total budget is one
+minute, preserving the central 55-second calculation deadline; actual output
+resets the ordinary 30-second idle timer within that same total budget. Authority
+checks remain bounded to five seconds. Stream large exports through the existing
+completion framing without an unbounded memory buffer or an 8MiB export cutoff.
+
+Storage usage retains the repository's actual owner filtering and the manager's
+storage-owner applicability flag; do not manufacture a different quota total.
+Storage settings expose only their existing role-appropriate public view, never
+the encrypted secret. Info describes the filtered central service and its trusted
+central metadata. It does not change the local installation's operator role or
+activate company mode. Ordinary API/UI integration and complete surface acceptance
+remain separate required gates.

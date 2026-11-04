@@ -47,6 +47,7 @@ type Contract struct {
 	Stream            bool
 	MaxRequestBytes   int64
 	Timeout           time.Duration
+	HeaderTimeout     time.Duration
 	Idempotency       bool
 }
 
@@ -71,6 +72,9 @@ func Classify(method, path string) Contract {
 	return c
 }
 func classifyCustomerRoute(method, path string) Contract {
+	if c := companyReadContract(method, path); c.Class == CentralCustomer {
+		return c
+	}
 	if c := mediaCustomerContract(method, path); c.Class == CentralCustomer {
 		return c
 	}

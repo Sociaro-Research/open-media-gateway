@@ -20,7 +20,7 @@ func (c *Coordinator) StreamCustomer(ctx context.Context, prepared CustomerConte
 	}
 	stream, stop := WatchMedia(ctx, fence)
 	defer stop()
-	headerDeadline := time.AfterFunc(MediaIdleTimeout, stop)
+	headerDeadline := time.AfterFunc(CustomerHeaderTimeout(method, path), stop)
 	response, e := c.central.openCustomerMedia(stream, prepared, method, path, query, headers, keyPresent, key)
 	headerDeadline.Stop()
 	if e != nil {
@@ -184,7 +184,7 @@ func (c *Client) openCustomerMedia(ctx context.Context, prepared CustomerContext
 		req.Header.Set("Authorization", "Bearer "+key)
 	}
 	client := *c.http
-	client.Timeout = MediaTimeout
+	client.Timeout = CustomerTimeout(method, path)
 	// The fixed public transport remains unchanged, proxy-disabled and checked-IP.
 	// Explicit identity encoding prevents net/http's transparent decompression.
 	response, e := client.Do(req)

@@ -229,7 +229,7 @@ func (s *Server) companyCustomerRequest(w http.ResponseWriter, r *http.Request, 
 		}
 		stream, stop := ci.WatchMedia(ctx, fence)
 		defer stop()
-		out := ci.NewMediaWriter(stream, w, r.Method, true, fence, stop)
+		out := ci.NewMediaWriterWithPreparation(stream, w, r.Method, true, fence, stop, ci.CustomerHeaderTimeout(r.Method, path))
 		defer out.Close()
 		mux.ServeHTTP(out, inner.WithContext(stream))
 		if e := out.Finish(); e != nil {
