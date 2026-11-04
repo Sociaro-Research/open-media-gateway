@@ -26,6 +26,12 @@ screen-specific copies. Exceptions must have a functional reason documented here
 | Spacing | Sections: `--space-section` 32px. Heading-to-content: 24/20/16px for page/section/group; shared action heading: 24px. Field groups: 12–20px; panel padding: 24px, 20px on narrow screens. |
 | Shape | Fields and popups: 12px radius, 1px border. Use existing shared classes; do not invent per-screen radii or shadows. |
 
+Human-authored descriptions use the shared `.body-copy` treatment: inherited
+interface font, the 14px body token, regular 400 weight, normal style and 1.5 line
+height. Template gallery cards, pending/failed selections and the ready runner
+reuse it. Headings, compact metadata, status and field guidance keep their
+semantic styles.
+
 File sizes use decimal display units: KB = 1,000 bytes and MB = 1,000,000 bytes.
 Reuse `file-size.js` for file sizes and upload-limit labels. Mark rounded limits with ≈
 without changing byte admission limits; expose exact byte boundaries in validation

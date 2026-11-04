@@ -853,6 +853,7 @@ table .floating-field > .select-trigger { min-height:44px; padding:9px 42px 9px 
 
 /* Console type scale and section rhythm. */
 :root { --type-page:36px; --type-section:20px; --type-group:16px; --type-body:14px; --type-detail:12px; --space-section:32px; }
+.body-copy { font-family:inherit; font-size:var(--type-body); font-weight:400; font-style:normal; line-height:1.5; overflow-wrap:anywhere; }
 :is(#configurationView,#systemView,#generationView) h1 { font-size:var(--type-page); font-weight:700; line-height:1.2; letter-spacing:-.03em; margin:0 0 24px; }
 :is(#configurationView,#systemView,#generationView) h2,
 :is(#configurationView,#systemView) .personal-section h1 { font-size:var(--type-section); font-weight:650; line-height:1.35; letter-spacing:-.02em; margin:0 0 20px; }
