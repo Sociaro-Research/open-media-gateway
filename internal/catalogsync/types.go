@@ -148,6 +148,8 @@ type Entry struct {
 	Rates             []Rate                     `json:"rates,omitempty"`
 }
 type Observation struct {
+	FailureStage string               `json:"failure_stage,omitempty"`
+	ModelReview  *ModelReviewEvidence `json:"model_review,omitempty"`
 	// Per-source facts retain exact provenance when a later document omits a field.
 	OperationalHistory map[string]map[string]CoverageSource `json:"operational_history,omitempty"`
 	Source             Source                               `json:"source"`

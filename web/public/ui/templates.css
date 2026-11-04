@@ -2,7 +2,7 @@
    Keep these rules scoped while other console settings evolve independently. */
 #templatesView > .console-section-heading { margin:0 0 24px; min-height:44px; gap:16px; flex-wrap:wrap; }
 #templatesView > .console-section-heading h1 { font-size:var(--type-page); font-weight:700; line-height:1.2; letter-spacing:-.03em; }
-#templatesView :is(.primary,.secondary):not(.template-card-title,.select-trigger) { font-size:var(--type-body); font-weight:600; line-height:20px; min-height:44px; padding:10px 16px; border-radius:12px; gap:12px; justify-content:center; white-space:normal; max-width:100%; }
+#templatesView :is(.primary,.secondary):not(.template-card-title,.select-trigger,.media-picker-action,.reference-selection-remove,.reference-delete) { font-size:var(--type-body); font-weight:600; line-height:20px; min-height:44px; padding:10px 16px; border-radius:12px; gap:12px; justify-content:center; white-space:normal; max-width:100%; }
 .template-editor > .secondary { justify-self:start; }
 .template-editor .primary.compact { min-width:0; }
 .template-editor .form-heading h2 { font-size:var(--type-section); line-height:1.35; }

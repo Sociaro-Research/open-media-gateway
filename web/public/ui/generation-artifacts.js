@@ -2,6 +2,21 @@
 (() => {
  'use strict';
  const node=(tag,text='',cls='')=>Object.assign(document.createElement(tag),{textContent:text,className:cls});
+ // Use decoded display dimensions, never a requested output ratio or poster size.
+ function fitVideo(player,{signal,current=()=>true}){
+  if(player.tagName!=='VIDEO'||signal.aborted)return;
+  const reset=()=>player.style.removeProperty('--task-video-ratio');
+  const update=()=>{
+   if(!current()||signal.aborted)return;
+   const width=player.videoWidth,height=player.videoHeight;
+   if(player.readyState<1||!Number.isFinite(width)||!Number.isFinite(height)||width<=0||height<=0)return reset();
+   if(player.currentSrc!==player.src)return;
+   player.style.setProperty('--task-video-ratio',String(width/height));
+  };
+  for(const event of ['loadedmetadata','resize'])player.addEventListener(event,update,{signal});
+  for(const event of ['loadstart','emptied','error'])player.addEventListener(event,reset,{signal});
+  signal.addEventListener('abort',reset,{once:true});update();
+ }
  async function attach(article,task,{api,context,bytes}){
   const controller=new AbortController(),identity=context(),current=()=>article.isConnected&&!controller.signal.aborted&&identity===context();article.mediaController=controller;
   const result=article.querySelector('.task-result'),groups=new Map(),entries=[];result.classList.add('generation-outputs');
@@ -15,6 +30,7 @@
    else if(type.startsWith('audio/')||['audio','music','speech'].includes(kind)){player=document.createElement('audio');player.controls=true;player.preload='metadata';}
    else if(type.startsWith('video/')||kind==='video'){player=document.createElement('video');player.controls=true;player.preload='metadata';player.playsInline=true;}
    if(player){player.className=textual?'artifact-text':'task-media';card.append(player);}
+   if(player?.tagName==='VIDEO')fitVideo(player,{signal:controller.signal,current});
    const facts=[kind,artifact.size_bytes>0?bytes(artifact.size_bytes):'',artifact.duration>0?artifact.duration+' s':''].filter(Boolean).join(' · ');status.textContent=facts;card.append(status,actions);result.append(card);
    const buttons=[],feedback=text=>{status.textContent=[facts,text].filter(Boolean).join(' · ');};let pending=false,textRead=null,textSequence=0;
    const access=()=>api('/v1/generations/'+encodeURIComponent(task.id)+'/media-access',{signal:controller.signal,cache:'no-store'});
@@ -49,5 +65,5 @@
   finally{if(current())entries.forEach(entry=>entry.lock(false));}
   controller.signal.addEventListener('abort',()=>{for(const entry of entries)entry.clear?.();for(const player of result.querySelectorAll('.task-media')){player.pause?.();player.removeAttribute('src');player.removeAttribute('poster');player.load?.();}},{once:true});
  }
- window.GenerationArtifacts={attach};
+ window.GenerationArtifacts={attach,fitVideo};
 })();

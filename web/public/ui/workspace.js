@@ -21,6 +21,9 @@
   let loaded=false,items=[],selected='',binding='',embedded=null,home=null,sequence=0;
   const node=(tag,text,cls)=>{const e=document.createElement(tag);if(text!=null)e.textContent=text;if(cls)e.className=cls;return e;};
   const current=()=>items.find(o=>o.id===selected)||null;
+  // Reuse the existing key-issuance capability; a header link grants no access.
+  function canOpenKeys(){const workspace=current();return !clientManager&&!!workspace&&(workspace.personal?!!consolePolicy.personal_providers:OrganizationRoles.issue(workspace.role,true,''));}
+  function syncKeysNavigation(){document.querySelector('#keysNav').hidden=!canOpenKeys();}
   function persist(){try{sessionStorage.setItem('gateway-workspace-'+binding,selected)}catch{}}
   function restore(){if(embedded){home.append(embedded);embedded.classList.remove('personal-section');embedded.querySelector('h1')?.removeAttribute('aria-level');embedded.hidden=true;embedded=null;}sharedConfiguration=false;}
   async function initialize(user){binding=user?.id||'api';await refresh();const ret=window.PaymentTopups?.returned();if(ret)set(ret.org,{navigate:false});}
@@ -31,10 +34,10 @@
     if(!clientManager&&consolePolicy.personal_providers)items.push({id:'personal',name:'Profile',personal:true});
     let previous=selected;if(!loaded){try{previous=sessionStorage.getItem('gateway-workspace-'+binding)||''}catch{}}
     selected=items.some(o=>o.id===previous)?previous:items[0]?.id||'';
-    select.replaceChildren(...items.map(o=>new Option(o.name,o.id)));if(!items.length)select.append(new Option('No organizations',''));select.value=selected;select.disabled=!items.length;loaded=true;persist();renderMenu();FormUI.refresh();
+    select.replaceChildren(...items.map(o=>new Option(o.name,o.id)));if(!items.length)select.append(new Option('No organizations',''));select.value=selected;select.disabled=!items.length;loaded=true;persist();renderMenu();syncKeysNavigation();FormUI.refresh();
     if(previous&&previous!==selected)window.GenerationKey?.activateWorkspace(selected);
   }
-  function set(id,{key=false,navigate=true}={}){if(!items.some(o=>o.id===id))return false;restore();const changed=selected!==id;selected=id;select.value=id;persist();renderMenu();FormUI.refresh();if(changed&&!key)window.GenerationKey?.activateWorkspace(id);if(navigate)showConsoleSection('organizations');return true;}
+  function set(id,{key=false,navigate=true}={}){if(!items.some(o=>o.id===id))return false;restore();const changed=selected!==id;selected=id;select.value=id;persist();renderMenu();syncKeysNavigation();FormUI.refresh();if(changed&&!key)window.GenerationKey?.activateWorkspace(id);if(navigate)showConsoleSection('organizations');return true;}
   select.addEventListener('change',()=>set(select.value));
   select.addEventListener('click',()=>{if(currentConsoleSection!=='organizations'&&items.length===1)showConsoleSection('organizations')});
   async function open(page){
@@ -51,7 +54,7 @@
     restore();
     GatewayLayout.clear(parent);parent.replaceChildren(node('h1','Profile'));const tabs=node('div',null,'organization-tabs'),body=node('div',null,'organization-page');parent.append(tabs,body);
     let subsections;const pages=['Profile',...(!clientManager&&consolePolicy.personal_providers?['Providers','Storage','API keys','Usage','Reports']:[])];
-    async function display(name){if(name!=='Profile'&&current()?.id!=='personal')set('personal',{navigate:false});restore();GatewayKeys.close();GatewayReports.close();body.replaceChildren();for(const b of tabs.children)b.setAttribute('aria-pressed',String(b.textContent===name));subsections?.sync();
+    async function display(name,initial=false){window.syncWorkspacePage?.(name,{initial});if(name!=='Profile'&&current()?.id!=='personal')set('personal',{navigate:false});restore();GatewayKeys.close();GatewayReports.close();body.replaceChildren();for(const b of tabs.children)b.setAttribute('aria-pressed',String(b.textContent===name));subsections?.sync();
       if(name==='Profile')GatewayProfile.open(body);
       else if(name==='API keys')await GatewayKeys.open(body,'');
       else if(name==='Reports')await GatewayReports.open(false,{personal:true,parent:body});
@@ -59,8 +62,8 @@
       else {const kind=name.toLowerCase();embedded=document.querySelector('#'+kind+'View');home=embedded.parentNode;body.append(embedded);embedded.classList.add('personal-section');embedded.querySelector('h1')?.setAttribute('aria-level','2');embedded.hidden=false;if(kind==='providers')await loadAdminProviders();else await loadStorageSettings();}
     }
     for(const name of pages){const button=node('button',name,'secondary');button.type='button';button.onclick=()=>display(name);tabs.append(button);}
-    subsections=GatewayLayout.bind(tabs,{scope:parent,label:'Profile',body});
-    await display(pages.includes(page)?page:pages[0]);
+    if(pages.length>1)subsections=GatewayLayout.bind(tabs,{scope:parent,label:'Profile',body});else tabs.remove();
+    await display(pages.includes(page)?page:pages[0],true);
   }
   async function acceptKey(key){
     const id=key.organization_id||'personal';if(!loaded||selected===id)return true;
@@ -76,7 +79,7 @@
   user.addEventListener('keydown',e=>{if(e.key==='Escape'){userMenuVisible(false);userToggle.focus();e.preventDefault()}else if(['ArrowDown','ArrowUp','Home','End'].includes(e.key)){e.preventDefault();const buttons=[...userDropdown.querySelectorAll('button:not([hidden])')],index=buttons.indexOf(document.activeElement);if(userDropdown.hidden||index<0){userMenuVisible(true,true);return;}buttons[e.key==='Home'?0:e.key==='End'?buttons.length-1:(index+(e.key==='ArrowUp'?-1:1)+buttons.length)%buttons.length]?.focus();}});
   document.addEventListener('click',e=>{if(!user.contains(e.target))userMenuVisible(false)});
   document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(!userDropdown.hidden){userMenuVisible(false);userToggle.focus()}if(!menu.hidden){menuVisible(false);toggle.focus()}}});
-  document.querySelector('#personalSettingsButton').onclick=()=>{userMenuVisible(false);showConsoleSection('profile');userToggle.focus()};
+  document.querySelector('#personalSettingsButton').onclick=()=>{userMenuVisible(false);showConsoleSection('profile',{historyMode:'push'});userToggle.focus()};
   document.querySelector('#logoutButton').addEventListener('click',()=>userMenuVisible(false));
-  window.Workspace={initialize,refresh,open,openProfile,restore,set,current,acceptKey,id:()=>selected,isSelf:id=>id===binding,ready:()=>loaded};
+  window.Workspace={canOpenKeys,initialize,refresh,open,openProfile,restore,set,current,acceptKey,id:()=>selected,isSelf:id=>id===binding,ready:()=>loaded};
 })();

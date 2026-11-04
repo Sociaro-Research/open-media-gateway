@@ -28,7 +28,7 @@ func SupportedParser(p string) bool {
 	return false
 }
 func Fetch(ctx context.Context, client *http.Client, source Source) Observation {
-	ob := Observation{Source: source, Entries: []Entry{}}
+	ob := Observation{Source: source, Entries: []Entry{}, FailureStage: "retrieval"}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, source.URL, nil)
 	if err == nil {
 		req.Header.Set("User-Agent", "Sociaro-Gateway-CatalogSync/1.0")
@@ -58,7 +58,8 @@ func Fetch(ctx context.Context, client *http.Client, source Source) Observation 
 	}
 	entries, text, err := Parse(source, body)
 	if err != nil {
-		ob.Error = err.Error()
+		ob.Error = interpretationError
+		ob.FailureStage = "interpretation"
 		if evidence, e := document(body); e == nil && len(evidence) <= 2<<20 {
 			ob.Text = evidence
 			hash := sha256.Sum256([]byte(evidence))
@@ -68,11 +69,13 @@ func Fetch(ctx context.Context, client *http.Client, source Source) Observation 
 	}
 	if len(text) > 2<<20 {
 		ob.Error = "Extracted document exceeded the size limit"
+		ob.FailureStage = "interpretation"
 		return ob
 	}
 	if entries == nil {
 		entries = []Entry{}
 	}
+	ob.FailureStage = ""
 	ob.Entries, ob.Text = entries, text
 	hash := sha256.Sum256([]byte(text))
 	ob.Hash = hex.EncodeToString(hash[:])

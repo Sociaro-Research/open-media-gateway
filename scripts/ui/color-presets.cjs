@@ -27,6 +27,7 @@ const server=http.createServer(async(req,res)=>{
  if(p==='/v1/me'){if(req.method==='PATCH'){const update=await body();if(profileFail)return json({error:{message:'Could not save profile'}},500);if(update.color_preset&&!settings.presets.some(x=>x.id===update.color_preset))return json({error:{message:'Unknown color theme'}},400);user={...user,...update};}return json(user);}
  if(p==='/site.json')return json({branding:settings});
  if(p.startsWith('/branding/assets/')){const asset=settings.assets?.[p.split('/').at(-1)];if(!asset?.data)return res.writeHead(404).end();res.writeHead(200,{'Content-Type':asset.mime});return res.end(Buffer.from(asset.data,'base64'));}
+ if(p==='/auth/company-connection')return json({},404);
  if(p==='/auth/methods')return json({google:true,email:false,email_delivery:false});
  if(p==='/v1/info')return json({auth_mode:'google',provider:'mock',console:{generation_ui:true,personal_providers:false,version:1}});
  if(p==='/v1/system/settings')return json({generation_ui:true,personal_providers:false,version:1});

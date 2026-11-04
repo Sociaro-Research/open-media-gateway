@@ -49,9 +49,10 @@ func Definition() providerkit.Definition {
 			{Key: "multi_edit_pro_price", Label: "Confirmed multi-edit pro tariff (USD/request, optional)", Env: "KLING_MULTI_EDIT_PRO_PRICE"},
 			{Key: "effect_prices", Label: "Confirmed Effects tariffs (scene to USD/request JSON, optional)", Env: "KLING_EFFECT_PRICES"},
 		},
-		CatalogSources:       reviewedSources(),
-		CatalogInterpret:     interpretPrices,
-		CatalogSourceAliases: aliases,
+		CatalogSources:             reviewedSources(),
+		CatalogInterpret:           interpretPrices,
+		CatalogSourceAliases:       aliases,
+		CatalogVerificationSources: flash4VerificationSources(),
 		// Model versions live in routes, not a JSON model field. The generic
 		// manual-model override cannot safely substitute these upstream IDs.
 		BillingHelp: "Published USD list prices supply estimates automatically; optional account overrides are preserved. Prepaid units, trials, discounts and CNY are not converted to USD or treated as confirmed bills. Check connection uses the free authenticated account query without retaining balances; success verifies authentication, not model entitlement or funded generation. Fresh queries are limited to one per second per gateway process; successful checks are cached for five minutes.",

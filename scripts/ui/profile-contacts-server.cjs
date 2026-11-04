@@ -89,7 +89,8 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
   await viewer.addCookies([{name:'media_gateway_session',value:viewerToken,url:base,httpOnly:true,sameSite:'Lax'}]);
   const other=await viewer.newPage();other.setDefaultTimeout(8000);other.on('pageerror',e=>errors.push(e.message));
   await other.goto(base+'/organizations');await other.getByRole('tab',{name:'Members',exact:true}).click();
-  const published=other.locator('.member-contact').filter({hasText:'Contact editor'}).getByRole('link',{name:'Saved contact',exact:true});
+  await other.locator('.member-contact').filter({hasText:'Contact editor'}).getByRole('button',{name:'Contact Contact editor',exact:true}).focus();
+  const published=other.getByRole('dialog',{name:'Contact Contact editor',exact:true}).getByRole('link',{name:'Saved contact',exact:true});
   await published.waitFor();assert.equal(await published.getAttribute('href'),'mailto:editor@example.test');
   const members=await other.evaluate(async company=>{const r=await fetch('/v1/organizations/'+company+'/members');if(!r.ok)throw Error('member read '+r.status);return (await r.json()).data;},company);
   assert.deepEqual(members.find(m=>m.name==='Contact editor').contacts,[{label:'Saved contact',url:'mailto:editor@example.test'}]);

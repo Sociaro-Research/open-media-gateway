@@ -17,6 +17,9 @@ func assertKlingContracts(t *testing.T, models []core.MediaModel) {
 		min, max, step, prompt int
 	}
 	expected := map[string]contract{
+		kling.TextToVideo4Flash:   {0, false, []string{"none"}, 3, 20, 1, 26000},
+		kling.ImageToVideo4Flash:  {1, false, []string{"first_frame"}, 3, 20, 1, 26000},
+		kling.OmniVideo4Flash:     {10, true, []string{"references"}, 3, 20, 1, 26000},
 		kling.TextToVideo:         {0, false, []string{"none"}, 3, 15, 1, 3072},
 		kling.ImageToVideo:        {2, false, []string{"first_frame", "first_last_frame"}, 3, 15, 1, 3072},
 		kling.TextToVideo4:        {0, false, []string{"none"}, 3, 30, 1, 10000},

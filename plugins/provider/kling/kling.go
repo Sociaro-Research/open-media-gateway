@@ -95,6 +95,9 @@ func (a *Adapter) Generate(ctx context.Context, r core.MediaRequest) (core.Provi
 	if r.Model == OmniVideo4 {
 		return a.generateOmni4(ctx, m, r)
 	}
+	if isKling4Flash(r.Model) {
+		return a.generateFlash4(ctx, m, r)
+	}
 	if f, ok := additionalNativeFamily(r.Model); ok {
 		return a.generateAdditionalNative(ctx, f, m, r)
 	}
@@ -214,9 +217,15 @@ func (a *Adapter) GetTask(ctx context.Context, id string) (core.ProviderResult, 
 		if isSolutionOperation(handle.Operation) {
 			return a.getSolutionTask(ctx, handle.Operation, handle.ID)
 		}
+		if isKling4Flash(handle.Operation) {
+			return a.getNativeVideoTask(ctx, handle.ID, true)
+		}
 		return core.ProviderResult{}, errors.New("unsupported Kling task handle operation")
 	}
+	return a.getNativeVideoTask(ctx, id, false)
+}
 
+func (a *Adapter) getNativeVideoTask(ctx context.Context, id string, requireBillingDuration bool) (core.ProviderResult, error) {
 	if !validTaskID(id) {
 		return core.ProviderResult{}, errors.New("invalid Kling task ID")
 	}
@@ -247,14 +256,22 @@ func (a *Adapter) GetTask(ctx context.Context, id string) (core.ProviderResult, 
 			seconds = 0
 		}
 		usage := map[string]any{}
-		if seconds > 0 {
-			usage["output_video_duration"] = seconds
-		}
 		var optionalUsage struct {
-			InputDuration json.RawMessage `json:"input_duration"`
+			InputDuration  json.RawMessage `json:"input_duration"`
+			OutputDuration json.RawMessage `json:"output_duration"`
 		}
 		_ = json.Unmarshal(task.Usage, &optionalUsage)
-		if inputDuration := taskOptionalString(optionalUsage.InputDuration); seconds > 0 && inputDuration != "" {
+		billableSeconds := seconds
+		if requireBillingDuration {
+			billableSeconds = 0
+			if output, e := strconv.ParseFloat(taskOptionalString(optionalUsage.OutputDuration), 64); e == nil && output > 0 && !math.IsNaN(output) && !math.IsInf(output, 0) {
+				billableSeconds = output
+			}
+		}
+		if billableSeconds > 0 {
+			usage["output_video_duration"] = billableSeconds
+		}
+		if inputDuration := taskOptionalString(optionalUsage.InputDuration); billableSeconds > 0 && inputDuration != "" {
 			input, e := strconv.ParseFloat(inputDuration, 64)
 			if e == nil && input > 0 && !math.IsNaN(input) && !math.IsInf(input, 0) {
 				usage["input_video_duration"] = input
@@ -279,7 +296,7 @@ func (a *Adapter) GetTask(ctx context.Context, id string) (core.ProviderResult, 
 				billing = append(billing, entry)
 			}
 		}
-		if seconds > 0 && len(billing) > 0 {
+		if (seconds > 0 || requireBillingDuration && billableSeconds > 0) && len(billing) > 0 {
 			usage["billing"] = billing
 		}
 		artifacts := []core.ProviderArtifact{{ID: string(task.Outputs[0].ID), MediaType: "video", Format: "mp4", URL: task.Outputs[0].URL, Duration: seconds, GroupID: string(task.Outputs[0].ID)}}

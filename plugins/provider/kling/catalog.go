@@ -17,7 +17,7 @@ import (
 const kling3PromptMaxCharacters = 3072
 
 func promptCharacterLimit(id string) int {
-	if id == OmniVideo4 {
+	if id == OmniVideo4 || isKling4Flash(id) {
 		return 26000
 	}
 	if isKling4(id) {
@@ -82,6 +82,7 @@ func catalog() []core.MediaModel {
 	}
 	models = append(models, additionalNativeCatalog()...)
 	models = append(models, omni4Model())
+	models = append(models, flash4Models()...)
 	models = append(models, imageModels()...)
 	models = append(models, audioModels()...)
 	models = append(models, generatedAudioModel())
@@ -162,6 +163,9 @@ func (a *Adapter) ValidateRequest(ctx context.Context, r core.MediaRequest) erro
 	if r.Model == OmniVideo4 {
 		return validateOmni4(m, r)
 	}
+	if isKling4Flash(r.Model) {
+		return validateFlash4(m, r)
+	}
 	if f, ok := additionalNativeFamily(r.Model); ok {
 		return validateAdditionalNative(f, m, r)
 	}
@@ -234,6 +238,9 @@ func (a *Adapter) Quote(ctx context.Context, _ core.MediaModel, r core.MediaRequ
 	}
 	if r.Model == OmniVideo4 {
 		return a.quoteOmni4(m, r)
+	}
+	if isKling4Flash(r.Model) {
+		return quoteFlash4(m, r)
 	}
 	if f, ok := additionalNativeFamily(r.Model); ok {
 		return quoteAdditionalNative(f, m, r)

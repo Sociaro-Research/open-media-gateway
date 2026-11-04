@@ -5,6 +5,8 @@ const root=path.resolve(__dirname,'../../web/public/ui');
 const a='11111111-1111-4111-8111-111111111111',b='22222222-2222-4222-8222-222222222222';
 const company=(id,name)=>({id,name:name||(id===a?'Organization A':'Organization B'),role:'admin',balance_usd:50,credit_limit_usd:100,default_weekly_limit_usd:10,storage_bytes:0});
 const server=http.createServer((req,res)=>{
+ if(new URL(req.url,'http://fixture').pathname==='/auth/company-connection'){res.writeHead(404,{'Content-Type':'application/json'});return res.end(JSON.stringify({connected:false}));}
+
  const name=path.basename(new URL(req.url,'http://fixture').pathname),file=path.join(root,name.includes('.')?name:'index.html');
  if(!fs.existsSync(file))return res.writeHead(404).end();
  res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':file.endsWith('.svg')?'image/svg+xml':'text/html');res.end(fs.readFileSync(file));

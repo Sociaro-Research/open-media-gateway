@@ -134,7 +134,7 @@ window.applySystemAccess=function(settings,admin=systemAdministrator){
  if(window.Workspace?.ready())Workspace.refresh().catch(()=>{});
  elements.generationNav.hidden=clientManager||!consolePolicy.generation_ui;document.querySelector('#templatesNav').hidden=clientManager||!consolePolicy.generation_ui;elements.providersNav.hidden=clientManager||!personalConfiguration;
  document.querySelector('#storageNav').hidden=clientManager||!personalConfiguration;
- document.querySelector('#keysNav').hidden=clientManager;
+ document.querySelector('#keysNav').hidden=!window.Workspace?.canOpenKeys();
  if(clientManager){document.querySelector('#createGenerationKey').disabled=true;lastConfigurationSection='organizations';}
  if((currentConsoleSection==='generation'&&!consolePolicy.generation_ui)||(['providers','storage'].includes(currentConsoleSection)&&!personalConfiguration)||(currentConsoleSection==='system'&&!admin))showConsoleSection(consoleAuthenticated?'keys':'docs');
 };
@@ -142,6 +142,8 @@ const configurationSections = ['providers', 'storage', 'keys', 'reports', 'organ
 if (location.pathname === '/configuration') currentConsoleSection = configurationSections.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'providers';
 if(location.pathname==='/organizations'||sessionStorage.getItem('gateway-pending-invite'))currentConsoleSection='organizations';
 let lastConfigurationSection = configurationSections.includes(currentConsoleSection) ? currentConsoleSection : 'providers';
+// Preserve a routed subsection while its existing workspace host is rendered.
+let currentConsoleRoute=currentConsoleSection;
 const compactConfiguration = window.matchMedia('(max-width: 700px)');
 const configurationMenu = document.querySelector('#configurationMenu');
 configurationMenu.open = !compactConfiguration.matches;
@@ -234,6 +236,7 @@ async function attachStoredMedia(article, task) {
 
   const keyVersion = generationKeyVersion;
   const current = () => article.isConnected && !controller.signal.aborted && keyVersion === generationKeyVersion;
+  GenerationArtifacts.fitVideo(player, {signal: controller.signal, current});
   const status = document.createElement('span');
   status.setAttribute('role', 'status');
   note.append(status);
@@ -694,27 +697,46 @@ async function updateAdminProvider(payload, successMessage, showSaved = false) {
   }
 }
 
-function showConsoleSection(name) {
+function syncWorkspacePage(page,{initial=false}={}) {
+ if(currentConsoleSection!=='organizations'||location.hash)return;
+ const route=page==='API keys'?'keys':'organizations',changed=route!==currentConsoleRoute;
+ currentConsoleRoute=route;
+ for(const name of ['keys','organizations']){const nav=document.querySelector('#'+name+'Nav');nav.classList.toggle('active',name===route);if(name===route)nav.setAttribute('aria-current','page');else nav.removeAttribute('aria-current');}
+ document.querySelector('#workspacePicker').classList.toggle('active',route==='organizations'&&!Workspace.current()?.personal);
+ document.querySelector('#userMenuToggle').classList.toggle('active',route==='organizations'&&!!Workspace.current()?.personal);
+ history[changed&&!initial?'pushState':'replaceState']({...history.state,workspacePage:page},'',route==='keys'?'/api-keys':'/organizations');
+}
+
+function showConsoleSection(name,{historyMode='replace',workspacePage}={}) {
   const navigation=++consoleNavigation;
   if(name==='docs'){void GatewaySite.openDocs(location.hash,()=>navigation===consoleNavigation);return;}
   window.Workspace?.restore();
   if(name!=='system')window.GatewaySystem?.close();
-  let page={keys:'API keys',reports:'Billing',providers:'Providers',storage:'Storage'}[name];
+  const keysRoute=name==='keys'&&!clientManager&&(!window.Workspace?.ready()||Workspace.canOpenKeys());
+  let page={keys:'API keys',reports:'Billing',providers:'Providers',storage:'Storage'}[name]||workspacePage;
+  if(name==='keys'&&!keysRoute)page=undefined;
   if(name==='configuration'||configurationSections.includes(name))name='organizations';
   if(clientManager&&!['organizations','docs','profile'].includes(name))name='organizations';
   if(name==='system'&&consoleInitialized&&!systemAdministrator)name='organizations';
   if(['generation','templates'].includes(name)&&!consolePolicy.generation_ui)name='organizations';
   GatewayLayout.clear(document.querySelector('#configurationView'));
   currentConsoleSection=name;
+  currentConsoleRoute=keysRoute?'keys':name;
   const allowed=authState==='authenticated'&&(authMode==='api_key'||consoleAuthenticated);
+  // Commit explicit navigation before synchronous personal-workspace rendering.
+  // Its initial subsection sync may annotate this entry, but must not replace the previous page.
+  if(allowed){
+    const destination=keysRoute?'/api-keys':({templates:'/templates',system:'/system',profile:'/profile',organizations:'/organizations'}[name]||'/');
+    if(location.pathname+location.search+location.hash!==destination)history[historyMode==='push'?'pushState':'replaceState'](null,'',destination);
+  }
   elements.authGate.hidden=name==='docs'||authState!=='anonymous';
   document.querySelector('#configurationView').hidden=!['organizations','profile'].includes(name)||!allowed;
   for(const section of ['generation','templates','providers','storage','keys','reports','docs','system','organizations','profile']){
     document.querySelector('#'+section+'View').hidden=section!==name||(section!=='docs'&&!allowed);
-    const nav=document.querySelector('#'+section+'Nav');if(!nav)continue;nav.classList.toggle('active',section===name);if(section===name)nav.setAttribute('aria-current','page');else nav.removeAttribute('aria-current');
+    const nav=document.querySelector('#'+section+'Nav');if(!nav)continue;nav.classList.toggle('active',section===currentConsoleRoute);if(section===currentConsoleRoute)nav.setAttribute('aria-current','page');else nav.removeAttribute('aria-current');
   }
-  document.querySelector('#workspacePicker').classList.toggle('active',name==='organizations'&&!window.Workspace?.current()?.personal);
-  document.querySelector('#userMenuToggle').classList.toggle('active',name==='profile'||(name==='organizations'&&!!window.Workspace?.current()?.personal));
+  document.querySelector('#workspacePicker').classList.toggle('active',name==='organizations'&&!keysRoute&&!window.Workspace?.current()?.personal);
+  document.querySelector('#userMenuToggle').classList.toggle('active',name==='profile'||(name==='organizations'&&!keysRoute&&!!window.Workspace?.current()?.personal));
   window.GatewayKeys?.close();window.GatewayReports?.close();
   if(name!=='system')window.GatewayOrganizations?.close();
   if(name==='system'&&allowed)window.GatewaySystem?.open();
@@ -728,12 +750,7 @@ function showConsoleSection(name) {
  window.GatewayTemplates?.section(name,allowed);
  if(name==='templates'&&allowed)window.GatewayTemplates.open();
   if(name==='generation'&&allowed&&window.GenerationKey.value()){refreshGenerationBudget();updatePrice();loadTasks();}
-  if(name==='docs'){if(!location.hash.startsWith('#docs/'))history.replaceState(null,'','/docs');window.GatewayDocs?.open();}
-  else if(name==='templates')history.replaceState(null,'','/templates');
-  else if(name==='system')history.replaceState(null,'','/system');
-  else if(name==='profile')history.replaceState(null,'','/profile');
-  else if(name==='organizations')history.replaceState(null,'','/organizations');
-  else history.replaceState(null,'','/');
+
 }
 
 function updateJournalPagination() {
@@ -893,7 +910,7 @@ function setAuthState(state) {
   elements.generationNav.hidden = state !== 'authenticated' || clientManager || !consolePolicy.generation_ui;
   document.querySelector('#systemNav').hidden = state !== 'authenticated' || !systemAdministrator;
   elements.userMenu.hidden = state !== 'authenticated' || !consoleAuthenticated;
-  showConsoleSection(currentConsoleSection);
+  showConsoleSection(currentConsoleRoute);
 }
 
 function modelOptionLabel(model) {
@@ -1113,20 +1130,25 @@ function setActionEstimate(value, priced=false) {
  document.querySelector('#priceSeparator').textContent=priced?' for ':' — ';
 }
 
+function setEstimateFeedback(message='',type='') {
+ FormUI.message(elements.priceDetails,message,type);
+ elements.priceCard.hidden=!message;
+}
+
 function updatePrice() {
  clearTimeout(quoteTimer);
  const sequence=++quoteSequence;
  setActionEstimate('Calculating…');
  if(currentConsoleSection==='templates'){elements.priceCard.hidden=true;return;}
  elements.priceCard.hidden = !window.GenerationKey.value() || !selectedModel();
- FormUI.message(elements.priceDetails,'');
+ setEstimateFeedback('');
  const request=estimateRequest(); if(!request){setActionEstimate('Choose a model');return;}
- if(durationChoice&&!durationChoice.valid()){setActionEstimate('Choose a valid duration');elements.priceCard.classList.add('unknown');FormUI.message(elements.priceDetails,'Use the duration values shown in the field label.');return;}
- if(voiceLanguageControl&&!voiceLanguageControl.valid()){setActionEstimate('Choose voice and language');elements.priceCard.classList.add('unknown');FormUI.message(elements.priceDetails,'Choose an available voice and language to get a verified estimate.');return;}
- if(playgroundResources&&!playgroundResources.valid()){setActionEstimate('Complete resource inputs');elements.priceCard.classList.add('unknown');FormUI.message(elements.priceDetails,'Complete the resource fields to get a verified estimate.');return;}
- if(modelParameterEditor&&!modelParameterEditor.valid()){setActionEstimate('Complete model parameters');elements.priceCard.classList.add('unknown');FormUI.message(elements.priceDetails,'Complete the parameter fields to get a verified estimate.');return;}
+ if(durationChoice&&!durationChoice.valid()){setActionEstimate('Choose a valid duration');elements.priceCard.classList.add('unknown');setEstimateFeedback('Use the duration values shown in the field label.');return;}
+ if(voiceLanguageControl&&!voiceLanguageControl.valid()){setActionEstimate('Choose voice and language');elements.priceCard.classList.add('unknown');setEstimateFeedback('Choose an available voice and language to get a verified estimate.');return;}
+ if(playgroundResources&&!playgroundResources.valid()){setActionEstimate('Complete resource inputs');elements.priceCard.classList.add('unknown');setEstimateFeedback('Complete the resource fields to get a verified estimate.');return;}
+ if(modelParameterEditor&&!modelParameterEditor.valid()){setActionEstimate('Complete model parameters');elements.priceCard.classList.add('unknown');setEstimateFeedback('Complete the parameter fields to get a verified estimate.');return;}
  setActionEstimate('Calculating…');
- FormUI.message(elements.priceDetails,'');
+ setEstimateFeedback('');
  quoteTimer=setTimeout(async()=>{
   try {
    const quote=await fetchEstimate(request);
@@ -1134,12 +1156,12 @@ function updatePrice() {
    const amount=quote.cost?.customer_expected_usd??quote.cost?.expected_usd;if(quote.cost?.quantity_unknown||!Number.isFinite(amount)||amount<0)throw Error('Verified estimate unavailable.');
    setActionEstimate(formatPrice(amount),true);
    elements.priceCard.classList.toggle('unknown',!quote.can_generate);
-   FormUI.message(elements.priceDetails,quote.can_generate ? (quote.cost.pricing?.estimate_description || 'Final generation cost may differ.') : `Exceeds the available organization or weekly allowance (${formatUSD(quote.remaining_usd)}).`,quote.can_generate?'':'error');
+   setEstimateFeedback(quote.can_generate ? (quote.cost.pricing?.estimate_description || '') : `Exceeds the available organization or weekly allowance (${formatUSD(quote.remaining_usd)}).`,quote.can_generate?'':'error');
   } catch(error) {
    if(sequence!==quoteSequence) return;
    const hasInput=request.prompt || selectedModel()?.prompt_optional || selectedModel()?.no_prompt;
    setActionEstimate(hasInput ? 'Estimate unavailable' : 'Enter a prompt');
-   FormUI.message(elements.priceDetails,hasInput ? error.message : '',hasInput?'error':'');
+   setEstimateFeedback(hasInput ? error.message : '',hasInput?'error':'');
    elements.priceCard.classList.add('unknown');
   }
  },400);
@@ -1266,14 +1288,14 @@ window.addEventListener('gateway-key-change', () => {
   refreshGenerationBudget();
   if (ready) { setMessage(''); loadProviders(); loadTasks(true); }
 });
-document.querySelector('#templatesNav').addEventListener('click',()=>showConsoleSection('templates'));
-elements.generationNav.addEventListener('click', () => showConsoleSection('generation'));
-document.querySelector('#systemNav').addEventListener('click',()=>showConsoleSection('system'));
+document.querySelector('#templatesNav').addEventListener('click',()=>showConsoleSection('templates',{historyMode:'push'}));
+elements.generationNav.addEventListener('click', () => showConsoleSection('generation',{historyMode:'push'}));
+document.querySelector('#systemNav').addEventListener('click',()=>showConsoleSection('system',{historyMode:'push'}));
 document.querySelector('#organizationsNav').addEventListener('click',()=>showConsoleSection('organizations'));
 document.querySelector('#configurationNav').addEventListener('click', () => showConsoleSection('configuration'));
 elements.providersNav.addEventListener('click', () => showConsoleSection('providers'));
 document.querySelector('#reportsNav').addEventListener('click', () => showConsoleSection('reports'));
-document.querySelector('#keysNav').addEventListener('click', () => showConsoleSection('keys'));
+document.querySelector('#keysNav').addEventListener('click', () => showConsoleSection('keys',{historyMode:'push'}));
 document.querySelector('#storageNav').addEventListener('click', () => showConsoleSection('storage'));
 document.querySelector('#docsNav').addEventListener('click', () => showConsoleSection('docs'));
 elements.logout.addEventListener('click', async () => {
@@ -1717,18 +1739,17 @@ async function initialize() {
       await window.Workspace.initialize(user);
       // Authentication already opened Profile. Keep its editable draft and focus
       // when the independent workspace read finishes.
-      if(currentConsoleSection!=='profile')showConsoleSection(currentConsoleSection);
+      if(currentConsoleSection!=='profile')showConsoleSection(currentConsoleRoute);
     }
     catch { FormUI.message(elements.sessionMessage,'Could not load workspaces. Open your workspace to try again.','error'); elements.sessionMessage.hidden=false; }
   }
   if (clientManager) window.GenerationKey.forget(); else window.GenerationKey.initialize(user || null);
   window.RemoteWorkspace?.setActor(user);
-  const companyControl=document.querySelector('#companyConnectionButton');companyControl.hidden=!window.CompanyConnection?.active();companyControl.onclick=()=>window.RemoteWorkspace.open();
   if(!window.CompanyConnection?.active()&&!await window.WorkspaceAuthorization?.initialize(user))void window.SetupSelector?.initialize(user);
 }
 
 document.querySelector('#authRetry').addEventListener('click', initialize);
-showConsoleSection(currentConsoleSection);
+showConsoleSection(currentConsoleRoute);
 void initialize();
 setInterval(() => {
   if (!document.hidden && currentConsoleSection === 'generation' && window.GenerationKey.value()) loadTasks(false, journalPage.pageError && journalNearBottom());
@@ -1757,6 +1778,13 @@ function confirmResultDeletion(task){
  document.body.append(dialog);dialog.querySelector('[data-cancel]').onclick=()=>dialog.close();dialog.addEventListener('close',()=>dialog.remove());
  const confirm=dialog.querySelector('[data-confirm]');confirm.onclick=async()=>{confirm.disabled=true;FormUI.message(dialog.querySelector('[role=status]'),'Deleting…');try{await api(`/v1/generations/${task.id}/content`,{method:'DELETE'});dialog.close();await loadTasks(true);window.dispatchEvent(new Event('gateway-storage-change'));}catch(error){FormUI.message(dialog.querySelector('[role=status]'),error.message,'error');confirm.disabled=false;}};dialog.showModal();dialog.querySelector('[data-cancel]').focus();
 }
+
+window.addEventListener('popstate',()=>{
+ // Existing hash handlers capture invitations and other one-time links first.
+ if(location.hash)return;
+ const route={'/api-keys':'keys','/templates':'templates','/system':'system','/profile':'profile','/organizations':'organizations'}[location.pathname]||'generation';
+ showConsoleSection(route,{workspacePage:history.state?.workspacePage});
+});
 
 window.addEventListener('hashchange',()=>{if(location.pathname==='/configuration'){const name=location.hash.slice(1);if(configurationSections.includes(name)&&name!==currentConsoleSection)showConsoleSection(name)}});
 

@@ -392,7 +392,7 @@ func Reconcile(previous State, native Capture, observations []Observation, now t
 		}
 		run.Sources[i].Review = ob.Review
 		if ob.Error != "" {
-			warn("", ob.Source.ID, "Source check failed; last confirmed information was preserved", map[string]string{"error": ob.Error, "hash": ob.FetchedHash})
+			warn("", ob.Source.ID, sourceFailureReason, sourceFailure(ob))
 			if old.Source.ID != "" {
 				ob.Entries = old.Entries
 				if ob.Text == "" {

@@ -2,14 +2,16 @@ const {evidencePath} = require('./evidence.cjs');
 // Isolated profile/theme UI checks. No live account or provider requests.
 const {chromium}=require('playwright'),http=require('node:http'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const root=path.resolve(__dirname,'../../web/public/ui');
-const server=http.createServer((req,res)=>{const file=path.join(root,path.basename(req.url.split('?')[0]).includes('.')?path.basename(req.url.split('?')[0]):'index.html');if(!fs.existsSync(file))return res.writeHead(404).end();res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':file.endsWith('.svg')?'image/svg+xml':'text/html');res.end(fs.readFileSync(file));});
+const server=http.createServer((req,res)=>{
+ if(new URL(req.url,'http://fixture').pathname==='/auth/company-connection'){res.writeHead(404,{'Content-Type':'application/json'});return res.end(JSON.stringify({connected:false}));}
+const file=path.join(root,path.basename(req.url.split('?')[0]).includes('.')?path.basename(req.url.split('?')[0]):'index.html');if(!fs.existsSync(file))return res.writeHead(404).end();res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':file.endsWith('.svg')?'image/svg+xml':'text/html');res.end(fs.readFileSync(file));});
 (async()=>{
  await new Promise(r=>server.listen(0,'127.0.0.1',r));const browser=await chromium.launch({headless:true,executablePath:process.env.UI_BROWSER_PATH}),page=await browser.newPage({viewport:{width:1440,height:1000}});page.setDefaultTimeout(8000);
  const errors=[],requests=[];page.on('pageerror',e=>errors.push(e.message));let personal=false,manager=false,fail=false;
  let user={id:'33333333-3333-4333-8333-333333333333',name:'Google Name',email:'user@example.test',theme:'system',session_id:'fixture'};
  await page.route('**/v1/**',async route=>{const req=route.request(),p=new URL(req.url()).pathname,json=data=>route.fulfill({json:data});
   if(p==='/v1/me'){if(req.method()==='PATCH'){requests.push(req.postDataJSON());if(fail)return route.fulfill({status:500,json:{error:{message:'Could not save profile'}}});user={...user,...req.postDataJSON()};}return json({...user,is_client_manager:manager});}
-  if(p==='/v1/info')return json({auth_mode:'google',console:{generation_ui:true,personal_providers:personal,shared_resources:true}});
+  if(p==='/v1/info')return json({auth_mode:'google',console:{generation_ui:true,personal_providers:personal,shared_resources:!personal}});
   if(p==='/v1/admin/providers')return json({data:[{id:'mock',name:'Mock provider',models:[],configured:false,enabled:true}]});
   return json({data:[]});
  });

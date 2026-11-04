@@ -102,15 +102,22 @@ func TestKlingConnectionEncryptionCatalogEstimatesAndPinnedPolling(t *testing.T)
 	}
 	assertKlingContracts(t, catalog[0].Models)
 	for _, model := range catalog[0].Models {
-		if !slices.Contains([]string{kling.TextToVideo, kling.ImageToVideo, kling.TextToVideo4, kling.ImageToVideo4, kling.TextToVideo3Turbo, kling.ImageToVideo3Turbo, kling.TextToVideo25Turbo, kling.ImageToVideo25Turbo, kling.OmniVideo4}, model.ID) {
+		if !slices.Contains([]string{kling.TextToVideo4Flash, kling.ImageToVideo4Flash, kling.OmniVideo4Flash, kling.TextToVideo, kling.ImageToVideo, kling.TextToVideo4, kling.ImageToVideo4, kling.TextToVideo3Turbo, kling.ImageToVideo3Turbo, kling.TextToVideo25Turbo, kling.ImageToVideo25Turbo, kling.OmniVideo4}, model.ID) {
 			continue
 		}
 		input := core.CreateMediaInput{Provider: connection.ID, Model: model.ID, Prompt: "Synthetic fixture"}
 		if model.RequiresImageInput {
 			input.Options.ImageURLs = []string{"https://cdn.example/first.png"}
 		}
+		isFlash := model.ID == kling.TextToVideo4Flash || model.ID == kling.ImageToVideo4Flash || model.ID == kling.OmniVideo4Flash
+		if isFlash {
+			input.Options.Duration = 10
+		}
 		estimate, err := service.Estimate(ctx, input)
 		want := int64(420000)
+		if isFlash {
+			want = 940000
+		}
 		if model.ID == kling.TextToVideo4 || model.ID == kling.ImageToVideo4 {
 			want = 2000010
 		}

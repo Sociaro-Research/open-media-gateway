@@ -55,7 +55,7 @@
     if(organizationID){
       const recipientField=node('div'),recipientLabel=node('label','User'),recipient=node('select');recipient.id='newKeyUser';recipient.name='user_id';recipientLabel.htmlFor=recipient.id;
       for(const member of members.filter(m=>OrganizationRoles.issue(organizationRole,Workspace.isSelf(m.id),m.role))){const option=UserUI.option(member,member.name?member.name+' · '+member.email:member.email);recipient.append(option);if(Workspace.isSelf(member.id)){option.defaultSelected=true;recipient.value=member.id;}}
-      recipientField.append(recipientLabel,recipient);form.querySelector('.keys-fields').prepend(recipientField);
+      recipientField.append(recipientLabel,recipient);const creationFields=form.querySelector('.keys-fields');creationFields.classList.add('key-creation-fields-with-recipient');creationFields.prepend(recipientField);
       const orgScope=node('label');orgScope.innerHTML='<input type="checkbox" name="organizations"> Manage organization';form.querySelector('fieldset').append(orgScope);
       form.elements.providers.closest('label').remove();form.elements.storage.closest('label').remove();
     }
@@ -84,7 +84,12 @@
       finally {button.disabled=!secretPanel.hidden;}
     });
 
-    const toolbar=node('div',undefined,'keys-toolbar'),monthField=node('div'),monthLabel=node('label','Month');monthLabel.htmlFor=month.id;monthField.append(monthLabel,month);toolbar.append(monthField);content.append(toolbar);
+    const toolbar=node('div',undefined,'keys-toolbar'),monthField=node('div'),monthLabel=node('label','Month');monthLabel.htmlFor=month.id;monthField.append(monthLabel,month);
+    const statusField=node('div'),statusLabel=node('label','Status'),statusFilter=node('select');statusFilter.id='keyStatusFilter';statusFilter.multiple=true;statusLabel.htmlFor=statusFilter.id;
+    for(const [value,label] of [['active','Active'],['revoked','Revoked'],['expired','Expired'],['disabled','Disabled']])statusFilter.append(new Option(label,value,value==='active',value==='active'));
+    statusField.append(statusLabel,statusFilter);toolbar.append(monthField,statusField);content.append(toolbar);
+    const keyStatus=(key,now)=>key.revoked_at?'revoked':key.expires_at&&Date.parse(key.expires_at)<=now?'expired':(key.resource_mode==='shared'?!sharedAllowed:!personalAllowed)?'disabled':'active';
+    statusFilter.addEventListener('change',renderKeys);
     const keyList=node('div');content.append(keyList);
     month.addEventListener('change',async()=>{
       if(!month.value)return;renderKeys();
@@ -95,9 +100,11 @@
     function renderKeys() {
       keyList.replaceChildren();toolbar.hidden=!keys.length;
       if(!keys.length) {paragraph('No keys yet.',keyList);return;}
-      table(['Key',...(organizationID?['User','Issued by']:[]),'Spending','Permissions','Activity','Status',''],keys.map(key=>{
-        const revoked=!!key.revoked_at, expired=key.expires_at && Date.parse(key.expires_at)<=Date.now();
-        const identity=node('div');identity.append(node('strong',key.name),node('code',key.prefix+'…'),node('small',key.id));if(key.purpose==='playground_templates')identity.append(node('small','Created by Playground · Templates'));
+      const selectedStatuses=new Set([...statusFilter.selectedOptions].map(option=>option.value)),currentTime=Date.now(),visibleKeys=keys.filter(key=>selectedStatuses.has(keyStatus(key,currentTime)));
+      if(!visibleKeys.length){paragraph('No keys match the selected statuses.',keyList);return;}
+      table(['Key',...(organizationID?['User','Issued by']:[]),'Spending','Permissions','Activity','Status',''],visibleKeys.map(key=>{
+        const state=keyStatus(key,currentTime),revoked=state==='revoked';
+        const identity=node('div');identity.append(node('strong',key.name),node('code',key.prefix+'…'));
         const activity=node('div');activity.append(node('small','Created '+new Date(key.created_at).toLocaleDateString()),node('small',key.last_used_at ? 'Used '+new Date(key.last_used_at).toLocaleString() : 'Not used yet'),node('small',key.expires_at ? 'Expires '+new Date(key.expires_at).toLocaleDateString() : 'No expiration'));
         const revoke=node('button',revoked?'Revoked':'Revoke','secondary danger');revoke.type='button';revoke.disabled=revoked;
         revoke.addEventListener('click',()=>confirmRevoke(key,revoke));
@@ -107,7 +114,7 @@
           spend.append(node('small',`${item.tasks} ${item.tasks===1?'task':'tasks'}`));
           if(item.unknown_cost_tasks) spend.append(node('small',`${item.unknown_cost_tasks} legacy tasks with unknown cost`, 'keys-incomplete'));
         }
-        return [identity,...(organizationID?[UserUI.identity(members.find(m=>m.id===key.user_id)||{id:key.user_id,email:key.user_email,picture:key.user_picture}),UserUI.identity(members.find(m=>m.id===key.created_by)||{id:key.created_by,email:key.creator_email,picture:key.creator_picture})]:[]),spend,key.scopes.join(', '),activity,revoked?'Revoked':expired?'Expired':((key.resource_mode==='shared'?!sharedAllowed:!personalAllowed))?'Disabled by system settings':'Active',revoked?'':revoke];
+        return [identity,...(organizationID?[UserUI.identity(members.find(m=>m.id===key.user_id)||{id:key.user_id,email:key.user_email,picture:key.user_picture}),UserUI.identity(members.find(m=>m.id===key.created_by)||{id:key.created_by,email:key.creator_email,picture:key.creator_picture})]:[]),spend,key.scopes.join(', '),activity,({revoked:'Revoked',expired:'Expired',disabled:'Disabled by system settings',active:'Active'})[state],revoked?'':revoke];
       }),keyList);
     }
     function confirmRevoke(key,button) {

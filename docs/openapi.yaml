@@ -6566,6 +6566,35 @@ paths:
         '403': {description: Company access or browser session required}
         '503': {description: Support contacts unavailable}
 
+  "/v1/key/support":
+    get:
+      security: [{bearerAuth: []}]
+      tags: [Organizations]
+      operationId: get_key_support
+      summary: Get the authenticated company's support manager
+      x-required-scope: generation
+      description: Requires a current company-bound API key with generation scope and current company membership. The company comes only from the authenticated key; no query or path company selector is accepted. Returns the same assigned-manager display card as browser Support, with deliberately published contacts only. No login email or private profile fields are returned. An unassigned company returns null client_manager. Browser sessions, personal keys and deployment service keys cannot use this endpoint. Responses are not publicly cached.
+      responses:
+        '200':
+          description: Assigned client manager, if any
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [client_manager]
+                properties:
+                  client_manager:
+                    type: [object, 'null']
+                    properties:
+                      id: {type: string, format: uuid}
+                      name: {type: string}
+                      picture: {type: string, format: uri}
+                      contacts: {$ref: '#/components/schemas/ContactLinks'}
+        '400': {description: Query selectors are not accepted}
+        '401': {description: Valid API key required}
+        '403': {description: Company key, scope or current membership required}
+        '503': {description: Support contacts unavailable}
+
   "/v1/me":
     get:
       security:
@@ -11800,8 +11829,27 @@ components:
       required:
       - id
       type: object
+    CatalogModelReviewEvidence:
+      description: Bounded public model-column evidence from a rejected document. This label is not a runtime model ID and establishes neither adapter support nor account entitlement. Adapter review/integration is required for the published model or condition.
+      type: object
+      readOnly: true
+      additionalProperties: false
+      required: [source_id, url, snapshot, model_label, line]
+      properties:
+        source_id: {type: string, maxLength: 100}
+        url: {type: string, format: uri, maxLength: 2048}
+        snapshot: {type: string, pattern: '^[0-9a-fA-F]{64}$', description: SHA-256 of the rejected normalized document.}
+        model_label: {type: string, maxLength: 80, pattern: '^[A-Za-z][A-Za-z0-9 .+()_-]{0,79}$'}
+        line: {type: integer, minimum: 1, maximum: 100000, description: One-based line in that normalized document.}
     CatalogObservation:
       properties:
+        failure_stage:
+          description: Read-only stage of a failed source check. Absent from historical records; only the exact known historical interpretation error can identify their stage safely.
+          readOnly: true
+          type: string
+          enum: [retrieval, interpretation]
+        model_review:
+          $ref: '#/components/schemas/CatalogModelReviewEvidence'
         operational_history:
           description: Read-only last-confirmed typed facts by exact model and field, retaining each source snapshot when a later observation omits that field. Historical values never establish current verification.
           readOnly: true
@@ -11979,7 +12027,7 @@ components:
             id: {type: string}
             url: {type: string}
             parser: {type: string}
-        status: {type: string, enum: [retrieved, retrieval_failed, stale, preserved, not_checked]}
+        status: {type: string, enum: [retrieved, retrieval_failed, interpretation_failed, stale, preserved, not_checked], description: "interpretation_failed means the fetched document was rejected by parsing or adapter interpretation; retrieval_failed means fetching failed or the legacy failure stage is unknown."}
         hash: {type: string, description: "Current normalized snapshot, or failed fetched snapshot when available."}
         previous_hash: {type: string, description: Last confirmed normalized snapshot retained for comparison and restoration of evidence.}
     CatalogRun:

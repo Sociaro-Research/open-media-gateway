@@ -44,7 +44,7 @@
     nodes.push(card);
    }
    for(const [key,card]of cards)if(!keys.has(key)){stop(card);cards.delete(key);}
-   ReferenceUpload.reconcile(grid,nodes);
+   ReferenceUpload.reconcile(grid,[...nodes,...(options.transientNodes||[])]);
   }
   function resetConfirmations(){for(const card of cards.values())card.deleteConfirmation?.reset();}
   return {dialog,intro,status,grid,more,render,stop:()=>{resetConfirmations();for(const media of dialog.querySelectorAll('video,audio'))media.pause();},dispose:()=>{disposed=true;stop(dialog);unobserve();cards.clear();dialog.close();dialog.remove();}};

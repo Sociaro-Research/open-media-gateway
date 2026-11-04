@@ -49,7 +49,7 @@ layout shifts when Save/Cancel is hidden. Repeated groups must use the same spac
 within its group; showing Save, validation, loading or error states must not cause
 overlaps or erase the separation between controls. On narrow screens, wrap or stack
 groups in reading order, retain label/control gaps and use the existing mobile
-panel gutters. Do not squeeze controls together to make a row fit.
+panel gutters. Do not squeeze controls together to make a row fit. Shared media-picker headings keep their requirements at half width on wide screens and wrap below the title at full width on narrow screens; never compress format guidance into a character-wide column.
 
 Before accepting any UI change:
 
@@ -129,6 +129,7 @@ validate the same 1440/390/320 px layouts and keyboard controls as email sign-in
 - **Dropdowns:** use `ControlPickers`, with the same frame, label and height as inputs. **Table variant:** 44px, no visible label because the column heading supplies context; retain an accessible label. Do not use `data-plain-control` to bypass standard field styling.
 - **Searchable people selection:** use `ControlPickers.search` with the search field inside the dropdown, above scrollable results. Do not add a separate search field or Search button to the form. Keep avatars in results and the selected value; keep loading, empty, retry and pagination guidance inside the popup. Preserve selection while searching and ignore stale responses after another query or dismissal. Support keyboard navigation and Escape without submitting the parent form.
 - **Multiple selection:** use the shared `ControlPickers` multiple selector. Keep the popup open while changing options, use the shared switches, and support arrow keys, Space, Tab and Escape.
+- **API-key management:** place Status beside Month using the shared multiple selector. Keep Active, Revoked, Expired and Disabled distinct, default to Active only, and show a filtered-empty result when none match. Month selects the usage period, not key creation dates. Show the key name and masked prefix without a service UUID or repeated managed-key origin label; retain IDs and purpose internally. Organization key creation places User, Name and Expiration in three equal desktop columns, with the natural two-field layout when User is absent and stacked fields in narrow containers. Keep permissions and submission behavior unchanged.
 - **Duration:** Templates and Playground use `ModelInfo.durationLabel` to show the selected model's known seconds bounds directly in the floating input label. Include a non-unit step when the allowed values are discrete, show only a known one-sided bound, and retain honest unavailable/input-derived states. Do not repeat the range in a detached caption. Preserve native bounds/step validation, saved-value reconciliation and distinct validation errors. Give the label enough field width to remain readable; the narrow Playground panel places Duration on a full row.
 - **Template resolution summaries:** Show the selected target's validated effective output resolution before review/generation, keeping it in the existing compact settings row. Preserve the saved preference in the editor; when it differs from supported choices, show the saved value with its effective choice. An authoritative empty resolution uses Model resolution default. Do not imply an unsupported saved resolution will be sent, change the aspect-ratio control, or relax input-media limits.
 - **Template audio summaries:** Audio is an optional preference and does not filter models. Show Audio On/Off only for a selected model with a configurable switch, Model audio default when the preference is omitted or unsupported, Audio On (model default) for an always-on target, and Overridden Audio when replacement audio is selected. Pending metadata identifies saved values as Audio preference On/Off. Preserve the existing compact settings row; do not imply silence when no switch is sent.
@@ -249,6 +250,10 @@ room for navigation, otherwise it uses the available space beside the menu.
 Mobile retains 12px gutters and automatic widths. Container queries adapt shared
 forms and grids to a narrow content frame even on a wide monitor. Compact controls,
 readable documentation and profile forms retain their functional local limits.
+
+Profile omits subsection navigation when Profile is its only page, using the existing
+no-sidebar layout and readable form width. A personal workspace with multiple pages
+retains its actual navigation.
 
 `layout.js` manages subsection navigation for Settings, Profile and organization
 details. By default, desktop navigation moves the same
@@ -417,17 +422,42 @@ Arial/Helvetica document style. Payment hyperlinks use conventional blue
 retain their standard document colors. This is the exported document's existing
 paper-design exception; console theme tokens and links are unchanged.
 
+The Reports column-settings gear is a borderless icon action at rest. Retain its
+44px hit target and the shared single visible keyboard-focus perimeter; do not
+remove focus indications or change unrelated buttons.
+
+### Request logs
+
+Keep request rows compact: show the initiating user and the safe used-key label
+in one identity column. Authorized request content opens through a Details row
+action in the shared responsive native dialog, outside the table; restricted
+content remains restricted. Reuse the shared top-right Close action, structured
+facts, scrollable content and focus/Escape behavior. Details must remain available
+on keyboard focus and touch, with no inline row expansion. USD costs in these logs
+and their details use `$`, retaining existing precision and numeric values; do not
+change other currency presentation or billing calculations.
+
 ### Company support and personal contacts
 
 Every company role has a Support section. Its client manager card reuses
 `UserUI.identity`, shared panel tokens and secondary link actions, with responsive
 wrapping. Empty assignment/contact states explain the next step. Only deliberately
 published links are shown; account email is not inferred as a contact method.
+Connected instances read this same company-bound card through the company-key
+Support API. Keep company selection server-owned and preserve the browser-only
+Support endpoint for ordinary signed-in sessions.
 Profile Contact links uses a heading Save, shared floating fields and an editable
 Label/Link table with Add contact and Remove actions. The table scrolls within
 its container on narrow screens. Optional-sharing guidance names its audience.
-Member rows reuse the same contact-link renderer below the shared person identity.
-No design-system exception is required.
+Member rows keep the shared person identity compact. Valid published contacts use
+that identity as a hover, keyboard and touch trigger for a floating nonmodal
+popover containing the shared contact links. Interactive links never use tooltip
+semantics. The panel remains open while pointer or focus is inside, dismisses on
+Escape or outside interaction without immediate reopening, and closes when its
+company/view context ends. Empty or invalid contacts leave an ordinary identity.
+Reuse popup tokens and the shared close action; opening contacts must not resize
+the row or discard role/limit drafts. Profile and Support retain their existing
+contact presentation.
 
 
 Payment request **Expired** is a terminal state distinct from a short Stripe
@@ -469,7 +499,7 @@ reuse the same naming helper; filtering does not rename the remaining choices.
 ## Playground project actions
 
 The Journal's shared Project dropdown contains **All Projects**, **No Projects**, **New Project…**, a divider, then existing projects. New Project opens the existing creation dialog without changing the filter; cancelling retains the filter. No Projects filters unassigned history and never becomes a submitted project identity. Keep the field 240px wide where space permits, shrinking to available width, with shared ellipsis and full accessible text. A real selected project shows **Edit** inside the field at the right, vertically centered; it opens Rename/Delete independently of the combobox. All/No Projects hide Edit. Keep Edit a sibling of the combobox button, never nested interactive markup. No external plus or ellipsis buttons remain.
-All Save, Apply and Edit actions embedded inside an input or dropdown are plain text actions without an inner border, background or shadow. The outer field retains its shared focus/selection perimeter; inner text actions use an underline for keyboard focus, including forced colors. Keep standalone buttons unchanged. The internal Edit follows this shared rule. Retain its 44px touch target and placement; use a text underline for keyboard focus rather than a border. Its Rename/Delete menu matches the complete parent field width and uses small monochrome icons in the shared SVG style. The generic menu opt-in must not resize unrelated menus. Shared dropdown labels align with the selected-value content edge, including the reserved layout border; focus must not shift either edge. Menu dividers use the same shared horizontal content gutters as option text and checkmarks.
+All Save, Apply and Edit actions embedded inside an input or dropdown are plain text actions without an inner border, background or shadow. The outer field retains its shared focus/selection perimeter; inner text actions use an underline for keyboard focus, including forced colors. Keep standalone buttons unchanged. The internal Edit follows this shared rule. Retain its 44px touch target and placement; use a text underline for keyboard focus rather than a border. Its Rename/Delete menu matches the complete parent field width and uses small monochrome icons in the shared SVG style. The profile dropdown reuses that 16px outline SVG treatment in an 18px leading column with an 8px gap and 44px action targets. Icons are decorative, inherit each action's existing color, and do not change labels, order, visibility or keyboard behavior. The generic menu opt-in must not resize unrelated menus. Shared dropdown labels align with the selected-value content edge, including the reserved layout border; focus must not shift either edge. Menu dividers use the same shared horizontal content gutters as option text and checkmarks.
 Reuse `FormUI.dialogHeading`, floating fields and the shared compact actions.
 Deletion requires confirmation and clears tags only, retaining generations/media.
 
@@ -520,6 +550,11 @@ installation-name fields. Resume the saved request after reload; never create
 requests on page load or radio selection. The compact pending state shows the
 comparison code, Open Sociaro fallback, status and Cancel. Only a verified,
 redeemed and locally saved connection is labeled Connected.
+The connected company’s Management page contains the local-owner Disconnect
+action and explains that the company is hosted on Sociaro. Disconnect returns
+to local operation without deleting the central company or files; keep the
+existing consequence confirmation. Do not place this control in the personal
+menu or conflate it with central installation-access revocation.
 
 On Sociaro, use the existing shared modal heading, account identity and compact
 actions: **Connect this installation?**, its name/address, comparison code and
@@ -545,7 +580,14 @@ Show compact limits without an approximate symbol; exact-byte admission remains
 unchanged. Drop targets and adjacent actions share the 44px height. Library fields
 and sections use the shared 16px gap without a redundant selection explanation.
 Cards retain equal 12px corner rounding and the shared 2px selected perimeter.
-Selection Remove uses a compact neutral translucent label; permanent Delete uses danger colors. Both retain compact labels inside 44px gesture targets,
+In-progress reference uploads occupy transient cards in the Reference library
+grid, with a bounded empty media frame, centered loading indicator and the shared
+compact action labelled `Cancel upload`. Each pending card is nonselectable and
+has no saved-file Delete action. Cancellation aborts that file's transfer or
+removes it from the queue and suppresses late UI completion; it never deletes a
+stored file. Retain accessible status/error feedback, keyboard focus and reduced
+motion support when cards complete, fail, retry or leave the current view.
+Selection Remove uses the shared `ReferenceUpload` compact neutral translucent label in both single-file and multiple-file previews. Templates, Appearance, provider and invoice logos, override audio and resource-source uploads reuse the same label markup and gesture target; page-level button typography must not override these media actions. A selected completed-generation source retains its adjacent Remove placement so its lazy authorized media preview and playback remain unchanged, but uses the same shared action label and hit target. Native resource bindings and text-list removal are not file-preview controls. Permanent Delete uses danger colors. Both retain compact labels inside 44px gesture targets,
 without a white outline. Permanent deletion requires two activations of the same
 button: Delete, then Confirm Delete. Leaving its focus, Escape or closing the library
 resets confirmation. Permission, in-use and uncertain-completion protections remain
@@ -564,6 +606,15 @@ on their thumbnail/placeholder, with a 44px target and visible focus; do not add
 detached Preview action or Rename UI. Names and existing APIs remain unchanged.
 Selected and focused cards use the configured `--accent`, rather than a fixed blue or a copy of the current theme color. Selection and keyboard focus share one perimeter; the focused selected edge is thicker. Preview
 failures offer an overlay retry without changing the binding.
+
+Selected-image media frames follow the image's intrinsic canvas aspect ratio
+within the shared preview bounds, including meaningful transparent padding; never
+crop to opaque pixels or stretch the frame across an unrelated upload field.
+Captions stay outside the media surface. Appearance uses the same proportional
+media-card rendering for explicit uploads and inherited images, while inherited
+images keep Upload available and have no Remove action. Logo, Compact Logo and
+Favicon preview canvases use fixed white for their light target and black for
+their dark target, independent of the current application theme or custom palette.
 
 Single-file selection controls reuse `ReferenceUpload` with `onRemove`. Empty
 blocks show Upload and Choose from library when that scope has a library. Selected
@@ -845,3 +896,15 @@ Journal Copy and Try again actions do not depend on catalogue load order. Check
 current availability on activation; keep the draft and saved generation unchanged
 when the check fails or the model is unavailable. Session mutation retries retain
 their separate explicit-review safeguard.
+
+Journal video previews use the decoded intrinsic aspect ratio at a 330px outer
+height, reduced proportionally when needed to fit the available width. Preserve
+the full frame and native controls, with a bounded fallback before metadata loads.
+
+The console header starts with Keys, Docs, Playground and Templates, followed by
+other authorized sections. Keys uses the current workspace and existing key-issuance
+permissions; subsection navigation and browser history keep its active state current.
+
+Successful central installation approval closes a script-created window directly,
+without another modal. If closing is blocked, show one nonmodal approval status.
+The local interface becomes Connected only after its existing redemption succeeds.

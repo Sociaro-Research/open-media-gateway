@@ -51,13 +51,13 @@ func AssessCompleteness(previous State, native Capture, observations []Observati
 		checked[ob.Source.ID] = true
 		s := CoverageSource{Source: ob.Source, Hash: ob.Hash, Status: "retrieved"}
 		if ob.Error != "" {
-			s.Status = "retrieval_failed"
+			s.Status = failureStatus(ob)
 			s.Hash = ob.FetchedHash
 			old := previous.Observations[ob.Source.ID]
 			if old.Source == ob.Source {
 				s.LastConfirmedHash = old.Hash
 			}
-			result.Reasons = append(result.Reasons, ob.Source.ID+": retrieval failed; current verification unavailable")
+			result.Reasons = append(result.Reasons, ob.Source.ID+": "+strings.ReplaceAll(s.Status, "_", " ")+"; current verification unavailable")
 		}
 		result.Sources = append(result.Sources, s)
 	}

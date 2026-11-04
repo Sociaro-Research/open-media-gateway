@@ -79,15 +79,15 @@
       dialog.showModal();FormUI.refresh();name.focus();
     }
     function imageEditor(slot){
-      const box=el('div',undefined,'branding-asset');box.dataset.asset=slot.key;
-      const previewBox=el('div',undefined,'branding-image-preview'),img=el('img'),text=el('span',undefined,'branding-image-text'),source=el('p','','branding-image-source');img.alt=slotName(slot)+' preview';source.id='brand-image-source-'+slot.key;previewBox.append(img,text);
+      const box=el('div',undefined,'branding-asset');box.dataset.asset=slot.key;if(slot.theme)box.dataset.previewTheme=slot.theme;
+      const source=el('p','','branding-image-source');source.id='brand-image-source-'+slot.key;
       const widget=ReferenceUpload.create({label:slot.label,headingTag:'h4',kinds:['image'],maxBytes:()=>512*1024,limits:()=>({content_types:slot.theme?['image/png','image/jpeg','image/svg+xml']:['image/png','image/jpeg']}),locked:()=>busy||!current(),
        onBusy:value=>{pendingUploads+=value?1:-1;save.disabled=colorSave.disabled=busy||pendingUploads>0;changed();},
        validate:async selected=>{if(!selected.size||selected.size>512*1024)throw Error('Image must be nonempty and at most '+FileSize.exact(512*1024)+'.');const mime=/\.svg$/i.test(selected.name)?'image/svg+xml':selected.type;if(!['image/png','image/jpeg','image/svg+xml'].includes(mime)||(!slot.theme&&mime==='image/svg+xml'))throw Error('Choose a supported image format.');},
        onFile:async(selected,signal)=>{const mime=/\.svg$/i.test(selected.name)?'image/svg+xml':selected.type;const encoded=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result.split(',')[1]);reader.onerror=()=>reject(Error('Could not read image.'));reader.readAsDataURL(selected);});signal.throwIfAborted();if(!current())return;draft.assets[slot.key]={mime,data:encoded};refreshImages();renderPreview();changed();FormUI.message(status,'');},
        onRemove:()=>{delete draft.assets[slot.key];widget.clearRetry();refreshImages();renderPreview();changed();}});
       widget.input.name='asset_'+slot.key;widget.upload.setAttribute('aria-label','Upload '+slot.label.toLowerCase()+(slot.theme?' in '+slot.theme+' theme':''));widget.remove.setAttribute('aria-label','Remove '+slot.label.toLowerCase()+(slot.theme?' in '+slot.theme+' theme':''));
-      box.append(widget.root,previewBox,source);assetControls.set(slot.key,{slot,previewBox,img,text,source,remove:widget.remove,widget});return box;
+      box.append(widget.root,source);assetControls.set(slot.key,{slot,source,widget,inherited:null,inheritedURL:''});return box;
     }
     const previewHeader=el('div',undefined,'branding-preview-header'),previewTitle=el('h3','Preview'),themeLabel=el('label',undefined,'system-toggle branding-preview-mode'),themeToggle=el('input');themeToggle.type='checkbox';themeToggle.name='preview_light';themeToggle.checked=previewTheme==='light';themeToggle.setAttribute('aria-label','Light preview');themeLabel.append(el('span','Dark'),themeToggle,el('span','Light'));previewHeader.append(previewTitle,themeLabel);
     const preview=el('div',undefined,'branding-preview'),previewLogo=el('img'),previewName=el('h3'),previewText=el('p','Preview of panels, text, actions and feedback.'),previewAction=el('button','Primary action','primary compact');previewAction.type='button';const previewDanger=el('button','Danger action','primary compact danger');previewDanger.type='button';const previewFeedback=el('div',undefined,'branding-preview-feedback');for(const [key,label]of [['success','Success'],['yellow','Warning'],['red','Error']]){const n=el('span',label);n.style.color='var(--'+key+')';previewFeedback.append(n);}preview.append(previewHeader,previewLogo,previewName,previewText,previewAction,previewDanger,previewFeedback);for(const checked of [false,true]){const label=el('label',undefined,'system-toggle'),switchInput=el('input'),state=el('span',checked?'On':'Off');switchInput.type='checkbox';switchInput.checked=checked;switchInput.setAttribute('aria-label','Preview switch '+(checked?'on':'off'));switchInput.onchange=()=>{state.textContent=switchInput.checked?'On':'Off';};label.append(switchInput,state);preview.append(label);}colorForm.append(preview);
@@ -106,7 +106,17 @@
     const save=el('button','Save','primary compact');save.type='submit';form.append(save);
     const colorSave=el('button','Save','primary compact');colorSave.type='submit';colorForm.append(colorSave);
     function renderPreview(){for(const [key,value]of Object.entries(selectedPreset()[previewTheme]))if(/^#[0-9a-fA-F]{6}$/.test(value))preview.style.setProperty('--'+key,value);const image=resolveImage(draft,'logo'+(previewTheme==='light'?'_light':''));previewLogo.hidden=!image.url;if(image.url)previewLogo.src=image.url;else previewLogo.removeAttribute('src');previewLogo.alt=draft.name;previewName.textContent=draft.name;}
-    function refreshImages(){for(const [key,{slot,previewBox,img,text,source,remove,widget}]of assetControls){const resolved=resolveImage(draft,key),palette=selectedPreset()[slot.theme||'light'];for(const token of ['panel','text','line'])if(/^#[0-9a-fA-F]{6}$/.test(palette[token]))previewBox.style.setProperty('--'+token,palette[token]);img.hidden=!resolved.url;if(resolved.url&&img.getAttribute('src')!==resolved.url)img.src=resolved.url;else if(!resolved.url)img.removeAttribute('src');text.hidden=!resolved.text;text.textContent=resolved.text||'';source.textContent=resolved.note;remove.hidden=!draft.assets[key];previewBox.hidden=!!draft.assets[key]||!resolved.url;const asset=draft.assets[key];widget.setPreview(asset?{name:slotName(slot),type:asset.mime,url:'data:'+asset.mime+';base64,'+asset.data}:null);widget.sync();}}
+    function refreshImages(){for(const [key,control]of assetControls){
+      const {slot,source,widget}=control,resolved=resolveImage(draft,key),asset=draft.assets[key];source.textContent=resolved.note;
+      widget.setPreview(asset?{name:slotName(slot),type:asset.mime,url:'data:'+asset.mime+';base64,'+asset.data}:null);
+      // Inherited artwork shares the same measured media row, but is not a local
+      // selection: Upload remains available and there is no inherited Remove.
+      if(!asset&&resolved.url){
+        if(control.inheritedURL!==resolved.url){control.inherited=ReferenceUpload.mediaCard({name:slotName(slot),type:resolved.mime,url:resolved.url});control.inheritedURL=resolved.url;}
+        ReferenceUpload.reconcile(widget.previews,[control.inherited]);
+      }else{control.inherited=null;control.inheritedURL='';}
+      widget.sync();
+    }}
     function refresh(){for(const key of ['name','description','contact_email'])form.elements[key].value=draft[key];for(const [key,input]of widthInputs)input.value=(key==='site_max_width'&&draft[key]===undefined?1280:draft[key])??'';tree.checked=!!draft.sidebar_subsections;presetSelect.replaceChildren(...draft.presets.map(p=>new Option(presetTitle(p),p.id)),new Option('+ Create new theme',''));presetSelect.value=selectedPreset().id;presetName.value=selectedPreset().name;presetState();for(const {hex,picker,theme,key}of paletteInputs.values()){hex.value=selectedPreset()[theme][key];picker.value=/^#[0-9a-fA-F]{6}$/.test(hex.value)?hex.value:'#000000';}refreshImages();renderPreview();FormUI.refresh();ControlPickers.sync(presetSelect);}
     const read=()=>JSON.stringify(appearanceValues(draft)),colorRead=()=>JSON.stringify({presets:draft.presets,default_preset:draft.default_preset});
     function changed(){FormUI.update(form);FormUI.update(colorForm);}

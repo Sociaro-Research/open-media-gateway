@@ -132,7 +132,7 @@ const server = http.createServer((req, res) => {
     const seedance={...video,id:'dreamina-seedance-2-0-260128',public_id:'bytedance/dreamina-seedance-2-0-260128',display_name:'Seedance 2.0',resolutions:['480p','720p'],max_duration:15,supports_audio:true,supports_video_input:true,max_video_inputs:3,reference_modes:[{id:'none',label:'Text only',max_images:0,max_videos:0,max_audios:0},{id:'references',label:'References',min_images:0,max_images:9,min_videos:0,max_videos:3,min_audios:0,max_audios:3}]};
     const seedanceProvider={id:'bytedance',name:'BytePlus Seedance',models:[seedance]};
     catalog.push(seedanceProvider);
-    const reference='/references/fixture/video.mp4?signature=fixture';
+    const reference=`http://127.0.0.1:${server.address().port}/references/fixture/video.mp4?signature=fixture`;
     tasks=[{id:'failed-seedance',provider:'bytedance',provider_model:seedance.id,model:seedance.public_id,media_type:'video',status:'failed',prompt:'Use @Video1 as the cinematic reference.',seconds:'15',size:'480p',options:{ratio:'16:9',generate_audio:true,seed:0,reference_mode:'references',video_urls:[reference]},created_at:Math.floor(Date.now()/1000),updated_at:Math.floor(Date.now()/1000),error:{message:'Fixture provider rejection'}}];
     await page.evaluate(async()=>{await loadProviders();await loadTasks(true);});
     const copiedTask=page.locator('[data-task-id="failed-seedance"]');
@@ -140,8 +140,10 @@ const server = http.createServer((req, res) => {
       await page.setViewportSize({width,height:1000});
       await page.evaluate(()=>updateModelSelection(modelSelectionValue('mock','shared-id')));
       await page.locator('#prompt').fill('Replace this draft');
+      await page.locator('#formMessage').evaluate(node=>{node.textContent='';});
       await copiedTask.locator('.task-menu summary').focus();await page.keyboard.press('Enter');
       await copiedTask.locator('.reuse-task').focus();await page.keyboard.press('Enter');
+      await page.waitForFunction(()=>document.querySelector('#formMessage').textContent==='Parameters copied. Ready to edit.');
       assert.equal(await page.locator('#formMessage').innerText(),'Parameters copied. Ready to edit.');
       assert.deepEqual(await page.evaluate(()=>[selectedProvider().id,selectedModel().id]),['bytedance',seedance.id]);
       assert.equal(await page.locator('#prompt').inputValue(),tasks[0].prompt);
@@ -154,20 +156,28 @@ const server = http.createServer((req, res) => {
       assert.equal(await page.locator('#videoSelectedReferences .reference-card').count(),1);
       assert.equal(await page.locator('#prompt').evaluate(e=>e===document.activeElement),true);
       assert.equal(await copiedTask.locator('.task-menu').getAttribute('open'),null);
-      assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+      await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+      const copyGeometry=await page.evaluate(()=>({width:innerWidth,scrollWidth:document.documentElement.scrollWidth,offenders:[...document.querySelectorAll('body *')].map(n=>({tag:n.tagName,className:typeof n.className==='string'?n.className:'',right:n.getBoundingClientRect().right,width:n.getBoundingClientRect().width})).filter(n=>n.right>innerWidth+1).slice(0,15)}));
       await page.screenshot({path:path.join(output,`seedance-copy-${width}.png`)});
+      assert.ok(copyGeometry.scrollWidth<=copyGeometry.width,JSON.stringify(copyGeometry));
     }
     // Renaming a public alias must not prevent copying the original task.
     seedance.public_id='cinema-renamed';await page.evaluate(()=>loadProviders());
-    await copiedTask.locator('.task-menu summary').click();await copiedTask.locator('.reuse-task').click();
+    await page.locator('#formMessage').evaluate(node=>{node.textContent='';});
+    await copiedTask.locator('.task-menu summary').focus();await page.keyboard.press('Enter');
+    await copiedTask.locator('.reuse-task').focus();await page.keyboard.press('Enter');
+    await page.waitForFunction(()=>document.querySelector('#formMessage').textContent==='Parameters copied. Ready to edit.');
     assert.equal(await page.locator('#formMessage').innerText(),'Parameters copied. Ready to edit.');
     assert.equal(await page.evaluate(()=>estimateRequest().model),seedance.id);
     assert.equal(await page.evaluate(()=>generationRequest(estimateRequest()).model),'cinema-renamed');
     seedanceProvider.models=[];await page.evaluate(()=>loadProviders());
     await page.locator('#prompt').fill('Keep this draft');
     const selection=await page.locator('#model').inputValue();
-    await copiedTask.locator('.task-menu summary').click();await copiedTask.locator('.reuse-task').click();
-    assert.match(await page.locator('#formMessage').innerText(),/provider or model is unavailable/);
+    await page.locator('#formMessage').evaluate(node=>{node.textContent='';});
+    await copiedTask.locator('.task-menu summary').focus();await page.keyboard.press('Enter');
+    await copiedTask.locator('.reuse-task').focus();await page.keyboard.press('Enter');
+    await page.waitForFunction(()=>document.querySelector('#formMessage').textContent==='This provider or model is no longer available. Your draft and saved generation are unchanged.');
+    assert.equal(await page.locator('#formMessage').innerText(),'This provider or model is no longer available. Your draft and saved generation are unchanged.');
     assert.equal(await page.locator('#prompt').inputValue(),'Keep this draft');
     assert.equal(await page.locator('#model').inputValue(),selection);
     // Connection IDs and refreshed mode descriptors are part of model identity.

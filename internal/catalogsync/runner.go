@@ -129,7 +129,9 @@ func (r *Runner) check(parent context.Context, schedule Schedule, settings Setti
 			}); ok {
 				entries, err := interpreter.InterpretCatalogSource(call, schedule.Provider, source, ob.Text)
 				if err != nil {
-					ob.Error = "Operational source interpretation failed; last confirmed information was preserved"
+					ob.Error = interpretationError
+					ob.FailureStage = "interpretation"
+					ob.ModelReview = interpretationReview(err, source, ob.Hash)
 					ob.FetchedHash = ob.Hash
 					ob.Hash = ""
 				} else if entries != nil {
@@ -182,12 +184,15 @@ func Report(run Run) (string, string, string) {
 	}
 	for _, w := range run.NewWarnings {
 		newKeys[w.Key] = true
-		fmt.Fprintf(&out, "%s [%s]: %s\nEvidence: %s\n", w.Model, w.Source, w.Reason, w.Evidence)
+		fmt.Fprintf(&out, "%s [%s]: %s\nEvidence: %s\n", w.Model, w.Source, w.Reason, reportWarningEvidence(w, run.Sources))
 	}
 	out.WriteString("\nPREVIOUS WARNINGS — STILL OPEN\n")
 	for _, w := range run.OpenWarnings {
 		if !newKeys[w.Key] {
 			fmt.Fprintf(&out, "%s [%s]: %s\nFirst seen: %s; last seen: %s; checks: %d\n", w.Model, w.Source, w.Reason, w.FirstSeen.Format(time.RFC3339), w.LastSeen.Format(time.RFC3339), w.Occurrences)
+			if w.Reason == sourceFailureReason {
+				fmt.Fprintf(&out, "Evidence: %s\n", reportWarningEvidence(w, run.Sources))
+			}
 		}
 	}
 	out.WriteString("\nRESOLVED WARNINGS\n")

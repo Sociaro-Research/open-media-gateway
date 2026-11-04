@@ -148,7 +148,7 @@ func TestKling4ValidationPublishedPricesAndAccountOverrides(t *testing.T) {
 
 func TestReferencePromptMetadataMatchesReviewedKlingRoutes(t *testing.T) {
 	for _, model := range catalog() {
-		if model.ID == OmniVideo4 || model.ID == OmniVideo3 || model.ID == OmniVideoO1 {
+		if model.ID == OmniVideo4 || model.ID == OmniVideo4Flash || model.ID == OmniVideo3 || model.ID == OmniVideoO1 {
 			if model.ReferencePromptSyntax != "kling-id" || strings.Join(model.ReferencePromptTypes, ",") != "image,video" {
 				t.Fatal(model)
 			}

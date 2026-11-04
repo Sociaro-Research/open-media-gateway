@@ -9,6 +9,8 @@
  function fileTypes(kind,rule){const declared=rule?.content_types;return declared?.length?[...types[kind],...extended[kind]].filter(type=>declared.some(item=>equivalent(item)===equivalent(type))):types[kind];}
  const el=(tag,text='',cls='')=>{const n=document.createElement(tag);n.textContent=text;n.className=cls;return n;};
  const button=(text,fn)=>{const b=el('button',text,'secondary');b.type='button';b.onclick=fn;return b;};
+ // Selected-file and library actions share one compact label inside the hit target.
+ const mediaAction=(text,fn)=>{const b=button('',fn);b.classList.add('media-picker-action');b.append(el('span',text,'media-picker-action-label'));return b;};
  const formatLimit=bytes=>FileSize.megabytes(bytes).replaceAll('≈','');
  const compactLimit=bytes=>{const unit=bytes>=1000000?1000000:bytes>=1000?1000:1,value=Math.round(bytes/unit);return value+(unit===1000000?' MB':unit===1000?' KB':' B');};
  const formatNames={'image/jpeg':'JPEG','image/svg+xml':'SVG','image/webp':'WebP','video/quicktime':'MOV','audio/mpeg':'MP3','audio/mp4':'M4A','audio/wave':'WAV','audio/wav':'WAV','audio/x-wav':'WAV'};
@@ -47,7 +49,7 @@
   const failure=el('span','Preview unavailable','media-picker-preview-error'),retryPreview=button('Retry preview',event=>{event.stopPropagation();if(current.url&&media.tagName!=='DIV'){delete card.dataset.previewError;failure.hidden=true;retryPreview.hidden=true;media.src=window.CompanyConnection?.url(current.url)||current.url;if(media.tagName!=='IMG')media.load();}});failure.hidden=retryPreview.hidden=true;retryPreview.classList.add('media-picker-preview-retry');media.addEventListener('error',()=>{failure.hidden=retryPreview.hidden=false;});media.addEventListener(media.tagName==='IMG'?'load':'loadedmetadata',()=>{delete card.dataset.previewError;failure.hidden=retryPreview.hidden=true;});
   shell.append(media,failure,retryPreview);card.append(shell,caption);if(choose){choose.append(el('span',item.name||'Reference','sr-only'));card.append(choose);}
   let play;if(kind==='video'&&media.tagName==='VIDEO'){play=button('▶',event=>{event.stopPropagation();if(media.paused)media.play().catch(()=>{card.dataset.previewError='true';});else media.pause();});play.classList.add('reference-play');const sync=()=>{play.textContent=media.paused?'▶':'Ⅱ';play.setAttribute('aria-label',(media.paused?'Play ':'Pause ')+(current.name||'video'));};media.addEventListener('play',sync);media.addEventListener('pause',sync);sync();shell.append(play);}
-  let removeButton;if(onRemove){removeButton=button('',event=>{event.stopPropagation();if(!removeButton.disabled)remove?.(current,event);});removeButton.append(el('span',removeLabel,'media-picker-action-label'));removeButton.classList.add(library?'reference-delete':'reference-selection-remove');removeButton.setAttribute('aria-label',removeLabel+' '+item.name+(library?' from library':''));shell.append(removeButton);touchGuard(card,'.reference-delete,.reference-selection-remove');}
+  let removeButton;if(onRemove){removeButton=mediaAction(removeLabel,event=>{event.stopPropagation();if(!removeButton.disabled)remove?.(current,event);});removeButton.classList.add(library?'reference-delete':'reference-selection-remove');removeButton.setAttribute('aria-label',removeLabel+' '+item.name+(library?' from library':''));shell.append(removeButton);touchGuard(card,'.reference-delete,.reference-selection-remove');}
   const strip=library?el('span','Selected','reference-selected-strip'):null;if(strip){strip.hidden=true;card.append(strip);}
   card.update=(value,options={})=>{const previous=current;current=value;if(media.tagName!=='DIV'&&value.url&&(value.revision!==previous.revision||value.version!==previous.version||!media.hasAttribute('src')||card.dataset.previewError==='true'&&(window.CompanyConnection?.url(value.url)||value.url)!==media.getAttribute('src'))){delete card.dataset.previewError;media.src=window.CompanyConnection?.url(value.url)||value.url;}select=options.onSelect??select;remove=options.onRemove??remove;caption.textContent=value.name||'Reference';caption.title=caption.textContent;if(choose){choose.setAttribute('aria-pressed',String(!!options.selected));choose.disabled=!!options.busy||!!value.deleting;choose.setAttribute('aria-label',options.selectionLabel||selectionLabel||'Use '+value.name+' in generation');}if(removeButton){removeButton.disabled=!!options.busy||!!value.deleting||options.canDelete===false;removeButton.title=options.deleteReason||'';}if(strip)strip.hidden=!options.selected;card.dataset.selected=String(!!options.selected);};
   card.preview=media;card.removeButton=removeButton;card.update(item);return card;
@@ -65,7 +67,7 @@
   const cancel=button('Cancel upload',()=>operation?.abort());cancel.dataset.uploadCancel='';cancel.hidden=true;
   const retry=button('Retry upload',()=>{returnFocus=true;if(lastFiles.length)select(lastFiles);});retry.hidden=true;
   actions.append(upload);if(library)actions.append(library);actions.append(cancel,retry);drop.append(el('p',config.multiple?'Drop files here':'Drop file here'));row.append(drop,actions);root.append(header,row,previews,precision,status,input);
-  const remove=config.onRemove?button('Remove',event=>{event.stopPropagation();if(locked())return;config.onRemove();if(root.isConnected)upload.focus({preventScroll:true});}):null;
+  const remove=config.onRemove?mediaAction('Remove',event=>{event.stopPropagation();if(locked())return;config.onRemove();if(root.isConnected)upload.focus({preventScroll:true});}):null;
   if(remove){remove.dataset.uploadRemove='';remove.classList.add('reference-selection-remove','reference-preview-remove');remove.setAttribute('aria-label','Remove');remove.setAttribute('aria-description','Remove '+config.label);remove.hidden=true;}
   const unobserve=observeRow(previews);
   function focusAction(){const action=remove&&selected?remove:upload;if(!action.disabled)action.focus({preventScroll:true});}
@@ -84,5 +86,5 @@
   const dispose=()=>{if(disposed)return;disposed=true;lifetimes.delete(root);operation?.abort();setPreview(null);unobserve();};lifetimes.set(root,dispose);config.signal?.addEventListener('abort',dispose,{once:true});
   const api={root,input,drop,actions,header,hint,previews,status,upload,library,remove,message,sync,setPreview,run,error,setLabel,dispose,select,clearRetry(){lastFiles=[];retry.hidden=true;}};if(remove)previews.append(remove);sync();return api;
  }
- window.ReferenceUpload={create,formatLimit,compactLimit,formats,fileTypes,mediaCard,touchGuard,trackRatio,layoutRow,observeRow,reconcile,stop};
+ window.ReferenceUpload={create,formatLimit,compactLimit,formats,fileTypes,mediaCard,mediaAction,touchGuard,trackRatio,layoutRow,observeRow,reconcile,stop};
 })();

@@ -57,12 +57,17 @@ func videoPriceTables() []klingPriceTable {
 	out := "Per second (Total duration = Output duration)"
 	columns := map[int]string{3: "720p", 4: "1080p", 5: "4k"}
 	low := map[int]string{3: "720p", 4: "1080p"}
+	flash := map[int]string{3: "720p"}
 	high := map[int]string{4: "1080p"}
 	call := map[int]string{3: ""}
 	row := func(model, feature, billing, suffix string, cols map[int]string, v ...klingPriceVariant) klingPriceRow {
 		return klingPriceRow{key: model + "|" + feature, billing: billing, suffix: suffix, columns: cols, variants: v}
 	}
 	rows := []klingPriceRow{
+		row("Kling 4.0 Flash", "No Input Video (Input videos include reference videos (feature video and base video), and video character element.)", out, "s", flash,
+			klingPriceVariant{ids: []string{TextToVideo4Flash, ImageToVideo4Flash}, rate: catalogsync.Rate{VideoInput: priceBool(false)}}, klingPriceVariant{ids: []string{OmniVideo4Flash}, rate: catalogsync.Rate{VideoInput: priceBool(false), VideoInputIncludesResources: true}}),
+		row("Kling 4.0 Flash", "With Input Video (Input Duration ≤ Output Duration) (Input videos include reference videos (feature video and base video), and video character element.)", "Per second (Total duration = Output duration × 2)", "s", flash, klingPriceVariant{ids: []string{OmniVideo4Flash}, rate: catalogsync.Rate{VideoInput: priceBool(true), VideoInputIncludesResources: true, DurationBillingRule: "output_plus_max_input_output"}}),
+		row("Kling 4.0 Flash", "With Input Video (Input Duration > Output Duration) (Input videos include reference videos (feature video and base video), and video character element.)", "Per second (Total duration = Input duration + Output duration)", "s", flash, klingPriceVariant{ids: []string{OmniVideo4Flash}, rate: catalogsync.Rate{VideoInput: priceBool(true), VideoInputIncludesResources: true, DurationBillingRule: "output_plus_max_input_output"}}),
 		row("Kling 4.0", "No Input Video (Input videos include reference videos (feature video and base video), and video character element.)", out, "s", low,
 			klingPriceVariant{ids: []string{TextToVideo4, ImageToVideo4}, rate: catalogsync.Rate{VideoInput: priceBool(false)}}, klingPriceVariant{ids: []string{OmniVideo4}, rate: catalogsync.Rate{VideoInput: priceBool(false), VideoInputIncludesResources: true}}),
 		row("Kling 4.0", "With Input Video (Input Duration ≤ Output Duration) (Input videos include reference videos (feature video and base video), and video character element.)", "Per second (Total duration = Output duration × 2)", "s", low, klingPriceVariant{ids: []string{OmniVideo4}, rate: catalogsync.Rate{VideoInput: priceBool(true), VideoInputIncludesResources: true, DurationBillingRule: "output_plus_max_input_output"}}),
@@ -269,7 +274,7 @@ func interpretPrices(source catalogsync.Source, text string) ([]catalogsync.Entr
 	selectors := map[string]map[string]catalogsync.Rate{}
 	seen := map[string]bool{}
 	active := -1
-	for _, line := range strings.Split(text, "\n") {
+	for lineIndex, line := range strings.Split(text, "\n") {
 		if !strings.HasPrefix(strings.TrimSpace(line), "|") {
 			continue
 		}
@@ -309,7 +314,10 @@ func interpretPrices(source catalogsync.Source, text string) ([]catalogsync.Entr
 			}
 		}
 		if row == nil {
-			return nil, errors.New("Kling pricing row or condition changed; adapter review is required")
+			// Read the original model column: normalization must not turn hostile
+			// markup or control characters into trusted public evidence.
+			rawCells := strings.Split(strings.TrimSpace(line), "|")
+			return nil, catalogsync.NewModelReviewError(source, strings.Trim(rawCells[1], " "), lineIndex+1)
 		}
 		unique := fmt.Sprint(active) + "/" + key
 		if seen[unique] {

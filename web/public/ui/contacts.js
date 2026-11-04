@@ -16,6 +16,52 @@
   for(const c of contacts||[]){if(!validURL(c.url))continue;const item=el('li'),a=el('a',c.label,'secondary contact-link');a.href=c.url;a.target='_blank';a.rel='noopener noreferrer';a.referrerPolicy='no-referrer';item.append(a);list.append(item);}
   return list;
  }
+ let activeMember=null,memberSequence=0;
+ function closeMember({restore=false,suppress=false}={}){
+  if(!activeMember)return;const state=activeMember;activeMember=null;clearTimeout(state.timer);state.control.panelHover=false;state.observer.disconnect();state.resizeObserver.disconnect();cancelAnimationFrame(state.frame);state.panel.remove();state.trigger.setAttribute('aria-expanded','false');state.trigger.removeAttribute('aria-controls');
+  if(suppress)state.control.suppressed=true;
+  if(restore&&state.trigger.isConnected){state.control.restoring=true;state.trigger.focus({preventScroll:true});state.control.restoring=false;}
+ }
+ function positionMember(){
+  if(!activeMember)return;const {trigger,panel,current}=activeMember;
+  if(!trigger.isConnected||!current()){closeMember();return;}
+  const r=trigger.getBoundingClientRect();if(r.bottom<0||r.top>innerHeight||r.right<0||r.left>innerWidth){closeMember();return;}
+  panel.style.maxHeight=Math.max(80,innerHeight-24)+'px';const b=panel.getBoundingClientRect(),below=r.bottom+8;
+  panel.style.left=Math.max(12,Math.min(r.left,innerWidth-b.width-12))+'px';panel.style.top=Math.max(12,Math.min(below+b.height<=innerHeight-12?below:r.top-b.height-8,innerHeight-b.height-12))+'px';
+ }
+ function memberIdentity(person,{current=()=>true}={}){
+  const box=el('div',null,'member-contact'),identity=UserUI.identity(person,{secondary:true}),contacts=links(person.contacts);
+  if(!contacts.children.length){box.append(identity);return box;}
+  const trigger=el('button',null,'member-contact-trigger'),control={hover:false,panelHover:false,suppressed:false,pointer:false};trigger.type='button';trigger.append(identity);trigger.setAttribute('aria-haspopup','dialog');trigger.setAttribute('aria-expanded','false');trigger.setAttribute('aria-label','Contact '+UserUI.name(person));box.append(trigger);
+  const inside=()=>box.contains(document.activeElement);
+  const releaseSuppression=()=>{if(!control.hover&&!inside())control.suppressed=false;};
+  function schedule(){
+   if(activeMember?.trigger!==trigger){setTimeout(releaseSuppression,0);return;}
+   clearTimeout(activeMember.timer);activeMember.timer=setTimeout(()=>{if(activeMember?.trigger===trigger&&!control.hover&&!control.panelHover&&!inside())closeMember();releaseSuppression();},200);
+  }
+  function open(explicit=false){
+   if(!trigger.isConnected||!current()||control.suppressed&&!explicit)return;
+   if(explicit)control.suppressed=false;
+   if(activeMember?.trigger===trigger){clearTimeout(activeMember.timer);return;}
+   closeMember();window.ModelInfo?.close();
+   const panel=el('aside',null,'model-info-popup member-contact-popup'),header=el('div',null,'model-info-header'),dismiss=el('button','×','icon-close');panel.id='member-contacts-'+(++memberSequence);panel.setAttribute('role','dialog');panel.setAttribute('aria-label','Contact '+UserUI.name(person));panel.setAttribute('popover','manual');
+   dismiss.type='button';dismiss.setAttribute('aria-label','Close contacts');dismiss.onclick=()=>closeMember({restore:true,suppress:true});header.append(el('strong',UserUI.name(person)),dismiss);panel.append(header,contacts);box.append(panel);
+   const observer=new MutationObserver(()=>{if(activeMember?.trigger===trigger&&(!trigger.isConnected||!current()))closeMember();});
+   const resizeObserver=new ResizeObserver(()=>{if(activeMember?.trigger!==trigger)return;cancelAnimationFrame(activeMember.frame);activeMember.frame=requestAnimationFrame(positionMember);});
+   activeMember={trigger,panel,control,current,observer,resizeObserver,frame:0,timer:null};observer.observe(document.body,{childList:true,subtree:true});for(const target of [trigger,panel,box.closest('.organizations-content')||document.body])resizeObserver.observe(target);trigger.setAttribute('aria-expanded','true');trigger.setAttribute('aria-controls',panel.id);if(panel.showPopover)panel.showPopover();positionMember();
+   panel.onpointerenter=()=>{control.panelHover=true;clearTimeout(activeMember?.timer);};panel.onpointerleave=()=>{control.panelHover=false;schedule();};panel.onclick=e=>e.stopPropagation();
+  }
+  trigger.onpointerenter=e=>{if(e.pointerType!=='mouse')return;if(!inside())control.suppressed=false;control.hover=true;open();};trigger.onpointerleave=()=>{control.hover=false;schedule();};
+  trigger.onpointerdown=()=>{control.pointer=true;control.openAtPress=activeMember?.trigger===trigger;};
+  trigger.onfocus=()=>{if(!control.restoring&&!control.pointer){control.suppressed=false;open();}};
+  trigger.onclick=e=>{e.stopPropagation();control.pointer=false;if(control.openAtPress&&e.detail!==0)closeMember({suppress:true});else open(true);};
+  trigger.onpointerup=trigger.onpointercancel=trigger.onblur=()=>{control.pointer=false;};
+  box.addEventListener('focusin',()=>{if(activeMember?.trigger===trigger)clearTimeout(activeMember.timer);});box.addEventListener('focusout',schedule);
+  return box;
+ }
+ document.addEventListener('keydown',e=>{if(activeMember&&e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();closeMember({restore:true,suppress:true});}},true);
+ document.addEventListener('pointerdown',e=>{if(activeMember&&!activeMember.trigger.contains(e.target)&&!activeMember.panel.contains(e.target))closeMember({suppress:true});},true);
+ window.addEventListener('resize',positionMember);document.addEventListener('scroll',e=>{if(activeMember&&!activeMember.panel.contains(e.target))positionMember();},true);
  function editor(parent,getUser,saveUser){
   const form=el('form',null,'profile-section profile-contacts'),heading=FormUI.sectionHeading(form,'Contact links'),save=el('button','Save','secondary'),status=el('p'),help=el('p','Optional. These links are shared with your company’s client manager and people who can view company members. Add a label and an email address or a full link, for example https://t.me/name, mailto:name@example.com or tel:+15551234567. Choose Save to publish your changes.','field-explanation');save.type='submit';heading.parentElement.append(save);
   const wrap=el('div',null,'docs-table-wrap'),table=el('table',null,'docs-table contact-editor'),thead=el('thead'),head=el('tr'),tbody=el('tbody');
@@ -44,14 +90,16 @@
   };
  }
  async function support(parent,api,organization,current){
+  const companyID=organization.id,connection=window.CompanyConnection?.record?.()||null,connected=!!window.CompanyConnection?.active?.();
+  const currentSupport=()=>current()&&parent.isConnected&&organization.id===companyID&&(window.CompanyConnection?.record?.()||null)===connection&&!!window.CompanyConnection?.active?.()===connected;
   FormUI.sectionHeading(parent,'Support');const status=el('p','Loading…');status.setAttribute('role','status');parent.append(status);
-  async function load(){status.textContent='Loading…';try{const data=await api('/v1/organizations/'+organization.id+'/support');if(!current())return;status.remove();
+  async function load(){if(!currentSupport())return;status.textContent='Loading…';try{if(connected&&connection?.organization_id!==companyID)throw Error('Company connection changed. Reopen this company.');const data=await api(connected?'/v1/key/support':'/v1/organizations/'+companyID+'/support');if(!currentSupport())return;status.remove();
    const card=el('section',null,'support-card'),person=data.client_manager;
    if(!person){card.append(el('h3','Your support team'),el('p','A client manager has not been assigned to your company yet. Ask your company administrator for help.','field-explanation'));parent.append(card);return;}
    card.append(el('p','Your client manager','support-eyebrow'),UserUI.identity(person));
    const contacts=links(person.contacts);if(contacts.children.length)card.append(el('p','Have a question? Your client manager is here to help. Choose any of the contact options below to get in touch.','field-explanation'),contacts);else card.append(el('p','Your client manager has not added contact links yet. Ask your company administrator to help you get in touch.','field-explanation'));parent.append(card);
-  }catch(error){if(!current())return;FormUI.message(status,error.message,'error');const retry=el('button','Retry','secondary');retry.type='button';retry.onclick=()=>{retry.remove();load();};parent.append(retry);}}
+  }catch(error){if(!currentSupport())return;FormUI.message(status,error.message,'error');const retry=el('button','Retry','secondary');retry.type='button';retry.onclick=()=>{retry.remove();load();};parent.append(retry);}}
   await load();
  }
- window.ContactLinks={editor,links,support};
+ window.ContactLinks={editor,links,support,memberIdentity,closeMember};
 })();

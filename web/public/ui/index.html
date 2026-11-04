@@ -19,10 +19,11 @@
         <img class="brand-mark brand-symbol" alt="" hidden>
       </a>
         <nav class="section-nav" id="sectionNav" aria-label="Main navigation" hidden>
+          <button class="nav-button" id="keysNav" type="button" hidden>Keys</button>
+          <button class="nav-button" id="docsNav" type="button">Docs</button>
           <button class="nav-button active" id="generationNav" type="button" aria-current="page">Playground</button>
           <button class="nav-button" id="templatesNav" type="button">Templates</button>
           <button id="configurationNav" type="button" hidden>Workspace</button>
-          <button class="nav-button" id="docsNav" type="button">Docs</button>
           <button class="nav-button" id="systemNav" type="button" hidden>Administration</button>
         <div id="workspacePicker" class="workspace-picker" hidden><select id="workspaceSelect" hidden data-plain-control aria-label="Organization"></select><button id="workspaceOpen" class="nav-button" type="button"></button><button id="workspaceToggle" type="button" aria-label="Choose organization" aria-haspopup="menu" aria-expanded="false" aria-controls="workspaceMenu"><span class="select-chevron" aria-hidden="true"></span></button><div id="workspaceMenu" role="menu" aria-label="Organizations" hidden></div></div>
         </nav>
@@ -36,9 +37,8 @@
           <span class="user-identity"><strong id="userName"></strong><small id="userEmail"></small></span>
           </button>
           <div id="userDropdown" role="menu" aria-label="User menu" hidden>
-            <button id="personalSettingsButton" type="button" role="menuitem" >Profile</button>
-            <button id="companyConnectionButton" type="button" role="menuitem" hidden>Sociaro connection</button>
-            <button id="logoutButton" type="button" role="menuitem">Sign out</button>
+            <button id="personalSettingsButton" type="button" role="menuitem" data-menu-icon="profile"><span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></svg></span><span class="menu-label">Profile</span></button>
+            <button id="logoutButton" type="button" role="menuitem" data-menu-icon="sign-out"><span class="menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9 4H4v16h5M13 7l5 5-5 5M8 12h10"/></svg></span><span class="menu-label">Sign out</span></button>
           </div>
         </div>
       </div>
@@ -171,11 +171,11 @@
 </div>
 <div class="toggle-grid">
                 <label class="toggle-option" id="audioOption">
-                  <span><strong>Audio</strong><small>Synchronized audio</small></span>
+                  <span><strong>Audio</strong></span>
                   <input id="generateAudio" name="generateAudio" type="checkbox">
                 </label>
                 <label class="toggle-option" id="cameraOption">
-                  <span><strong>Fixed camera</strong><small>No camera movement</small></span>
+                  <span><strong>Fixed camera</strong></span>
                   <input id="cameraFixed" name="cameraFixed" type="checkbox">
                 </label>
               </div>
@@ -214,7 +214,7 @@
                 <summary>Advanced settings</summary>
                 <div class="advanced-grid">
                 <label class="toggle-option" id="watermarkOption">
-                  <span><strong>Watermark</strong><small>Provider watermark</small></span>
+                  <span><strong>Watermark</strong></span>
                   <input id="watermark" name="watermark" type="checkbox">
                 </label>
 
@@ -295,7 +295,7 @@
         <nav class="configuration-nav" aria-label="Configuration navigation">
           <button id="providersNav" type="button">Providers</button>
           <button id="storageNav" type="button" hidden>Storage</button>
-          <button id="organizationsNav" type="button">Organizations</button><button id="keysNav" type="button">API keys</button>
+          <button id="organizationsNav" type="button">Organizations</button>
         <button type="button" id="reportsNav">Reports</button>
 </nav>
           </details>

@@ -23,11 +23,37 @@
    catch(error){if(current())FormUI.message(status,error.message,'error');}finally{pending=false;writing=false;submit.disabled=false;}
   };
  }
+ function managesCompany(id){const saved=window.CompanyConnection?.record();return !!window.CompanyConnection?.active()&&saved?.access==='company-api-v1'&&saved.organization_id===id;}
+ async function disconnectCompany(reviewed,current,button,status,completionCurrent=current){
+  if(writing||!current())return;
+  if(!confirm('Disconnect this installation? The company and its files remain on Sociaro. Revoke the key on Sociaro to remove its remote access.'))return;
+  writing=true;button.disabled=true;
+  try{await api(base,{method:'DELETE',body:JSON.stringify({version:reviewed.version})});if(completionCurrent())location.assign('/');}
+  catch(error){if(current())FormUI.message(status,error.message,'error');}
+  finally{writing=false;if(button.isConnected)button.disabled=false;}
+ }
+ async function mountCompanyManagement(parent,id,rootCurrent=()=>true){
+  if(!managesCompany(id))return;
+  const binding=window.CompanyConnection.record(),viewer=actor;
+  const sameConnection=()=>actor===viewer&&window.CompanyConnection?.record()===binding&&managesCompany(id),current=()=>parent.isConnected&&rootCurrent()&&sameConnection();
+  const panel=node('section',undefined,'keys-form'),status=node('p','Checking connection…');panel.dataset.companyConnection='';status.setAttribute('role','status');panel.append(status);parent.append(panel);
+  async function load(){
+   if(!current())return;panel.replaceChildren(status);FormUI.message(status,'Checking connection…');
+   try{
+    const saved=await api(base);if(!current())return;
+    if(!saved.connected||saved.access!=='company-api-v1'||saved.organization_id!==id||saved.origin!==binding.origin||saved.context!==binding.context||saved.version!==binding.version)throw Error('The installation connection changed. Reload to review its current state.');
+    const disconnect=node('button','Disconnect','secondary compact danger');disconnect.type='button';disconnect.onclick=()=>disconnectCompany(saved,current,disconnect,status,sameConnection);
+    const actions=node('div',undefined,'form-actions');actions.append(disconnect);
+    panel.replaceChildren(node('h2','Sociaro connection'),node('p','This company is hosted on Sociaro. Disconnect to return this installation to local mode.'),actions,status);FormUI.message(status,'');
+   }catch(error){if(!current())return;FormUI.message(status,error.message,'error');if(error.status!==401&&error.status!==403){const retry=node('button','Retry','secondary compact');retry.type='button';retry.onclick=load;panel.append(retry);}}
+  }
+  await load();
+ }
  function companyConnected(parent,current){
   parent.append(node('h2',connection.organization_name||'Sociaro'));
-  const actions=node('div',undefined,'dialog-actions'),resume=node('button','Open workspace','primary compact'),disconnect=node('button','Disconnect','secondary danger'),status=node('p');resume.type=disconnect.type='button';status.setAttribute('role','status');actions.append(resume,disconnect);parent.append(actions,status);
+  const reviewed={...connection},actions=node('div',undefined,'dialog-actions'),resume=node('button','Open workspace','primary compact'),disconnect=node('button','Disconnect','secondary danger'),status=node('p');resume.type=disconnect.type='button';status.setAttribute('role','status');actions.append(resume,disconnect);parent.append(actions,status);
   resume.onclick=()=>location.assign('/');
-  disconnect.onclick=async()=>{if(writing||!current())return;if(!confirm('Disconnect this installation? The company and its files remain on Sociaro. Revoke the key on Sociaro to remove its remote access.'))return;writing=true;disconnect.disabled=true;try{await api(base,{method:'DELETE',body:JSON.stringify({version:connection.version})});location.assign('/');}catch(error){if(current())FormUI.message(status,error.message,'error');}finally{writing=false;disconnect.disabled=false;}};
+  disconnect.onclick=()=>disconnectCompany(reviewed,current,disconnect,status);
  }
  function connected(parent,current){
   parent.append(node('h2','Connected'),node('p',connection.organization_name||'Your installation is connected to Sociaro.','field-explanation'));
@@ -96,5 +122,5 @@
   async function poll(){try{if(current()&&!document.hidden)await refresh();}catch(e){if(current())FormUI.message(message,e.message,'error');}if(current())timer=setTimeout(poll,5000);}
   try{const catalogue=await remote('/v1/models');if(!current())return;models=catalogue.data||[];const groups=new Map();for(const m of models){const id=m.provider||m.owned_by||'remote';if(!groups.has(id))groups.set(id,{id,name:id,models:[]});groups.get(id).models.push({...m.capabilities,id:m.id,public_id:m.id});}ModelPicker.populate(select,[...groups.values()],{placeholder:'Choose a model',optionValue:(p,m)=>m.id});FormUI.refresh();await refresh();timer=setTimeout(poll,5000);}catch(e){if(current())FormUI.message(message,e.message,'error');}
  }
- window.RemoteWorkspace={open,close,setBusy(value){writing=value;},isBusy(){return writing;},setActor(user){if(actor?.id!==user?.id){epoch++;opening=null;writing=false;clearTimeout(timer);dialog?.close();dialog?.remove();connection=null;}actor=user;}};
+ window.RemoteWorkspace={open,close,managesCompany,mountCompanyManagement,setBusy(value){writing=value;},isBusy(){return writing;},setActor(user){if(actor?.id!==user?.id){epoch++;opening=null;writing=false;clearTimeout(timer);dialog?.close();dialog?.remove();connection=null;}actor=user;}};
 })();

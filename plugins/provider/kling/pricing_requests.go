@@ -19,7 +19,7 @@ func (a *Adapter) CatalogRateRequest(model core.MediaModel, rate catalogsync.Rat
 	if !ok {
 		return core.MediaRequest{}, core.ErrModelUnavailable
 	}
-	if rate.VideoInputIncludesResources && m.ID != OmniVideo4 {
+	if rate.VideoInputIncludesResources && m.ID != OmniVideo4 && m.ID != OmniVideo4Flash {
 		return core.MediaRequest{}, errors.New("unreviewed video-resource tariff condition")
 	}
 	if rate.Region != "Singapore" || rate.InputImages != nil || len(rate.Components) > 0 || rate.Quality != "" || rate.ValidateConditions() != nil {

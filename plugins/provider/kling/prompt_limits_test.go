@@ -20,7 +20,7 @@ func TestPromptCharacterLimitsNativeModelsAndModes(t *testing.T) {
 		if m.ID == ImageToVideo3Turbo || m.ID == TextToVideo25Turbo || m.ID == ImageToVideo25Turbo {
 			limit = 2500
 		}
-		if m.ID == OmniVideo4 {
+		if m.ID == OmniVideo4 || isKling4Flash(m.ID) {
 			limit = 26000
 		}
 		if m.MaxPromptCharacters != limit {
@@ -29,7 +29,7 @@ func TestPromptCharacterLimitsNativeModelsAndModes(t *testing.T) {
 		for _, mode := range m.ReferenceModes {
 			t.Run(m.ID+"/"+mode.ID, func(t *testing.T) {
 				unicodeLimit := limit
-				if m.ID == OmniVideo4 {
+				if m.ID == OmniVideo4 || isKling4Flash(m.ID) {
 					unicodeLimit = 11000
 				}
 				r := core.MediaRequest{Model: m.ID, Prompt: strings.Repeat("😀", unicodeLimit), Options: core.MediaOptions{ReferenceMode: mode.ID}}

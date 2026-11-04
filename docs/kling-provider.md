@@ -1,6 +1,7 @@
 # Direct Kling integration
 
-Contracts were reviewed on **2026-10-31** against the official
+Kling 4.0 Flash contracts were reviewed on **2026-11-04**; the existing families
+were reviewed on **2026-10-31** against the official
 [API index](https://kling.ai/document-api/llms.txt), including its endpoint-specific
 Markdown exports. The adapter uses `https://api-singapore.klingai.com` and a
 current API key in the Bearer authorization header. Authentication, account
@@ -22,6 +23,7 @@ concrete connection prefix, for example `kling/kling-4.0-omni-video`.
 
 | Family | Gateway operations | Official contract |
 | --- | --- | --- |
+| Flash video | `kling-4.0-flash-text-to-video`, `kling-4.0-flash-image-to-video`, `kling-4.0-flash-omni-video` | [Text](https://kling.ai/document-api/api/video/4-0-flash/text-to-video.md), [Image](https://kling.ai/document-api/api/video/4-0-flash/image-to-video.md), [Omni](https://kling.ai/document-api/api/video/4-0-flash/video-omni.md) |
 | Native video | Text/image operations for4.0,3.0,3.0Turbo,2.6,2.5Turbo | [Video capability map](https://kling.ai/document-api/guides/capability-map/video.md); each specific endpoint supplies its limits |
 | Omni video | `kling-4.0-omni-video`, `kling-3.0-omni-video`, `kling-o1-omni-video` | [4Omni](https://kling.ai/document-api/api/video/4-0/video-omni.md), [3Omni](https://kling.ai/document-api/api/video/3-0-omni/video-omni.md), [O1](https://kling.ai/document-api/api/video/o1/video-omni.md) |
 | Motion control | `kling-3.0-motion-control`, `kling-2.6-motion-control` | [Motion control](https://kling.ai/document-api/api/video/motion-control.md) |
@@ -34,7 +36,63 @@ concrete connection prefix, for example `kling/kling-4.0-omni-video`.
 Use the authorized `/v1/models` response for exact operation IDs, controls,
 reference modes, resource schemas and price availability. Capability maps do not
 override specific endpoint contracts:4.0's direct API currently exposes720p and
-1080p. No undocumented Flash route or4K parameter is synthesized.
+1080p. Flash has its own reviewed routes and 720p-only contract. No undocumented
+4K parameter is synthesized.
+
+## Kling 4.0 Flash
+
+Flash is a separate family, not a standard 4.0 alias. All three endpoints accept
+integer output durations from 3 to 20 seconds at 720p. Text-to-video supports
+21:9, 16:9, 9:16 and 1:1. Image-to-video accepts exactly one first-frame image,
+without a separate aspect-ratio control or middle/last keyframes. Gateway accepts
+public HTTPS image URLs rather than exposing the provider's inline-base64 input.
+Images are JPEG/PNG, with a conservative inclusive 30,000,000-byte ceiling,
+dimensions at least 300 pixels and an aspect ratio between 0.4 and 2.5.
+
+Flash Omni supports first-frame/reference images, reference/source videos and
+managed Elements, but no standalone voices or middle/last keyframes. The limits
+are 10 images, 7 Elements (at most 3 video-character Elements), 5 combined
+videos/video-character Elements and 15 total inputs. At most one source video is
+allowed. Each video and the combined video/Element duration must be 3–20 seconds.
+MP4/MOV inputs use the inclusive 300,000,000-byte, 700–4553-pixel, 8,294,400-pixel
+area, 24–60 fps and 0.4–2.5 aspect-ratio limits. Element preparation retains its
+separate, stricter source contract; generation-reference limits do not widen it.
+
+Omni's `options.parameters.audio` is `native` or `original`. Original audio
+requires an actual reference/source video, not merely a video-character Element.
+The provider prefers source-video audio, otherwise the first reference video.
+The reference order is preserved. Omni supports adaptive aspect ratio; text and
+image routes do not acquire that option. All Flash routes support the existing
+watermark control and Gateway task ID, serialized in native nested `options`.
+Provider callbacks are not exposed; Gateway polls and archives the primary output.
+
+The prompt policy uses Gateway's explicit ASCII/non-ASCII 26,000/11,000 weighted
+budget, as for standard Omni. Omitting duration preserves provider prompt/input
+inference. A quote requires an explicit output duration and inspected input
+duration when video is present; it never assumes unknown input is zero.
+
+[Published Flash list pricing](https://kling.ai/document-api/pricing/base/video.md)
+is USD 0.094 per output second without video input. With video input, including
+video-character Elements, it is USD 0.063 times
+`output + max(total input, output)`. Thus 10 seconds without video is USD 0.94,
+and 10 seconds with at most 10 input seconds is USD 1.26. Standard 4.0 account
+overrides do not apply to Flash. Package units, account eligibility and actual
+charges remain distinct from these estimates.
+
+Flash task handles bind polling to the operation, owner and connection revision.
+The artifact retains its physical file duration. Billable usage comes from
+`usage.output_duration` and provider-normalized `usage.input_duration`; missing
+or invalid billed output duration remains unknown, while an otherwise valid
+primary video can still be archived. Billing records do not become confirmed USD
+merely because they were returned. No paid-generation success is implied by the
+offline contract tests.
+
+Flash operations declare their exact endpoint documents as expected operational
+sources; Omni also expects its Elements document. New default registrations do
+not rewrite existing saved schedules. A saved schedule without those exact
+Flash pages remains `not_checked`/incomplete for the affected operations.
+Successful retrieval and pricing-row evidence alone do not verify the complete
+operational contract or acknowledge a changed document.
 
 ## Kling4 keyframes and Omni references
 

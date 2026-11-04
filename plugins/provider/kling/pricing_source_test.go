@@ -130,7 +130,7 @@ func TestPublishedPricingEveryActiveTariffMatchesValidatedAdapterQuote(t *testin
 			}
 		}
 	}
-	expected := []string{TextToVideo, ImageToVideo, TextToVideo4, ImageToVideo4, OmniVideo4, TextToVideo3Turbo, ImageToVideo3Turbo, TextToVideo25Turbo, ImageToVideo25Turbo, TextToVideo26, ImageToVideo26, MotionControl3, MotionControl26, OmniVideo3, OmniVideoO1, TextToAudio, VideoToAudio, TextToSpeech, ImageRecognition, FaceDetection, ResourceCreateVoice, ImageGeneration3, ImageGeneration21, ImageOmni3, ImageO1, MultiImage21, ImageOutpainting, ImageMultiShot, ApparelReplicator, GoodsStudio, VideoCommerce, VirtualTryOn}
+	expected := []string{TextToVideo4Flash, ImageToVideo4Flash, OmniVideo4Flash, TextToVideo, ImageToVideo, TextToVideo4, ImageToVideo4, OmniVideo4, TextToVideo3Turbo, ImageToVideo3Turbo, TextToVideo25Turbo, ImageToVideo25Turbo, TextToVideo26, ImageToVideo26, MotionControl3, MotionControl26, OmniVideo3, OmniVideoO1, TextToAudio, VideoToAudio, TextToSpeech, ImageRecognition, FaceDetection, ResourceCreateVoice, ImageGeneration3, ImageGeneration21, ImageOmni3, ImageO1, MultiImage21, ImageOutpainting, ImageMultiShot, ApparelReplicator, GoodsStudio, VideoCommerce, VirtualTryOn}
 	for _, id := range expected {
 		if !exercised[id] {
 			t.Fatalf("documented executable pricing path was not checked: %s", id)

@@ -105,6 +105,7 @@ function hashReferenceFile(file,signal){
   const libraryUI=ReferenceUpload.create({label:kind[0].toUpperCase()+kind.slice(1)+' references',kinds:[kind],multiple:true,maxBytes,limits:()=>selectedModel()?.reference_media_limits?.[kind]||{},locked:()=>busy||loading||!!pendingSelection,onFiles:upload});
   const oldLibraryDrop=library.querySelector('#libraryDropzone');oldLibraryDrop.replaceWith(libraryUI.root);libraryUI.drop.id='libraryDropzone';libraryUI.upload.dataset.upload='';
   const selectedCards=new Map();
+  let pendingUploads=[];
   function message(text = '', error = false) {
     for (const target of [status, libraryStatus]) { target.textContent = text; target.classList.toggle('error', error); target.classList.toggle('sr-only',!!text&&!error&&!/saved without|cancelled|unavailable|pending|unchanged|could not|failed/i.test(text)); }
   }
@@ -133,12 +134,28 @@ function hashReferenceFile(file,signal){
   const displayedValues=()=>pendingSelection?.values||urls();
   function currentSelection(pending){return pending.epoch===epoch&&pending.key===generationKeyVersion&&pending.voice===voiceTarget&&pending.intent===ReferenceValidation.signature(validationTarget())&&pending.selection===selectionSignature();}
   function discardSelection(){if(pendingSelection){pendingSelection.controller.abort();pendingSelection=null;}}
+  function pendingCards(){return pendingUploads.filter(entry=>!entry.cancelled).map(entry=>entry.card);}
+  function removePending(entry){pendingUploads=pendingUploads.filter(value=>value!==entry);}
+  function focusUpload(entry){
+    if(!entry.restoreFocus)return;
+    if(document.activeElement!==document.body&&!entry.card.contains(document.activeElement)){entry.restoreFocus=false;return;}
+    const next=pendingCards().find(card=>card.isConnected)?.removeButton,upload=library.open?libraryUI.upload:pickerUI.upload,target=next||(!upload.disabled?upload:null);
+    if(target){entry.restoreFocus=false;target.focus({preventScroll:true});}
+  }
+  function pendingFile(file){
+    const entry={file,controller:new AbortController(),cancelled:false,restoreFocus:false};
+    const cancel=()=>{if(entry.cancelled||!pendingUploads.includes(entry))return;entry.restoreFocus=entry.card.contains(document.activeElement);entry.cancelled=true;entry.controller.abort();removePending(entry);render();message('Upload cancelled: '+file.name);focusUpload(entry);};
+    const card=ReferenceUpload.mediaCard({name:file.name,type:'pending',placeholder:' '}),spinner=document.createElement('span'),announcement=document.createElement('span');
+    const action=ReferenceUpload.mediaAction('Cancel upload',event=>{event.stopPropagation();cancel();});action.classList.add('reference-selection-remove');action.setAttribute('aria-label','Cancel upload '+file.name);card.querySelector('.media-picker-media').append(action);card.removeButton=action;
+    card.classList.add('reference-upload-pending');card.dataset.uploadPending='';card.removeAttribute('data-selected');card.setAttribute('aria-busy','true');
+    spinner.className='reference-upload-spinner';spinner.setAttribute('aria-hidden','true');announcement.className='sr-only';announcement.setAttribute('role','status');announcement.setAttribute('aria-live','polite');announcement.textContent='Queued upload: '+file.name;
+    card.preview.replaceChildren(spinner,announcement);entry.card=card;entry.announcement=announcement;return entry;
+  }
   function render() {
     if(pendingSelection&&!currentSelection(pendingSelection)){discardSelection();checkedSignature='';message('Selection, model or workflow changed. Choose the file again.',true);}
     pickerUI.sync();libraryUI.sync();const label=manual.querySelector('label');if(label&&!label.contains(field))label.textContent=limit()===1?'URL':'one per line';parseDraft();if(urlDraftError)message(urlDraftError,true);
     syncFileInput();files.accept=accept();
     if(!urlDraftError&&!pendingSelection)recheck();
-    for(const node of document.querySelectorAll(`[data-reference-cancel="${kind}"]`))node.hidden=!busy;
     const values = displayedValues();if(!pendingSelection)syncRoles(values);selected.classList.toggle('has-reference-roles',(ModelControls.schema(selectedModel(),kind)?.roles.length||0)>1);
     const occurrences=new Map();const nodes=values.map((url,index)=>{
       const info=metadata.get(url),identity=info?.id?JSON.stringify([info.scope||'organization',info.id]):url||'empty:'+index,occurrence=occurrences.get(identity)||0;occurrences.set(identity,occurrence+1);const key=identity+'#'+occurrence;let card=selectedCards.get(key);if(card){if(info)card.update({name:info.name||card.querySelector('.reference-name').textContent,type:kind+'/unknown',url:url.startsWith('asset://')?ProviderReferenceLibrary.safeURL(info.preview_url):absolute(info.url||url),version:info.version,revision:info.revision});card.currentIndex=index;card.draggable=!busy&&!pendingSelection;card.querySelector('.reference-selection-remove').disabled=busy;if(card.decoration===JSON.stringify([selectionVersion,voices[url],roleEntries[index]?.role,index,!!pendingSelection])){updateCaption(card,!url?'Choose reference':info?.name||(url.startsWith('asset://')?url.slice(8):`Reference ${index+1}`),index);return card;}card.querySelectorAll('.reference-role,.reference-voice,.reference-clear-voice').forEach(n=>n.remove());}
@@ -169,7 +186,7 @@ function hashReferenceFile(file,signal){
       }
       return card;
     });
-    ReferenceUpload.reconcile(selected,nodes);for(const [key,card]of selectedCards)if(!nodes.includes(card))selectedCards.delete(key);
+    ReferenceUpload.reconcile(selected,[...nodes,...(!library.open?pendingCards():[])]);for(const [key,card]of selectedCards)if(!nodes.includes(card))selectedCards.delete(key);
     remote?.configure();
     if (library.open) renderLibrary();
     window.dispatchEvent(new Event('gateway-reference-change'));
@@ -229,11 +246,12 @@ function hashReferenceFile(file,signal){
     });
   }
   function renderLibrary() {
-    if(remote?.active()){remote.render();return;}
+    if(remote?.active()){remote.render();ReferenceUpload.reconcile(libraryUI.previews,pendingCards());return;}
+    ReferenceUpload.reconcile(libraryUI.previews,[]);
     const values = displayedValues();
     libraryView.render(items.filter(item=>(item.content_type||'image/png').startsWith(kind+'/')).map(item=>({...item,url:absolute(item.url)})),{
       selected:item=>values.some(url=>url===item.url||metadata.get(url)?.id===item.id&&(metadata.get(url)?.scope||'organization')===(item.scope||'organization')),onSelect:select,busy,
-      canDelete:()=>!pendingSelection,scope:sharedLibrary?'template':'organization',onDelete:sharedLibrary?null:deleteItem
+      canDelete:()=>!pendingSelection,scope:sharedLibrary?'template':'organization',onDelete:sharedLibrary?null:deleteItem,transientNodes:pendingCards()
     });
     more.hidden = !hasMore; more.disabled = busy || loading;
   }
@@ -256,52 +274,59 @@ function hashReferenceFile(file,signal){
   async function upload(list, replaceIndex = null) {
     if ((library.open&&sharedLibrary) || busy || loading || pendingSelection || !list.length) return;
     if(remote?.active()&&!remote.prepareUpload())return;
-    const currentEpoch = epoch, modelID = selectedModel()?.id, validation=validationTarget(), intent=ReferenceValidation.signature(validation), signal = controller.signal, voiceIntent = kind==='audio'?voiceTarget:null, providerUpload=!!remote?.active();
-    let expectedSelection=selectionSignature();
-    busy = true; remote?.setUploading(true); render();
-    let added = 0, duplicates = [], failures = [], unattached = 0;
+    const currentEpoch=epoch,modelID=selectedModel()?.id,validation=validationTarget(),intent=ReferenceValidation.signature(validation),parentSignal=controller.signal,voiceIntent=kind==='audio'?voiceTarget:null,providerUpload=!!remote?.active();
+    let expectedSelection=selectionSignature(),added=0,duplicates=[],failures=[],unattached=0;
+    const entries=[];
+    for(const file of list){
+      let error=file.size>maxBytes()?`${file.name}: size ${file.size} bytes; maximum ${maxBytes()} bytes. Reduce the file size.`:!file.size?`${file.name}: file is empty.`:!accept().split(',').includes(file.type)?`${file.name}: format ${file.type||'unknown'}; use a supported ${kind} file (${accept()}).`:'';
+      if(!error&&providerUpload)error=remote.fileError(file);
+      if(error){failures.push(error);continue;}entries.push(pendingFile(file));
+    }
+    if(!entries.length){message(failures.join(' '),true);return;}
+    const abort=()=>{for(const entry of entries)entry.controller.abort();};parentSignal.addEventListener('abort',abort,{once:true});if(parentSignal.aborted)abort();
+    pendingUploads=entries;busy=true;message();libraryUI.message();remote?.setUploading(true);render();
     try {
       await window.GenerationKey.ensureSession(true);
       if(currentEpoch!==epoch)return;
       const expectedKey=window.GenerationKey.value();
-      for (const file of list) {
-        if(file.size>maxBytes()){failures.push(`${file.name}: size ${file.size} bytes; maximum ${maxBytes()} bytes. Reduce the file size.`);continue;}
-        if(!accept().split(',').includes(file.type)){failures.push(`${file.name}: format ${file.type||'unknown'}; use a supported ${kind} file (${accept()}).`);continue;}
-        if(providerUpload){const error=remote.fileError(file);if(error){failures.push(`${file.name}: ${error}`);continue;}}
-        message(`Uploading ${file.name}…`);
+      for(const entry of entries){
+        if(entry.cancelled)continue;
+        const {file}=entry,signal=entry.controller.signal;entry.announcement.textContent='Uploading '+file.name;message('Uploading '+file.name+'…');
         try {
-          await window.StorageQuota?.check();
-          if(currentEpoch!==epoch)return;
+          signal.throwIfAborted();await window.StorageQuota?.check();signal.throwIfAborted();if(currentEpoch!==epoch)return;
           const uploadValidation={...validation,reference_ids:validationTarget()?.reference_ids?.filter(id=>replaceIndex===null||id!==ReferenceValidation.ids([urls()[replaceIndex]])[0])||[]};
-          const item=await ReferenceValidation.upload(file,{validation:uploadValidation,signal,expectedKey,onProgress:text=>message(text)});
-          if(currentEpoch!==epoch)return;
-          if(providerUpload){await remote.registerUploaded(item);added++;continue;}
-          const url = absolute(item.url); metadata.set(url, item); if (item.duplicate) duplicates.push(file.name); else added++;
-          const values = urls();
-          // An upload belongs to the picker intent that started it, even after reopening.
+          const item=await ReferenceValidation.upload(file,{validation:uploadValidation,signal,expectedKey,onProgress:text=>{if(currentEpoch===epoch&&!entry.cancelled){entry.announcement.textContent=text;message(text);}}});
+          signal.throwIfAborted();if(currentEpoch!==epoch)return;
+          // Upload cancellation does not undo completed storage or provider registration.
+          if(providerUpload){removePending(entry);render();await remote.registerUploaded(item);added++;continue;}
+          const url=absolute(item.url);metadata.set(url,item);if(item.duplicate)duplicates.push(file.name);else added++;
+          if(!items.some(existing=>existing.id===item.id)){if(item.duplicate)items.push(item);else items.unshift(item);}
+          const values=urls();
           if(voiceIntent){
-            if(voiceTarget===voiceIntent&&expectedSelection===selectionSignature()){voices[voiceIntent.url]=url;voiceTarget=null;library.close();pickers.forEach(p=>p.render());updatePrice();}
-            else unattached++;
+            if(voiceTarget===voiceIntent&&expectedSelection===selectionSignature()){voices[voiceIntent.url]=url;voiceTarget=null;library.close();pickers.forEach(p=>p.render());updatePrice();}else unattached++;
             continue;
           }
-          if (values.includes(url)&&!(sparse&&values.includes(''))) continue;
-          if (expectedSelection!==selectionSignature() || intent !== ReferenceValidation.signature(validationTarget()) || modelID !== selectedModel()?.id || !selectedModel()?.[`supports_${kind}_input`]) { unattached++; continue; }
+          if(values.includes(url)&&!(sparse&&values.includes('')))continue;
+          if(expectedSelection!==selectionSignature()||intent!==ReferenceValidation.signature(validationTarget())||modelID!==selectedModel()?.id||!selectedModel()?.[`supports_${kind}_input`]){unattached++;continue;}
           const candidate=replaceIndex!==null&&replaceIndex<values.length?values.map((v,i)=>i===replaceIndex?url:v):insert(values,url);
-          await ReferenceValidation.check(candidateIDs(candidate),validation,{signal,expectedKey});
-          if(currentEpoch!==epoch)return;
+          await ReferenceValidation.check(candidateIDs(candidate),validation,{signal,expectedKey});signal.throwIfAborted();if(currentEpoch!==epoch)return;
           if(expectedSelection!==selectionSignature()||intent!==ReferenceValidation.signature(validationTarget())){unattached++;continue;}
-          if (replaceIndex !== null && replaceIndex < values.length) { values[replaceIndex] = url; replaceIndex = null; write(values,true); }
-          else if (limit()===1||values.length < limit() || sparse&&values.includes('')) write(insert(values,url),true);
-          else unattached++;
+          if(replaceIndex!==null&&replaceIndex<values.length){values[replaceIndex]=url;replaceIndex=null;write(values,true);}
+          else if(limit()===1||values.length<limit()||sparse&&values.includes(''))write(insert(values,url),true);else unattached++;
           expectedSelection=selectionSignature();
-        } catch (error) { if (currentEpoch === epoch) failures.push(`${file.name}: ${error.message}`); }
-        if (currentEpoch !== epoch) return;
+        }catch(error){if(currentEpoch===epoch&&!entry.cancelled&&error.name!=='AbortError')failures.push(`${file.name}: ${error.message}`);}
+        finally{removePending(entry);if(currentEpoch===epoch){render();focusUpload(entry);}}
+        if(currentEpoch!==epoch)return;
       }
-    } catch(error){if(currentEpoch===epoch)failures.push(error.message);} finally {
-      if (currentEpoch === epoch) {
-        busy = false; remote?.setUploading(false); files.value = ''; render();window.dispatchEvent(new Event('gateway-storage-change'));
-        if (library.open) await load();
-        message([added ? (providerUpload?`${added} file${added===1?'':'s'} sent for BytePlus registration.`:`${added} file${added === 1 ? '' : 's'} saved to your library.`) : '', unattached ? `${unattached} saved without adding to this generation (selection or model changed, or reference limit reached).` : '', duplicates.length ? `Already in your library: ${duplicates.join(', ')}. The existing file was used; no copy was created.` : '', ...failures].filter(Boolean).join(' '), !!failures.length);
+    }catch(error){if(currentEpoch===epoch&&error.name!=='AbortError')failures.push(error.message);}
+    finally{
+      parentSignal.removeEventListener('abort',abort);
+      if(currentEpoch===epoch){
+        pendingUploads=[];busy=false;remote?.setUploading(false);files.value='';window.dispatchEvent(new Event('gateway-storage-change'));
+        if(library.open)await load();else render();
+        if(currentEpoch!==epoch||parentSignal.aborted)return;
+        message([added?(providerUpload?`${added} file${added===1?'':'s'} sent for BytePlus registration.`:`${added} file${added===1?'':'s'} saved to your library.`):'',unattached?`${unattached} saved without adding to this generation (selection or model changed, or reference limit reached).`:'',duplicates.length?`Already in your library: ${duplicates.join(', ')}. The existing file was used; no copy was created.`:'',entries.some(entry=>entry.cancelled)?'Upload cancelled.':'',...failures].filter(Boolean).join(' '),!!failures.length);
+        for(const entry of entries)focusUpload(entry);
       }
     }
   }
@@ -368,20 +393,16 @@ function hashReferenceFile(file,signal){
   }
   function reset() {
     discardSelection();sparse=false;missingTarget=null;roleEntries=[];remote?.reset();
-    draggedURL = null; epoch++; controller.abort(); controller = new AbortController(); busy = false; loading = false;
+    draggedURL = null; epoch++; controller.abort(); controller = new AbortController(); pendingUploads=[]; busy = false; loading = false;
     checkedSignature='';checking=false;validationError='';
     items = []; metadata.clear(); offset = 0; hasMore = false; library.close(); files.value = ''; write([]); message();
   }
-  const cancelUpload=()=>{
-    epoch++;controller.abort();controller=new AbortController();busy=false;loading=false;checking=false;checkedSignature='';files.value='';remote?.setUploading(false);render();message('Upload cancelled. Your previous selection is unchanged.');
-  };
-  for(const host of [status,libraryStatus]){const cancel=button('Cancel upload','Cancel reference upload',cancelUpload);cancel.dataset.referenceCancel=kind;cancel.hidden=true;host.after(cancel);}
   // The shared surface owns file chooser and drop handlers.
   function cancelVoice(){missingTarget=null;if(kind==='audio'){voiceTarget=null;syncFileInput();}}
   library.querySelectorAll('[data-close]').forEach(node => node.addEventListener('click', () => {cancelVoice();library.close();}));
   library.addEventListener('cancel',cancelVoice);
   // Native close events may be queued until after the picker has reopened.
-  library.addEventListener('close',()=>{if(!library.open){listSequence++;listController?.abort();loading=false;cancelVoice();const label=returnFocus?.getAttribute('aria-label');const trigger=returnFocus?.isConnected?returnFocus:label?[...document.querySelectorAll('button[aria-label]')].find(n=>n.getAttribute('aria-label')===label):null;const active=document.activeElement;if(trigger&&!trigger.disabled&&!trigger.closest('[hidden]')&&(active===document.body||active===previousFocus||active===returnFocus||library.contains(active)))trigger.focus();}});
+  library.addEventListener('close',()=>{if(!library.open){listSequence++;listController?.abort();loading=false;cancelVoice();if(pendingUploads.length)render();const label=returnFocus?.getAttribute('aria-label');const trigger=returnFocus?.isConnected?returnFocus:label?[...document.querySelectorAll('button[aria-label]')].find(n=>n.getAttribute('aria-label')===label):null;const active=document.activeElement;if(trigger&&!trigger.disabled&&!trigger.closest('[hidden]')&&(active===document.body||active===previousFocus||active===returnFocus||library.contains(active)))trigger.focus();}});
   more.addEventListener('click', () => load(true));
   field.addEventListener('input', render);
   function describe(url, index) {
