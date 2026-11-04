@@ -165,7 +165,7 @@ func (r *SystemRepository) OrganizationSettings(ctx context.Context, actor, id, 
 	if len(markup) > 1 || len(markup) == 1 && markup[0] != nil && markup[0].Validate() != nil {
 		return org.ErrInvalid
 	}
-	if strings.TrimSpace(name) == "" || len(name) > 160 || credit < 0 || credit > money.USD(1_000_000*money.Scale) || weekly != nil && (*weekly < 0 || *weekly > money.USD(1_000_000*money.Scale)) {
+	if strings.TrimSpace(name) == "" || credit < 0 || credit > money.USD(1_000_000*money.Scale) || weekly != nil && (*weekly < 0 || *weekly > money.USD(1_000_000*money.Scale)) {
 		return org.ErrInvalid
 	}
 	tx, e := beginAuditTx(ctx, r.db)
@@ -186,10 +186,16 @@ func (r *SystemRepository) OrganizationSettings(ctx context.Context, actor, id, 
 	if (changeCredit || len(markup) > 0) && role != "system_admin" {
 		return org.ErrForbidden
 	}
+	nameLength := len(name)
 	name = org.CompanyName(name)
 	var previous string
 	if e = tx.QueryRowContext(ctx, `SELECT name FROM organizations WHERE id=$1`, id).Scan(&previous); e != nil {
 		return e
+	}
+	// An existing installation address may exceed the manual name limit.
+	// Saving its other settings must not force a rename or truncate it.
+	if nameLength > 160 && (len(previous) <= 160 || name != org.CompanyName(previous)) {
+		return org.ErrInvalid
 	}
 	if name != org.CompanyName(previous) {
 		if e = checkCompanyIdentity(ctx, tx, actor, id, name, ""); e != nil {

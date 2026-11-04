@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"time"
@@ -12,7 +11,6 @@ import (
 	"github.com/Sociaro-Research/open-media-gateway/internal/apikey"
 	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
 	"github.com/Sociaro-Research/open-media-gateway/internal/installation"
-	org "github.com/Sociaro-Research/open-media-gateway/internal/organization"
 	wa "github.com/Sociaro-Research/open-media-gateway/internal/workspaceauth"
 	"github.com/google/uuid"
 )
@@ -188,10 +186,12 @@ func (r *SystemRepository) Approve(ctx context.Context, actor, code string, in w
 		}
 	} else if errors.Is(err, sql.ErrNoRows) {
 		// Display names/origins are not identity. The proof hash is durable across device requests.
-		name := org.CompanyName(current.Label) + " · " + hex.EncodeToString(current.InstallationHash[:16])
-		if err = checkCompanyIdentity(ctx, tx, actor, "", name, ""); err != nil {
-			return empty, err
+		name, nameErr := wa.CompanyAddress(current.Origin)
+		if nameErr != nil {
+			return empty, nameErr
 		}
+		// Different proof-bound installations may have the same display address.
+		// Manual company creation and renaming retain their duplicate checks.
 		company = uuid.NewString()
 		if _, err = tx.ExecContext(ctx, `INSERT INTO organizations(id,name) VALUES($1,$2)`, company, name); err != nil {
 			return empty, err
