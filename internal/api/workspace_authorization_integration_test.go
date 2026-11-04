@@ -376,7 +376,14 @@ func TestWorkspaceSignupCompanyAndInstallationEndToEnd(t *testing.T) {
 	}
 	expect(call(hostHandler, "POST", "/v1/workspace-authorizations/inspect", inspect, nil, credential, false), 403)
 	expect(call(hostHandler, "POST", "/v1/organizations", map[string]string{"name": "Escalation"}, nil, credential, false), 403)
-	list := call(hostHandler, "GET", "/v1/workspace-installations", nil, customer, "", false)
+	expect(call(hostHandler, "GET", "/v1/workspace-installations", nil, customer, "", false), 403)
+	adminToken, _ := wa.DeviceCode()
+	if err = hostPeople.CreateSession(ctx, wa.Digest(adminToken), hostAdmin.ID, time.Now().Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	adminCookie := &http.Cookie{Name: "media_gateway_session", Value: adminToken}
+	installationAccess := "/v1/system/organizations/" + accepted.Company + "/installation-access"
+	list := call(hostHandler, "GET", installationAccess, nil, adminCookie, "", false)
 	expect(list, 200)
 	if strings.Contains(list.Body.String(), credential) {
 		t.Fatal("grant list returned secret")
@@ -451,8 +458,9 @@ func TestWorkspaceSignupCompanyAndInstallationEndToEnd(t *testing.T) {
 		t.Fatal(err)
 	}
 	strangerCookie := &http.Cookie{Name: "media_gateway_session", Value: strangerToken}
-	expect(call(hostHandler, "DELETE", "/v1/workspace-installations/"+saved.KeyID, nil, strangerCookie, "", false), 410)
-	expect(call(hostHandler, "DELETE", "/v1/workspace-installations/"+saved.KeyID, nil, customer, "", false), 200)
+	expect(call(hostHandler, "DELETE", "/v1/workspace-installations/"+saved.KeyID, nil, strangerCookie, "", false), 403)
+	expect(call(hostHandler, "DELETE", "/v1/workspace-installations/"+saved.KeyID, nil, customer, "", false), 403)
+	expect(call(hostHandler, "DELETE", installationAccess+"/"+saved.KeyID, nil, adminCookie, "", false), 200)
 	expect(call(localHandler, "GET", "/v1/system/remote-workspace/proxy/v1/key?workspace_context="+url.QueryEscape(saved.SnapshotID()), nil, localCookie, "", false), 401)
 	if count(hostDB, "organizations") != 2 {
 		t.Fatal("revocation deleted company")

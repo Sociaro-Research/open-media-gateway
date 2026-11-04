@@ -785,23 +785,56 @@ paths:
   /v1/workspace-installations:
     get:
       operationId: listMyInstallationGrants
-      summary: List the signed-in customer's own installation grants
+      deprecated: true
+      summary: Former personal installation administration endpoint
       security: [{sessionAuth: []}]
-      description: Lists up to 100 own grants with company, client origin, expiry and revocation state. No tokens. Existing grants remain manageable when new onboarding is disabled.
+      description: Disabled. Use company-scoped central Administrator installation access. Internal disconnect/recovery and ordinary API-key management are unchanged.
       responses:
-        '200': {description: Own grants}
-        '403': {description: Browser account required; API keys rejected}
+        '403': {description: Personal installation administration is unavailable}
   /v1/workspace-installations/{id}:
     parameters:
     - {in: path, name: id, required: true, schema: {type: string, format: uuid}}
     delete:
       operationId: revokeMyInstallationGrant
-      summary: Revoke only the signed-in customer's own installation key
+      deprecated: true
+      summary: Former personal installation revocation endpoint
       security: [{sessionAuth: []}]
-      description: Repeated revocation is safe; membership/key authority is checked on subsequent generation requests. Keeps remote companies, jobs, files and charges. Clears retained delivery ciphertext.
+      responses:
+        '403': {description: Use company-scoped central Administrator installation access}
+  /v1/system/installation-access:
+    get:
+      operationId: summarizeOrganizationInstallationAccess
+      summary: Read active installation-key counts by company
+      security: [{sessionAuth: []}]
+      description: Central system Administrator browser session only. One summary for the organization table; excludes expired/revoked keys and deferred company-interface grants. Returns organization_id and active_count.
+      responses:
+        '200': {description: Active installation access counts}
+        '403': {description: Central Administrator browser session required}
+  /v1/system/organizations/{company}/installation-access:
+    parameters:
+    - {in: path, name: company, required: true, schema: {type: string, format: uuid}}
+    get:
+      operationId: listOrganizationInstallationAccess
+      summary: List a company's installation access across issuers
+      security: [{sessionAuth: []}]
+      description: Central system Administrator browser session only. Includes permanent company-access and expiring generation-only workspace keys, including revoked history. Returns key ID, company ID/name, display name, client origin, access kind, creation/expiry/revocation times and nonsecret key prefix; never credentials. Does not include deferred company-interface grants.
+      responses:
+        '200': {description: Company installation access records}
+        '403': {description: Central Administrator browser session required}
+        '410': {description: Organization unavailable}
+  /v1/system/organizations/{company}/installation-access/{id}:
+    parameters:
+    - {in: path, name: company, required: true, schema: {type: string, format: uuid}}
+    - {in: path, name: id, required: true, schema: {type: string, format: uuid}}
+    delete:
+      operationId: revokeOrganizationInstallationAccess
+      summary: Revoke one exact installation key in the selected company
+      security: [{sessionAuth: []}]
+      description: Central system Administrator browser session only; current role and company/key association checked transactionally. Idempotent revocation clears retained delivery ciphertext, preserving history, companies, jobs, files, charges and other keys. No bulk revocation.
       responses:
         '200': {description: Revoked}
-        '410': {description: No matching own installation grant}
+        '403': {description: Central Administrator browser session required}
+        '410': {description: No matching company installation grant}
   /v1/system/remote-workspace/authorization:
     get:
       operationId: readLocalInstallationAuthorization

@@ -1,6 +1,6 @@
 (() => {
  'use strict';
- const remembered='gateway-workspace-authorization';let dialog,actor,revision=0,writing=null,accountRevision=0,memory;
+ const remembered='gateway-workspace-authorization';let dialog,actor,revision=0,writing=null,memory;
  const node=(tag,text,cls)=>{const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e;};
  function capture(){const value=location.hash.match(/^#workspace_authorize=([A-Z2-7]{13})$/)?.[1];if(value){memory={code:value,time:Date.now()};try{sessionStorage.setItem(remembered,JSON.stringify(memory));history.replaceState(null,'',location.pathname+location.search);}catch{/* Keep the link usable when session storage is unavailable. */}}try{const stored=JSON.parse(sessionStorage.getItem(remembered)||'null');if(stored)memory=stored;}catch{}return memory&&/^[A-Z2-7]{13}$/.test(memory.code)&&Number.isFinite(memory.time)&&Date.now()-memory.time>=0&&Date.now()-memory.time<15*60*1000?memory.code:null;}
  const close=()=>{if(writing===revision)return;revision++;dialog?.close();};
@@ -28,14 +28,65 @@
    box.onsubmit=e=>{e.preventDefault();void send(false);};cancel.onclick=()=>send(true);approve.focus();
   }catch(e){if(current())FormUI.message(status,e.message,'error');}
  }
- async function grants(){const box=shell('Installation access'),version=revision,status=node('p','Loading…');status.setAttribute('role','status');box.append(status);try{const result=await api('/v1/workspace-installations');if(version!==revision)return;status.textContent=result.data.length?'':'No installation access has been issued by this account.';for(const grant of result.data){const row=node('article',undefined,'remote-job');row.append(node('strong',grant.name),node('p',grant.client_origin),node('p',(grant.provisioning==='dedicated'?'Dedicated company: ':'Legacy company: ')+(grant.company_name||grant.organization_id)),node('p',grant.expires_at?'Access expires '+new Date(grant.expires_at).toLocaleString():'Active until revoked'));const revoke=node('button',grant.revoked_at?'Revoked':'Revoke access','secondary danger');revoke.type='button';revoke.disabled=!!grant.revoked_at;revoke.onclick=async()=>{if(!confirm('Revoke this installation’s key? Its remote jobs, charges and files are preserved.'))return;revoke.disabled=true;try{await api('/v1/workspace-installations/'+encodeURIComponent(grant.id),{method:'DELETE'});revoke.textContent='Revoked';}catch(e){FormUI.message(status,e.message,'error');revoke.disabled=false;}};row.append(revoke);box.append(row);}}catch(e){FormUI.message(status,e.message,'error');}}
+ const adminAccess=()=>typeof systemAdministrator!=='undefined'&&systemAdministrator&&typeof consolePolicy!=='undefined'&&consolePolicy.installation_role==='central';
+ const activeGrant=grant=>!grant.revoked_at&&(!grant.expires_at||Date.parse(grant.expires_at)>Date.now());
+ const grantBase=company=>'/v1/system/organizations/'+encodeURIComponent(company)+'/installation-access';
+ let administration=false;
+ function closeInstallations(){if(administration){revision++;dialog?.close();administration=false;}}
+ async function grants(company,isCurrent,refresh){
+  if(!adminAccess()||!isCurrent())return;
+  const box=shell('Installation access'),version=revision,status=node('p','Loading…'),account=actor;
+  administration=true;status.setAttribute('role','status');box.append(node('strong',company.name),status);
+  const current=()=>version===revision&&dialog.open&&adminAccess()&&isCurrent()&&actor?.id===account?.id&&actor?.session_id===account?.session_id;
+  const retry=node('button','Retry','secondary');retry.type='button';retry.hidden=true;box.append(retry);
+  let loading=false;const controls=[];
+  const sync=()=>controls.forEach(({grant,button})=>{button.disabled=writing===version||!activeGrant(grant);});
+  async function load(){
+   if(loading||!current())return;loading=true;retry.hidden=true;FormUI.message(status,'Loading…');
+   try{
+    const result=await api(grantBase(company.id));if(!current())return;
+    FormUI.message(status,result.data.length?'':'No installation access.');
+    for(const grant of result.data){
+     const row=node('article',undefined,'remote-job'),issued=new Date(grant.created_at).toLocaleString(),scope=grant.access==='company-api-v1'?'Company access':'Generation-only access';
+     row.append(node('strong',grant.name),node('p',grant.client_origin),node('p',scope+' · '+grant.prefix),node('p','Issued '+issued),node('p',grant.expires_at?'Access expires '+new Date(grant.expires_at).toLocaleString():'Active until revoked'));
+     const revoke=node('button',grant.revoked_at?'Revoked':activeGrant(grant)?'Revoke':'Expired','secondary danger');revoke.type='button';revoke.disabled=!activeGrant(grant);let busy=false;
+     revoke.onclick=async()=>{
+      if(busy||writing===version||!current()||!activeGrant(grant))return;
+      if(!confirm('Revoke '+scope.toLowerCase()+' for '+grant.name+' ('+grant.client_origin+'), issued '+issued+' ('+grant.prefix+')? Other access, jobs, charges and files are preserved.'))return;
+      busy=true;writing=version;sync();FormUI.message(status,'Revoking…');
+      try{await api(grantBase(company.id)+'/'+encodeURIComponent(grant.id),{method:'DELETE'});if(!current())return;grant.revoked_at=new Date().toISOString();revoke.textContent='Revoked';FormUI.message(status,'');void refresh();}
+      catch(e){if(current())FormUI.message(status,e.message,'error');}
+      finally{busy=false;if(writing===version)writing=null;if(current())sync();}
+     };
+     controls.push({grant,button:revoke});const actions=node('div',undefined,'dialog-actions');actions.append(revoke);row.append(actions);box.append(row);
+    }
+   }catch(e){if(current()){FormUI.message(status,e.message,'error');retry.hidden=false;}}
+   finally{loading=false;}
+  }
+  retry.onclick=load;void load();
+ }
+ function organizationActions(companies,isCurrent){
+  const actions=new Map();if(!adminAccess())return actions;
+  let loading=false,failed=false;
+  const current=()=>isCurrent()&&adminAccess();
+  async function refresh(){
+   if(loading||!current())return;loading=true;
+   for(const button of actions.values())button.disabled=true;
+   try{
+    const result=await api('/v1/system/installation-access');if(!current())return;failed=false;
+    const active=new Map(result.data.map(item=>[item.organization_id,item.active_count]));
+    for(const [id,button]of actions){button.textContent='Revoke';button.disabled=!(active.get(id)>0);}
+   }catch{if(current()){failed=true;for(const button of actions.values()){button.textContent='Retry access';button.disabled=false;}}}
+   finally{loading=false;}
+  }
+  for(const company of companies){
+   const revoke=node('button','Revoke','secondary danger');revoke.type='button';revoke.disabled=true;revoke.setAttribute('aria-label','Revoke installation access for '+company.name);
+   revoke.onclick=()=>{if(!current()||!revoke.isConnected)return;if(failed){void refresh();return;}void grants(company,()=>current()&&revoke.isConnected,refresh);};
+   actions.set(company.id,revoke);
+  }
+  queueMicrotask(refresh);return actions;
+ }
  capture();
  window.addEventListener('hashchange',()=>{if(/^#workspace_authorize=[A-Z2-7]{13}$/.test(location.hash)){const code=capture();if(actor&&code)void authorize(code);}});
- async function updateMenu(user){
-  const ticket=++accountRevision;document.querySelector('#workspaceGrantsButton')?.remove();if(!user)return;
-  try{const result=await api('/v1/workspace-installations');if(ticket!==accountRevision||actor?.id!==user.id||!result.data?.length)return;
-   const button=node('button','Installation access');button.type='button';button.id='workspaceGrantsButton';button.setAttribute('role','menuitem');button.onclick=()=>{const menu=document.querySelector('#userDropdown');if(menu)menu.hidden=true;void grants();};document.querySelector('#userDropdown')?.append(button);
-  }catch{/* Existing company management remains available when this optional list cannot load. */}
- }
- window.WorkspaceAuthorization={async initialize(user){if(actor?.id!==user?.id||actor?.session_id!==user?.session_id){revision++;dialog?.close();}actor=user;void updateMenu(user);const code=capture();if(!user){close();return false;}if(code){await authorize(code);return true;}return false;},authorize,grants};
+ window.WorkspaceAuthorization={async initialize(user){if(actor?.id!==user?.id||actor?.session_id!==user?.session_id){revision++;dialog?.close();}actor=user;document.querySelector('#workspaceGrantsButton')?.remove();const code=capture();if(!user){close();return false;}if(code){await authorize(code);return true;}return false;},authorize,organizationActions,closeInstallations};
 })();

@@ -12,11 +12,12 @@
  let epoch=0;
  let managerFilters=null;
  async function list(all=false){return (await api('/v1/organizations'+(all?'?all=true':''))).data;}
- async function open(parent=document.querySelector('#organizationsContent'),all=false,forceList=false){if(!all&&!forceList&&window.Workspace?.ready())return Workspace.open();const token=++epoch;GatewayLayout.clear(parent);parent.classList.add('organizations-content');parent.replaceChildren(el('h1','Organizations'));const status=el('p','Loading…');parent.append(status);
+ async function open(parent=document.querySelector('#organizationsContent'),all=false,forceList=false){if(!all&&!forceList&&window.Workspace?.ready())return Workspace.open();const token=++epoch;window.WorkspaceAuthorization?.closeInstallations();GatewayLayout.clear(parent);parent.classList.add('organizations-content');parent.replaceChildren(el('h1','Organizations'));const status=el('p','Loading…');parent.append(status);
  if(clientManager&&!all){await managerList(parent,status,token);return;}
  try{const items=await list(all);if(token!==epoch)return;FormUI.message(status,items.length?'':'No organizations.');
  if(all){let name,domain,admin;const f=form(parent,'Create organization',async()=>{await api('/v1/organizations',{method:'POST',body:JSON.stringify({name:name.value,domain:domain.value,admin_user:admin.value})});await window.Workspace?.refresh();await open(parent,all)});name=field(f,'Name','text','',true);domain=field(f,'Company website','text','',true);domain.maxLength=2048;domain.autocomplete='url';admin=field(f,'First supermanager (optional)');admin.title='Email or user ID';f.classList.add('organization-create');f.finish('Create',()=>!!name.value.trim()&&!!domain.value.trim());}
- const organizationsTable=table(parent,['Organization','Balance','Credit Limit','Shared storage',''],items.map(o=>[o.name,!OrganizationRoles.statistics(o.role)?'—':money(o.balance_usd),!OrganizationRoles.statistics(o.role)?'—':money(o.credit_limit_usd),!OrganizationRoles.statistics(o.role)?'—':StorageQuota.size(o.storage_bytes),button('Manage',()=>details(parent,o,all))]));
+ const installationActions=all?window.WorkspaceAuthorization?.organizationActions(items,()=>token===epoch):null;
+ const organizationsTable=table(parent,['Organization','Balance','Credit Limit','Shared storage',''],items.map(o=>[o.name,!OrganizationRoles.statistics(o.role)?'—':money(o.balance_usd),!OrganizationRoles.statistics(o.role)?'—':money(o.credit_limit_usd),!OrganizationRoles.statistics(o.role)?'—':StorageQuota.size(o.storage_bytes),(()=>{const actions=el('div',null,'form-actions');actions.append(button('Manage',()=>details(parent,o,all)));if(all){const revoke=installationActions?.get(o.id);if(revoke)actions.append(revoke);}return actions;})()]));
  organizationsTable.querySelectorAll('tbody tr').forEach((row,index)=>{
   const manage=row.querySelector('button');if(!manage||manage.disabled)return;
   row.classList.add('organization-row');row.tabIndex=0;row.setAttribute('aria-label','Manage '+items[index].name);
@@ -76,7 +77,7 @@
   await load();
   await window.ClientOnboarding?.mount(parent,{current:()=>token===epoch,refresh:async()=>{await load();await window.Workspace?.refresh();}});
  }
- async function details(parent,o,all,selectedPage=null){const token=++epoch;const base='/v1/organizations/'+o.id;GatewayLayout.clear(parent);parent.replaceChildren(el('h1',o.name));
+ async function details(parent,o,all,selectedPage=null){const token=++epoch;window.WorkspaceAuthorization?.closeInstallations();const base='/v1/organizations/'+o.id;GatewayLayout.clear(parent);parent.replaceChildren(el('h1',o.name));
  if(clientManager){const heading=el('div',null,'report-heading console-section-heading');heading.append(parent.firstChild,button('Bonuses',()=>SalesBonuses.open(api)),button('Companies',()=>open(parent,false,true)));parent.prepend(heading);}
  const summary=el('dl',null,'organization-summary'),summaryValues={};const stat=(label,value)=>{const item=el('div'),description=el('dd'),valueNode=el('span',value);summaryValues[label]=valueNode;description.append(valueNode);item.append(el('dt',label),description);summary.append(item)};
  const refreshSummary=()=>{if(token!==epoch)return;parent.querySelector('h1').textContent=o.name;for(const [label,value] of [['Balance',money(o.balance_usd)],['Credit Limit',money(o.credit_limit_usd)],['Your week',`${money(o.weekly_committed_usd)} / ${money(o.weekly_limit_usd)}`]]){if(summaryValues[label])summaryValues[label].textContent=value}};
@@ -225,5 +226,5 @@
 
  function captureInvitation(){if(location.pathname!=='/organizations'||!location.hash.startsWith('#invite='))return false;sessionStorage.setItem('gateway-pending-invite',location.hash.slice(8));history.replaceState(null,'',location.pathname+location.search);return true;}
  captureInvitation();window.addEventListener('hashchange',()=>{if(captureInvitation())showConsoleSection('organizations');});
- window.GatewayOrganizations={open,list,details,close(){epoch++;ModelInfo.close();window.SalesPermissions?.close();window.SalesBonuses?.close()}};
+ window.GatewayOrganizations={open,list,details,close(){epoch++;window.WorkspaceAuthorization?.closeInstallations();ModelInfo.close();window.SalesPermissions?.close();window.SalesBonuses?.close()}};
 })();

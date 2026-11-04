@@ -177,22 +177,11 @@ func (s *Server) approveWorkspaceAuthorization(w http.ResponseWriter, r *http.Re
 	}
 	writeJSON(w, 200, challenge)
 }
+
+// The former personal administration endpoints are intentionally closed. Central
+// administrators use the company-scoped routes; internal recovery and ordinary
+// API-key self-service retain their existing authorization contracts.
 func (s *Server) workspaceInstallations(w http.ResponseWriter, r *http.Request) {
-	if !browserWorkspaceAccount(w, r) || !s.workspaceThrottle(w, r, "installations", 60) {
-		return
-	}
-	if r.Method == http.MethodDelete {
-		if err := s.workspaceAuthorization.Repo.Revoke(r.Context(), identity.ActorID(r.Context()), r.PathValue("id")); err != nil {
-			workspaceAuthorizationError(w, err)
-			return
-		}
-		writeJSON(w, 200, map[string]bool{"revoked": true})
-		return
-	}
-	grants, err := s.workspaceAuthorization.Repo.Grants(r.Context(), identity.ActorID(r.Context()))
-	if err != nil {
-		workspaceAuthorizationError(w, err)
-		return
-	}
-	writeJSON(w, 200, map[string]any{"data": grants})
+	w.Header().Set("Cache-Control", "no-store")
+	workspaceAuthorizationError(w, wa.ErrForbidden)
 }
