@@ -22,6 +22,7 @@ const (
 // Only reviewed aliases and exact snapshots are exposed. The account's /models response wins;
 // unknown models and snapshots never inherit capabilities or tariffs by prefix.
 var modelIDs = []string{
+	"gpt-image-2.6-flare", "gpt-image-2.6-sunburst",
 	"gpt-image-2.5-flare", "gpt-image-2.5-sunburst", "gpt-image-2",
 	"gpt-image-1.5", "gpt-image-1-mini", "gpt-image-1", "chatgpt-image-latest",
 	"gpt-4o-mini-tts", "tts-1", "tts-1-hd", "gpt-audio-1.5", "gpt-audio", "gpt-audio-mini",
@@ -47,6 +48,11 @@ func canonicalModel(id string) string {
 	return id
 }
 
+// The 2.6 contract is deliberately bounded to these aliases, not future snapshots.
+func isImage26(id string) bool {
+	return id == "gpt-image-2.6-flare" || id == "gpt-image-2.6-sunburst"
+}
+
 func (a *Adapter) ReviewedCatalogModels() []core.MediaModel {
 	models := make([]core.MediaModel, 0, len(modelIDs))
 	for _, id := range modelIDs {
@@ -66,13 +72,20 @@ func describeModel(id string) core.MediaModel {
 		m.MediaType = "image"
 		m.Resolutions = []string{"1024x1024", "1536x1024", "1024x1536"}
 		m.Qualities = []string{"medium", "low", "high"}
-		if strings.HasPrefix(id, "gpt-image-2") {
+		if strings.HasPrefix(id, "gpt-image-2") && !isImage26(id) {
 			m.Resolutions = append(m.Resolutions, "2048x2048", "2048x1152", "1152x2048", "3840x2160", "2160x3840")
 		}
 		if strings.HasPrefix(id, "gpt-image-2.5") {
 			m.Qualities = append(m.Qualities, "xhigh", "max")
 		}
 		m.Backgrounds = []string{"opaque", "transparent", "auto"}
+		if isImage26(id) {
+			// Standard raster sizes/qualities are explicit in both endpoint
+			// references. Do not inherit older models' larger size presets or
+			// xhigh/max while their 2.6 reference wording remains inconsistent.
+			m.Backgrounds = []string{"opaque"}
+			m.Parameters = []core.ParameterField{{Key: "complexity", Label: "Complexity", Type: "select", Choices: []string{"low", "medium", "high"}, Default: "high"}}
+		}
 		m.Formats = []string{"png", "jpeg", "webp"}
 		m.SupportsImageInput = true
 		m.MaxImageInputs = 16
@@ -207,6 +220,9 @@ func (a *Adapter) ValidateRequest(ctx context.Context, r core.MediaRequest) erro
 	}
 	m := describeModel(r.Model)
 	o := r.Options
+	if _, err := core.NormalizeParameters(m.Parameters, o.Parameters); err != nil {
+		return err
+	}
 	invalid := func(message string) error { return fmt.Errorf("%w: %s", core.ErrOptionsInvalid, message) }
 	if strings.TrimSpace(r.Prompt) == "" {
 		return invalid("prompt is required")
@@ -243,6 +259,11 @@ func (a *Adapter) ValidateRequest(ctx context.Context, r core.MediaRequest) erro
 			return invalid("speech options cannot be used for images")
 		}
 		for _, value := range o.ImageURLs {
+			// JSON image_url has a 20,971,520-character bound, including a
+			// data URL's encoded body. Keep the existing legacy limits intact.
+			if isImage26(r.Model) && len(value) > 20_971_520 {
+				return invalid("image reference URL exceeds 20971520 characters")
+			}
 			if err := validateImageURL(value); err != nil {
 				return invalid(err.Error())
 			}

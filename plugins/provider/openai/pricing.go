@@ -19,6 +19,10 @@ const priceSource = "https://developers.openai.com/api/docs/pricing"
 func rates(id string) map[string]float64 {
 	id = canonicalModel(id)
 	switch id {
+	case "gpt-image-2.6-flare", "gpt-image-2.6-sunburst":
+		// Reviewed 2026-11-05. Cached-input attribution is not exposed by
+		// this direct Images API integration; retain standard list rates.
+		return map[string]float64{"text_input_tokens": 5, "image_input_tokens": 8, "image_output_tokens": 30}
 	case "gpt-image-1-mini":
 		return map[string]float64{"text_input_tokens": 2, "image_input_tokens": 2.5, "image_output_tokens": 8}
 	case "gpt-image-1":
@@ -46,6 +50,10 @@ func (a *Adapter) Quote(ctx context.Context, _ core.MediaModel, r core.MediaRequ
 	p := core.PricingSnapshot{Currency: "USD", Unit: "multi_metric", Per: 1, Source: priceSource, Version: "openai-2026-10-12.1", CheckedAt: time.Date(2026, 10, 12, 0, 0, 0, 0, time.UTC), Region: "standard"}
 	c := core.TaskCost{Status: "estimated", QuotedAt: now, Pricing: p}
 	id := canonicalModel(r.Model)
+	if isImage26(id) {
+		c.Pricing.Version = "openai-image-2.6-2026-11-05"
+		c.Pricing.CheckedAt = time.Date(2026, 11, 5, 0, 0, 0, 0, time.UTC)
+	}
 	if strings.HasPrefix(r.Model, "tts-1") {
 		rate := money.USD(15 * money.Scale)
 		if id == "tts-1-hd" {
@@ -117,6 +125,9 @@ func (a *Adapter) Quote(ctx context.Context, _ core.MediaModel, r core.MediaRequ
 	c.Pricing.EstimateDescription = strings.Join(explanation, " + ") + " = $" + c.ExpectedUSD.String() + ". Text input uses UTF-8 bytes plus 32 overhead tokens. These are planning estimates; actual usage can differ."
 	if strings.Contains(r.Model, "image") {
 		c.Pricing.EstimateDescription += " Each input image reserves 4,096 tokens."
+		if isImage26(id) {
+			c.Pricing.EstimateDescription += " Image output uses the reviewed GPT Image 2.6 calculator. Complexity is independent of quality and has no separate fee; cached-input discounts are not applied."
+		}
 		if tariff["text_output_tokens"] > 0 {
 			c.Pricing.EstimateDescription += " Internal text/reasoning output assumes 4,096 tokens; this is a heuristic, not an enforced upper bound."
 		}
@@ -145,6 +156,16 @@ func outputTokens(id, size, quality string) float64 {
 	var w, h int
 	if _, err := fmt.Sscanf(size, "%dx%d", &w, &h); err != nil || w <= 0 || h <= 0 {
 		return 0
+	}
+	if isImage26(id) {
+		// Official GPT Image 2.6 calculator, reviewed 2026-11-05:
+		// round(ceil(cells * roundToEven(cells / ratio) * pixelFactor)
+		//       * qualityMultiplier). Keep the rounding order intact.
+		cells := map[string]float64{"low": 16, "medium": 24, "high": 48}[quality]
+		multiplier := map[string]float64{"low": 4.2, "medium": 3.3, "high": 1}[quality]
+		ratio := math.Max(float64(w), float64(h)) / math.Min(float64(w), float64(h))
+		base := math.Ceil(cells * math.RoundToEven(cells/ratio) * (2_000_000 + float64(w*h)) / 4_000_000)
+		return math.Round(base * multiplier)
 	}
 	if strings.HasPrefix(id, "gpt-image-2") {
 		cells := map[string]float64{"low": 16, "medium": 48, "high": 96}
@@ -187,6 +208,19 @@ func imageUsage(raw json.RawMessage, model string) *core.ProviderUsage {
 	usage := &core.ProviderUsage{Raw: append(json.RawMessage(nil), raw...), CostStatus: "metered"}
 	if json.Unmarshal(raw, &value) != nil {
 		return usage
+	}
+	if isImage26(model) {
+		// Never settle missing, contradictory or unpriced quantities as zero.
+		// SVG authoring and any text output are outside this raster tariff.
+		if value.Details.Text == nil || value.Details.Image == nil || value.Output == nil {
+			return usage
+		}
+		if value.Input != nil && *value.Input != *value.Details.Text+*value.Details.Image {
+			return usage
+		}
+		if d := value.OutputDetails; d != nil && (d.Text == nil || d.Image == nil || *d.Text != 0 || *d.Image != *value.Output) {
+			return usage
+		}
 	}
 	addMetric(usage, "text_input_tokens", value.Details.Text)
 	addMetric(usage, "image_input_tokens", value.Details.Image)

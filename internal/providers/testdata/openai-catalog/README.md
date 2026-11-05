@@ -27,5 +27,14 @@ SHA-256:
 `TestOpenAIReportWarningsResolveAfterCodeUpgrade` exercises the configured
 provider connection wrapper, reconciliation, a quiet repeated check and changed
 tariffs for every supported alias/snapshot. Set `GATEWAY_OPENAI_REVIEW_DIR` to a
-directory containing the complete downloaded `pricing.html` to run the same
-acceptance against the actual public page without fetching during tests.
+directory containing the complete downloaded `pricing.html` to run current 2.6
+tariff acceptance against the actual public page without fetching during tests.
+The historical report replay keeps its original fixture and reviewed scope.
+
+`pricing-image26.html` is a separate 2026-11-05 Standard pricing extraction for
+`gpt-image-2.6-flare` and `gpt-image-2.6-sunburst`. It retains the source's Astro
+group/heading structure and explicit per-million-token unit. Both models list
+USD 5 text input, 8 image input and 30 image output. Cached columns are retained
+as source facts but are not imported as discounts. The historical fixtures above
+remain unchanged. The 2.6 replay covers tariff import, quote quantities and
+preservation of confirmed entries when a source fails or an unknown ID appears.

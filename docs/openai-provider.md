@@ -1,11 +1,14 @@
 # OpenAI provider
 
 Reviewed against official OpenAI documentation on **2026-09-11**.
+The bounded GPT Image 2.6 contract and calculator were additionally reviewed on
+**2026-11-05**.
 
 ## Supported workflows
 
 | Workflow | Reviewed model aliases | Gateway media type |
 | --- | --- | --- |
+| Raster image generation and editing with complexity control | `gpt-image-2.6-flare`, `gpt-image-2.6-sunburst` | `image` |
 | Image generation and editing with image references | `gpt-image-2.5-flare`, `gpt-image-2.5-sunburst`, `gpt-image-2` | `image` |
 | Earlier image models, while available | `gpt-image-1.5`, `gpt-image-1-mini`, `gpt-image-1`, `chatgpt-image-latest` | `image` |
 | Verbatim text-to-speech | `gpt-4o-mini-tts`, `tts-1`, `tts-1-hd` | `speech` |
@@ -67,6 +70,34 @@ The adapter exposes a deliberate supported subset of each API's controls:
 
 Unsupported controls fail validation before a paid request. New capabilities
 must be added explicitly, with validation, tests and accurate catalog metadata.
+
+### GPT Image 2.6 subset
+
+The exact two 2.6 aliases support one PNG/JPEG/WebP output, the standard sizes
+1024x1024, 1536x1024 and 1024x1536, and low/medium/high quality. The default
+remains medium quality at 1024x1024; the provider default model remains
+`gpt-image-2.5-flare`. Set `options.parameters.complexity` to `low`, `medium` or
+`high` (default `high`). Complexity controls planning independently of rendering
+quality and has no separate fee.
+
+Editing uses the documented JSON `images: [{image_url: ...}]` body with up to
+16 PNG/JPEG/WebP references. Each URL or complete encoded data URL must be no
+longer than 20,971,520 characters; this is additional to upload and decoded-file
+limits. Remote references continue to be fetched by OpenAI.
+
+This subset supports opaque backgrounds. Transparent/automatic backgrounds,
+larger/custom sizes, xhigh/max quality, GIF, SVG, markup-guided edits, masks,
+streaming and authoring-model selection are not exposed for 2.6. The guide's
+calculator includes xhigh/max, while endpoint quality wording still names 2.5;
+size/background examples also retain earlier-model wording. These controls
+require a separate contract review. SVG additionally bills its authoring model;
+GIF edit fields conflict with the guide's generation-only description.
+
+Sources: [generation reference](https://developers.openai.com/api/reference/resources/images/methods/generate),
+[edit reference](https://developers.openai.com/api/reference/resources/images/methods/edit),
+[image guide and calculator](https://developers.openai.com/api/docs/guides/image-generation),
+[Flare](https://developers.openai.com/api/docs/models/gpt-image-2.6-flare) and
+[Sunburst](https://developers.openai.com/api/docs/models/gpt-image-2.6-sunburst).
 
 ## Connect
 
@@ -130,6 +161,14 @@ local planning estimate for inputs: UTF-8 byte count plus 32 text tokens and
 not exact tokenization or a guaranteed upper bound. Dimensions, image encoding,
 model behavior and prompt content affect the actual usage. In particular, 2.5
 uses its own calculator settings, not GPT Image 2's quality-to-token mapping.
+
+GPT Image 2.6 uses its own reviewed calculator multipliers. At 1024x1024,
+low/medium/high quality estimates 823/1,449/1,756 image output tokens respectively,
+excluding inputs. Both aliases use standard USD 5 text-input, 8 image-input and
+30 image-output per million tokens. No cached-input discount is inferred.
+These quantities are planning estimates, not measured usage or guaranteed bounds.
+Missing or contradictory usage, nonzero unpriced text-output quantities, and
+unexpected SVG authoring usage leave the 2.6 metered cost pending.
 
 GPT Audio reserves the full 4,096 output-token limit at its higher audio-output
 rate, plus estimated text input; short responses can cost much less. Actual

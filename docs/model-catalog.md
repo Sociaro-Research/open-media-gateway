@@ -44,6 +44,10 @@ customer estimates and final charges retain their distinct meanings.
 
 Pricing rules:
 
+- GPT Image 2.6 uses its independently reviewed calculator: 823/1,449/1,756
+  estimated output tokens at 1024 square and low/medium/high quality, plus input
+  estimates. Both exact aliases use $30 per million output image tokens. See the
+  [bounded 2.6 contract](openai-provider.md#gpt-image-26-subset).
 - GPT Image 2.5 uses 439 estimated output tokens at 1024 square/medium versus
   1,756 for GPT Image 2; both use $30 per million output image tokens. Their
   different prices are expected. Reference estimates now include the same

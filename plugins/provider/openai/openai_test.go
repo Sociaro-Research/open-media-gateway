@@ -85,7 +85,11 @@ func TestAllImageModelsGenerateAndEdit(t *testing.T) {
 					if _, ok := p["response_format"]; ok {
 						t.Fatal("GPT Image does not accept response_format")
 					}
-					return response(200, "application/json", imageResponse), nil
+					body := imageResponse
+					if isImage26(id) {
+						body = `{"data":[{"b64_json":"aW1hZ2U="}],"usage":{"input_tokens":110,"output_tokens":440,"input_tokens_details":{"text_tokens":10,"image_tokens":100},"output_tokens_details":{"text_tokens":0,"image_tokens":440}}}`
+					}
+					return response(200, "application/json", body), nil
 				})
 				req := core.MediaRequest{Model: id, Prompt: "draw a tree"}
 				if edit {

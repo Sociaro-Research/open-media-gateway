@@ -10,6 +10,11 @@ func catalogDocumentReviews() map[string]catalogsync.DocumentReview {
 
 func catalogSources() []catalogsync.Source {
 	sources := []catalogsync.Source{{ID: "pricing", URL: priceSource, Parser: "openai-pricing"}, {ID: "changelog", URL: "https://developers.openai.com/api/docs/changelog", Parser: "document"}, {ID: "deprecations", URL: "https://developers.openai.com/api/docs/deprecations", Parser: "document"}}
+	sources = append(sources,
+		catalogsync.Source{ID: "image-generation", URL: "https://developers.openai.com/api/docs/guides/image-generation", Parser: "document"},
+		catalogsync.Source{ID: "image-generate-api", URL: "https://developers.openai.com/api/reference/resources/images/methods/generate", Parser: "document"},
+		catalogsync.Source{ID: "image-edit-api", URL: "https://developers.openai.com/api/reference/resources/images/methods/edit", Parser: "document"},
+	)
 	for _, id := range modelIDs {
 		if canonicalModel(id) != id {
 			continue

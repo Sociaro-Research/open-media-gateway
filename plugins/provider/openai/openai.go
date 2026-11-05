@@ -78,6 +78,10 @@ func (a *Adapter) GetTask(context.Context, string) (core.ProviderResult, error) 
 func (a *Adapter) image(ctx context.Context, r core.MediaRequest) (core.ProviderTask, error) {
 	format := valueOr(r.Options.Format, "png")
 	payload := map[string]any{"model": r.Model, "prompt": r.Prompt, "n": 1, "size": valueOr(r.Options.Resolution, "1024x1024"), "quality": valueOr(r.Options.Quality, "medium"), "output_format": format, "background": valueOr(r.Options.Background, "opaque")}
+	if isImage26(r.Model) {
+		parameters, _ := core.NormalizeParameters(describeModel(r.Model).Parameters, r.Options.Parameters)
+		payload["complexity"] = parameters["complexity"]
+	}
 	path := "/images/generations"
 	if len(r.Options.ImageURLs) > 0 {
 		path = "/images/edits"
@@ -95,7 +99,8 @@ func (a *Adapter) image(ctx context.Context, r core.MediaRequest) (core.Provider
 		Data []struct {
 			Base64 string `json:"b64_json"`
 		} `json:"data"`
-		Usage json.RawMessage `json:"usage"`
+		Usage    json.RawMessage `json:"usage"`
+		SVGUsage json.RawMessage `json:"svg_usage"`
 	}
 	if json.Unmarshal(data, &response) != nil || len(response.Data) != 1 {
 		return core.ProviderTask{}, errors.New("OpenAI image response is malformed or has no single result")
@@ -104,7 +109,12 @@ func (a *Adapter) image(ctx context.Context, r core.MediaRequest) (core.Provider
 	if err != nil {
 		return core.ProviderTask{}, err
 	}
-	return core.ProviderTask{ID: valueOr(requestID, "immediate"), ResultURL: result, Usage: imageUsage(response.Usage, r.Model)}, nil
+	usage := imageUsage(response.Usage, r.Model)
+	if isImage26(r.Model) && len(response.SVGUsage) > 0 && string(response.SVGUsage) != "null" {
+		// An unexpected additional authoring model has no reviewed tariff.
+		usage = nil
+	}
+	return core.ProviderTask{ID: valueOr(requestID, "immediate"), ResultURL: result, Usage: usage}, nil
 }
 
 func (a *Adapter) speech(ctx context.Context, r core.MediaRequest) (core.ProviderTask, error) {

@@ -38,7 +38,7 @@ func openaiCatalogFixture(t *testing.T) (*Manager, context.Context, catalogsync.
 		t.Fatal(err)
 	}
 	capture, err := m.CaptureCatalog(ctx, "openai")
-	if err != nil || len(capture.Reviewed) != 24 || len(capture.Inactive) != 7 || len(capture.TariffAliases) != 11 {
+	if err != nil || len(capture.Reviewed) != 26 || len(capture.Inactive) != 7 || len(capture.TariffAliases) != 11 {
 		t.Fatal(capture, err)
 	}
 	return m, ctx, capture
@@ -99,11 +99,22 @@ func TestOpenAIDownloadedReportReplay(t *testing.T) {
 	if dir == "" {
 		t.Skip("no downloaded public OpenAI sources")
 	}
-	openaiReportReplay(t, dir+"/pricing.html")
+	// A current page can add aliases and remove retired prices. Replay its
+	// current 2.6 tariff contract separately from the historical 2026-10 report.
+	openaiImage26Replay(t, dir+"/pricing.html")
 }
 func openaiReportReplay(t *testing.T, pricingFile string) {
 	t.Helper()
 	m, ctx, capture := openaiCatalogFixture(t)
+	// This historical report predates Image 2.6; its captured prices cannot
+	// assert tariffs for new models. The separate 2.6 replay uses current data.
+	var historical []core.MediaModel
+	for _, model := range capture.Reviewed {
+		if model.ID != "gpt-image-2.6-flare" && model.ID != "gpt-image-2.6-sunburst" {
+			historical = append(historical, model)
+		}
+	}
+	capture.Reviewed = historical
 	body, err := os.ReadFile(pricingFile)
 	if err != nil {
 		t.Fatal(err)
