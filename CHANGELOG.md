@@ -5,10 +5,14 @@ All notable changes to Media Gateway will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/).
 
-## [v1.0.2] - 2026-11-01
+## [v1.0.2] - 2026-11-05
 
 ### Added
 
+- Connect the existing interface to a central company using explicit sign-in
+  approval and a permanent, revocable company key. Keep central resources and
+  ordinary API permissions; expose the assigned manager's published Support
+  contacts through the company-key API.
 - Template authoring, shared reference libraries, explicit image/video covers,
   one current template definition and scoped generation with immutable admitted
   job snapshots. Published saves immediately update future generations.
@@ -24,6 +28,13 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Share Requests filters, configurable columns, combined user/key identity and
+  the request-details dialog between administration and company views, with
+  unchanged company and role isolation.
+- Unify file actions, fitted image previews, inline upload cancellation, switch
+  labels and template-description typography across the existing interface.
+- Place installation revocation in central organization administration and local
+  Disconnect in company Management; show Revoke only for active installations.
 - Keep public provider catalogues and admission focused on image, video, speech
   and music. Necessary input preparation stays attached to an authorized media
   consumer; existing bindings and already admitted jobs retain recovery access.
@@ -38,6 +49,14 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Preserve literal free-form reference prompts with advisory diagnostics while
+  retaining mandatory prompt, media and template validation.
+- Keep API-key status filtering distinct from its usage month, remove redundant
+  row metadata and preserve narrow-screen key-creation controls.
+- Recover the local mode choices after confirmed central key revocation without
+  treating a temporary outage as revocation or replaying remote work locally.
+- Retain generation admission, active-reference retention and historical
+  provider-handle compatibility without resubmitting accepted paid work.
 - Explain private-address policy and DNS failures during S3 connection checks
   without exposing credentials or relaxing outbound destination protection.
 - Preserve completed primary video outputs when optional provider metadata or
@@ -60,14 +79,21 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ### Upgrade notes
 
-- This release includes database migrations 071 through 087. Back up the
+- This release includes database migrations 071 through 096. Back up the
   database, configuration and media, preserve signing/encryption keys and drain
   workers before upgrading. Image rollback alone does not restore schema
   compatibility; follow the documented preservation and rollback procedure.
+- The existing company-key connection is the supported central integration.
+  The separate full company-interface protocol remains gated; inactive schema
+  foundations do not enable its unfinished capabilities. Existing generation-only
+  installation approvals require explicit new consent for company access.
 - `LEGACY_API_ORIGIN` is empty by default. It changes only exact-host API
   admission, not DNS/TLS, browser cookie or cross-origin trust. Reference
   capability URLs have no expiry, so an old hostname cannot be retired solely
   by waiting for media URL expiry.
+- Older records without immutable admission evidence still require current
+  normalized preparation and dependencies. Equivalent requests with changed wire
+  encoding do not promise recovery after those dependencies change.
 - Native provider support and published tariff evidence do not establish a
   particular account's entitlement or verify paid generation. Unverified tariff
   conditions continue to fail closed.
