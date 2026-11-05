@@ -31,6 +31,7 @@ const server=http.createServer((req,res)=>{
   await context.route('**/*',async route=>{
    const req=route.request(),url=new URL(req.url()),p=url.pathname;
    if(url.origin!==origin){errors.push('External request: '+url.origin);return route.abort();}
+   if(p==='/auth/company-connection'){assert.equal(req.method(),'GET');return route.fulfill({json:{connected:false}});}
    if(!p.startsWith('/v1/'))return route.continue();if(req.method()==='DELETE')state.deletes++;
    const gate=state.gate;
    if(gate&&gate.match(p,req.method())){state.gate=null;gate.arrived.resolve();await gate.release.promise;}
@@ -63,7 +64,7 @@ const server=http.createServer((req,res)=>{
   async function close(){await picker.getByRole('button',{name:'Close library',exact:true}).click();}
   async function selectProvider(id){await page.locator('#model').selectOption(JSON.stringify([id,model.id]));await page.waitForFunction(id=>selectedProvider()?.id===id,id);}
   try{
-   await page.goto(origin);await useFixtureKey(page,'synthetic-key');await page.waitForFunction(()=>selectedModel()?.id==='seedance');
+   await page.goto(origin);await page.waitForFunction(()=>consoleInitialized&&window.Workspace?.ready()&&!initializationPending);await useFixtureKey(page,'synthetic-key');await page.waitForFunction(()=>selectedModel()?.id==='seedance');
    await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);
    await test({page,picker,state,open,source,inventory,close,selectProvider});
    assert.deepEqual(errors,[]);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'no horizontal page overflow');

@@ -12,6 +12,7 @@ const server=http.createServer((req,res)=>{if(req.url.startsWith('/preview/')){r
  const model={id:'seedance',display_name:'Seedance assets',reference_prompt_syntax:'numbered',media_type:'video',supports_asset_references:true,supports_image_input:true,max_image_inputs:9,resolutions:['720p'],ratios:['16:9'],default_duration:5,min_duration:4,max_duration:15,reference_modes:[{id:'references',label:'References',min_images:0,max_images:9,min_videos:0,max_videos:0,min_audios:0,max_audios:0}],pricing:{known:true,reference_price_usd:0}};
  let generationPosts=0;
  let groups=[],assets=[],imports=0,creates=0,reads=0,deleteBlocked=true,library=[];const org='11111111-1111-4111-8111-111111111111';
+ await page.route('**/auth/company-connection',route=>{assert.equal(route.request().method(),'GET');return route.fulfill({json:{connected:false}});});
  await page.route('**/v1/**',route=>{const req=route.request(),url=new URL(req.url()),p=url.pathname,json=data=>route.fulfill({json:generationFixtureResponse(route.request(),data)});
  if(p==='/v1/info')return json({auth_mode:'google',provider:'bytedance'});if(p==='/v1/me')return json({id:'admin',name:'Admin',session_id:'fixture',is_system_admin:true});
  if(p==='/v1/organizations')return json({data:[{id:org,name:'Studio',role:'supermanager',available_usd:10}]});if(p==='/v1/api-keys'&&req.method()==='POST')return json({secret:'fixture-key'});
@@ -31,7 +32,7 @@ const server=http.createServer((req,res)=>{if(req.url.startsWith('/preview/')){r
  });
  async function fillSelect(label,value){const select=page.getByRole('combobox',{name:label,exact:true});await select.selectOption(value);}
  try{
- await page.goto(origin);await useFixtureKey(page,'fixture-key');await page.waitForFunction(()=>selectedModel()?.id==='seedance');
+ await page.goto(origin);await page.waitForFunction(()=>consoleInitialized&&window.Workspace?.ready()&&!initializationPending);await useFixtureKey(page,'fixture-key');await page.waitForFunction(()=>selectedModel()?.id==='seedance');
  await page.locator('#chooseReferences').click();await page.getByRole('combobox',{name:'image reference source',exact:true}).click();await page.getByRole('option',{name:'BytePlus',exact:true}).click();await page.getByRole('button',{name:'New group',exact:true}).click();await page.getByRole('textbox',{name:'image group name',exact:true}).fill('Characters');await page.getByRole('button',{name:'Create group',exact:true}).click();await page.waitForFunction(()=>document.querySelector('#referenceLibrary select[aria-label="image asset group"]').value==='group-new');
  await page.locator('#referenceFiles').setInputFiles({name:'Character.png',mimeType:'image/png',buffer:png});await page.locator('#referenceLibrary [data-asset-id="asset-new"]').waitFor();
  assert.equal(creates,1);await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await page.waitForFunction(()=>document.querySelector('#imageURLs').value==='asset://asset-new');
