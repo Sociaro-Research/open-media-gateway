@@ -22,8 +22,12 @@ compatibility. No provider feature was removed to fit an OpenAI schema.
 | Generation history | `GET /v1/generations` | List envelope; 1-100 jobs per page, cursor or offset pagination |
 
 Authenticate using `Authorization: Bearer <GATEWAY_API_KEY>`. Existing key scopes,
-organization membership, ownership, provider connection availability, storage policy, budget
-reservation, markup, and idempotency apply through the same admission pipeline.
+organization membership, ownership, provider connection availability, storage
+policy, completed-spending budget checks, markup, and idempotency apply through
+the same admission pipeline. Estimates and pending tasks do not reserve funds.
+For shared providers, new requests are blocked when the available organization
+balance or member weekly allowance is zero or negative; an estimate can exceed
+the remaining amount. Accepted work can therefore take spending beyond a limit.
 The catalog and responses expose only gateway customer prices to regular users;
 provider accounting remains visible only to authorized system administrators.
 
@@ -259,7 +263,7 @@ organization. Organization administrators cannot grant themselves access. An
 organization grant does not enable a disabled provider or bypass key/account
 restrictions. The policy applies to catalogs, estimates and all generation routes;
 callers cannot use a hidden model by guessing its ID. Policy read failures reject
-requests. Admission rechecks availability transactionally before reserving funds.
+requests. Admission rechecks availability transactionally before accepting new work.
 
 Renaming affects new requests. Accepted generations and webhook snapshots retain
 the public ID used at acceptance and the native `provider_model` for provenance.

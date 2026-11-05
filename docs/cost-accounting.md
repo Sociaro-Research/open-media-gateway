@@ -28,9 +28,13 @@ places. Per-task estimates round upward to the nearest microdollar. Account-leve
 free quotas, promotions, discounts, taxes, and resource packs are not inferred from
 an account balance. Their effect is visible when a bill can be reconciled.
 
-Tariffs are reviewed and versioned with releases, independently of the provider
-model catalogue (cached for ten minutes). There is no automatic scraping of public
-pricing pages. New models, unsupported regions, and reference-video configurations
+Compiled tariffs provide a reviewed, versioned baseline. Provider model discovery
+has its own ten-minute cache. For shared providers, configured daily
+[catalogue synchronization](catalog-sync.md) also fetches public source documents
+and versions safe metadata and compatible tariffs without a release. A tariff
+must match the reviewed estimator's region, units and billing rules; unsupported
+changes remain warnings rather than guessed prices. Accepted tasks retain their
+pricing snapshots. New models, unsupported regions, and reference-video configurations
 without verified pricing return `422 pricing_unavailable`. Supported quote paths
 currently include the existing priced Seedance video models without video input,
 Seedream 4.0/4.5/5.0 Lite, Qwen Image 2/3 and selected editing models, Wan 3.0 and
@@ -94,8 +98,12 @@ For a matched bill, `tariff_usd` is `Price × Count`, `package_units` is
 at $0.04 covered by a package has $0.04 consumption and $0 cash payment. The journal
 shows one price, switching from Estimated cost to Cost once terminal usage is known; cash settlement belongs in Reports.
 The original estimate is retained. Package coverage is not guessed from balance or
-called a daily allowance. Revisions replace charges; an invalidated match restores
-the provisional reservation. Gross consumption drives organization balance and member weekly usage; net provider charges do not.
+called a daily allowance. Revisions replace charges; an invalidated match clears
+the confirmed bill fields and returns the task to pending billing. Completed
+consumption then falls back to metered usage or other known provider cost, not
+the original estimate. An unknown cost stays unknown and does not reserve funds.
+Gross consumption drives organization balance and member weekly usage; net
+provider charges do not.
 
 Other provider bills still require an exact instance/task identifier match. Unpaid,
 non-USD, or ambiguous bills remain pending. Alibaba JSON is decoded before the
