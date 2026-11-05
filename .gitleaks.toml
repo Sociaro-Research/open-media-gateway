@@ -47,3 +47,13 @@ regexTarget = "line"
 regexes = [
   '''\A(?:\r?\n)?\tref := references\.Image\{ID: uuid\.NewString\(\), Name: "Audio", ContentType: "audio/wav", SizeBytes: 12, StorageKey: "fixture/sound", SHA256: "hash", CreatedAt: time\.Now\(\)\}\r?\n?\z''',
 ]
+
+[[allowlists]]
+targetRules = ["generic-api-key"]
+description = "Exact reviewed public installation-access description"
+condition = "AND"
+paths = ['''\Adocs/openapi\.yaml\z''']
+regexTarget = "line"
+regexes = [
+  '''\A(?:\r?\n)?      description: Central system Administrator browser session only\. Includes permanent company-access and expiring generation-only workspace keys, including revoked history\. Returns key ID, company ID/name, display name, client origin, access kind, creation/expiry/revocation times and nonsecret key prefix; never credentials\. Does not include deferred company-interface grants\.\r?\n?\z''',
+]
