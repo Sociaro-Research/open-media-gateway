@@ -1,6 +1,7 @@
-"""Release metadata checks use synthetic files and never publish artifacts."""
+"""Check release metadata fixtures and documentation against runtime configuration."""
 import importlib.util
 from pathlib import Path
+import re
 import tempfile
 import unittest
 
@@ -8,6 +9,18 @@ spec = importlib.util.spec_from_file_location(
     "release_docs", Path(__file__).resolve().parents[1] / "check-release-docs.py")
 checker = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(checker)
+
+
+class PlaygroundKeyDocumentation(unittest.TestCase):
+    def test_vault_environment_name_matches_runtime_configuration(self):
+        root = Path(__file__).resolve().parents[2]
+        config = (root / "internal/config/config.go").read_text()
+        setting = re.search(r'c\.ProviderCredentialsKey\s*=\s*env\("([A-Z_]+)"', config)
+        self.assertIsNotNone(setting, "Locate the runtime vault encryption setting")
+        guide = (root / "docs/playground-keys.md").read_text()
+        documented = set(re.findall(r'`(PROVIDER_CREDENTIALS[A-Z_]*)`', guide))
+        self.assertEqual(documented, {setting[1]},
+                         "Playground vault guide must name the actual environment variable")
 
 
 class ReleaseDocumentation(unittest.TestCase):

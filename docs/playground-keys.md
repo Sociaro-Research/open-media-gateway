@@ -41,8 +41,8 @@ endpoint accepts bearer credentials as authority to retrieve a secret. See
 [OpenAPI](openapi.yaml) for the request and response contracts.
 
 At rest, the vault uses AES-GCM with a random nonce, a separate encryption domain
-derived from the existing `PROVIDER_CREDENTIALS_KEY`, and authenticated binding
-to purpose, account, workspace and key ID. Ordinary API authentication still
+derived from the existing `PROVIDER_CREDENTIALS_ENCRYPTION_KEY`, and authenticated
+binding to purpose, account, workspace and key ID. Ordinary API authentication still
 looks up the normal key hash and checks current policy. Preserve and protect the
 operator-managed encryption secret with backups; changing/losing it does not
 recover old vault contents. Decryption failure stops restore without creating a
