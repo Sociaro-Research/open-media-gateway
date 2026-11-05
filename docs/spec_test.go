@@ -111,3 +111,31 @@ func TestResponseObjectsPreserveDescriptions(t *testing.T) {
 		}
 	}
 }
+
+func TestModelIdentityDescriptionsSeparatePublicAndReferenceIDs(t *testing.T) {
+	data, err := JSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var spec map[string]any
+	if err := json.Unmarshal(data, &spec); err != nil {
+		t.Fatal(err)
+	}
+	paths := spec["paths"].(map[string]any)
+	for _, path := range []string{"/v1/models", "/v1/models/{model}"} {
+		operation := paths[path].(map[string]any)["get"].(map[string]any)
+		description := operation["description"].(string)
+		if !strings.Contains(description, "exact public IDs") || strings.Contains(description, "Raw unique model IDs") {
+			t.Errorf("%s must describe exact public identities, including renamed IDs", path)
+		}
+	}
+	schemas := spec["components"].(map[string]any)["schemas"].(map[string]any)
+	generation := schemas["GenerationRequest"].(map[string]any)["properties"].(map[string]any)["model"].(map[string]any)["description"].(string)
+	reference := schemas["ReferenceValidationTarget"].(map[string]any)["properties"].(map[string]any)["model"].(map[string]any)["description"].(string)
+	if !strings.Contains(generation, "Exact public ID") || strings.Contains(generation, "legacy native") {
+		t.Error("Generation model must remain an exact public ID")
+	}
+	if !strings.Contains(reference, "legacy native model ID on this provider connection") || !strings.Contains(reference, "Ambiguous matches are rejected") {
+		t.Error("Reference validation alone retains connection-scoped legacy IDs without ambiguous aliases")
+	}
+}

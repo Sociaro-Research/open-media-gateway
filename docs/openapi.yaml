@@ -2643,9 +2643,10 @@ paths:
         '422': {description: Verified price unavailable.}
   /v1/models:
     get:
-      description: Only enabled models visible to this API key. Raw unique model IDs,
-        or provider/model for ambiguous names. capabilities preserves full metadata,
-        controls and role-filtered gateway prices.
+      description: Only enabled models visible to this API key. Returns exact public IDs,
+        initially provider/model and optionally renamed by an administrator. Use these
+        IDs unchanged for retrieval and generation; native IDs are not generation aliases.
+        capabilities preserves full metadata, controls and role-filtered gateway prices.
       operationId: list_models
       responses:
         "200":
@@ -2674,9 +2675,10 @@ paths:
       - Catalog
   /v1/models/{model}:
     get:
-      description: Only enabled models visible to this API key. Raw unique model IDs,
-        or provider/model for ambiguous names. capabilities preserves full metadata,
-        controls and role-filtered gateway prices.
+      description: Only enabled models visible to this API key. Returns exact public IDs,
+        initially provider/model and optionally renamed by an administrator. Use these
+        IDs unchanged for retrieval and generation; native IDs are not generation aliases.
+        capabilities preserves full metadata, controls and role-filtered gateway prices.
       operationId: retrieve_model
       responses:
         "200":
