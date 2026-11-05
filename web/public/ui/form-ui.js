@@ -175,7 +175,12 @@
       const focused=document.activeElement===control,start=control.selectionStart,end=control.selectionEnd;
       setVisible(control.type==='password');
       if(focused)control.focus({preventScroll:true});
-      if(start!==null)control.setSelectionRange(start,end);
+      if(start!==null){
+        // A type change can recreate the native editor during layout. Resolve
+        // that editor before restoring the range so later layout cannot reset it.
+        control.getBoundingClientRect();
+        control.setSelectionRange(start,end);
+      }
     };
     passwordControls.set(control,{button,setVisible});setVisible(false);wrap.append(button);
   }
