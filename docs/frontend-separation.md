@@ -111,10 +111,21 @@ and idempotency keys. Central failure is an error, never a local generation or
 storage fallback. Disconnect stops use by this interface and preserves central
 company data; remote key revocation remains available centrally.
 
-Profile writes, account support and browser-only managed Playground-key operations
-remain subject to their existing session-only guards. The connected interface
-already has its company key and does not invoke managed-key creation/restoration.
-No separate generator or copied local catalogue is used.
+Only a typed central `401 api_key_revoked` for the exact forwarded credential
+triggers automatic disconnection. The proxy checks the current binding and
+atomically compares its version before clearing it, then returns
+`410 company_connection_revoked`. The browser blocks further customer dispatch
+until it reloads the local bootstrap, where the existing mode choices and
+reconnection are available. It never replays the failed operation locally.
+Network failures, timeouts, 5xx, permission failures and unrelated 401 responses
+preserve the saved connection; a stale response cannot clear a newer binding.
+
+Profile writes and browser-only managed Playground-key operations remain subject
+to their existing session-only guards. The connected Support view uses the
+company-scoped `/v1/key/support` endpoint for the assigned manager's published
+contacts; the original browser-session endpoint remains unchanged. The connected
+interface already has its company key and does not invoke managed-key
+creation/restoration. No separate generator or copied local catalogue is used.
 
 Existing storage and payment transports are unchanged. Signed media uses the
 central origin. S3 uploads still use the existing signed browser upload plan and

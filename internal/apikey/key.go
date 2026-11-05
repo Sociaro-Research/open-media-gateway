@@ -10,6 +10,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/Sociaro-Research/open-media-gateway/internal/money"
 	"slices"
 	"strings"
@@ -32,6 +33,9 @@ const (
 var ErrForbidden = errors.New("API key management is not allowed for this role or recipient")
 
 var ErrNotFound = errors.New("API key not found")
+
+// ErrRevoked confirms that the exact supplied token belongs to a revoked key.
+var ErrRevoked = fmt.Errorf("%w: revoked", ErrNotFound)
 
 type Key struct {
 	Purpose           string     `json:"purpose,omitempty"`

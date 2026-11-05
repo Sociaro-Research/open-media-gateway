@@ -1,12 +1,15 @@
 package api
 
 import (
+	"bytes"
 	"crypto/subtle"
+	"encoding/json"
 	"errors"
 	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
 	"github.com/Sociaro-Research/open-media-gateway/internal/installation"
 	remote "github.com/Sociaro-Research/open-media-gateway/internal/remoteworkspace"
 	"io"
+	"mime"
 	"net/http"
 	"strings"
 )
@@ -115,6 +118,16 @@ func (s *Server) companyKeyProxy(w http.ResponseWriter, r *http.Request) {
 		remoteError(w, remote.ErrConflict)
 		return
 	}
+	if confirmedCompanyKeyRevocation(response) {
+		// The version compare-and-swap also closes the race after the snapshot
+		// check: a late response must never disconnect a renewed connection.
+		if _, err = s.remoteWorkspaceManager.Repo.DisconnectRemoteWorkspace(r.Context(), owner, record.Version); err != nil {
+			remoteError(w, err)
+			return
+		}
+		writeError(w, http.StatusGone, "company_connection_revoked", "Sociaro access was revoked. This installation is no longer connected.")
+		return
+	}
 	// Do not follow upstream redirects or copy cookies. Browser transport also
 	// uses redirect:error; external signed-storage URLs remain credential-free.
 	for _, name := range []string{"Content-Type", "Content-Length", "Content-Disposition", "Content-Range", "Accept-Ranges", "ETag", "Last-Modified", "Retry-After", "Location"} {
@@ -128,4 +141,28 @@ func (s *Server) companyKeyProxy(w http.ResponseWriter, r *http.Request) {
 			panic(http.ErrAbortHandler)
 		}
 	}
+}
+
+// Only the central API's typed denial of the exact forwarded credential is
+// terminal. Preserve all bytes for unrelated failures and never infer this
+// state from an error message, local session failure or a temporary outage.
+func confirmedCompanyKeyRevocation(response *http.Response) bool {
+	if response.StatusCode != http.StatusUnauthorized {
+		return false
+	}
+	contentType, _, err := mime.ParseMediaType(response.Header.Get("Content-Type"))
+	if err != nil || contentType != "application/json" {
+		return false
+	}
+	raw, err := io.ReadAll(io.LimitReader(response.Body, 4097))
+	response.Body = io.NopCloser(io.MultiReader(bytes.NewReader(raw), response.Body))
+	if err != nil || len(raw) > 4096 {
+		return false
+	}
+	var problem struct {
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	return json.Unmarshal(raw, &problem) == nil && problem.Error.Code == "api_key_revoked"
 }

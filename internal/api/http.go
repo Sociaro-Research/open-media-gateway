@@ -663,6 +663,10 @@ func (s *Server) authenticate(next http.Handler) http.Handler {
 				next.ServeHTTP(w, r.WithContext(ctx))
 				return
 			}
+			if errors.Is(err, apikey.ErrRevoked) {
+				writeError(w, http.StatusUnauthorized, "api_key_revoked", "This API key has been revoked")
+				return
+			}
 			if !errors.Is(err, apikey.ErrNotFound) {
 				writeError(w, http.StatusServiceUnavailable, "service_unavailable", "API key could not be verified")
 				return

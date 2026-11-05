@@ -1,10 +1,11 @@
 (() => {
  'use strict';
  const originalFetch=window.fetch.bind(window);
- let connection=null,flight=null;
+ let connection=null,flight=null,transition=null;
  const localControl=path=>/^\/v1\/system\/remote-workspace(?:[/?]|$)/.test(path);
  const customer=path=>path.startsWith('/v1/')||['/media/','/references/','/template-media/','/provider-assets/'].some(prefix=>path.startsWith(prefix));
  async function initialize(){
+  if(transition)throw new DOMException('Company connection revoked','AbortError');
   if(connection)return connection;
   if(flight)return flight;
   flight=(async()=>{
@@ -20,8 +21,9 @@
   return flight;
  }
  window.fetch=async(input,options)=>{
-  const current=connection;if(!current)return originalFetch(input,options);
   const source=input instanceof Request?input.url:String(input),url=new URL(source,location.href);
+  if(transition&&[location.origin,transition.origin].includes(url.origin)&&customer(url.pathname)&&!localControl(url.pathname))throw new DOMException('Company connection revoked','AbortError');
+  const current=connection;if(!current)return originalFetch(input,options);
   if(url.origin!==location.origin&&url.origin!==current.origin)return originalFetch(input,options);
   if(!customer(url.pathname))return originalFetch(input,options);
   const request=new Request(input instanceof Request?input:url.href,options),headers=new Headers(request.headers);
@@ -38,6 +40,18 @@
   if(connection!==current)throw new DOMException('Company connection changed','AbortError');
   const response=await originalFetch(forwarded);
   if(connection!==current)throw new DOMException('Company connection changed','AbortError');
+  if(response.status===410){
+   const problem=await response.clone().json().catch(()=>null);
+   if(connection!==current)throw new DOMException('Company connection changed','AbortError');
+   if(problem?.error?.code==='company_connection_revoked'){
+    // The local proxy has durably cleared this exact connection. Reload the
+    // existing local bootstrap; never replay the failed operation locally.
+    transition=current;
+    connection=null;
+    location.assign('/');
+    throw new DOMException('Company connection revoked','AbortError');
+   }
+  }
   return response;
  };
  window.CompanyConnection={url:value=>connection&&typeof value==='string'&&/^\/(?:media|references|template-media)\//.test(value)?new URL(value,connection.origin).href:value,initialize,active:()=>!!connection,key:()=>connection?.key||'',record:()=>connection?.record||null};

@@ -142,6 +142,15 @@ func (r *APIKeyRepository) Authenticate(ctx context.Context, hash []byte) (ident
 		WHERE NOT u.is_client_manager AND (k.organization_id IS NULL OR m.user_id IS NOT NULL) AND k.token_hash = $1 AND k.revoked_at IS NULL AND (k.expires_at IS NULL OR k.expires_at > NOW())`, hash).
 		Scan(&user.ID, &user.Email, &user.Name, &user.Picture, &key.ID, &scopes, &key.ResourceMode, &key.StorageMode, &key.OrganizationID, &key.OrganizationAdmin, &key.OrganizationRole, &key.Purpose)
 	if errors.Is(err, sql.ErrNoRows) {
+		// Only an exact stored token digest proves revocation. Unknown, expired
+		// and otherwise ineligible credentials keep their generic denial.
+		var revoked bool
+		if e := r.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM user_api_keys WHERE token_hash=$1 AND revoked_at IS NOT NULL)`, hash).Scan(&revoked); e != nil {
+			return identity.User{}, apikey.Key{}, e
+		}
+		if revoked {
+			return identity.User{}, apikey.Key{}, apikey.ErrRevoked
+		}
 		return user, key, apikey.ErrNotFound
 	}
 	if err != nil {

@@ -62,6 +62,7 @@ paths:
         '401': {description: Login or key rejected}
         '403': {description: Origin, owner, scope or central permission denied}
         '409': {description: Connection context changed}
+        '410': {description: Confirmed central key revocation durably disconnected this exact saved company connection (company_connection_revoked); do not replay the request locally}
         '502': {description: Central request unavailable}
     head:
       tags: [Authentication]
@@ -75,6 +76,7 @@ paths:
         '401': {description: Login or key rejected}
         '403': {description: Origin, owner, scope or central permission denied}
         '409': {description: Connection context changed}
+        '410': {description: Confirmed central key revocation durably disconnected this exact saved company connection (company_connection_revoked); do not replay the request locally}
         '502': {description: Central request unavailable}
     post:
       tags: [Authentication]
@@ -88,6 +90,7 @@ paths:
         '401': {description: Login or key rejected}
         '403': {description: Origin, owner, scope or central permission denied}
         '409': {description: Connection context changed}
+        '410': {description: Confirmed central key revocation durably disconnected this exact saved company connection (company_connection_revoked); do not replay the request locally}
         '502': {description: Central request unavailable}
     put:
       tags: [Authentication]
@@ -101,6 +104,7 @@ paths:
         '401': {description: Login or key rejected}
         '403': {description: Origin, owner, scope or central permission denied}
         '409': {description: Connection context changed}
+        '410': {description: Confirmed central key revocation durably disconnected this exact saved company connection (company_connection_revoked); do not replay the request locally}
         '502': {description: Central request unavailable}
     patch:
       tags: [Authentication]
@@ -114,6 +118,7 @@ paths:
         '401': {description: Login or key rejected}
         '403': {description: Origin, owner, scope or central permission denied}
         '409': {description: Connection context changed}
+        '410': {description: Confirmed central key revocation durably disconnected this exact saved company connection (company_connection_revoked); do not replay the request locally}
         '502': {description: Central request unavailable}
     delete:
       tags: [Authentication]
@@ -127,6 +132,7 @@ paths:
         '401': {description: Login or key rejected}
         '403': {description: Origin, owner, scope or central permission denied}
         '409': {description: Connection context changed}
+        '410': {description: Confirmed central key revocation durably disconnected this exact saved company connection (company_connection_revoked); do not replay the request locally}
         '502': {description: Central request unavailable}
   /auth/company-interface/local/customer/{path}:
     parameters:
@@ -8970,6 +8976,8 @@ components:
       scheme: bearer
       description: Personal Gateway key (gw_…), or the separate deployment service
         key. An explicit key takes precedence over a browser session. Only Authorization Bearer is accepted.
+        An exact stored revoked token returns HTTP 401 with code api_key_revoked.
+        Unknown tokens, expired-only keys and membership-only denial do not establish revocation.
     sessionAuth:
       type: apiKey
       in: cookie
