@@ -70,6 +70,34 @@ ignored `dist/` or `.local/`, or CI artifacts.
 See [docs/provider-development.md](docs/provider-development.md) for the adapter
 checklist.
 
+## User-facing errors
+
+Every error shown to a user or agent must provide the safest verified explanation
+and a concrete next step. Apply this rule across API, UI, worker/Journal, CLI and
+historical read paths. Review diagnostic changes against this checklist:
+
+- [ ] Identify the verified cause and known field, type, range, choice or limit
+  that helps correct the request. Do not guess causes or invent universal limits.
+- [ ] Preserve reviewed public field names in `param` (for example, `speed`).
+  For arbitrary/unrecognized names, including secret-like names, use a reviewed
+  enclosing field such as `body` instead of reflecting the name; never reflect
+  submitted values or private implementation details.
+- [ ] Explain what the caller should correct or what an operator should check.
+  Use task/correlation identifiers only when already available and authorized;
+  preserve opaque authentication, permission and hidden-resource responses.
+- [ ] If acceptance or completion is uncertain, say so. Direct the caller to the
+  original task's status, Journal or provider history before a new submission.
+  Describe only supported recovery using the original idempotency key, endpoint,
+  body and account/workspace context. Avoid unconditional retry instructions or
+  promises about recovery, charges or duplicate prevention.
+- [ ] Preserve existing HTTP status, error code/type/envelope, permissions and
+  lifecycle for diagnostic-only changes. Reconstruct safe errors from bounded,
+  trusted evidence; never expose raw upstream bodies/messages, credentials,
+  signed URLs, local paths or another user's data.
+- [ ] Add synthetic negative and compatibility regressions at the affected public
+  boundaries, including saved-error reads where relevant: useful safe fields and
+  next steps survive, unsafe input stays private, and existing contracts hold.
+
 ## Pull requests
 
 Keep pull requests focused. Explain the user-visible change, its risks, how it
