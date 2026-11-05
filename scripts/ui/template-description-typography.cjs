@@ -11,7 +11,7 @@ const descriptions={long:'Ordinary template description with several lines.\nA s
 const title=id=>({long:'Long description',short:'Short description',empty:'No description'}[id]);
 const content=id=>({title:title(id),description:descriptions[id],provider:'mock',model:model.id,media_type:'video',syntax:'ui-reference-v1',prompt:'Synthetic prompt',options:{reference_mode:'references',resolution:'720p',ratio:'16:9',duration:5},slots:[]});
 let detailState='ready',release=null;const requests=[],errors=[],external=[],measurements=[],groups=[];
-const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aT0sAAAAASUVORK5CYII=','base64');
+const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=','base64');
 const server=http.createServer(async(req,res)=>{const u=new URL(req.url,'http://fixture');requests.push({path:u.pathname,method:req.method});const json=(v,status=200)=>{res.writeHead(status,{'Content-Type':'application/json'});res.end(JSON.stringify(generationFixtureResponse(req,v,status)));};
  if(u.pathname.startsWith('/v1/')){
   if(u.pathname==='/v1/info')return json({auth_mode:'google',console:{generation_ui:true}});

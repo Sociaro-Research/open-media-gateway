@@ -14,7 +14,7 @@ const crypto = require('node:crypto');
 const assert = require('node:assert/strict');
 const ui = process.env.UI_SOURCE_DIR || path.resolve(__dirname, '../../web/public/ui');
 // Independent PNG fixture; reference tests must not depend on site branding.
-const image = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=', 'base64');
+const image = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=', 'base64');
 const output = process.env.UI_SCREENSHOT_DIR || evidencePath('/tmp/media-gateway-references-ui');
 fs.mkdirSync(output, {recursive:true});
 const csp=fs.readFileSync(path.join(ui,'../../Caddyfile'),'utf8').match(/header @consolePolicy Content-Security-Policy "([^"\n]+)"/)[1];

@@ -10,7 +10,7 @@ const model={id:'mock-image-v1',display_name:'Mock Image',media_type:'image',sup
 const catalog=[{id:'mock',name:'Mock',default_model:model.id,models:[model,{...model,id:'wide',display_name:'Wide fixture',reference_modes:[{id:'references',label:'References',max_images:16}]}]}];
 let record={id:'template',version:1,draft:{title:'Slot counts',provider:'mock',model:model.id,media_type:'image',syntax:'ui-reference-v1',prompt:prompt(15),options:{reference_mode:'references'},slots:[],cover_id:'cover'}},requests=[];
 const warning='15 image slots, maximum 14 for the selected model. Reduce slots before publishing. You can still save this draft.';
-const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aT0sAAAAASUVORK5CYII=','base64');
+const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=','base64');
 const server=http.createServer(async(req,res)=>{const u=new URL(req.url,'http://fixture');let raw=[];for await(const chunk of req)raw.push(chunk);let body;try{body=JSON.parse(Buffer.concat(raw))}catch{}
  const json=(data,status=200)=>{res.writeHead(status,{'Content-Type':'application/json'});res.end(JSON.stringify(generationFixtureResponse(req,data,status)));};
  if(u.pathname==='/cover.png'||u.pathname.endsWith('/assets/cover')){res.setHeader('Content-Type','image/png');return res.end(png);}

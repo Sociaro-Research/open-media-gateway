@@ -4,7 +4,7 @@ const {useFixtureKey}=require('./fixture-key.cjs');
 const {chromium,webkit}=require('playwright'),http=require('node:http'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const {evidencePath}=require('./evidence.cjs');
 const engine=process.env.UI_BROWSER_ENGINE||'chromium',output=evidencePath('/tmp/gateway-prompt-reference-contracts/'+engine+'/');fs.mkdirSync(output,{recursive:true});
-const root=path.resolve(__dirname,'../../web/public/ui'),png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=','base64');
+const root=path.resolve(__dirname,'../../web/public/ui'),png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=','base64');
 const server=http.createServer((req,res)=>{if(req.url.startsWith('/fixture/')){res.setHeader('Content-Type','image/png');return res.end(png)}const file=path.join(root,req.url==='/'?'index.html':path.basename(req.url.split('?')[0]));if(!fs.existsSync(file))return res.writeHead(404).end();res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html');res.end(fs.readFileSync(file));});
 const mode={id:'references',label:'References',max_images:9,max_videos:3,max_audios:3};
 const base={media_type:'video',supports_image_input:true,supports_video_input:true,supports_audio_input:true,max_image_inputs:9,resolutions:['720p'],ratios:['16:9'],default_duration:5,min_duration:2,max_duration:15,reference_modes:[mode]};

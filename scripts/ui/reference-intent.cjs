@@ -8,7 +8,7 @@ const root=process.env.UI_SOURCE_DIR||path.resolve(__dirname,'../../web/public/u
 const nativeVoice=process.env.UI_VOICE_UPLOAD==='chooser';
 const output=process.env.UI_SCREENSHOT_DIR||evidencePath('/tmp/gateway-reference-intent');
 fs.mkdirSync(output,{recursive:true});
-const image=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=','base64');
+const image=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=','base64');
 const audio=Buffer.from('synthetic audio fixture; never sent to a provider');
 const profile=(id,label,i,v,a)=>({id,label,min_images:0,max_images:i,min_videos:0,max_videos:v,min_audios:0,max_audios:a});
 const seedance={id:'dreamina-seedance-2-0-260128',display_name:'Seedance 2.0',media_type:'video',resolutions:['720p'],ratios:['16:9'],min_duration:2,max_duration:15,default_duration:5,supports_image_input:true,supports_audio_input:true,supports_video_input:true,max_image_inputs:9,reference_modes:[profile('references','References',9,3,3)],pricing:{known:true,reference_price_usd:0}};

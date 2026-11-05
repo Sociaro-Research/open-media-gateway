@@ -8,7 +8,7 @@ const catalog=[{id:'fixture',name:'Fixture',default_model:model.id,models:[model
 let definition={title:'Provider template',description:'Descriptor-driven controls.',provider:'fixture',model:'reviewed',media_type:'video',syntax:'ui-reference-v1',prompt:'Animate these references',options:{reference_mode:'references',resolution:'720p',parameters:{audience:['one','two']},reference_roles:{image_2:'last_frame'}},slots:[{id:'image:1',type:'image',index:1,role:'reference',label:'First',asset_id:'first'},{id:'image:2',type:'image',index:2,role:'reference',label:'Second',asset_id:'second'}],cover_id:'first'};
 let version=1,unknown=true,zero=false,requests=[],tasks=[];
 let editingReferences=['https://files.example.test/a.png','https://files.example.test/b.png'];
-const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aT0sAAAAASUVORK5CYII=','base64');
+const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=','base64');
 const server=http.createServer(async(req,res)=>{const u=new URL(req.url,'http://fixture'),p=u.pathname;const chunks=[];for await(const b of req)chunks.push(b);let body;try{body=JSON.parse(Buffer.concat(chunks))}catch{}const json=(v,c=200)=>{res.writeHead(c,{'Content-Type':'application/json'});res.end(JSON.stringify(generationFixtureResponse(req,v,c)));};
  if(p.startsWith('/v1/')){requests.push({path:p,method:req.method,body});
   if(p==='/v1/info')return json({auth_mode:'google',provider:'fixture',console:{generation_ui:true,personal_providers:true,installation_role:'ordinary',central_origin:'https://console.sociaro.ai'}});

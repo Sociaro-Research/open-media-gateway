@@ -4,7 +4,7 @@ const {useFixtureKey}=require('./fixture-key.cjs');
 const {generationFixtureResponse}=require('./generation-page-fixture.cjs');
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const engine=process.env.UI_BROWSER_ENGINE||'chromium',root=path.resolve(__dirname,'../../web/public/ui'),output=path.resolve(process.env.UI_EVIDENCE_DIR||'dist/checks/gw296-'+engine);fs.mkdirSync(output,{recursive:true});
-const image=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=','base64');
+const image=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=','base64');
 const model={id:'fixture',display_name:'Fixture',media_type:'image',supports_image_input:true,max_image_inputs:10,reference_prompt_syntax:'numbered',reference_prompt_types:['image'],resolutions:['1024x1024'],ratios:['1:1'],pricing:{known:true,reference_price_usd:0}};
 let items=[{id:'existing',name:'Existing.png',content_type:'image/png',url:'/references/owner/existing',size_bytes:image.length}],sequence=0,hold=true,holdRead=false,readGates=[],fail=false,received=[],gates=[],aborted=0,writes=[];
 const server=http.createServer(async(req,res)=>{

@@ -2,7 +2,7 @@
 const {chromium,webkit}=require('playwright'),{useFixtureKey}=require('./fixture-key.cjs'),{generationPage}=require('./generation-page-fixture.cjs');
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),http=require('node:http');
 const engine=process.env.UI_BROWSER_ENGINE||'chromium',source=path.resolve(process.env.UI_SOURCE_DIR||'web/public/ui'),out=path.resolve(process.env.UI_EVIDENCE_DIR||'.local/template-submission/'+engine);fs.mkdirSync(out,{recursive:true});
-const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aT0sAAAAASUVORK5CYII=','base64');
+const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=','base64');
 const model={id:'motion',display_name:'Motion',media_type:'video',supports_image_input:true,supports_audio:true,reference_prompt_syntax:'numbered',reference_prompt_types:['image'],reference_modes:[{id:'references',label:'References',max_images:2}],resolutions:['720p'],ratios:['16:9'],min_duration:4,max_duration:10,default_duration:5,pricing:{known:true,reference_price_usd:0}};
 const catalog=[{id:'mock',name:'Mock',live:false,default_model:'motion',models:[model,{...model,id:'other',display_name:'Other motion',resolutions:['1080p']}]}];
 const definition={title:'Submission fixture',description:'Retain this template and its current inputs.',provider:'mock',model:'motion',media_type:'video',prompt:'Animate @Image1',syntax:'ui-reference-v1',options:{reference_mode:'references',resolution:'720p',ratio:'16:9',duration:5,generate_audio:false},cover_id:'cover',slots:[{id:'image:1',type:'image',index:1,role:'reference',label:'Face',asset_id:''}]};

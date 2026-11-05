@@ -5,7 +5,7 @@ const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),
 const engine=process.env.UI_BROWSER_ENGINE||'chromium';
 const root=path.resolve(process.env.UI_SOURCE_DIR||'web/public/ui');
 const output=path.resolve(process.env.UI_EVIDENCE_DIR||'.local/template-loading/'+engine);
-const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aT0sAAAAASUVORK5CYII=','base64');
+const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=','base64');
 // Reuse the documented synthetic H.264 fixture generator; no live media.
 const video=fs.readFileSync(path.resolve(process.env.GATEWAY_TEMPLATE_CLIP_DIR||'.local/video-workflow/clips','cfr24.mp4'));
 const model={id:'motion',display_name:'Motion',media_type:'video',supports_image_input:true,supports_video_input:true,reference_modes:[{id:'references',label:'References',max_images:3,max_videos:2}],min_duration:4,max_duration:15,default_duration:5,resolutions:['720p'],ratios:['16:9'],pricing:{known:true,reference_price_usd:0}};
