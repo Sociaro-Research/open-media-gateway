@@ -176,6 +176,17 @@ changes but does not infer their pricing or new generation behavior from prose.
 A changed unstructured document remains an open warning until a reviewed parser
 can interpret it. Extending the parser and selecting it on the existing source
 is the explicit resolution path; hiding a source does not mark its warnings fixed.
+
+Sonilo defaults retain the public core OpenAPI document and separately monitor
+`https://platform.sonilo.com/openapi.json`, the complete specification linked by
+the core document. The complete document includes native video-output and
+combined-sound endpoints omitted from the core subset. Its absence from an
+existing saved schedule is reported as `not_checked` for active native models.
+Both documents remain unstructured evidence: fetching them cannot verify fields,
+resolve their disagreements, import tariffs or enable additional operations.
+Existing schedules require deliberate source adoption; upgrades do not replace
+administrator sources or acknowledge existing warnings.
+
 OpenAI model pages also monitor unparsed changes beyond their description.
 OpenAI exact snapshots share published parent tariffs only through the module's
 reviewed `CatalogAliases` map. Each snapshot retains its wire ID and quantity
