@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"net/http/httptest"
+	"os"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -16,6 +18,42 @@ import (
 type generationPageFixture struct {
 	*openAIServiceFixture
 	query core.GenerationPageQuery
+}
+
+func TestDocumentedGenerationCursorRequests(t *testing.T) {
+	guide, err := os.ReadFile("../../docs/openai-api.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Execute the guide's first-page and continuation examples through the real
+	// HTTP parser so removing cursor support or breaking the examples fails CI.
+	examples := regexp.MustCompile(`(?m)^\s*GET (/v1/generations\?[^\s]*cursor=[^\s]*)$`).FindAllStringSubmatch(string(guide), -1)
+	if len(examples) != 2 {
+		t.Fatalf("docs/openai-api.md: want first-page and continuation cursor examples, got %d", len(examples))
+	}
+	s := &generationPageFixture{openAIServiceFixture: openAIFixture()}
+	h := New(s, healthStub{}, "secret")
+	next := ""
+	for i, example := range examples {
+		path := strings.ReplaceAll(example[1], "NEXT_CURSOR", next)
+		r := httptest.NewRequest("GET", path, nil)
+		r.Header.Set("Authorization", "Bearer secret")
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		var page struct {
+			Object     string `json:"object"`
+			NextCursor string `json:"next_cursor"`
+			HasMore    bool   `json:"has_more"`
+			NextOffset *int   `json:"next_offset"`
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &page); err != nil || w.Code != 200 || page.Object != "list" || !page.HasMore || page.NextCursor == "" || page.NextOffset != nil {
+			t.Fatalf("docs/openai-api.md request %q: status=%d body=%s error=%v", path, w.Code, w.Body.String(), err)
+		}
+		if (i == 0 && s.query.Before != nil) || (i == 1 && (s.query.Before == nil || s.query.Before.ID != "11111111-1111-4111-8111-111111111111")) {
+			t.Fatalf("docs/openai-api.md request %q did not select the expected page: %+v", path, s.query)
+		}
+		next = page.NextCursor
+	}
 }
 
 func (s *generationPageFixture) ListGenerationPage(_ context.Context, q core.GenerationPageQuery) (core.GenerationPage, error) {
@@ -54,7 +92,7 @@ func TestGenerationCursorAPI(t *testing.T) {
 	if w.Code != 200 || len(s.query.IDs) != 1 || !strings.Contains(w.Body.String(), `"journal_revision"`) {
 		t.Fatal("changed-card read", w.Code, w.Body.String(), s.query)
 	}
-	for _, query := range []string{"cursor=bad", "cursor=" + page.NextCursor, "cursor=&through=bad", "cursor=&offset=0", "through=" + page.NextCursor, "cursor=&limit=0", "cursor=&limit=101", "cursor=&extra=x", "cursor=&view=full", "cursor=&include_total=0", "cursor=&ids=", "cursor=&ids=bad", "cursor=&ids=" + strings.TrimSuffix(strings.Repeat("11111111-1111-4111-8111-111111111111,", 51), ","), "cursor=&ids=11111111-1111-4111-8111-111111111111,11111111-1111-4111-8111-111111111111", "view=versions", "ids=11111111-1111-4111-8111-111111111111", "include_total=false"} {
+	for _, query := range []string{"cursor=bad", "cursor=" + page.NextCursor, "cursor=&through=bad", "cursor=&offset=0", "cursor=&offset=", "cursor=&offset=1", "cursor=" + page.NextCursor + "&project_id=none&offset=0", "through=" + page.NextCursor, "cursor=&limit=0", "cursor=&limit=101", "cursor=&extra=x", "cursor=&view=full", "cursor=&include_total=0", "cursor=&ids=", "cursor=&ids=bad", "cursor=&ids=" + strings.TrimSuffix(strings.Repeat("11111111-1111-4111-8111-111111111111,", 51), ","), "cursor=&ids=11111111-1111-4111-8111-111111111111,11111111-1111-4111-8111-111111111111", "view=versions", "ids=11111111-1111-4111-8111-111111111111", "include_total=false"} {
 		w := send("/v1/generations?" + query)
 		if w.Code != 400 {
 			t.Fatal(query, w.Code, w.Body.String())

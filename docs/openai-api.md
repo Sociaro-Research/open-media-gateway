@@ -19,7 +19,7 @@ compatibility. No provider feature was removed to fit an OpenAI schema.
 | Estimate before creating | `POST /v1/generations/estimate` | Same input, customer cost, no generation |
 | Read status | `GET /v1/generations/{id}` or `GET /v1/videos/{id}` | Owner-scoped generation/video |
 | Download result | `GET /v1/generations/{id}/content` or `GET /v1/videos/{id}/content` | Authenticated media, supports ranges and HEAD |
-| Generation history | `GET /v1/generations?limit=50&offset=0` | List envelope; 1-100 jobs per page, offset pagination |
+| Generation history | `GET /v1/generations` | List envelope; 1-100 jobs per page, cursor or offset pagination |
 
 Authenticate using `Authorization: Bearer <GATEWAY_API_KEY>`. Existing key scopes,
 organization membership, ownership, provider connection availability, storage policy, budget
@@ -27,11 +27,49 @@ reservation, markup, and idempotency apply through the same admission pipeline.
 The catalog and responses expose only gateway customer prices to regular users;
 provider accounting remains visible only to authorized system administrators.
 
-History pages return `object: "list"`, `data`, `has_more` and `next_offset`.
-Start with offset 0 and follow `next_offset` while `has_more` is true. Offset must
-be from 0 to 1,000,000; limit defaults to 50. Cursor parameters are rejected.
 Request admission can return HTTP 429 `rate_limit_exceeded` with `Retry-After`
 in seconds; see [configurable quotas](request-limits.md).
+
+## Generation history
+
+History is returned in pages, newest first (creation time, then ID descending).
+Each response contains `object: "list"`, `data` and `has_more`. The `limit`
+defaults to 50 and must be an integer from 1 to 100. Choose one paging mode:
+
+- **Cursor:** include `cursor=` with an empty value for the first page. While
+  `has_more` is true, copy the response's `next_cursor` into the next request's
+  `cursor` parameter. Treat it as an opaque position; do not build it yourself.
+  Replace `NEXT_CURSOR` below with that returned value:
+
+  ```http
+  GET /v1/generations?limit=50&cursor=
+  GET /v1/generations?limit=50&cursor=NEXT_CURSOR
+  ```
+
+  New arrivals do not shift subsequent cursor pages. A nonempty page returns
+  `next_cursor` even when `has_more` is false; stop paging when `has_more` is
+  false. An empty page returns `next_cursor: null`. Cursor responses also include
+  `journal_scope` and, unless `include_total=false`, the exact `total` for the
+  full viewer/project filter. They do not include `next_offset`.
+- **Offset:** omit `cursor`, start with `offset=0`, then use the response's
+  `next_offset` as the next request's `offset` while `has_more` is true.
+  The offset defaults to 0 and must be an integer from 0 to 1,000,000.
+  Offset responses include `next_offset`, not `next_cursor`.
+
+Do not send `offset` with `cursor`, even as `offset=0` or an empty `offset=`;
+the API returns HTTP 400. Keep the same authenticated viewer and `project_id`
+filter when following a cursor. Omit `project_id` for all visible generations,
+use a project UUID for one project, or `project_id=none` for unassigned ones.
+Malformed cursors or cursors from another viewer/project filter return HTTP 400.
+If permissions change and invalidate a saved cursor or change `journal_scope`,
+discard the previous view and restart with `cursor=`.
+
+For refreshing a previously loaded range, cursor mode also accepts `through`,
+an inclusive oldest position saved from `next_cursor`. Start again with `cursor=`
+and that `through` value, following `has_more`/`next_cursor` within the range.
+The total still counts the full filtered history. See the
+[OpenAPI contract](openapi.yaml) for `through` and the cursor-only `view`, `ids`
+and `include_total` controls.
 
 ## Requests and provider extensions
 
