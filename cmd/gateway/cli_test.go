@@ -96,6 +96,22 @@ func TestCLIProcessNoServiceAccess(t *testing.T) {
 		{[]string{"healthcheck", "extra"}, false, "unexpected arguments"}, {[]string{"--version", "extra"}, false, "unexpected arguments"},
 		{[]string{"admin", "typo"}, false, "unknown admin command"}, {[]string{"admin"}, false, "usage: gateway admin"},
 		{[]string{"admin", "users", "--unknown"}, false, "flag provided but not defined"},
+		{[]string{"admin", "init"}, false, "--email is required"},
+		{[]string{"admin", "synthetic-private-argument"}, false, "unknown admin command"},
+		{[]string{"admin", "users", "--synthetic-private-argument"}, false, "flag provided but not defined"},
+		{[]string{"admin", "init", "--email", "invalid"}, false, "--email is required"},
+		{[]string{"admin", "catalog-document"}, false, "--hash is required"},
+		{[]string{"admin", "catalog-document", "--hash", "invalid"}, false, "64 hexadecimal characters"},
+		{[]string{"admin", "bootstrap"}, false, "--user-id is required"},
+		{[]string{"admin", "bootstrap", "--user-id", "bad-id"}, false, "--user-id is required"},
+		{[]string{"admin", "grant"}, false, "--user-id is required"},
+		{[]string{"admin", "grant", "--user-id", "bad-id"}, false, "--user-id is required"},
+		{[]string{"admin", "revoke"}, false, "--user-id is required"},
+		{[]string{"admin", "revoke", "--user-id", "bad-id"}, false, "--user-id is required"},
+		{[]string{"admin", "issue-key"}, false, "--user-id is required"},
+		{[]string{"admin", "issue-key", "--user-id", "bad-id"}, false, "--user-id is required"},
+		{[]string{"admin", "users", "extra"}, false, "unexpected positional argument #1"},
+		{[]string{"admin", "users", "--email", "synthetic"}, false, "--email is not supported"},
 	} {
 		t.Run(strings.Join(tc.args, "/"), func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -109,6 +125,9 @@ func TestCLIProcessNoServiceAccess(t *testing.T) {
 			}
 			if got := connections.Load(); got != 0 {
 				t.Fatalf("unexpected service connections: %d", got)
+			}
+			if strings.Contains(string(out), "synthetic-private-argument") {
+				t.Fatal("CLI echoed a private argument")
 			}
 		})
 	}

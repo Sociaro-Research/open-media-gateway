@@ -2,48 +2,40 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
+	"os"
+	"time"
+
 	"github.com/Sociaro-Research/open-media-gateway/internal/auth"
 	"github.com/Sociaro-Research/open-media-gateway/internal/postgres"
 	"github.com/Sociaro-Research/open-media-gateway/internal/providerconfig"
-	"github.com/google/uuid"
-	"os"
-	"time"
 )
 
 func adminCommand(args []string) error {
-	if err := validateAdminCommand(args); err != nil {
+	return adminCommandWithDatabase(args, postgres.Open, postgres.Migrate)
+}
+
+func adminCommandWithDatabase(args []string, open func(context.Context, string) (*sql.DB, error), migrate func(*sql.DB) error) error {
+	opts, err := parseAdminFlags(args)
+	if err != nil {
 		return err
-	}
-	flags := flag.NewFlagSet("admin "+args[0], flag.ContinueOnError)
-	id := flags.String("user-id", "", "existing user ID")
-	search := flags.String("search", "", "name, email or ID")
-	email := flags.String("email", "", "new administrator email")
-	name := flags.String("name", "Administrator", "display name")
-	keyName := flags.String("key-name", "Server administrator", "API key name")
-	hash := flags.String("hash", "", "stored catalogue document SHA-256")
-	provider := flags.String("provider", "", "catalogue provider connection ID (empty means all)")
-	if err := flags.Parse(args[1:]); err != nil {
-		return err
-	}
-	if flags.NArg() != 0 {
-		return errors.New("unexpected arguments")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	db, err := postgres.Open(ctx, os.Getenv("DATABASE_URL"))
+	db, err := open(ctx, os.Getenv("DATABASE_URL"))
 	if err != nil {
-		return err
+		// PostgreSQL parse/dial errors can include the DSN and credentials.
+		return fmt.Errorf("gateway admin %s: cannot initialize PostgreSQL; check DATABASE_URL syntax (postgres://USER:PASSWORD@HOST:5432/DATABASE), credentials, server availability and database access", args[0])
 	}
 	defer db.Close()
 	if args[0] == "setup-code" {
 		if len(os.Getenv("SESSION_SIGNING_SECRET")) < 32 {
 			return errors.New("configure SESSION_SIGNING_SECRET and AUTH_PUBLIC_URL before browser setup")
 		}
-		if err = postgres.Migrate(db); err != nil {
+		if err = migrate(db); err != nil {
 			return err
 		}
 		secret := os.Getenv("PROVIDER_CREDENTIALS_ENCRYPTION_KEY")
@@ -63,11 +55,11 @@ func adminCommand(args []string) error {
 	}
 	repo := postgres.NewSystemRepository(db)
 	if args[0] == "catalog-document" {
-		text, err := postgres.NewCatalogRepository(db).Document(ctx, *hash)
+		text, err := postgres.NewCatalogRepository(db).Document(ctx, opts.hash)
 		if err != nil {
 			return err
 		}
-		return json.NewEncoder(os.Stdout).Encode(map[string]string{"hash": *hash, "text": text})
+		return json.NewEncoder(os.Stdout).Encode(map[string]string{"hash": opts.hash, "text": text})
 	}
 	if args[0] == "catalog-warnings" {
 		catalog := postgres.NewCatalogRepository(db)
@@ -77,7 +69,7 @@ func adminCommand(args []string) error {
 		}
 		result := map[string]any{}
 		for _, s := range schedules {
-			if *provider != "" && s.Provider != *provider {
+			if opts.provider != "" && s.Provider != opts.provider {
 				continue
 			}
 			state, err := catalog.State(ctx, s.Provider)
@@ -91,23 +83,18 @@ func adminCommand(args []string) error {
 		return encoder.Encode(result)
 	}
 	if args[0] == "init" || args[0] == "issue-key" {
-		if err = postgres.Migrate(db); err != nil {
+		if err = migrate(db); err != nil {
 			return err
-		}
-		if args[0] == "issue-key" {
-			if _, err = uuid.Parse(*id); err != nil {
-				return errors.New("provide an administrator UUID with --user-id")
-			}
 		}
 		var result any
 		if args[0] == "init" {
-			key, secret, e := repo.InitializeAdministrator(ctx, *email, *name, *keyName)
+			key, secret, e := repo.InitializeAdministrator(ctx, opts.email, opts.name, opts.keyName)
 			if e != nil {
 				return e
 			}
 			result = map[string]any{"key": key, "secret": secret}
 		} else {
-			key, secret, e := repo.IssueAdministratorKey(ctx, *id, *keyName)
+			key, secret, e := repo.IssueAdministratorKey(ctx, opts.userID, opts.keyName)
 			if e != nil {
 				return e
 			}
@@ -116,21 +103,15 @@ func adminCommand(args []string) error {
 		return json.NewEncoder(os.Stdout).Encode(result)
 	}
 	if args[0] == "users" {
-		users, err := repo.Users(ctx, *search, false, 100, 0)
+		users, err := repo.Users(ctx, opts.search, false, 100, 0)
 		if err != nil {
 			return err
 		}
 		return json.NewEncoder(os.Stdout).Encode(users)
 	}
-	if args[0] != "bootstrap" && args[0] != "grant" && args[0] != "revoke" {
-		return errors.New("unknown admin command")
-	}
-	if _, err = uuid.Parse(*id); err != nil {
-		return errors.New("provide an existing user's UUID with --user-id")
-	}
-	if err = repo.SetAdmin(ctx, "", *id, args[0] != "revoke", args[0] == "bootstrap"); err != nil {
+	if err = repo.SetAdmin(ctx, "", opts.userID, args[0] != "revoke", args[0] == "bootstrap"); err != nil {
 		return err
 	}
-	fmt.Println("Administrator role updated for", *id)
+	fmt.Println("Administrator role updated for", opts.userID)
 	return nil
 }

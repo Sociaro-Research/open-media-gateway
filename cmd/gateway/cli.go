@@ -65,7 +65,7 @@ func validateAdminCommand(args []string) error {
 	case "setup-code", "init", "users", "bootstrap", "grant", "revoke", "issue-key", "catalog-warnings", "catalog-document":
 		return nil
 	default:
-		return fmt.Errorf("unknown admin command %q; %s", args[0], adminUsage)
+		return fmt.Errorf("unknown admin command; %s; example: gateway admin users", adminUsage)
 	}
 }
 
