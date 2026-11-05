@@ -2,9 +2,7 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
 	"time"
 
@@ -34,13 +32,8 @@ func (s *Server) checkStorageSettings(w http.ResponseWriter, r *http.Request) {
 	s.storageSettingsRequest(w, r, true)
 }
 func (s *Server) storageSettingsRequest(w http.ResponseWriter, r *http.Request, checkOnly bool) {
-	r.Body = http.MaxBytesReader(w, r.Body, 16<<10)
-	defer r.Body.Close()
 	var input storage.Update
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&input); err != nil || decoder.Decode(&struct{}{}) != io.EOF {
-		writeError(w, http.StatusBadRequest, "invalid_request", "request body must contain one storage settings object")
+	if !decodeSystemLimit(w, r, &input, 16<<10) {
 		return
 	}
 	input.BrowserOrigin, _ = r.Context().Value(storageBrowserOriginKey{}).(string)

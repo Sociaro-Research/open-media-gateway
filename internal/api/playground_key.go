@@ -1,10 +1,8 @@
 package api
 
 import (
-	"encoding/json"
 	"errors"
 	ci "github.com/Sociaro-Research/open-media-gateway/internal/companyinterface"
-	"io"
 	"net/http"
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/apikey"
@@ -43,27 +41,22 @@ func (s *Server) playgroundKey(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 503, "playground_key_unavailable", "Account key storage is unavailable")
 		return
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, 1024)
-	defer r.Body.Close()
 	var in struct {
 		OrganizationID string `json:"organization_id,omitempty"`
 		RequestID      string `json:"request_id,omitempty"`
 	}
-	dec := json.NewDecoder(r.Body)
-	dec.DisallowUnknownFields()
-	var decodeErr error
 	if r.URL.Path == "/v1/playground-key/create" {
-		decodeErr = dec.Decode(&in)
+		if !decodeSystemLimit(w, r, &in, 1024) {
+			return
+		}
 	} else {
 		var workspace struct {
 			OrganizationID string `json:"organization_id,omitempty"`
 		}
-		decodeErr = dec.Decode(&workspace)
+		if !decodeSystemLimit(w, r, &workspace, 1024) {
+			return
+		}
 		in.OrganizationID = workspace.OrganizationID
-	}
-	if decodeErr != nil || dec.Decode(&struct{}{}) != io.EOF {
-		writeError(w, 400, "invalid_request", "Send one workspace object")
-		return
 	}
 	if in.OrganizationID != "" {
 		parsed, parseErr := uuid.Parse(in.OrganizationID)

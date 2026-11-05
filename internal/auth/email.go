@@ -6,7 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"io"
+	"github.com/Sociaro-Research/open-media-gateway/internal/requestjson"
 	"mime"
 	"net"
 	"net/http"
@@ -147,14 +147,8 @@ func (m *Manager) Email(w http.ResponseWriter, r *http.Request) {
 		Password        string `json:"password"`
 		Token           string `json:"token"`
 	}
-	d := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096))
-	d.DisallowUnknownFields()
-	if err := d.Decode(&in); err != nil {
-		emailError(w, 400, "invalid_request", "Check the email and password fields.")
-		return
-	}
-	if d.Decode(&struct{}{}) != io.EOF {
-		emailError(w, 400, "invalid_request", "Invalid request.")
+	if problem := requestjson.Decode(w, r, &in, 4096, true); problem != nil {
+		emailError(w, 400, "invalid_request", problem.Message)
 		return
 	}
 	action := r.PathValue("action")

@@ -3,9 +3,8 @@ package auth
 import (
 	"context"
 	"crypto/subtle"
-	"encoding/json"
 	"errors"
-	"io"
+	"github.com/Sociaro-Research/open-media-gateway/internal/requestjson"
 	"mime"
 	"net"
 	"net/http"
@@ -105,11 +104,14 @@ func (m *Manager) Setup(w http.ResponseWriter, r *http.Request) {
 		emailError(w, 415, "invalid_request", "Use a JSON request.")
 		return
 	}
-	var in struct{ Code, Email, Name, Password string }
-	d := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096))
-	d.DisallowUnknownFields()
-	if d.Decode(&in) != nil || d.Decode(&struct{}{}) != io.EOF {
-		emailError(w, 400, "invalid_request", "Check the setup fields.")
+	var in struct {
+		Code     string `json:"code"`
+		Email    string `json:"email"`
+		Name     string `json:"name"`
+		Password string `json:"password"`
+	}
+	if problem := requestjson.Decode(w, r, &in, 4096, true); problem != nil {
+		emailError(w, 400, "invalid_request", problem.Message)
 		return
 	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)

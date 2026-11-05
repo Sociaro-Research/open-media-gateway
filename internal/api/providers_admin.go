@@ -2,9 +2,7 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
 	"slices"
 
@@ -54,17 +52,8 @@ func (s *Server) checkAdminProvider(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) updateAdminProvider(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, 512<<10)
-	defer r.Body.Close()
 	var update providers.ProviderUpdate
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&update); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid_request", "request body must be a provider settings object")
-		return
-	}
-	if decoder.Decode(&struct{}{}) != io.EOF {
-		writeError(w, http.StatusBadRequest, "invalid_request", "request body must contain one JSON object")
+	if !decodeSystemLimit(w, r, &update, 512<<10) {
 		return
 	}
 	if update.Connection != nil || update.Name != nil || update.Archived != nil {
@@ -119,13 +108,8 @@ func (s *Server) createAdminProvider(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 503, "unavailable", "provider creation is unavailable")
 		return
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, 4096)
-	defer r.Body.Close()
 	var input providers.CreateConnection
-	d := json.NewDecoder(r.Body)
-	d.DisallowUnknownFields()
-	if d.Decode(&input) != nil || d.Decode(&struct{}{}) != io.EOF {
-		writeError(w, 400, "invalid_request", "send api_type and name")
+	if !decodeSystemLimit(w, r, &input, 4096) {
 		return
 	}
 	item, err := manager.Create(r.Context(), input)

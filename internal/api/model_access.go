@@ -2,9 +2,7 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
 	"slices"
 	"strings"
@@ -131,13 +129,12 @@ func (s *Server) modelSettings(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, map[string]any{"data": views, "model_ids": access.ModelIDs, "version": access.Version})
 		return
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, 256<<10)
-	defer r.Body.Close()
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
 	if org != "" {
 		var input modelaccess.Access
-		if decoder.Decode(&input) != nil || decoder.Decode(&struct{}{}) != io.EOF || input.ModelIDs == nil || input.Version < 1 || len(input.ModelIDs) > 10000 {
+		if !decodeSystemLimit(w, r, &input, 256<<10) {
+			return
+		}
+		if input.ModelIDs == nil || input.Version < 1 || len(input.ModelIDs) > 10000 {
 			writeError(w, 400, "invalid_request", "send model_ids and the current version")
 			return
 		}
@@ -163,8 +160,7 @@ func (s *Server) modelSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var input modelaccess.Update
-	if decoder.Decode(&input) != nil || decoder.Decode(&struct{}{}) != io.EOF {
-		writeError(w, 400, "invalid_request", "send public_id, enabled_by_default and version")
+	if !decodeSystemLimit(w, r, &input, 256<<10) {
 		return
 	}
 	if e := input.Validate(); e != nil {

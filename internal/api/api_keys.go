@@ -2,10 +2,8 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	org "github.com/Sociaro-Research/open-media-gateway/internal/organization"
-	"io"
 	"net/http"
 	"slices"
 	"time"
@@ -125,13 +123,8 @@ func (s *Server) createAPIKey(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, 4<<10)
-	defer r.Body.Close()
 	var input apikey.CreateInput
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&input); err != nil || decoder.Decode(&struct{}{}) != io.EOF {
-		writeError(w, http.StatusBadRequest, "invalid_request", "send one JSON object with name, scopes and optional expires_at")
+	if !decodeSystemLimit(w, r, &input, 4<<10) {
 		return
 	}
 	if centralInstallation(r) && (input.OrganizationID == "" || input.ResourceMode == "personal" || input.StorageMode == "personal") {

@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"slices"
 	"strconv"
@@ -17,6 +16,7 @@ import (
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
 	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
 	org "github.com/Sociaro-Research/open-media-gateway/internal/organization"
+	"github.com/Sociaro-Research/open-media-gateway/internal/requestjson"
 )
 
 func isModelCatalogPath(path string) bool {
@@ -293,9 +293,14 @@ func (s *Server) createOpenAIGeneration(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 	} else {
-		r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
-		d := json.NewDecoder(r.Body)
-		if err := d.Decode(&fields); err != nil || fields == nil || d.Decode(&struct{}{}) != io.EOF {
+		if problem := requestjson.Decode(w, r, &fields, 64<<10, false); problem != nil {
+			if problem.Param == "" {
+				problem.Param = "body"
+			}
+			writeJSONProblem(w, *problem)
+			return
+		}
+		if fields == nil {
 			invalidParameter(w, "body", "send one JSON object, up to ≈65.54 KB (65536 bytes)")
 			return
 		}
@@ -328,7 +333,11 @@ func (s *Server) openAIInput(r *http.Request, fields map[string]json.RawMessage)
 	d := json.NewDecoder(bytes.NewReader(b))
 	d.DisallowUnknownFields()
 	if err := d.Decode(&input); err != nil {
-		return fail("body", "invalid generation fields: "+err.Error())
+		problem := requestjson.Describe(err, &input)
+		if problem.Param == "" {
+			problem.Param = "body"
+		}
+		return fail(problem.Param, problem.Message)
 	}
 	if raw, ok := fields["timeout_seconds"]; ok {
 		delete(fields, "timeout_seconds")
@@ -506,7 +515,12 @@ func (s *Server) openAIInput(r *http.Request, fields map[string]json.RawMessage)
 		return fail("image", "image is required for an edit")
 	}
 	for key := range fields {
-		return fail(key, "unsupported parameter: "+key+"; provider-specific controls belong in options.parameters and must be advertised by the model")
+		// Only schema-owned public names may be echoed. Unknown keys can be
+		// arbitrarily long or contain credentials accidentally pasted as keys.
+		if slices.Contains([]string{"provider", "media_type", "input", "voice", "instructions", "size", "seconds", "quality", "background", "output_format", "response_format", "image", "input_reference", "stream", "n"}, key) {
+			return fail(key, "unsupported parameter: "+key+"; provider-specific controls belong in options.parameters and must be advertised by the model")
+		}
+		return fail("body", "Unsupported JSON field. Remove fields not listed in the endpoint documentation; provider-specific controls belong in options.parameters and must be advertised by the model")
 	}
 	return input, "", nil
 }

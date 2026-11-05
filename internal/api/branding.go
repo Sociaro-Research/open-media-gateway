@@ -2,8 +2,6 @@ package api
 
 import (
 	"context"
-	"encoding/json"
-	"io"
 	"net/http"
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/branding"
@@ -37,13 +35,8 @@ func (s *Server) brandingSettings(w http.ResponseWriter, r *http.Request) {
 		s.writeViewerJSON(w, r, 200, map[string]any{"settings": settings.Normalize(), "defaults": branding.Defaults().Normalize(), "colors": branding.Colors})
 		return
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, branding.MaxRequestBytes)
-	defer r.Body.Close()
 	next := branding.Defaults()
-	d := json.NewDecoder(r.Body)
-	d.DisallowUnknownFields()
-	if err := d.Decode(&next); err != nil || d.Decode(&struct{}{}) != io.EOF {
-		writeError(w, 400, "invalid_request", "send one appearance object up to ≈6.29 MB (6291456 bytes)")
+	if !decodeSystemLimit(w, r, &next, branding.MaxRequestBytes) {
 		return
 	}
 	if err := next.Validate(); err != nil {

@@ -2,13 +2,11 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"github.com/Sociaro-Research/open-media-gateway/internal/apikey"
 	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
 	"github.com/Sociaro-Research/open-media-gateway/internal/limits"
 	"github.com/google/uuid"
-	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -148,13 +146,8 @@ func (s *Server) limitSettings(w http.ResponseWriter, r *http.Request) {
 	if readMethod(r.Method) {
 		p, err = repo.LimitSettings(r.Context(), identity.ActorID(r.Context()), org)
 	} else {
-		r.Body = http.MaxBytesReader(w, r.Body, 8192)
-		defer r.Body.Close()
 		var input limits.Config
-		d := json.NewDecoder(r.Body)
-		d.DisallowUnknownFields()
-		if e := d.Decode(&input); e != nil || d.Decode(&struct{}{}) != io.EOF {
-			writeError(w, 400, "invalid_request", "send one quota configuration")
+		if !decodeSystemLimit(w, r, &input, 8192) {
 			return
 		}
 		if e := input.Validate(org == ""); e != nil {

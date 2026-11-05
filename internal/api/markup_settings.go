@@ -2,7 +2,6 @@ package api
 
 import (
 	"encoding/json"
-	"io"
 	"net/http"
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
@@ -52,12 +51,7 @@ func (s *Server) markupSettings(w http.ResponseWriter, r *http.Request) {
 		Version    int64           `json:"version"`
 	}
 	var next markup.Config
-	r.Body = http.MaxBytesReader(w, r.Body, 256*1024)
-	defer r.Body.Close()
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&input); err != nil || decoder.Decode(&struct{}{}) != io.EOF {
-		writeError(w, 400, "invalid_request", "send one markup configuration with valid percentages")
+	if !decodeSystemLimit(w, r, &input, 256*1024) {
 		return
 	}
 	if len(input.Default) == 0 || input.Exceptions == nil || json.Unmarshal(input.Default, &next.Default) != nil {

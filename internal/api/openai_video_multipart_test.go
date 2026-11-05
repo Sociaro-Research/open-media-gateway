@@ -52,7 +52,8 @@ func TestVideoMultipartAdmissionAndValidation(t *testing.T) {
 		{name: "image_edit_reference", path: "/v1/images/edits", model: "mock/mock-image-v1", fileKey: "image[]", files: 1, want: 202},
 		{name: "image_edit_requires_image", path: "/v1/images/edits", model: "mock/mock-image-v1", want: 400, wantMessage: "send 1–16 images"},
 		{name: "unknown_model", model: "mock/unknown", want: 400, wantMessage: "model"},
-		{name: "unknown_field", fields: [][2]string{{"unknown", "value"}}, want: 400, wantMessage: "unsupported parameter"},
+		{name: "unknown_field", fields: [][2]string{{"unknown", "value"}}, want: 400, wantMessage: "Unsupported JSON field"},
+		{name: "private_unknown_field", fields: [][2]string{{"sk_live_private-value", "private-value"}}, want: 400, wantMessage: "Unsupported JSON field"},
 		{name: "duplicate_prompt", fields: [][2]string{{"prompt", "duplicate"}}, want: 400, wantMessage: "field must appear once"},
 		{name: "invalid_options_json", fields: [][2]string{{"options", "{"}}, want: 400},
 		{name: "invalid_seconds", fields: [][2]string{{"seconds", "0"}}, want: 400, wantMessage: "seconds"},
@@ -154,6 +155,9 @@ func TestVideoMultipartAdmissionAndValidation(t *testing.T) {
 			}
 			if tc.wantMessage != "" && !strings.Contains(response.Body.String(), tc.wantMessage) {
 				t.Fatalf("unexpected error: %s", response.Body.String())
+			}
+			if tc.name == "private_unknown_field" && (strings.Contains(response.Body.String(), "private-value") || strings.Contains(response.Body.String(), "sk_live")) {
+				t.Fatal("unknown multipart key leaked into diagnostics", response.Body.String())
 			}
 			if tc.want == 202 {
 				if repo.creates != 1 || len(queue.ids) != 1 || repo.task.Status != core.TaskQueued || repo.task.Cost == nil || repo.task.Cost.ExpectedUSD != 0 {

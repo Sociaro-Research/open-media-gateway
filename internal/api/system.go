@@ -2,15 +2,14 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"github.com/Sociaro-Research/open-media-gateway/internal/apikey"
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
 	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
 	"github.com/Sociaro-Research/open-media-gateway/internal/money"
+	"github.com/Sociaro-Research/open-media-gateway/internal/requestjson"
 	"github.com/Sociaro-Research/open-media-gateway/internal/system"
 	"github.com/google/uuid"
-	"io"
 	"net/http"
 	"slices"
 	"strconv"
@@ -146,12 +145,8 @@ func decodeSystem(w http.ResponseWriter, r *http.Request, v any) bool {
 	return decodeSystemLimit(w, r, v, 8192)
 }
 func decodeSystemLimit(w http.ResponseWriter, r *http.Request, v any, limit int64) bool {
-	r.Body = http.MaxBytesReader(w, r.Body, limit)
-	defer r.Body.Close()
-	d := json.NewDecoder(r.Body)
-	d.DisallowUnknownFields()
-	if err := d.Decode(v); err != nil || d.Decode(&struct{}{}) != io.EOF {
-		writeError(w, 400, "invalid_request", "send one JSON object with the documented fields")
+	if problem := requestjson.Decode(w, r, v, limit, true); problem != nil {
+		writeJSONProblem(w, *problem)
 		return false
 	}
 	return true
@@ -321,4 +316,12 @@ func (s *Server) importShared(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(204)
+}
+
+func writeJSONProblem(w http.ResponseWriter, problem requestjson.Problem) {
+	var param *string
+	if problem.Param != "" {
+		param = &problem.Param
+	}
+	writeAPIError(w, http.StatusBadRequest, "invalid_request", problem.Message, param)
 }
