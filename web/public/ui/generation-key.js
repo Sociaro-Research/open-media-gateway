@@ -19,8 +19,8 @@
     setStatus(message); forgetButton.disabled = true;syncActions(); notify();
   }
   function value() {
-    if(!initialized)return '';
     if(window.CompanyConnection?.active())return window.CompanyConnection.key();
+    if(!initialized)return '';
     if (saved && Date.now() >= saved.expiresAt) forget('The 24-hour storage period ended. Paste a key or generate a new one.');
     return saved&&(!window.Workspace?.ready()||saved.workspaceID===Workspace.id())?saved.secret:'';
   }
