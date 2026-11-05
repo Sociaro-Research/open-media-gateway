@@ -144,6 +144,7 @@ if(location.pathname==='/organizations'||sessionStorage.getItem('gateway-pending
 let lastConfigurationSection = configurationSections.includes(currentConsoleSection) ? currentConsoleSection : 'providers';
 // Preserve a routed subsection while its existing workspace host is rendered.
 let currentConsoleRoute=currentConsoleSection;
+let renderedConsoleHistory='';
 const compactConfiguration = window.matchMedia('(max-width: 700px)');
 const configurationMenu = document.querySelector('#configurationMenu');
 configurationMenu.open = !compactConfiguration.matches;
@@ -697,6 +698,10 @@ async function updateAdminProvider(payload, successMessage, showSaved = false) {
   }
 }
 
+function consoleHistoryKey(){
+ return JSON.stringify([location.pathname,location.search,typeof history.state?.workspacePage==='string'?history.state.workspacePage:null]);
+}
+
 function syncWorkspacePage(page,{initial=false}={}) {
  if(currentConsoleSection!=='organizations'||location.hash)return;
  const route=page==='API keys'?'keys':'organizations',changed=route!==currentConsoleRoute;
@@ -705,6 +710,7 @@ function syncWorkspacePage(page,{initial=false}={}) {
  document.querySelector('#workspacePicker').classList.toggle('active',route==='organizations'&&!Workspace.current()?.personal);
  document.querySelector('#userMenuToggle').classList.toggle('active',route==='organizations'&&!!Workspace.current()?.personal);
  history[changed&&!initial?'pushState':'replaceState']({...history.state,workspacePage:page},'',route==='keys'?'/api-keys':'/organizations');
+ renderedConsoleHistory=consoleHistoryKey();
 }
 
 function showConsoleSection(name,{historyMode='replace',workspacePage}={}) {
@@ -729,6 +735,7 @@ function showConsoleSection(name,{historyMode='replace',workspacePage}={}) {
     const destination=keysRoute?'/api-keys':({templates:'/templates',system:'/system',profile:'/profile',organizations:'/organizations'}[name]||'/');
     if(location.pathname+location.search+location.hash!==destination)history[historyMode==='push'?'pushState':'replaceState'](null,'',destination);
   }
+  renderedConsoleHistory=consoleHistoryKey();
   elements.authGate.hidden=name==='docs'||authState!=='anonymous';
   document.querySelector('#configurationView').hidden=!['organizations','profile'].includes(name)||!allowed;
   for(const section of ['generation','templates','providers','storage','keys','reports','docs','system','organizations','profile']){
@@ -1782,6 +1789,8 @@ function confirmResultDeletion(task){
 window.addEventListener('popstate',()=>{
  // Existing hash handlers capture invitations and other one-time links first.
  if(location.hash)return;
+ // Fragment-only traversal may dismiss a dialog without rebuilding its active view.
+ if(consoleHistoryKey()===renderedConsoleHistory)return;
  const route={'/api-keys':'keys','/templates':'templates','/system':'system','/profile':'profile','/organizations':'organizations'}[location.pathname]||'generation';
  showConsoleSection(route,{workspacePage:history.state?.workspacePage});
 });
