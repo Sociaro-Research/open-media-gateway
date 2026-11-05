@@ -6,7 +6,7 @@ const {chromium,webkit}=require('playwright'),browserType=process.env.UI_BROWSER
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const root=path.resolve(__dirname,'../../web/public/ui');
 const logo=require('./provider-logo-fixtures.cjs').valid;
-const server=http.createServer((req,res)=>{
+const server=http.createServer((req,res)=>{if(req.method==='GET'&&new URL(req.url,'http://fixture').pathname==='/auth/company-connection'){res.writeHead(404,{'Content-Type':'application/json'});return res.end(JSON.stringify({connected:false}));}
  if(req.url==='/provider-assets/fixture/openai/icon.png'){res.setHeader('Content-Type','image/png');return res.end(logo);}
  const name=path.basename(req.url.split('?')[0]);const file=path.join(root,name.includes('.')?name:'index.html');
  if(!fs.existsSync(file))return res.writeHead(404).end();

@@ -395,8 +395,8 @@ Administrators. Expiry guidance is textual; no alternate date control is added.
 ### Company invoice settings and downloads
 
 Seller company settings reuse the shared floating fields, country selector,
-section Save and existing branding image preview/upload/remove classes for a
-separate invoice logo. A blank VAT number means no VAT registration; there is no
+section Save and `ReferenceUpload` selected-image preview/upload/remove controls
+for a separate invoice logo. A blank VAT number means no VAT registration; there is no
 duplicate registration switch or disabled VAT input. Show OSS only when a VAT
 number is supplied. Format errors use shared field validation and retain the
 draft; server errors for that number return to the same field. This is format
@@ -405,11 +405,12 @@ validation, not confirmation of tax registration.
 Shared settings groups use 24px from the action heading to content, 32px between
 groups, 20px between fields and 16px between a group heading, explanation and
 table. Grid headings and table wrappers have no additional inherited margins.
-The shared inline branding asset places a fixed 96px square preview on the left
-and its title, concise format hint and actions on the right. Images preserve
-their aspect ratio. Actions retain 44px targets with 12px gaps and wrap on narrow
-screens; the preview never becomes a full-width banner. Without an image, omit
-the preview and Remove action. Empty VAT rules omit the unused table header.
+The invoice logo uses the shared proportional selected-image frame within its
+preview bounds, with its caption outside the media and the compact overlay Remove
+action. Preserve the intrinsic canvas aspect ratio rather than forcing a square
+or stretching the frame across the upload field. Actions retain 44px targets and
+shared 12px gaps. Without an image, omit the preview and Remove action. Empty VAT
+rules omit the unused table header.
 
 The entire company/rules/logo draft shares
 one versioned Save; uploading or removing a logo alone makes it dirty. The Stripe

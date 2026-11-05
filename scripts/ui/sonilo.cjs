@@ -13,7 +13,7 @@ try{
  catalog=JSON.parse(execFileSync('go',['run',path.join(temp,'main.go')],{cwd:repo,encoding:'utf8'}));
 }finally{fs.rmSync(temp,{recursive:true,force:true});}
 const provider={...catalog,id:'sonilo',name:'Sonilo',live:true,configured:true,credentials_configured:true,enabled:true,status:'connected',default_model:'text-to-music',model_count:catalog.models.length,values:{base_url:'https://api.sonilo.com/v1',sound_price:'0.02'},hints:{api_key:'••••test'},base_url:'https://api.sonilo.com/v1',credential_source:'console'};
-const server=http.createServer((req,res)=>{
+const server=http.createServer((req,res)=>{if(req.method==='GET'&&new URL(req.url,'http://fixture').pathname==='/auth/company-connection'){res.writeHead(404,{'Content-Type':'application/json'});return res.end(JSON.stringify({connected:false}));}
  const name=path.basename(req.url.split('?')[0]),file=path.join(root,name.includes('.')?name:'index.html');
  if(!fs.existsSync(file))return res.writeHead(404).end();
  res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html');res.end(fs.readFileSync(file));

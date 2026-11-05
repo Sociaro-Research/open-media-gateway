@@ -2,7 +2,7 @@ const {evidencePath} = require('./evidence.cjs');
 // Real console UI, local API fixtures; no customer services or provider requests.
 const {chromium,webkit}=require('playwright'),http=require('node:http'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const root=path.resolve(__dirname,'../../web/public/ui'),out=process.env.UI_SCREENSHOT_DIR||evidencePath('/tmp/gateway-sales-ui');fs.mkdirSync(out,{recursive:true});
-const server=http.createServer((req,res)=>{const name=path.basename(req.url.split('?')[0]),file=path.join(root,name.includes('.')?name:'index.html');if(!fs.existsSync(file))return res.writeHead(404).end();res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html');res.end(fs.readFileSync(file));});
+const server=http.createServer((req,res)=>{if(req.method==='GET'&&new URL(req.url,'http://fixture').pathname==='/auth/company-connection'){res.writeHead(404,{'Content-Type':'application/json'});return res.end(JSON.stringify({connected:false}));}const name=path.basename(req.url.split('?')[0]),file=path.join(root,name.includes('.')?name:'index.html');if(!fs.existsSync(file))return res.writeHead(404).end();res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html');res.end(fs.readFileSync(file));});
 (async()=>{
  await new Promise(r=>server.listen(0,'127.0.0.1',r));const engine=process.env.UI_BROWSER_ENGINE==='webkit'?webkit:chromium;
  const browser=await engine.launch({headless:true,...(engine===chromium&&process.env.UI_BROWSER_PATH?{executablePath:process.env.UI_BROWSER_PATH}:{})}),page=await browser.newPage({viewport:{width:1440,height:1100}});page.setDefaultTimeout(10000);

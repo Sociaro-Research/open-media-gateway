@@ -18,6 +18,7 @@ const server=http.createServer(async(req,res)=>{
  const account=records.get(cookies.fixture_session);
  const json=(value,status=200,headers={})=>{res.writeHead(status,{'Content-Type':'application/json',...headers});res.end(JSON.stringify(value));};
  const failure=(message,status=400)=>json({error:{message}},status);
+ if(req.method==='GET'&&p==='/auth/company-connection')return json({connected:false},404);
  if(req.method==='POST'){
   const chunks=[];for await(const c of req)chunks.push(c);const data=JSON.parse(Buffer.concat(chunks).toString()||'{}');requests.push({p,data});
   if(p==='/auth/email/register'){

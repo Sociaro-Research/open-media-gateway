@@ -45,7 +45,8 @@ const server=http.createServer((req,res)=>{
    if(url==='/privacy'||url==='/terms'){
     await page.locator('[data-legal-default]').waitFor();
     assert.ok((await page.locator('[data-legal-default]').innerText()).includes('[CONTACT EMAIL]'),'Operator template contact placeholder must remain explicit');
-    assert.ok(!(await page.locator('body').innerText()).includes('Sociaro'));
+    assert.ok(!(await page.locator('[data-legal-default]').innerText()).includes('Sociaro'),'Operator legal template must not inherit vendor branding');
+    assert.equal(await page.locator('.site-footer-copyright').innerText(),'© 2026 Sociaro Baltic OÜ','Vendor copyright is independent of configured operator branding');
    }
    await page.evaluate(()=>GatewayTheme.apply('light'));
    await page.waitForFunction(()=>document.querySelector('.brand img').naturalWidth>0&&!document.querySelector('.brand img').hidden);

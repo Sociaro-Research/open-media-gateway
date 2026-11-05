@@ -5,7 +5,7 @@ const engine=process.env.UI_BROWSER_ENGINE||'chromium';
 if(!['chromium','webkit'].includes(engine))throw new Error('Unsupported browser engine: '+engine);
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const root=path.resolve(__dirname,'../../web/public/ui'),out=evidencePath('/tmp/gateway-catalog-ui');fs.mkdirSync(out,{recursive:true});
-const server=http.createServer((req,res)=>{const name=path.basename(req.url.split('?')[0]),file=path.join(root,name.includes('.')?name:'index.html');if(!fs.existsSync(file))return res.writeHead(404).end();res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html');res.end(fs.readFileSync(file));});
+const server=http.createServer((req,res)=>{if(req.method==='GET'&&new URL(req.url,'http://fixture.test').pathname==='/auth/company-connection'){res.writeHead(404,{'Content-Type':'application/json'});return res.end(JSON.stringify({connected:false}));}const name=path.basename(req.url.split('?')[0]),file=path.join(root,name.includes('.')?name:'index.html');if(!fs.existsSync(file))return res.writeHead(404).end();res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html');res.end(fs.readFileSync(file));});
 (async()=>{
  await new Promise(r=>server.listen(0,'127.0.0.1',r));
  const browser=await ({chromium,webkit}[engine]).launch({headless:true,...(process.env.UI_BROWSER_PATH&&engine==='chromium'?{executablePath:process.env.UI_BROWSER_PATH}:{})});

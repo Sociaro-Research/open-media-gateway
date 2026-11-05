@@ -4,7 +4,7 @@ const {[engine]:chromium}=require('playwright');
 const assert=require('node:assert/strict'),http=require('node:http'),fs=require('node:fs'),path=require('node:path');
 const ui=path.resolve(__dirname,'../../web/public/ui');
 let unavailable=true,logoutCalls=0;
-const server=http.createServer((req,res)=>{
+const server=http.createServer((req,res)=>{if(req.method==='GET'&&new URL(req.url,'http://fixture.test').pathname==='/auth/company-connection'){res.writeHead(404,{'Content-Type':'application/json'});return res.end(JSON.stringify({connected:false}));}
  if(req.url==='/auth/logout'){logoutCalls++;return res.writeHead(unavailable?503:204,{'Content-Type':'application/json'}).end(unavailable?JSON.stringify({error:{message:'retry'}}):undefined)}
  if(req.url==='/auth/session')return res.writeHead(204).end();
  const name=path.basename(req.url.split('?')[0]),file=path.join(ui,name.includes('.')?name:'index.html');
