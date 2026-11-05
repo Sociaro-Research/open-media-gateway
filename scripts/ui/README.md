@@ -16,6 +16,24 @@ ignored `.local/` or `dist/`; record limits explicitly.
 
 ## Available fixtures
 
+`node --test scripts/ui/api-errors.test.cjs scripts/ui/media-errors.test.cjs
+scripts/ui/media-error-flows.test.cjs` checks the actual shared request helper and
+saved-media renderer with synthetic responses and a minimal DOM boundary fixture.
+It covers safe JSON diagnoses, HTTP/body/network failures, sign-in checks,
+cancellation, signed-link renewal, repeated/interrupted actions and independent
+preview/download feedback. The DOM fixture does not establish browser behavior
+or visual acceptance.
+
+`node scripts/ui/portal-errors.cjs` exercises the same helper and renderer in a
+browser with entirely synthetic intercepted routes, including failed Open popup
+cleanup, expired-link retry, pending text/action races, plain-text diagnosis and
+adjacent settings/key feedback. Repeat with `UI_BROWSER_ENGINE=webkit`; use
+`UI_EVIDENCE_DIR` for results, asset hashes and both-theme screenshots at
+1440/390/320px. `UI_SOURCE_DIR` selects prior assets and `UI_BASELINE=1` captures
+their historical generic media messages. Run the existing
+`generation-artifacts.cjs` and `response-context.cjs` suites separately for the
+broader signed-media and late-key/body regressions.
+
 `node scripts/ui/footer-layout.cjs` loads the actual portal and documentation modules
 with synthetic HTTPS routes. Repeat with `UI_BROWSER_ENGINE=webkit`;
 `UI_EVIDENCE_DIR` retains responsive screenshots and geometry. It checks the

@@ -2,6 +2,20 @@
 (() => {
  'use strict';
  const node=(tag,text='',cls='')=>Object.assign(document.createElement(tag),{textContent:text,className:cls});
+ function failureMessage(error,operation='Preview',signed=false){
+  const prefix=operation+' unavailable. ';
+  // Only the shared API helper marks vetted HTTP/transport diagnostics. Native
+  // player/fetch errors can contain private URLs and must use bounded wording.
+  if(error.isGatewayError&&typeof error.message==='string'&&error.message.trim())return prefix+error.message;
+  if(error.code==='invalid_response')return prefix+'The Gateway returned an unreadable response. Ask your Gateway administrator to check saved media access.';
+  if(error.code==='network_error'||error.name==='TypeError')return prefix+'Check your connection and whether the Gateway is reachable, then try this media action again.';
+  if(signed&&[401,403].includes(error.status))return prefix+'The saved media link could not be used. Retry preview to request a fresh link; ask your Gateway administrator to check storage access if it continues.';
+  if(error.status===401)return prefix+'Sign in again or enter a valid Gateway API key, then try this media action again.';
+  if(error.status===403)return prefix+'Check the selected workspace and your permissions, or ask an administrator.';
+  if(error.status===429)return prefix+'Too many requests. Wait before trying this media action again.';
+  if(error.status>=500&&error.status<=599)return prefix+`The Gateway or storage service could not complete the request (HTTP ${error.status}). Try this media action later; contact your Gateway administrator if it continues.`;
+  return prefix+'Try this media action again; ask your Gateway administrator to check saved media access if it continues.';
+ }
  // Use decoded display dimensions, never a requested output ratio or poster size.
  function fitVideo(player,{signal,current=()=>true}){
   if(player.tagName!=='VIDEO'||signal.aborted)return;
@@ -19,6 +33,11 @@
  }
  async function attach(article,task,{api,context,bytes}){
   const controller=new AbortController(),identity=context(),current=()=>article.isConnected&&!controller.signal.aborted&&identity===context();article.mediaController=controller;
+  const accessBundle=async()=>{
+   const bundle=await api('/v1/generations/'+encodeURIComponent(task.id)+'/media-access',{signal:controller.signal,cache:'no-store'});
+   if(!bundle||typeof bundle!=='object'||Array.isArray(bundle)||bundle.artifacts!==undefined&&(!Array.isArray(bundle.artifacts)||bundle.artifacts.some(value=>!value||typeof value!=='object'||Array.isArray(value))))throw Object.assign(Error('Invalid media access response'),{code:'invalid_response'});
+   return bundle;
+  };
   const result=article.querySelector('.task-result'),groups=new Map(),entries=[];result.classList.add('generation-outputs');
   for(const artifact of task.artifacts||[]){
    if(!/^[1-9][0-9]*$/.test(artifact.id))continue;
@@ -32,35 +51,36 @@
    if(player){player.className=textual?'artifact-text':'task-media';card.append(player);}
    if(player?.tagName==='VIDEO')fitVideo(player,{signal:controller.signal,current});
    const facts=[kind,artifact.size_bytes>0?bytes(artifact.size_bytes):'',artifact.duration>0?artifact.duration+' s':''].filter(Boolean).join(' · ');status.textContent=facts;card.append(status,actions);result.append(card);
-   const buttons=[],feedback=text=>{status.textContent=[facts,text].filter(Boolean).join(' · ');};let pending=false,textRead=null,textSequence=0;
-   const access=()=>api('/v1/generations/'+encodeURIComponent(task.id)+'/media-access',{signal:controller.signal,cache:'no-store'});
+   let previewFeedback='',actionFeedback='';
+   const buttons=[],feedback=(text,action=false)=>{if(action)actionFeedback=text;else previewFeedback=text;status.textContent=[facts,previewFeedback,actionFeedback].filter(Boolean).join(' · ');};let pending=false,textRead=null,textSequence=0;
+   const access=accessBundle;
    const links=bundle=>(bundle.artifacts||[]).find(value=>value.id===artifact.id);
    const clear=()=>{textSequence++;textRead?.abort();if(textual&&player)player.textContent='';if(player){player.pause?.();player.removeAttribute('src');player.removeAttribute('poster');player.load?.();}};
-   const unavailable=error=>{if(error.status===404)entries.forEach(entry=>entry.gone());else feedback('Preview unavailable. Try again.');};
+   const unavailable=(error,operation='Preview',signed=false,action=false)=>{if(error.status===404&&!signed)entries.forEach(entry=>entry.gone());else feedback(failureMessage(error,operation,signed),action);};
    function action(text,fn){const button=node('button',text,'secondary');button.type='button';button.onclick=fn;actions.append(button);buttons.push(button);return button;}
    function lock(value){pending=value;buttons.forEach(button=>button.disabled=value);}
    let lastFrameAction=null;const primaryVideo=player?.tagName==='VIDEO'&&!entries.some(e=>e.video);
    async function openLink(field,download){
-    if(pending||!current())return;const tab=download?null:window.open('about:blank','_blank');if(!download&&!tab){feedback('Allow pop-ups to open saved media.');return;}if(tab){tab.opener=null;const meta=document.createElement('meta');meta.name='referrer';meta.content='no-referrer';tab.document.head.append(meta);}lock(true);
-    try{const bundle=await access();if(!current()){tab?.close();return;}const url=field==='last_frame_url'?bundle.last_frame_url:links(bundle)?.[field];if(!url){tab?.close();if(field==='last_frame_url'){player?.removeAttribute('poster');if(lastFrameAction)lastFrameAction.hidden=true;feedback('Last frame is unavailable.');}else markGone();return;}const link=(tab?.document||document).createElement('a');link.href=window.CompanyConnection?.url(url)||url;link.rel='noopener noreferrer';if(download)link.download=task.id+'-'+artifact.id;(tab?.document.body||document.body).append(link);link.click();if(download)link.remove();feedback('');}
-    catch(error){tab?.close();if(current()&&error.name!=='AbortError')unavailable(error);}finally{if(current())lock(false);}
+    if(pending||!current())return;const tab=download?null:window.open('about:blank','_blank');if(!download&&!tab){feedback('Allow pop-ups to open saved media.',true);return;}if(tab){tab.opener=null;const meta=document.createElement('meta');meta.name='referrer';meta.content='no-referrer';tab.document.head.append(meta);}lock(true);
+    try{const bundle=await access();if(!current()){tab?.close();return;}const url=field==='last_frame_url'?bundle.last_frame_url:links(bundle)?.[field];if(!url){tab?.close();if(field==='last_frame_url'){player?.removeAttribute('poster');if(lastFrameAction)lastFrameAction.hidden=true;feedback('Last frame is unavailable.',true);}else markGone();return;}const link=(tab?.document||document).createElement('a');link.href=window.CompanyConnection?.url(url)||url;link.rel='noopener noreferrer';if(download)link.download=task.id+'-'+artifact.id;(tab?.document.body||document.body).append(link);link.click();if(download)link.remove();feedback('',true);}
+    catch(error){tab?.close();if(current()&&error.name!=='AbortError')unavailable(error,download?'Download':field==='last_frame_url'?'Last frame preview':'Preview',false,true);}finally{if(current())lock(false);}
    }
    for(const [label,field,download]of [...(attachment?[]:[['Open ↗','preview_url',false]]),['Download ↓','download_url',true]])action(label,()=>openLink(field,download));
    const retry=action('Retry preview',async()=>{if(pending||!current())return;lock(true);try{const bundle=await access();if(current())show(bundle);}catch(error){if(current()&&error.name!=='AbortError')unavailable(error);}finally{if(current())lock(false);}});retry.hidden=true;
-   function markGone(){clear();retry.hidden=false;if(lastFrameAction)lastFrameAction.hidden=true;feedback('Saved output is no longer available.');}
+   function markGone(){clear();actionFeedback='';retry.hidden=false;if(lastFrameAction)lastFrameAction.hidden=true;feedback('Saved output is no longer available.');}
    function show(bundle){const link=links(bundle);if(attachment){retry.hidden=true;if(link?.download_url)feedback('Attachment only');else feedback('Saved attachment is no longer available.');return;}if(!link?.preview_url){markGone();return;}if(primaryVideo){if(bundle.last_frame_url){player.poster=window.CompanyConnection?.url(bundle.last_frame_url)||bundle.last_frame_url;if(!lastFrameAction)lastFrameAction=action('Last frame ↗',()=>openLink('last_frame_url',false));lastFrameAction.hidden=false;}else{player.removeAttribute('poster');if(lastFrameAction)lastFrameAction.hidden=true;}}if(textual){readText(link.preview_url);return;}if(player)player.src=window.CompanyConnection?.url(link.preview_url)||link.preview_url;retry.hidden=true;feedback('');}
 
    async function readText(url){
     textRead?.abort();textRead=new AbortController();const version=++textSequence;player.textContent='';feedback('Loading text…');
     try{const response=await fetch(url,{credentials:'omit',redirect:'error',referrerPolicy:'no-referrer',signal:AbortSignal.any([controller.signal,textRead.signal])});if(!response.ok)throw Object.assign(Error('Text preview unavailable'),{status:response.status});const reader=response.body.getReader(),decoder=new TextDecoder();let value='',size=0,truncated=false;while(true){const part=await reader.read();if(part.done)break;const remaining=65536-size;if(part.value.length>remaining){value+=decoder.decode(part.value.subarray(0,remaining));truncated=true;await reader.cancel();break;}size+=part.value.length;value+=decoder.decode(part.value,{stream:true});}value+=decoder.decode();if(!current()||version!==textSequence)return;player.textContent=value;retry.hidden=true;feedback(truncated?'Preview truncated. Download the full output.':'');}
-    catch(error){if(current()&&version===textSequence&&error.name!=='AbortError'){retry.hidden=false;unavailable(error);}}
+    catch(error){if(current()&&version===textSequence&&error.name!=='AbortError'){retry.hidden=false;unavailable(error,'Preview',true);}}
    }
-   if(player)player.onerror=()=>{if(current()){retry.hidden=false;feedback('Preview unavailable. Retry preview.');}};
+   if(player)player.onerror=()=>{if(current()){retry.hidden=false;feedback('Preview unavailable. Retry preview to request a fresh link; ask your Gateway administrator to check the media file and storage access if it continues.');}};
    entries.push({show,lock,clear,gone:markGone,video:player?.tagName==='VIDEO',fail(error){retry.hidden=false;unavailable(error);}});
   }
   if(!entries.length){result.textContent='Saved outputs are unavailable.';return;}
   entries.forEach(entry=>entry.lock(true));
-  try{const bundle=await api('/v1/generations/'+encodeURIComponent(task.id)+'/media-access',{signal:controller.signal,cache:'no-store'});if(current())entries.forEach(entry=>entry.show(bundle));}
+  try{const bundle=await accessBundle();if(current())entries.forEach(entry=>entry.show(bundle));}
   catch(error){if(current()&&error.name!=='AbortError'){if(error.status===404)entries.forEach(entry=>entry.gone());else entries.forEach(entry=>entry.fail(error));}}
   finally{if(current())entries.forEach(entry=>entry.lock(false));}
   controller.signal.addEventListener('abort',()=>{for(const entry of entries)entry.clear?.();for(const player of result.querySelectorAll('.task-media')){player.pause?.();player.removeAttribute('src');player.removeAttribute('poster');player.load?.();}},{once:true});
