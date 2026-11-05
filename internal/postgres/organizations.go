@@ -116,8 +116,11 @@ func (r *SystemRepository) organizations(ctx context.Context, actor string, all 
 }
 func (r *SystemRepository) CreateOrganization(ctx context.Context, actor, name, firstAdmin, website string) (org.Organization, error) {
 	o := org.Organization{ID: uuid.NewString(), Name: org.CompanyName(name)}
-	if o.Name == "" || len(o.Name) > 160 {
-		return o, org.ErrInvalid
+	if o.Name == "" {
+		return o, org.InvalidName
+	}
+	if len(o.Name) > 160 {
+		return o, org.InvalidNameLength
 	}
 	domain, e := org.CompanyDomain(website)
 	if e != nil {
@@ -163,10 +166,16 @@ func (r *SystemRepository) CreateOrganization(ctx context.Context, actor, name, 
 }
 func (r *SystemRepository) OrganizationSettings(ctx context.Context, actor, id, name string, credit money.USD, weekly *money.USD, changeCredit bool, markup ...*money.Percent) error {
 	if len(markup) > 1 || len(markup) == 1 && markup[0] != nil && markup[0].Validate() != nil {
-		return org.ErrInvalid
+		return org.InvalidMarkup
 	}
-	if strings.TrimSpace(name) == "" || credit < 0 || credit > money.USD(1_000_000*money.Scale) || weekly != nil && (*weekly < 0 || *weekly > money.USD(1_000_000*money.Scale)) {
-		return org.ErrInvalid
+	if strings.TrimSpace(name) == "" {
+		return org.InvalidName
+	}
+	if credit < 0 || credit > money.USD(1_000_000*money.Scale) {
+		return org.InvalidCreditLimit
+	}
+	if weekly != nil && (*weekly < 0 || *weekly > money.USD(1_000_000*money.Scale)) {
+		return org.InvalidDefaultWeeklyLimit
 	}
 	tx, e := beginAuditTx(ctx, r.db)
 	if e != nil {
@@ -195,7 +204,7 @@ func (r *SystemRepository) OrganizationSettings(ctx context.Context, actor, id, 
 	// An existing installation address may exceed the manual name limit.
 	// Saving its other settings must not force a rename or truncate it.
 	if nameLength > 160 && (len(previous) <= 160 || name != org.CompanyName(previous)) {
-		return org.ErrInvalid
+		return org.InvalidNameLength
 	}
 	if name != org.CompanyName(previous) {
 		if e = checkCompanyIdentity(ctx, tx, actor, id, name, ""); e != nil {
@@ -270,8 +279,11 @@ func (r *SystemRepository) OrganizationMembers(ctx context.Context, actor, id st
 	return out, rows.Err()
 }
 func (r *SystemRepository) SetOrganizationMember(ctx context.Context, actor, id, target, role string, limit *money.USD, limitProvided, remove bool) error {
-	if !org.ValidRole(role) || limit != nil && (*limit < 0 || *limit > money.USD(1_000_000*money.Scale)) {
+	if !org.ValidRole(role) {
 		return org.ErrInvalid
+	}
+	if limit != nil && (*limit < 0 || *limit > money.USD(1_000_000*money.Scale)) {
+		return org.InvalidWeeklyLimit
 	}
 	tx, e := beginAuditTx(ctx, r.db)
 	if e != nil {
@@ -367,8 +379,20 @@ func (r *SystemRepository) OrganizationCredits(ctx context.Context, actor, id st
 	return out, rows.Err()
 }
 func (r *SystemRepository) AddOrganizationCredit(ctx context.Context, actor, id string, c org.Credit) (org.Credit, error) {
-	if c.Amount == 0 || c.Amount < -money.USD(1_000_000*money.Scale) || c.Kind != "payment" && c.Kind != "promo" && c.Kind != "adjustment" || c.Amount < 0 && c.Kind != "adjustment" || len(c.Reason) > 1000 || strings.TrimSpace(c.ExternalID) == "" || len(c.ExternalID) > 200 {
-		return c, org.ErrInvalid
+	if c.Amount == 0 || c.Amount < -money.USD(1_000_000*money.Scale) {
+		return c, org.InvalidCreditAmount
+	}
+	if c.Kind != "payment" && c.Kind != "promo" && c.Kind != "adjustment" {
+		return c, org.InvalidCreditKind
+	}
+	if c.Amount < 0 && c.Kind != "adjustment" {
+		return c, org.InvalidNegativeCredit
+	}
+	if len(c.Reason) > 1000 {
+		return c, org.InvalidCreditReason
+	}
+	if strings.TrimSpace(c.ExternalID) == "" || len(c.ExternalID) > 200 {
+		return c, org.InvalidCreditExternalID
 	}
 	tx, e := beginAuditTx(ctx, r.db)
 	if e != nil {
@@ -389,8 +413,16 @@ func (r *SystemRepository) AddOrganizationCredit(ctx context.Context, actor, id 
 	if e = tx.QueryRowContext(ctx, `SELECT is_system_admin FROM users WHERE id=$1`, actor).Scan(&admin); e != nil {
 		return c, e
 	}
-	if !admin && (c.Amount <= 0 || c.Kind != "payment" || strings.TrimSpace(c.Reason) == "") {
-		return c, org.ErrInvalid
+	if !admin {
+		if c.Amount <= 0 {
+			return c, org.InvalidManagedCreditAmount
+		}
+		if c.Kind != "payment" {
+			return c, org.InvalidManagedCreditKind
+		}
+		if strings.TrimSpace(c.Reason) == "" {
+			return c, org.InvalidManagedCreditReason
+		}
 	}
 	var locked string
 	if e = tx.QueryRowContext(ctx, `SELECT id FROM organizations WHERE id=$1 FOR UPDATE`, id).Scan(&locked); e != nil {

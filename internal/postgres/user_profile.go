@@ -50,7 +50,7 @@ func (r *AuthRepository) UpdateProfile(ctx context.Context, id string, in auth.P
 			return identity.User{}, err
 		}
 		if !settings.HasPreset(*in.ColorPreset) {
-			return identity.User{}, auth.ErrInvalidProfile
+			return identity.User{}, auth.ErrProfileColorPreset
 		}
 	}
 	user, err := scanProfile(tx.QueryRowContext(ctx, `UPDATE users SET

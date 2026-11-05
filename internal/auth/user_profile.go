@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -27,20 +28,20 @@ type ProfileRepository interface {
 
 func (m *Manager) UpdateProfile(ctx context.Context, id string, in ProfileUpdate) (identity.User, error) {
 	if in.Name == nil && in.Theme == nil && in.ReportColumns == nil && in.ColorPreset == nil && in.Contacts == nil {
-		return identity.User{}, ErrInvalidProfile
+		return identity.User{}, invalidProfile("body", "provide at least one of name, theme, color_preset, report_columns or contacts")
 	}
 	if in.Name != nil {
 		name := strings.TrimSpace(*in.Name)
 		if name == "" || utf8.RuneCountInString(name) > 100 || strings.ContainsFunc(name, unicode.IsControl) {
-			return identity.User{}, ErrInvalidProfile
+			return identity.User{}, invalidProfile("name", "use 1–100 Unicode characters after trimming, without control characters")
 		}
 		in.Name = &name
 	}
 	if in.Theme != nil && *in.Theme != "dark" && *in.Theme != "light" && *in.Theme != "system" {
-		return identity.User{}, ErrInvalidProfile
+		return identity.User{}, invalidProfile("theme", "choose dark, light or system")
 	}
 	if in.ColorPreset != nil && !branding.ValidPresetID(*in.ColorPreset) {
-		return identity.User{}, ErrInvalidProfile
+		return identity.User{}, ErrProfileColorPreset
 	}
 	if in.ReportColumns != nil {
 		allowed := map[string]bool{
@@ -49,12 +50,15 @@ func (m *Manager) UpdateProfile(ctx context.Context, id string, in ProfileUpdate
 			"estimated_cost": true, "cost": true, "confirmed_cost": true, "settlement": true, "customer_charge": true, "profit": true, "profit_status": true,
 		}
 		if len(*in.ReportColumns) == 0 || len(*in.ReportColumns) > len(allowed) {
-			return identity.User{}, ErrInvalidProfile
+			return identity.User{}, invalidProfile("report_columns", "select 1–16 unique supported report columns")
 		}
 		seen := map[string]bool{}
-		for _, column := range *in.ReportColumns {
-			if !allowed[column] || seen[column] {
-				return identity.User{}, ErrInvalidProfile
+		for i, column := range *in.ReportColumns {
+			if !allowed[column] {
+				return identity.User{}, invalidProfile(fmt.Sprintf("report_columns[%d]", i), "choose date, generation_id, organization, user, api_key, model, provider, status, tokens, estimated_cost, cost, confirmed_cost, settlement, customer_charge, profit or profit_status")
+			}
+			if seen[column] {
+				return identity.User{}, invalidProfile(fmt.Sprintf("report_columns[%d]", i), "remove this duplicate report column")
 			}
 			seen[column] = true
 		}
@@ -62,13 +66,16 @@ func (m *Manager) UpdateProfile(ctx context.Context, id string, in ProfileUpdate
 	if in.Contacts != nil {
 		contacts := append([]identity.Contact{}, (*in.Contacts)...)
 		if len(contacts) > 20 {
-			return identity.User{}, ErrInvalidProfile
+			return identity.User{}, invalidProfile("contacts", "provide at most 20 contacts")
 		}
 		for i := range contacts {
 			c := &contacts[i]
 			c.Label, c.URL = strings.TrimSpace(c.Label), strings.TrimSpace(c.URL)
-			if c.Label == "" || utf8.RuneCountInString(c.Label) > 80 || strings.ContainsFunc(c.Label, unicode.IsControl) || len(c.URL) > 2048 || !identity.ValidContactURL(c.URL) {
-				return identity.User{}, ErrInvalidProfile
+			if c.Label == "" || utf8.RuneCountInString(c.Label) > 80 || strings.ContainsFunc(c.Label, unicode.IsControl) {
+				return identity.User{}, invalidProfile(fmt.Sprintf("contacts[%d].label", i), "use 1–80 Unicode characters after trimming, without control characters")
+			}
+			if len(c.URL) > 2048 || !identity.ValidContactURL(c.URL) {
+				return identity.User{}, invalidProfile(fmt.Sprintf("contacts[%d].url", i), "use an HTTP(S), mailto or tel link of at most 2048 bytes, without whitespace, control characters or embedded credentials")
 			}
 		}
 		in.Contacts = &contacts

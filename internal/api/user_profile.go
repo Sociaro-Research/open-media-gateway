@@ -20,7 +20,8 @@ func (s *Server) updateProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if in.ColorPreset != nil && !readBranding(r.Context(), s.brandingReader()).HasPreset(*in.ColorPreset) {
-		writeError(w, 400, "invalid_profile", "Choose a color theme published by an administrator")
+		field, message := auth.ErrProfileColorPreset.Diagnostic()
+		writeAPIError(w, 400, "invalid_profile", message, &field)
 		return
 	}
 	updater, ok := s.auth.(interface {
@@ -32,7 +33,13 @@ func (s *Server) updateProfile(w http.ResponseWriter, r *http.Request) {
 	}
 	updated, err := updater.UpdateProfile(r.Context(), user.ID, in)
 	if errors.Is(err, auth.ErrInvalidProfile) {
-		writeError(w, 400, "invalid_profile", "Use a name of 1–100 characters, a theme of dark, light or system, an existing color theme, a nonempty list of unique supported report columns, and up to 20 contacts with a 1–80 character label and an HTTP(S), mailto or tel link of up to 2048 bytes")
+		var validation *auth.ProfileValidationError
+		if errors.As(err, &validation) {
+			field, message := validation.Diagnostic()
+			writeAPIError(w, 400, "invalid_profile", message, &field)
+		} else {
+			writeError(w, 400, "invalid_profile", "Check the documented profile fields and correct the request before saving again")
+		}
 		return
 	}
 	if err != nil {

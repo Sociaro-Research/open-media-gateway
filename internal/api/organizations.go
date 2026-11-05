@@ -43,7 +43,15 @@ func orgError(w http.ResponseWriter, e error) {
 	case errors.Is(e, org.ErrNotFound):
 		writeError(w, 404, "not_found", e.Error())
 	case errors.Is(e, org.ErrInvalid):
-		writeError(w, 400, "invalid_request", e.Error())
+		var validation org.ValidationError
+		if errors.As(e, &validation) {
+			field, message := validation.Diagnostic()
+			if field != "" {
+				writeAPIError(w, 400, "invalid_request", message, &field)
+				return
+			}
+		}
+		writeError(w, 400, "invalid_request", org.ErrInvalid.Error())
 	case errors.Is(e, org.ErrInvitationUnavailable):
 		writeError(w, 409, "invitation_unavailable", e.Error())
 	case errors.Is(e, org.ErrConflict):
