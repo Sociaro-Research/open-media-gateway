@@ -7108,9 +7108,11 @@ paths:
       tags:
       - Account
       summary: Start Google sign-in
-      description: Browser redirect to Google. Used to establish a console session
-        and bootstrap the first key; no key required. Only registered when Google
-        OAuth is configured.
+      description: >-
+        Browser redirect to Google to establish a console session; no key required.
+        Sign-in does not create an API key. Registered when browser authentication
+        is configured. Google must also be enabled and its connection configured;
+        otherwise sign-in is unavailable.
       security: []
       responses:
         '302':
@@ -7124,13 +7126,13 @@ paths:
       - Account
       summary: Complete Google sign-in
       description: Browser callback with a one-time code and state. Validates identity,
-        establishes an HttpOnly session and redirects to UI_PUBLIC_URL/. A verified
-        Gmail address or verified Workspace identity with a nonempty hd claim can
+        establishes an HttpOnly session and redirects to UI_PUBLIC_URL/. A Gmail
+        address or Workspace identity with a nonempty hd claim, both requiring email_verified=true, can
         link to an existing email-only account without changing its ID, permissions
         or password. An existing different Google subject is never replaced;
         third-party addresses without hd cannot link by email alone. Failures
         redirect to UI_PUBLIC_URL/?auth_error=1 without issuing a session.
-        Only registered when Google OAuth is configured.
+        Registered when browser authentication is configured; Google must also be enabled and its connection configured.
       security: []
       responses:
         '302':

@@ -101,7 +101,8 @@ Google users can choose **Forgot password?**, prove mailbox ownership and set an
 email password for the same account. Google sign-in remains available to them.
 Google sign-in reuses an existing email-only account when the verified ID token
 proves that Google is authoritative for the same mailbox: a `@gmail.com` address,
-or `email_verified=true` with a nonempty Google Workspace `hd` claim. The callback
+or a Google Workspace address with a nonempty `hd` claim. Both cases require
+`email_verified=true`. The callback separately
 validates the token's signature, issuer, audience, expiry and nonce before passing
 these claims to account resolution. The link retains the user's ID, profile,
 password, role flags, memberships and saved data. Repeated sign-in uses Google's
