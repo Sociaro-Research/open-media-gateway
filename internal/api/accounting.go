@@ -37,7 +37,7 @@ func (s *Server) estimateGeneration(w http.ResponseWriter, r *http.Request, inpu
 	case errors.Is(err, core.ErrProviderChanged):
 		writeError(w, http.StatusConflict, "provider_changed", "The provider configuration changed. Review the request and try again.")
 	case errors.Is(err, core.ErrOptionsInvalid), errors.Is(err, core.ErrModelUnavailable), errors.Is(err, core.ErrPromptRequired), errors.Is(err, core.ErrPromptTooLong), errors.Is(err, core.ErrProviderUnavailable), errors.Is(err, core.ErrModelRequired), errors.Is(err, core.ErrWebhookInvalid):
-		writeError(w, 400, "invalid_request", err.Error())
+		generationValidationError(w, input, err)
 	case err != nil:
 		writeError(w, 503, "service_unavailable", "could not calculate an estimate")
 	default:

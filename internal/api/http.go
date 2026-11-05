@@ -497,7 +497,7 @@ func (s *Server) submitGeneration(w http.ResponseWriter, r *http.Request, input 
 	case errors.Is(err, core.ErrPromptRequired), errors.Is(err, core.ErrPromptTooLong), errors.Is(err, core.ErrModelRequired),
 		errors.Is(err, core.ErrProviderUnavailable), errors.Is(err, core.ErrModelUnavailable), errors.Is(err, core.ErrOptionsInvalid),
 		errors.Is(err, core.ErrWebhookInvalid), errors.Is(err, core.ErrIdempotencyKey):
-		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		generationValidationError(w, input, err)
 	case errors.Is(err, core.ErrBudgetExceeded):
 		writeError(w, http.StatusPaymentRequired, "budget_exceeded", core.ErrBudgetExceeded.Error())
 	case errors.Is(err, core.ErrPricingUnavailable):

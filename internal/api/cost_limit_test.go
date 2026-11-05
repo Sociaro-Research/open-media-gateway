@@ -71,7 +71,7 @@ func TestGenerationCostLimitDiagnostics(t *testing.T) {
 	}
 }
 
-func TestUnsupportedOptionsKeepExistingDiagnostic(t *testing.T) {
+func TestUnsupportedOptionsIdentifyField(t *testing.T) {
 	for _, path := range []string{"/v1/videos", "/v1/generations/estimate"} {
 		t.Run(path, func(t *testing.T) {
 			repo, queue := &admissionRepository{}, &admissionQueue{}
@@ -80,7 +80,7 @@ func TestUnsupportedOptionsKeepExistingDiagnostic(t *testing.T) {
 				map[string]string{"mock": "mock-video-v1"}, "mock")
 			body := `{"model":"mock/mock-video-v1","prompt":"test","options":{"negative_prompt":"unsupported"},"max_expected_cost_usd":0}`
 			response := openAIRequest(New(service, healthStub{}, "secret"), path, body)
-			if response.Code != 400 || !strings.Contains(response.Body.String(), core.ErrOptionsInvalid.Error()) || !strings.Contains(response.Body.String(), `"param":null`) {
+			if response.Code != 400 || !strings.Contains(response.Body.String(), core.ErrOptionsInvalid.Error()) || !strings.Contains(response.Body.String(), `"param":"options.negative_prompt"`) {
 				t.Fatalf("unsupported options diagnostic changed: %d %s", response.Code, response.Body)
 			}
 			if repo.creates != 0 || len(queue.ids) != 0 {

@@ -11345,7 +11345,7 @@ components:
           - param
           properties:
             type: {type: string, description: OpenAI-style error category.}
-            param: {type: [string, "null"], description: Invalid field when known.}
+            param: {type: [string, "null"], description: "Invalid public request field when known (for example voice, response_format, output_format, quality, seconds or options.duration). Semantic model option errors retain HTTP 400 and identify the field with supported choices, bounds or a corrective action in message. Rejected request values are not echoed."}
             code:
               type: string
             message:

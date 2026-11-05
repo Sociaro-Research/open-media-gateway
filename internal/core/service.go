@@ -396,7 +396,7 @@ func NormalizeModelOptions(descriptor MediaModel, options MediaOptions) (MediaOp
 }
 func normalizeModelOptions(descriptor MediaModel, options MediaOptions, deferResourceLookup bool) (MediaOptions, error) {
 	if options.OutputCount != 0 && (descriptor.MediaType != "image" || options.OutputCount < 1 || options.OutputCount > max(1, descriptor.MaxOutputs)) {
-		return MediaOptions{}, fmt.Errorf("%w: unsupported output count", ErrOptionsInvalid)
+		return MediaOptions{}, optionError("output_count", fmt.Sprintf("must be between 1 and %d for image output; omit it for other media types", max(1, descriptor.MaxOutputs)))
 	}
 	if options.OutputCount == 1 {
 		options.OutputCount = 0
@@ -431,31 +431,37 @@ func normalizeModelOptions(descriptor MediaModel, options MediaOptions, deferRes
 		return MediaOptions{}, err
 	}
 	for _, control := range []struct {
+		field   string
 		value   *string
 		choices []string
-	}{{&options.Quality, descriptor.Qualities}, {&options.Background, descriptor.Backgrounds}} {
+	}{{"quality", &options.Quality, descriptor.Qualities}, {"background", &options.Background, descriptor.Backgrounds}} {
 		if *control.value == "" && len(control.choices) > 0 {
 			*control.value = control.choices[0]
 		}
 		if *control.value != "" && !slices.Contains(control.choices, *control.value) {
-			return MediaOptions{}, ErrOptionsInvalid
+			return MediaOptions{}, optionChoices(control.field, control.choices)
 		}
 	}
 	if len(options.VideoURLs) > 0 {
 		if options.VideoURL != "" && options.VideoURL != options.VideoURLs[0] {
-			return MediaOptions{}, ErrOptionsInvalid
+			return MediaOptions{}, optionError("video_urls", "conflicts with video_url; use the same first reference")
 		}
 		options.VideoURL = options.VideoURLs[0]
 	}
 	if len(options.AudioURLs) > 0 {
 		if options.AudioURL != "" && options.AudioURL != options.AudioURLs[0] {
-			return MediaOptions{}, ErrOptionsInvalid
+			return MediaOptions{}, optionError("audio_urls", "conflicts with audio_url; use the same first reference")
 		}
 		options.AudioURL = options.AudioURLs[0]
 	}
-	for _, url := range append(options.Videos(), options.Audios()...) {
-		if url == "" {
-			return MediaOptions{}, ErrOptionsInvalid
+	for _, refs := range []struct {
+		field string
+		urls  []string
+	}{{"video_urls", options.Videos()}, {"audio_urls", options.Audios()}} {
+		for i, url := range refs.urls {
+			if url == "" {
+				return MediaOptions{}, optionError(fmt.Sprintf("%s.%d", refs.field, i), "must be a nonempty media reference")
+			}
 		}
 	}
 	if err := ValidateReferenceURLs(descriptor, options); err != nil {
@@ -480,17 +486,17 @@ func normalizeModelOptions(descriptor MediaModel, options MediaOptions, deferRes
 		}
 	}
 	if descriptor.NoSeed && options.Seed != nil {
-		return MediaOptions{}, ErrOptionsInvalid
+		return MediaOptions{}, optionError("seed", "is not supported by this model; omit it")
 	}
 	if descriptor.MaxSeed > 0 && options.Seed != nil && *options.Seed > descriptor.MaxSeed {
-		return MediaOptions{}, ErrOptionsInvalid
+		return MediaOptions{}, optionError("seed", fmt.Sprintf("must not exceed %d", descriptor.MaxSeed))
 	}
 	if descriptor.NoWatermark && options.Watermark != nil {
-		return MediaOptions{}, ErrOptionsInvalid
+		return MediaOptions{}, optionError("watermark", "is not supported by this model; omit it")
 	}
 	if descriptor.AudioAlwaysOn {
 		if options.GenerateAudio != nil && !*options.GenerateAudio {
-			return MediaOptions{}, fmt.Errorf("%w: this model always generates audio", ErrOptionsInvalid)
+			return MediaOptions{}, optionError("generate_audio", "must be true or omitted; this model always generates audio")
 		}
 		enabled := true
 		options.GenerateAudio = &enabled
@@ -501,49 +507,49 @@ func normalizeModelOptions(descriptor MediaModel, options MediaOptions, deferRes
 	}
 	if countErr == nil {
 		if descriptor.RequiresAudioInput && counts.Audios == 0 {
-			return MediaOptions{}, ErrOptionsInvalid
+			return MediaOptions{}, optionError("audio_urls", "requires at least one audio reference")
 		}
 		if !descriptor.SupportsAudioInput && counts.Audios > 0 {
-			return MediaOptions{}, ErrOptionsInvalid
+			return MediaOptions{}, optionError("audio_urls", "is not supported by this model; remove audio references")
 		}
 		if descriptor.RequiresVideoInput && counts.Videos == 0 {
-			return MediaOptions{}, ErrOptionsInvalid
+			return MediaOptions{}, optionError("video_urls", "requires at least one video reference")
 		}
 		if !descriptor.SupportsVideoInput && counts.Videos > 0 {
-			return MediaOptions{}, ErrOptionsInvalid
+			return MediaOptions{}, optionError("video_urls", "is not supported by this model; remove video references")
 		}
 		if descriptor.RequiresImageInput && counts.Images == 0 {
-			return MediaOptions{}, ErrOptionsInvalid
+			return MediaOptions{}, optionError("image_urls", "requires at least one image reference")
 		}
 		if descriptor.MinImageInputs > 0 && counts.Images < descriptor.MinImageInputs {
-			return MediaOptions{}, ErrOptionsInvalid
+			return MediaOptions{}, optionError("image_urls", fmt.Sprintf("requires at least %d image references", descriptor.MinImageInputs))
 		}
 		if !descriptor.SupportsImageInput && counts.Images > 0 {
-			return MediaOptions{}, ErrOptionsInvalid
+			return MediaOptions{}, optionError("image_urls", "is not supported by this model; remove image references")
 		}
 		if descriptor.MaxImageInputs > 0 && counts.Images > descriptor.MaxImageInputs {
-			return MediaOptions{}, ErrOptionsInvalid
+			return MediaOptions{}, optionError("image_urls", fmt.Sprintf("accepts at most %d image references", descriptor.MaxImageInputs))
 		}
 	}
 
 	if options.NegativePrompt != "" && !descriptor.SupportsNegativePrompt {
-		return MediaOptions{}, ErrOptionsInvalid
+		return MediaOptions{}, optionError("negative_prompt", "is not supported by this model; omit it")
 	}
 	switch descriptor.MediaType {
 	case "image":
 		if len(descriptor.Resolutions) == 0 && options.Resolution != "" {
-			return MediaOptions{}, ErrOptionsInvalid
+			return MediaOptions{}, optionChoices("resolution", descriptor.Resolutions)
 		}
 		if options.Resolution == "" && len(descriptor.Resolutions) > 0 {
 			options.Resolution = descriptor.Resolutions[0]
 		}
 		if len(descriptor.Resolutions) > 0 && !slices.Contains(descriptor.Resolutions, options.Resolution) {
-			return MediaOptions{}, ErrOptionsInvalid
+			return MediaOptions{}, optionChoices("resolution", descriptor.Resolutions)
 		}
 	case "speech":
 		resourceVoice := hasVoiceResourceIntent(descriptor, options)
 		if resourceVoice && options.Voice != "" {
-			return MediaOptions{}, ErrOptionsInvalid
+			return MediaOptions{}, optionError("voice", "conflicts with a saved voice reference; omit voice or remove the saved voice reference")
 		}
 		if !resourceVoice && descriptor.SupportsVoice && strings.TrimSpace(options.Voice) == "" {
 			if len(descriptor.Voices) > 0 {
@@ -551,25 +557,25 @@ func normalizeModelOptions(descriptor MediaModel, options MediaOptions, deferRes
 			}
 		}
 		if !resourceVoice && descriptor.RequiresVoice && strings.TrimSpace(options.Voice) == "" {
-			return MediaOptions{}, ErrOptionsInvalid
+			return MediaOptions{}, optionError("voice", "is required; choose a voice advertised by this model")
 		}
 		if !resourceVoice && len(descriptor.Voices) > 0 && !slices.Contains(descriptor.Voices, options.Voice) {
-			return MediaOptions{}, ErrOptionsInvalid
+			return MediaOptions{}, optionChoices("voice", descriptor.Voices)
 		}
 	case "music":
 		if descriptor.SupportsGender && options.Gender == "" {
 			options.Gender = "female"
 		}
 		if descriptor.SupportsGender && options.Gender != "female" && options.Gender != "male" {
-			return MediaOptions{}, ErrOptionsInvalid
+			return MediaOptions{}, optionChoices("gender", []string{"female", "male"})
 		}
 		if !descriptor.SupportsGender && options.Gender != "" {
-			return MediaOptions{}, ErrOptionsInvalid
+			return MediaOptions{}, optionChoices("gender", nil)
 		}
 		fallthrough
 	case "audio":
 		if descriptor.DurationFromInput && options.Duration != 0 {
-			return MediaOptions{}, fmt.Errorf("%w: duration follows the input media", ErrOptionsInvalid)
+			return MediaOptions{}, optionError("duration", "follows the input media; omit it")
 		}
 		if !descriptor.DurationFromInput && descriptor.MaxDuration > 0 {
 			if options.Duration == 0 {
@@ -577,7 +583,7 @@ func normalizeModelOptions(descriptor MediaModel, options MediaOptions, deferRes
 			}
 			if options.Duration < descriptor.MinDuration || options.Duration > descriptor.MaxDuration ||
 				(descriptor.DurationStep > 0 && options.Duration != 0 && (options.Duration-descriptor.MinDuration)%descriptor.DurationStep != 0) {
-				return MediaOptions{}, ErrOptionsInvalid
+				return MediaOptions{}, durationError(descriptor)
 			}
 		}
 	default:
@@ -590,10 +596,10 @@ func normalizeModelOptions(descriptor MediaModel, options MediaOptions, deferRes
 		options.Format = descriptor.Formats[0]
 	}
 	if len(descriptor.Formats) > 0 && !slices.Contains(descriptor.Formats, options.Format) {
-		return MediaOptions{}, ErrOptionsInvalid
+		return MediaOptions{}, optionChoices("format", descriptor.Formats)
 	}
 	if descriptor.MediaType != "video" && options.Seed != nil && (*options.Seed < 0 || *options.Seed > 2147483647) {
-		return MediaOptions{}, ErrOptionsInvalid
+		return MediaOptions{}, optionError("seed", "must be between 0 and 2147483647")
 	}
 	return options, nil
 }
@@ -619,25 +625,39 @@ func normalizeVideoOptions(descriptor MediaModel, options MediaOptions) (MediaOp
 	}
 	if descriptor.DurationFromInput {
 		if options.Duration != 0 {
-			return MediaOptions{}, fmt.Errorf("%w: duration follows the input video", ErrOptionsInvalid)
+			return MediaOptions{}, optionError("duration", "follows the input video; omit it")
 		}
 	} else if options.Duration == 0 && !descriptor.DurationMayBeInferred {
 		options.Duration = descriptor.DefaultDuration
 	}
-	if (len(descriptor.Resolutions) > 0 && !slices.Contains(descriptor.Resolutions, options.Resolution)) ||
-		(len(descriptor.Ratios) > 0 && !(descriptor.RatioMayBeInferred && options.Ratio == "") && !slices.Contains(descriptor.Ratios, options.Ratio)) ||
-		(len(descriptor.Ratios) == 0 && options.Ratio != "") ||
-		(!descriptor.DurationFromInput && !(descriptor.DurationMayBeInferred && options.Duration == 0) && (options.Duration < descriptor.MinDuration || options.Duration > descriptor.MaxDuration)) ||
-		(descriptor.DurationStep > 0 && options.Duration != 0 && (options.Duration-descriptor.MinDuration)%descriptor.DurationStep != 0) ||
-		(options.GenerateAudio != nil && *options.GenerateAudio && !descriptor.SupportsAudio) ||
-		(options.Draft != nil && *options.Draft && (!descriptor.SupportsDraft ||
-			(len(descriptor.DraftResolutions) > 0 && !slices.Contains(descriptor.DraftResolutions, options.Resolution)))) ||
-		(options.CameraFixed != nil && !descriptor.SupportsCameraFixed) ||
-		(options.ReturnLastFrame != nil && *options.ReturnLastFrame && !descriptor.SupportsLastFrame) {
-		return MediaOptions{}, ErrOptionsInvalid
+	if len(descriptor.Resolutions) > 0 && !slices.Contains(descriptor.Resolutions, options.Resolution) {
+		return MediaOptions{}, optionChoices("resolution", descriptor.Resolutions)
+	}
+	if (len(descriptor.Ratios) > 0 && !(descriptor.RatioMayBeInferred && options.Ratio == "") && !slices.Contains(descriptor.Ratios, options.Ratio)) || (len(descriptor.Ratios) == 0 && options.Ratio != "") {
+		return MediaOptions{}, optionChoices("ratio", descriptor.Ratios)
+	}
+	if (!descriptor.DurationFromInput && !(descriptor.DurationMayBeInferred && options.Duration == 0) && (options.Duration < descriptor.MinDuration || options.Duration > descriptor.MaxDuration)) || (descriptor.DurationStep > 0 && options.Duration != 0 && (options.Duration-descriptor.MinDuration)%descriptor.DurationStep != 0) {
+		return MediaOptions{}, durationError(descriptor)
+	}
+	if options.GenerateAudio != nil && *options.GenerateAudio && !descriptor.SupportsAudio {
+		return MediaOptions{}, optionError("generate_audio", "must be false or omitted; this model does not generate audio")
+	}
+	if options.Draft != nil && *options.Draft {
+		if !descriptor.SupportsDraft {
+			return MediaOptions{}, optionError("draft", "must be false or omitted; this model does not support drafts")
+		}
+		if len(descriptor.DraftResolutions) > 0 && !slices.Contains(descriptor.DraftResolutions, options.Resolution) {
+			return MediaOptions{}, optionError("resolution", "for draft output must be one of: "+strings.Join(descriptor.DraftResolutions, ", "))
+		}
+	}
+	if options.CameraFixed != nil && !descriptor.SupportsCameraFixed {
+		return MediaOptions{}, optionError("camera_fixed", "is not supported by this model; omit it")
+	}
+	if options.ReturnLastFrame != nil && *options.ReturnLastFrame && !descriptor.SupportsLastFrame {
+		return MediaOptions{}, optionError("return_last_frame", "must be false or omitted; this model does not return the last frame")
 	}
 	if options.Seed != nil && (*options.Seed < 0 || *options.Seed > 4294967295) {
-		return MediaOptions{}, ErrOptionsInvalid
+		return MediaOptions{}, optionError("seed", "must be between 0 and 4294967295")
 	}
 	return options, nil
 }
