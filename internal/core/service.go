@@ -161,7 +161,7 @@ func (s *TaskService) prepare(ctx context.Context, input CreateMediaInput, idemp
 	}
 	prompt := strings.TrimSpace(input.Prompt)
 	if len([]rune(prompt)) > MaxReviewedPromptCharacters {
-		return Task{}, ErrPromptTooLong
+		return Task{}, &promptValidationError{fmt.Sprintf("has %d Unicode code points; maximum %d at request parsing. Shorten the prompt and check the selected model's effective limit, which may be lower", len([]rune(prompt)), MaxReviewedPromptCharacters)}
 	}
 	provider := strings.ToLower(strings.TrimSpace(input.Provider))
 	if provider == "" {

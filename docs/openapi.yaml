@@ -10662,7 +10662,7 @@ components:
         parameters:
           type: [object, "null"]
           additionalProperties: true
-          description: Additional controls declared by MediaModel.parameters. Unknown keys and invalid types are rejected.
+          description: Additional controls declared by MediaModel.parameters. Unknown keys and invalid types are rejected. Validation errors identify the safe options.parameters field or zero-based item index and the applicable type, range, choice or length constraint without echoing rejected values.
         duration:
           type: [integer, "null"]
           minimum: 0

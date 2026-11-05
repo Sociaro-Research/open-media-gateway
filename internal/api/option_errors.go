@@ -10,6 +10,14 @@ import (
 
 // Generation option diagnostics use the same public field names as admission.
 func generationValidationError(w http.ResponseWriter, input core.CreateMediaInput, err error) {
+	if hint, ok := core.PromptValidationHint(err); ok {
+		field := "prompt"
+		if input.MediaType == "speech" {
+			field = "input"
+		}
+		invalidParameter(w, field, core.ErrPromptTooLong.Error()+": "+field+" "+hint)
+		return
+	}
 	var option *core.OptionValidationError
 	if !errors.As(err, &option) {
 		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
@@ -21,6 +29,11 @@ func generationValidationError(w http.ResponseWriter, input core.CreateMediaInpu
 	}
 	field := "options." + option.Field
 	switch option.Field {
+	case "prompt":
+		field = "prompt"
+		if input.MediaType == "speech" {
+			field = "input"
+		}
 	case "voice", "quality", "background":
 		field = option.Field
 	case "format":

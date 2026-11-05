@@ -2,7 +2,6 @@ package core
 
 import (
 	"encoding/json"
-	"fmt"
 	"math"
 	"regexp"
 	"slices"
@@ -29,7 +28,7 @@ func NormalizeParameters(fields []ParameterField, values map[string]any) (map[st
 	known := map[string]bool{}
 	for _, f := range fields {
 		if !parameterKey.MatchString(f.Key) || known[f.Key] {
-			return nil, fmt.Errorf("%w: invalid parameter schema", ErrOptionsInvalid)
+			return nil, parameterSchemaError()
 		}
 		known[f.Key] = true
 		v, ok := values[f.Key]
@@ -39,10 +38,11 @@ func NormalizeParameters(fields []ParameterField, values map[string]any) (map[st
 		}
 		if !ok {
 			if f.Required {
-				return nil, fmt.Errorf("%w: parameter %s is required", ErrOptionsInvalid, f.Key)
+				return nil, parameterError(f.Key, "is required; supply the documented value")
 			}
 			continue
 		}
+		original := v
 		valid := false
 		switch f.Type {
 		case "text", "select":
@@ -80,13 +80,13 @@ func NormalizeParameters(fields []ParameterField, values map[string]any) (map[st
 			valid = ok && !math.IsNaN(n) && !math.IsInf(n, 0) && (f.Min == nil || n >= *f.Min) && (f.Max == nil || n <= *f.Max) && (f.Type != "integer" || math.Trunc(n) == n)
 		}
 		if !valid {
-			return nil, fmt.Errorf("%w: invalid parameter %s", ErrOptionsInvalid, f.Key)
+			return nil, invalidParameterValue(f, original)
 		}
 		result[f.Key] = v
 	}
 	for k := range values {
 		if !known[k] {
-			return nil, fmt.Errorf("%w: unsupported parameter %s", ErrOptionsInvalid, k)
+			return nil, parameterError(k, "is not supported by this model; omit it")
 		}
 	}
 	if len(result) == 0 {
