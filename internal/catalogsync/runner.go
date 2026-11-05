@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
+	"github.com/Sociaro-Research/open-media-gateway/internal/installation"
 	"github.com/google/uuid"
 )
 
@@ -22,6 +23,8 @@ type Runner struct {
 	Providers Provider
 	Client    *http.Client
 	Mailer    Mailer
+	// CheckOrigin comes only from the configured public UI origin, never a request.
+	CheckOrigin string
 
 	mu          sync.Mutex
 	lastAttempt string
@@ -134,6 +137,7 @@ func (r *Runner) Tick(ctx context.Context, now time.Time) error {
 	return err
 }
 func (r *Runner) check(parent context.Context, schedule Schedule, settings Settings, now time.Time) error {
+	checkOrigin := normalizeCheckOrigin(r.CheckOrigin)
 	ctx, cancel := context.WithTimeout(parent, 10*time.Minute)
 	defer cancel()
 	previous, err := r.Repo.State(ctx, schedule.Provider)
@@ -211,6 +215,7 @@ func (r *Runner) check(parent context.Context, schedule Schedule, settings Setti
 		run.EmailStatus = "disabled"
 	}
 	run.ID = uuid.NewString()
+	run.CheckOrigin = checkOrigin
 	run.Provider = schedule.Provider
 	run.StartedAt = now
 	run.CompletedAt = time.Now().UTC()
@@ -222,9 +227,25 @@ func (r *Runner) check(parent context.Context, schedule Schedule, settings Setti
 	return r.Repo.Commit(commitCtx, schedule, next, run, NextDaily(run.CompletedAt, schedule.Time, settings.Timezone))
 }
 
+// Revalidate stored provenance before display, including imported historical runs.
+func normalizeCheckOrigin(raw string) string {
+	if len(raw) > 300 {
+		return ""
+	}
+	origin, err := installation.NormalizeOrigin(raw)
+	if err != nil {
+		return ""
+	}
+	return origin
+}
+
 func Report(run Run) (string, string, string) {
+	origin := normalizeCheckOrigin(run.CheckOrigin)
+	if origin == "" {
+		origin = "unknown (not recorded)"
+	}
 	var out strings.Builder
-	fmt.Fprintf(&out, "Catalogue check: %s\nChecked: %s\nStatus: %s\nPublished version: %d\n", run.Provider, run.CompletedAt.Format(time.RFC3339), run.Status, run.Version)
+	fmt.Fprintf(&out, "Catalogue check: %s\nCheck instance: %s\nRun ID: %s\nChecked: %s\nStatus: %s\nPublished version: %d\n", run.Provider, origin, run.ID, run.CompletedAt.Format(time.RFC3339), run.Status, run.Version)
 	writeCompleteness(&out, run.Completeness)
 	for _, source := range run.Sources {
 		if source.Review != nil {

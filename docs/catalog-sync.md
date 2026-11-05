@@ -217,7 +217,19 @@ unsupported candidates.
 
 Email is sent after a check with applied changes, a new/changed warning, a
 resolved warning, or incomplete/partial operational verification. A fully verified
-unchanged check stays in the journal without email. Every email includes:
+unchanged check stays in the journal without email.
+
+The header identifies the original **Check instance** and the **Run ID** that
+correlates with the journal and JSON export. New checks record the normalized
+configured public UI origin (`UI_PUBLIC_URL`, which defaults to `AUTH_PUBLIC_URL`)
+as optional `check_origin` metadata in the same transaction as the run. Reports
+use that saved origin even when another instance sends a queued report after a
+database copy or configuration change. Historical runs and missing or invalid
+origins show `unknown (not recorded)`; the sender's current configuration never
+fills that gap. Only a validated origin is displayed, without URL credentials,
+paths, query parameters or fragments; report HTML is escaped.
+
+The result sections include:
 
 1. Applied changes with before/after values and sources.
 2. New warnings requiring attention, highlighted in HTML.
@@ -232,6 +244,12 @@ retries. A crash after provider acceptance relies on the transport's idempotency
 window; absolute exactly-once email delivery cannot be guaranteed. Checks made
 without a recipient are recorded as delivery disabled and are not backfilled
 when an email is later configured.
+
+The saved provenance keeps retry bodies stable across origin configuration changes
+and database copies under the same report renderer. An older binary's report body
+can differ after an upgrade adds report fields, including for legacy runs. If a
+transport rejects a changed body under an existing idempotency key, inspect that
+run and the delivery result; do not change the key or blindly send a duplicate.
 
 ## Investigating production warnings
 

@@ -117,7 +117,7 @@ func run() error {
 	}
 	// The runner bootstraps schedules on its immediate first tick and retries
 	// failures; one invalid provider schedule must not prevent gateway startup.
-	catalogRunner := &catalogsync.Runner{Repo: catalogRepository, Providers: providerManager, Client: httpclient.NewPublic(30 * time.Second), Mailer: emailSender}
+	catalogRunner := &catalogsync.Runner{Repo: catalogRepository, Providers: providerManager, Client: httpclient.NewPublic(30 * time.Second), Mailer: emailSender, CheckOrigin: cfg.UIPublicURL}
 	go catalogRunner.Run(ctx)
 	loginProviders := userauth.NewLoginProviderManager(postgres.NewSystemRepository(db), credentialsCipher, cfg.AuthPublicURL)
 	if err := loginProviders.Bootstrap(ctx, cfg.GoogleOAuthClientID, cfg.GoogleOAuthClientSecret, cfg.GoogleOAuthRedirectURL); err != nil {

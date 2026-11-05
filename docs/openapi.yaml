@@ -12069,6 +12069,12 @@ components:
         previous_hash: {type: string, description: Last confirmed normalized snapshot retained for comparison and restoration of evidence.}
     CatalogRun:
       properties:
+        check_origin:
+          type: string
+          format: uri
+          maxLength: 300
+          readOnly: true
+          description: Canonical configured public UI origin of the original checking instance, recorded with the run. Absent for historical runs or missing or invalid configuration; never inferred from the current sender.
         completeness:
           $ref: '#/components/schemas/CatalogCompleteness'
         changes:

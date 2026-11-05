@@ -200,6 +200,7 @@ type State struct {
 type Run struct {
 	Completeness     *Completeness `json:"completeness,omitempty"`
 	ID               string        `json:"id"`
+	CheckOrigin      string        `json:"check_origin,omitempty"`
 	Provider         string        `json:"provider"`
 	StartedAt        time.Time     `json:"started_at"`
 	CompletedAt      time.Time     `json:"completed_at"`
