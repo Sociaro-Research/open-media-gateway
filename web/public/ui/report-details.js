@@ -3,6 +3,7 @@
  let active=null;
  const node=(tag,text,cls)=>{const n=document.createElement(tag);if(text!=null)n.textContent=text;if(cls)n.className=cls;return n;};
  const names={profit_usd:"Profit (USD)",profit_status:"Profit status",profit_recognized_at:"Profit recognized",billing_required:"Billing verification required",identity_historical:"Identity captured at request time",identity_snapshot:"Original identity",provider_name:"Provider name",id:'Generation ID',api_key_id:'API key',api_key_name:'API key name',public_model:'Public model',provider_model:'Provider model',user_id:'User ID',user_email:'User',organization_id:'Organization ID',organization_name:'Organization',created_at:'Created',updated_at:'Updated',completed_at:'Completed',stored_at:'Stored',started_at:'Processing started',poll_errors:'Polling errors',content_access:'Content access',request_logging:'Request logging',result_size_bytes:'Result size (bytes)',result_sha256:'Result SHA-256',result_content_type:'Result content type',result_deleted_at:'Result deleted',has_stored_result:'Stored result',consumed_usd:'Customer charge',expected_usd:'Estimated cost',metered_usd:'Metered cost',tariff_usd:'Confirmed cost',actual_usd:'Provider charged',generate_audio:'Generate audio',return_last_frame:'Return last frame',camera_fixed:'Fixed camera',reference_mode:'Reference mode',provider_task_id:'Provider task ID'};
+ names.api_key_id='API key ID';names.api_key_name='API key';
  const label=key=>names[key]||key.replaceAll('_',' ').replace(/^./,c=>c.toUpperCase());
  const usd=value=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:6}).format(value);
  function link(value,text=value){try{const url=new URL(value,location.origin);if(!['https:','http:'].includes(url.protocol))return null;const a=node('a',text);a.href=url.href;a.target='_blank';a.rel='noopener noreferrer';return a;}catch{return null;}}
@@ -42,7 +43,7 @@
   return grid.children.length?grid:facts(inputs);
  }
  function close(){if(active)active.dialog.close();}
- function render(parent,data){
+ function render(parent,data,remove){
   parent.replaceChildren();const report=data.report||{},generation=data.generation||{},request=data.request;
   const section=(title,contents)=>{const s=node('section',null,'detail-section');s.append(node('h3',title),contents);parent.append(s);};
   if(report.identity_historical===false)parent.append(node('p','Historical labels were not recorded for this request. Names shown are current labels.','field-explanation'));
@@ -70,6 +71,7 @@
    if(!data.links?.content_url&&data.links?.download_url){const card=mediaCard(data.links.download_url,'Result','file',{download:data.links.download_url});if(card)results.append(card);}
    if(!results.children.length)results.append(node('p',generation.result_deleted_at?'Result files have been deleted.':['completed','succeeded'].includes(generation.status)?'No stored result is available.':'No result is available yet.'));
    section('Results',results);
+   if(remove&&generation.can_delete&&['completed','succeeded','failed'].includes(generation.status)&&!generation.result_deleted_at){const button=node('button','Delete files','secondary danger');button.type='button';button.onclick=()=>remove(data);parent.lastChild.append(button);}
    if(generation.error)section('Error',valueNode(generation.error));
    if(request?.webhook_url)section('Webhook',valueNode(request.webhook_url));
   }
@@ -77,17 +79,28 @@
   if(report.cost||generation.cost)section('Cost',facts(report.cost||generation.cost));
   const all=node('details',null,'detail-record');all.append(node('summary','All retained data'),node('pre',JSON.stringify(data,null,2)));parent.append(all);
  }
- function open(endpoint,trigger){
-  close();const dialog=node('dialog',null,'keys-revoke-dialog detail-dialog'),status=node('p'),body=node('div');
-  const {heading,close:dismiss}=FormUI.dialogHeading(dialog,'Generation details',()=>dialog.close());heading.parentElement.classList.add('detail-heading');dialog.setAttribute('aria-label','Generation details');dialog.append(status,body);status.setAttribute('role','status');
-  const state={dialog};active=state;let fingerprint='';
+ function open(endpoint,trigger,options={}){
+  close();const api=options.api||window.api,dialog=node('dialog',null,'keys-revoke-dialog detail-dialog organization-request-dialog'),status=node('p'),body=node('div');
+  const {heading,close:dismiss}=FormUI.dialogHeading(dialog,'Request details',()=>dialog.close());heading.parentElement.classList.add('detail-heading');dialog.setAttribute('aria-label','Request details');dialog.append(status,body);status.setAttribute('role','status');
+  const state={dialog,restore:true};active=state;let fingerprint='';
+  const current=()=>active===state&&dialog.open&&(!trigger||trigger.isConnected)&&(options.current?.()??true);
+  function remove(data){
+   if(!current())return;
+   const generation=data.generation||{},organization=data.report?.organization_id,id=generation.id||data.report?.id;
+   if(!id||!generation.can_delete||data.content_access===false)return;
+   const confirmation=node('dialog',null,'keys-revoke-dialog'),message=node('p'),actions=node('div',null,'docs-actions'),cancel=node('button','Cancel','secondary'),confirm=node('button','Delete files','secondary danger');
+   state.confirmation=confirmation;confirmation.append(node('h2','Delete stored result files?'),node('p','Request history and accounting records are preserved.'));message.setAttribute('role','status');cancel.type=confirm.type='button';cancel.onclick=()=>confirmation.close();
+   confirm.onclick=async()=>{if(!current()||!confirmation.open||confirm.disabled)return;confirm.disabled=true;try{await api((organization?'/v1/organizations/'+encodeURIComponent(organization):'/v1')+'/generations/'+encodeURIComponent(id)+'/content',{method:'DELETE'});if(!current()||!confirmation.open)return;confirmation.close();state.restore=false;dialog.close();await options.onDeleted?.();}catch(error){if(!current()||!confirmation.open)return;FormUI.message(message,error.message,'error');confirm.disabled=false;}};
+   actions.append(cancel,confirm);confirmation.append(message,actions);confirmation.onclose=()=>{if(state.confirmation===confirmation)state.confirmation=null;confirmation.remove();};document.body.append(confirmation);confirmation.showModal();cancel.focus();
+  }
   document.body.append(dialog);dialog.showModal();
-  const updates=GatewayAutoUpdate.watch({root:dialog,active:()=>active===state,load:async({signal,current,quiet})=>{
-   if(!quiet)FormUI.message(status,'Loading generation…');
-   try{const data=await api(endpoint,{signal});if(!current())return;const signature=JSON.stringify(data);if(signature===fingerprint){FormUI.message(status,'');return;}fingerprint=signature;const next=node('div');render(next,data);GatewayAutoUpdate.reconcile(body,next);FormUI.message(status,'');}
-   catch(error){if(current()&&error.name!=='AbortError'){if([401,403,404].includes(error.status)){body.replaceChildren();fingerprint='';}FormUI.message(status,'Could not load generation: '+error.message,'error');}}
+  const observer=new MutationObserver(()=>{if(active===state&&!current()){state.restore=false;dialog.close();}});observer.observe(document.body,{childList:true,subtree:true});
+  const updates=GatewayAutoUpdate.watch({root:dialog,active:current,load:async({signal,current,quiet})=>{
+   if(!quiet)FormUI.message(status,'Loading request…');
+   try{const data=await api(endpoint,{signal});if(!current())return;const signature=JSON.stringify(data);if(signature===fingerprint){FormUI.message(status,'');return;}fingerprint=signature;const next=node('div');render(next,data,remove);GatewayAutoUpdate.reconcile(body,next);FormUI.message(status,'');}
+   catch(error){if(current()&&error.name!=='AbortError'){if([401,403,404].includes(error.status)){body.replaceChildren();fingerprint='';}FormUI.message(status,'Could not load request: '+error.message,'error');}}
   }});
-  dismiss.onclick=()=>dialog.close();dialog.onclose=()=>{updates.stop();const restore=active===state;if(restore)active=null;dialog.remove();if(restore&&trigger?.isConnected)trigger.focus();};
+  dismiss.onclick=()=>dialog.close();dialog.onclose=()=>{observer.disconnect();updates.stop();state.confirmation?.close();const restore=active===state;if(restore)active=null;dialog.remove();if(restore&&state.restore&&trigger?.isConnected)trigger.focus();};
   dismiss.focus();updates.refresh({quiet:false});
  }
  window.ReportDetails={open,close};

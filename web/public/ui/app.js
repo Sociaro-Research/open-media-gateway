@@ -742,7 +742,7 @@ function showConsoleSection(name,{historyMode='replace',workspacePage}={}) {
   if(name==='system'&&allowed)window.GatewaySystem?.open();
   if(name==='profile'&&allowed)window.Workspace?.openProfile(document.querySelector('#profileContent'));
   if(name==='organizations'&&allowed){
-    if(window.Workspace?.ready())window.Workspace.open(Workspace.current()?.personal&&page==='Billing'?'Reports':page).catch(e=>{if(navigation!==consoleNavigation)return;document.querySelector('#organizationsContent').replaceChildren(Object.assign(document.createElement('p'),{className:'operation-error',textContent:e.message}))});
+    if(window.Workspace?.ready())window.Workspace.open(Workspace.current()?.personal&&page==='Billing'?'Requests':page).catch(e=>{if(navigation!==consoleNavigation)return;document.querySelector('#organizationsContent').replaceChildren(Object.assign(document.createElement('p'),{className:'operation-error',textContent:e.message}))});
     else window.GatewayOrganizations?.open();
   }
   if(authState==='checking'||authState==='error'||!allowed)return;

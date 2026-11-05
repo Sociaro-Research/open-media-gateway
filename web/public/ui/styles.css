@@ -1309,7 +1309,7 @@ table .control-row { --control-height:44px; }
 .report-columns-button { --interaction-border-rest:0px; display:grid; place-items:center; width:44px; min-height:44px; padding:10px; border:0; background:transparent; }
 .report-columns-button svg { width:20px; height:20px; }
 
-.report-table [data-column=generation_id],.report-table [data-column=api_key] small { white-space:nowrap; }
+.report-table [data-column=generation_id] { white-space:nowrap; }
 
 /* Brand uploads retain their own aspect ratio and fit the shared header height. */
 .brand-mark { max-height:40px; }
@@ -1561,7 +1561,7 @@ body:has(.detail-dialog[open]) { overflow:hidden; }
 .support-eyebrow { margin:0 0 16px; color:var(--muted); font-size:12px; }
 .support-card > .field-explanation { margin:20px 0 0; }
 .request-identity { min-width:180px; max-width:280px; }
-.request-identity > small { overflow-wrap:anywhere; }
+.request-identity > small { white-space:normal; overflow-wrap:anywhere; }
 .member-contact { min-width:180px; }
 .member-contact-trigger { display:inline-flex; align-items:center; min-height:44px; max-width:100%; padding:0; border:0; border-radius:4px; background:none; color:var(--text); font:inherit; text-align:left; }
 .member-contact-trigger:focus-visible { outline:2px solid var(--accent); outline-offset:0; }

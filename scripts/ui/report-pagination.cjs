@@ -8,7 +8,7 @@ const id=n=>`11111111-1111-4111-8111-${String(n).padStart(12,'0')}`;
 const organization=id(999),user=id(998),key=id(997);
 const rows=Array.from({length:123},(_,i)=>({id:id(i+1),organization_name:'Fixture organization',user_id:i<3?user:id(996),user_email:i<3?'few@example.test':'many@example.test',api_key_id:i<3?key:id(995),api_key_name:'Fixture key',model:'mock-image',provider:'mock',status:'succeeded',created_at:i<3?'2026-08-10T12:00:00Z':'2026-09-10T12:00:00Z',cost:{actual_usd:0,actual_source:'free_provider'}}));
 const filter=query=>rows.filter(row=>(!query.user||[row.user_id,row.user_email].includes(query.user))&&(!query.generation_id||row.id===query.generation_id)&&(!query.api_key_id||row.api_key_id===query.api_key_id)&&(!query.from||row.created_at.slice(0,10)>=query.from)&&(!query.to||row.created_at.slice(0,10)<=query.to));
-const server=http.createServer((req,res)=>{let file=path.join(root,path.basename(req.url.split('?')[0]));if(!path.extname(file))file=path.join(root,'index.html');if(!fs.existsSync(file))return res.writeHead(404).end();res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html');res.end(fs.readFileSync(file));});
+const server=http.createServer((req,res)=>{if(new URL(req.url,'http://fixture').pathname==='/auth/company-connection'){res.writeHead(404,{'Content-Type':'application/json'});return res.end(JSON.stringify({connected:false}));}let file=path.join(root,path.basename(req.url.split('?')[0]));if(!path.extname(file))file=path.join(root,'index.html');if(!fs.existsSync(file))return res.writeHead(404).end();res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html');res.end(fs.readFileSync(file));});
 (async()=>{
  fs.mkdirSync(output,{recursive:true});await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
  const browser=await ({chromium,webkit}[engine]).launch({headless:true,executablePath:process.env.UI_BROWSER_PATH});
@@ -46,8 +46,8 @@ const server=http.createServer((req,res)=>{let file=path.join(root,path.basename
  });
  const content=page.locator('#reportsContent'),status=content.locator('[role=status]').first();
  const button=name=>content.getByRole('button',{name,exact:true});
- const displayed=()=>content.locator('tbody tr').evaluateAll(elements=>elements.map(el=>el.getAttribute('aria-label').replace('Open generation ','')));
- const ready=async()=>{await page.waitForFunction(()=>{const s=document.querySelector('#reportsContent [role=status]');return s&&(s.textContent===''||s.textContent.startsWith('No generations'));});};
+ const displayed=()=>content.locator('tbody tr').evaluateAll(elements=>elements.map(el=>el.getAttribute('aria-label').replace('Open request ','')));
+ const ready=async()=>{await page.waitForFunction(()=>{const s=document.querySelector('#reportsContent [role=status]');return s&&(s.textContent===''||s.textContent.startsWith('No requests'));});};
  const apply=async()=>{await button('Apply').click();await ready();};
  const show=async()=>{
   await page.waitForFunction(()=>consoleInitialized&&consoleAuthenticated&&Workspace.ready());
@@ -64,14 +64,14 @@ const server=http.createServer((req,res)=>{let file=path.join(root,path.basename
   await exportReady();await button('Download CSV').focus();
   assert.equal(await button('Download CSV').evaluate(el=>el===document.activeElement),true);
   const [download]=await Promise.all([page.waitForEvent('download'),pointer?button('Download CSV').click():page.keyboard.press('Enter')]);
-  assert.equal(download.suggestedFilename(),'generation-report.csv');
+  assert.equal(download.suggestedFilename(),'requests.csv');
   assert.deepEqual(fs.readFileSync(await download.path(),'utf8').trim().split('\r\n').slice(1).map(line=>line.split(',')[0]),expected);
   const query=requests.at(-1).query;assert.equal(query.format,'csv');assert.equal(query.offset,undefined);assert.equal(query.limit,undefined);await ready();return query;
  };
  const check=async(name,run)=>{
   const start=requests.length;
   try{await reset();await run();results.push({name,passed:true,requests:requests.slice(start),displayedIDs:await displayed()});}
-  catch(error){results.push({name,passed:false,error:error.message,requests:requests.slice(start),displayedIDs:await displayed(),status:await status.textContent()});await page.screenshot({path:path.join(output,`${engine}-${results.length}-failure.png`),fullPage:true});console.error('FAIL:',name,error.message);}
+  catch(error){console.error('ORIGINAL FAILURE',name,error.message);console.error('PAGE STATE',await page.locator('body').innerText());results.push({name,passed:false,error:error.message,requests:requests.slice(start),displayedIDs:await displayed(),status:await status.textContent().catch(()=>null)});await page.screenshot({path:path.join(output,`${engine}-${results.length}-failure.png`),fullPage:true});console.error('FAIL:',name,error.message);}
  };
  try{
   await page.goto(base+'/profile');
@@ -104,13 +104,13 @@ const server=http.createServer((req,res)=>{let file=path.join(root,path.basename
   });
   await check('Failed page read and Apply retry preserve drafts and reset offset',async()=>{
    await button('Next').click();await ready();await page.locator('#reportUser').fill('few@example.test');failNext=true;await button('Next').click();
-   await status.getByText('Could not load report: Fixture report unavailable',{exact:true}).waitFor();
+   await status.getByText('Could not load requests: Fixture report unavailable',{exact:true}).waitFor();
    assert.equal(requests.at(-1).query.user,'');assert.equal(requests.at(-1).query.offset,'100');assert.equal(await button('Download CSV').isVisible(),false);assert.equal(await content.locator('.report-pagination').isVisible(),false);assert.equal(await page.locator('#reportUser').inputValue(),'few@example.test');
    await apply();assert.equal(requests.at(-1).query.offset,'0');assert.equal(requests.at(-1).query.user,'few@example.test');assert.deepEqual(await displayed(),rows.slice(0,3).map(row=>row.id));await csv(rows.slice(0,3).map(row=>row.id));
   });
   await check('Failed Apply retries submitted drafts; later edits stay unapplied',async()=>{
-   await page.locator('#reportUser').fill('few@example.test');failNext=true;await button('Apply').click();await status.getByText('Could not load report: Fixture report unavailable',{exact:true}).waitFor();assert.equal(await page.locator('#reportUser').inputValue(),'few@example.test');
-   holdNext=true;await button('Apply').click();await page.waitForFunction(()=>document.querySelector('#reportsContent [role=status]').textContent==='Loading report…');
+   await page.locator('#reportUser').fill('few@example.test');failNext=true;await button('Apply').click();await status.getByText('Could not load requests: Fixture report unavailable',{exact:true}).waitFor();assert.equal(await page.locator('#reportUser').inputValue(),'few@example.test');
+   holdNext=true;await button('Apply').click();await page.waitForFunction(()=>document.querySelector('#reportsContent [role=status]').textContent==='Loading requests…');
    await page.locator('#reportUser').fill('many@example.test');release();await ready();assert.deepEqual(await displayed(),rows.slice(0,3).map(row=>row.id));assert.equal((await csv(rows.slice(0,3).map(row=>row.id))).user,'few@example.test');
   });
   await check('Apply generation ID on later page returns match at offset zero',async()=>{

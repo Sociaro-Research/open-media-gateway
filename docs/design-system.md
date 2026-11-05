@@ -183,13 +183,13 @@ validate the same 1440/390/320 px layouts and keyboard controls as email sign-in
 - Save is **not** a hover action: use `FormUI.watch`, hide it for unchanged rows, show it only for unsaved changes, and reset the baseline after success. Keep pending actions locked and preserve edits on failure.
 - Controls and buttons in a row share the 44px table height. Data-only and editable rows have no hover background unless they also have an explicit default action.
 
-## 6. Usage and Reports
+## 6. Usage and Requests
 
-Keep Usage and Reports as separate sections with the same filter controls. Usage shows metrics, spend over time, model rankings and provider breakdown; Reports shows only the filtered request table and CSV export. Report rows open a read-only generation detail dialog with every retained field permitted for the viewer. Use the shared interactive row states, Enter/Space activation and native dialog focus/Escape behavior. Show full prompt text and saved settings without truncation; result and reference links use authenticated or existing signed routes. The wider record dialog is justified by structured settings and long request content, with the shared palette, spacing and mobile gutters.
+Keep Usage and Requests as separate sections with the same filter controls. Usage shows metrics, spend over time, model rankings and provider breakdown; Requests shows the filtered request table and CSV export. Administration and company Requests reuse one table, filter set, column picker and request-details dialog; the data scope is all authorized companies or the current company. Preserve role-based financial and content redaction in both contexts. Show user and safe key label together without a redundant API-key prefix. Use the shared interactive row states, explicit Details action, Enter/Space activation and native dialog focus/Escape behavior. Show full retained prompt text and saved settings without truncation; result and reference links use authenticated or existing signed routes. Existing file deletion remains a separately confirmed, permission-gated action. The wider record dialog is justified by structured settings and long request content, with the shared palette, spacing and mobile gutters.
 
 Charts use the shared accent and `--chart-*` tokens in both themes. Keep exact values accessible on hover and keyboard focus; provide a table for the provider chart. Scope all aggregates to the applied Usage filters; show missing measurements explicitly.
 
-Reports opens its shared multiple-column picker from a gear button in the last
+Requests opens its shared multiple-column picker from a gear button in the last
 table header cell. Keep that cell visible at the right edge during horizontal
 scrolling; preserve the picker and keyboard focus while saving preferences.
 Generation cards show reference and result images as compact previews of the
@@ -431,7 +431,7 @@ Arial/Helvetica document style. Payment hyperlinks use conventional blue
 retain their standard document colors. This is the exported document's existing
 paper-design exception; console theme tokens and links are unchanged.
 
-The Reports column-settings gear is a borderless icon action at rest. Retain its
+The Requests column-settings gear is a borderless icon action at rest. Retain its
 44px hit target and the shared single visible keyboard-focus perimeter; do not
 remove focus indications or change unrelated buttons.
 

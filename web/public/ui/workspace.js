@@ -51,13 +51,14 @@
     await openProfile(parent,page);
   }
   async function openProfile(parent,page){
+    if(page==='Reports')page='Requests';
     restore();
     GatewayLayout.clear(parent);parent.replaceChildren(node('h1','Profile'));const tabs=node('div',null,'organization-tabs'),body=node('div',null,'organization-page');parent.append(tabs,body);
-    let subsections;const pages=['Profile',...(!clientManager&&consolePolicy.personal_providers?['Providers','Storage','API keys','Usage','Reports']:[])];
+    let subsections;const pages=['Profile',...(!clientManager&&consolePolicy.personal_providers?['Providers','Storage','API keys','Usage','Requests']:[])];
     async function display(name,initial=false){window.syncWorkspacePage?.(name,{initial});if(name!=='Profile'&&current()?.id!=='personal')set('personal',{navigate:false});restore();GatewayKeys.close();GatewayReports.close();body.replaceChildren();for(const b of tabs.children)b.setAttribute('aria-pressed',String(b.textContent===name));subsections?.sync();
       if(name==='Profile')GatewayProfile.open(body);
       else if(name==='API keys')await GatewayKeys.open(body,'');
-      else if(name==='Reports')await GatewayReports.open(false,{personal:true,parent:body});
+      else if(name==='Requests')await GatewayReports.open(false,{personal:true,parent:body});
       else if(name==='Usage')await GatewayReports.openUsage(false,{personal:true,parent:body});
       else {const kind=name.toLowerCase();embedded=document.querySelector('#'+kind+'View');home=embedded.parentNode;body.append(embedded);embedded.classList.add('personal-section');embedded.querySelector('h1')?.setAttribute('aria-level','2');embedded.hidden=false;if(kind==='providers')await loadAdminProviders();else await loadStorageSettings();}
     }
