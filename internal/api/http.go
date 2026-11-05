@@ -511,7 +511,7 @@ func (s *Server) submitGeneration(w http.ResponseWriter, r *http.Request, input 
 	case errors.Is(err, core.ErrIdempotencyConflict):
 		writeError(w, http.StatusConflict, "idempotency_conflict", core.ErrIdempotencyConflict.Error())
 	case err != nil:
-		writeError(w, http.StatusServiceUnavailable, "service_unavailable", "task could not be accepted")
+		writeError(w, http.StatusServiceUnavailable, "service_unavailable", generationAcceptanceUnconfirmed)
 	default:
 		view := core.GenerationView(task)
 		w.Header().Set("Location", view.StatusURL)

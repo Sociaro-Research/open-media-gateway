@@ -60,7 +60,7 @@ func (s *Server) generationIntent(next http.Handler) http.Handler {
 					}); ok {
 						known, e = hint.HasAcceptedIntent(r.Context(), r.Header.Get("Idempotency-Key"))
 						if e != nil {
-							writeError(w, 503, "service_unavailable", "accepted generation could not be checked")
+							writeError(w, 503, "service_unavailable", generationAcceptanceUnconfirmed)
 							return
 						}
 					}
@@ -116,7 +116,7 @@ func (s *Server) generationIntent(next http.Handler) http.Handler {
 			} else if errors.Is(e, core.ErrKeyUnavailable) {
 				writeError(w, 401, "unauthorized", e.Error())
 			} else {
-				writeError(w, 503, "service_unavailable", "accepted generation could not be recovered")
+				writeError(w, 503, "service_unavailable", generationAcceptanceUnconfirmed)
 			}
 			return
 		}
