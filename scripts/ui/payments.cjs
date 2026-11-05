@@ -1,8 +1,8 @@
 const {evidencePath} = require('./evidence.cjs');
 // Stripe UI fixtures only: no account credentials, payments, or external calls.
-const {chromium}=require('playwright');
+const {[process.env.UI_BROWSER_ENGINE||'chromium']:chromium}=require('playwright');
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
-const root=path.resolve(__dirname,'../../web/public/ui');
+const root=process.env.UI_SOURCE_DIR||path.resolve(__dirname,'../../web/public/ui');
 const server=http.createServer((req,res)=>{if(req.method==='GET'&&new URL(req.url,'http://fixture').pathname==='/auth/company-connection'){res.writeHead(404,{'Content-Type':'application/json'});return res.end(JSON.stringify({connected:false}));}let file=path.join(root,path.basename(req.url.split('?')[0]));if(!path.extname(file))file=path.join(root,'index.html');if(!fs.existsSync(file))return res.writeHead(404).end();res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html');res.end(fs.readFileSync(file));});
 (async()=>{
  await new Promise(r=>server.listen(0,'127.0.0.1',r));const browser=await chromium.launch({headless:true,...(process.env.UI_BROWSER_PATH?{executablePath:process.env.UI_BROWSER_PATH}:{})}),page=await browser.newPage({viewport:{width:1440,height:1080}});page.setDefaultTimeout(10000);
@@ -57,15 +57,16 @@ const server=http.createServer((req,res)=>{if(req.method==='GET'&&new URL(req.ur
   await form.getByRole('button',{name:'Validate',exact:true}).click();await form.getByText('API access verified.',{exact:true}).waitFor();
   await form.getByLabel('Secret API key',{exact:true}).fill('sk_live_unsaved');assert.equal(await form.getByRole('button',{name:'Validate',exact:true}).isDisabled(),true);
   await page.reload();await page.getByRole('tab',{name:'Payments',exact:true}).click();await form.getByRole('button',{name:'Validate',exact:true}).waitFor();
-  for(const width of [1440,390,320]){await page.setViewportSize({width,height:1100});await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
-   const boxes=await Promise.all([form.getByLabel('Secret API key',{exact:true}),form.getByRole('button',{name:'Validate',exact:true})].map(n=>n.boundingBox()));assert.ok(boxes.every(b=>b.height===58&&b.y===boxes[0].y),'Validate aligns with its key');
-   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'provider page overflow '+await page.evaluate(()=>JSON.stringify([...document.querySelectorAll('body *')].filter(e=>e.getBoundingClientRect().right>innerWidth+1&&getComputedStyle(e).position!=='absolute').slice(0,12).map(e=>({tag:e.tagName,cls:e.className,width:e.getBoundingClientRect().width,text:e.textContent.slice(0,50)})))));await form.screenshot({path:evidencePath(`/tmp/gateway-payment-settings-${width}.png`)})}
+  for(const theme of ['dark','light'])for(const width of [1440,390,320]){await page.evaluate(theme=>GatewayTheme.apply(theme),theme);await page.setViewportSize({width,height:1100});await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+   const boxes=await Promise.all([form.getByLabel('Secret API key',{exact:true}),form.getByRole('button',{name:'Validate',exact:true})].map(n=>n.boundingBox()));assert.ok(boxes.every(b=>b.height===58),'shared control height');assert.ok(boxes[1].y===boxes[0].y||boxes[1].y>=boxes[0].y+boxes[0].height+12,'Validate aligns or wraps with a shared gap');if(process.env.UI_BASELINE!=='1')assert.ok(boxes[0].width>=200,'key field remains readable');
+   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'provider page overflow '+await page.evaluate(()=>JSON.stringify([...document.querySelectorAll('body *')].filter(e=>e.getBoundingClientRect().right>innerWidth+1&&getComputedStyle(e).position!=='absolute').slice(0,12).map(e=>({tag:e.tagName,cls:e.className,width:e.getBoundingClientRect().width,text:e.textContent.slice(0,50)})))));await form.screenshot({path:evidencePath(`/tmp/gateway-payment-settings-${theme}-${width}.png`)})}
   await form.locator('select').selectOption('service',{force:true});await form.getByRole('button',{name:'Save',exact:true}).click();await page.waitForFunction(()=>document.querySelector('.payment-provider-editor select')?.value==='service'&&Array.from(document.querySelectorAll('.payment-provider-editor input')).filter(e=>e.value==='************').length===2);assert.equal(writes.at(-1).fee_mode,'service');assert.equal('webhook_secret' in writes.at(-1),false);
   // Row switches save immediately, preserve credentials, and roll back on failure.
   const providerSwitch=page.locator('.payment-provider-card').getByRole('switch',{name:'Stripe enabled',exact:true});
   await page.waitForFunction(()=>!document.querySelector('.payment-provider-card input[type=checkbox]').disabled);
   await providerSwitch.check();await page.waitForFunction(()=>document.querySelector('.payment-provider-card input[type=checkbox]').checked&&!document.querySelector('.payment-provider-card input[type=checkbox]').disabled);
-  failToggle=true;await providerSwitch.uncheck();await page.getByText('Provider update failed',{exact:true}).waitFor();assert.equal(await providerSwitch.isChecked(),true);assert.equal(await providerSwitch.isEnabled(),true);
+  // A failed update may roll back before WebKit's uncheck() postcondition runs.
+  failToggle=true;assert.equal(await providerSwitch.isChecked(),true);await providerSwitch.click();await page.getByText('Provider update failed',{exact:true}).waitFor();assert.equal(await providerSwitch.isChecked(),true);assert.equal(await providerSwitch.isEnabled(),true);
   failToggle=false;await providerSwitch.uncheck();await page.waitForFunction(()=>!document.querySelector('.payment-provider-card input[type=checkbox]').checked&&!document.querySelector('.payment-provider-card input[type=checkbox]').disabled);
   assert.equal(providers[0].enabled,false);const disabledVersion=providers[0].version;
   await providerSwitch.check();await page.waitForFunction(()=>document.querySelector('.payment-provider-card input[type=checkbox]').checked&&!document.querySelector('.payment-provider-card input[type=checkbox]').disabled);

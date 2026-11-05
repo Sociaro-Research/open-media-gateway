@@ -165,13 +165,19 @@
    roleForm.onsubmit=async e=>{e.preventDefault();if(role.value==='remove'){confirmAction('Remove member?',(()=>{const text=document.createDocumentFragment();text.append(UserUI.identity(m,{secondary:true}),' will lose access. Their API keys will be revoked. Files and history remain in this organization.');return text;})(),async()=>{await api(base+'/members/'+m.id,{method:'DELETE'});await reload()},{danger:true});return;}roleApply.disabled=true;FormUI.message(roleMsg,'');try{await update(role.value,m.weekly_limit_usd,roleForm)}catch(e){FormUI.message(roleMsg,e.message,'error')}finally{roleApply.disabled=false;FormUI.update(roleForm)}};
    return [memberIdentity(m),choices.length?roleForm:memberRoleLabel(m.role),money(m.weekly_committed_usd),money(m.total_consumed_usd??0),edit];
  }));
- if(systemAdministrator){let user;const add=form(body,'Assign an existing user',async()=>{await api(base+'/members/'+encodeURIComponent(user.value),{method:'PUT',body:JSON.stringify({role:'supermanager'})});await reload()});user=field(add,'Email or user ID','text','',true);add.finish('Assign',()=>!!user.value.trim());}
+ if(systemAdministrator){
+  let user,role;const add=form(body,'Assign an existing user',async()=>{await api(base+'/members/'+encodeURIComponent(user.value.trim()),{method:'PUT',body:JSON.stringify({role:role.value})});await reload()});
+  add.classList.add('organization-settings-grid');user=field(add,'Email or user ID','text','',true);
+  const label=el('label','Role','organization-field');role=el('select');role.setAttribute('aria-label','Role');
+  for(const value of OrganizationRoles.assign('system_admin','member')){const option=el('option',memberRoleLabel(value));option.value=value;role.append(option)}role.value='member';
+  label.append(role);add.append(label);add.finish('Assign',()=>!!user.value.trim()&&!!role.value);
+ }
 
  const invitations=el('section',null,'member-invitations'),heading=el('div',null,'report-heading console-section-heading'),linkPanel=el('div',null,'invitation-link'),history=el('div');
- const invitationForm=el('form',null,'keys-form organization-form'),roleLabel=el('label','Invitation role','organization-field'),inviteRole=el('select'),createInvite=el('button','Create invitation','primary compact'),inviteStatus=el('p'),actions=el('div',null,'form-actions');
+ const invitationForm=el('form',null,'keys-form organization-form'),roleLabel=el('label','Invitation role','organization-field'),inviteRole=el('select'),createInvite=el('button','Create invitation','primary compact'),inviteStatus=el('p'),actions=el('div',null,'field-action-row control-row');
  inviteRole.setAttribute('aria-label','Invitation role');
  for(const value of OrganizationRoles.assign(systemAdministrator?'system_admin':o.role,'member')){const option=el('option',memberRoleLabel(value));option.value=value;inviteRole.append(option)}inviteRole.value='member';
- roleLabel.append(inviteRole);createInvite.type='submit';inviteStatus.setAttribute('role','status');actions.append(createInvite,inviteStatus);invitationForm.append(roleLabel,actions);
+ roleLabel.append(inviteRole);createInvite.type='submit';inviteStatus.setAttribute('role','status');actions.append(roleLabel,createInvite);invitationForm.append(actions,inviteStatus);
  invitationForm.onsubmit=async event=>{event.preventDefault();if(createInvite.disabled)return;const role=inviteRole.value;createInvite.disabled=inviteRole.disabled=true;inviteStatus.classList.remove('settings-warning');FormUI.message(inviteStatus,'');try{const invite=await api(base+'/invitations',{method:'POST',body:JSON.stringify({role})});if(token!==epoch||activePage!=='Members')return;const url=location.origin+'/organizations#invite='+invite.token,input=el('input');input.readOnly=true;input.value=url;input.setAttribute('aria-label','One-time invitation link');linkPanel.replaceChildren(el('p','Invited role: '+memberRoleLabel(invite.role||role)),input);await InvitationFeedback.created(inviteStatus,()=>token===epoch&&activePage==='Members'&&inviteStatus.isConnected);await loadInvitations();}catch(e){FormUI.message(inviteStatus,e.message,'error')}finally{createInvite.disabled=inviteRole.disabled=false}};
  heading.append(el('h2','Invitations'));invitations.append(heading,invitationForm,linkPanel,history);body.append(invitations);
  async function loadInvitations(){

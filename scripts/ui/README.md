@@ -235,6 +235,15 @@ Run `node scripts/ui/organizations.cjs` for organization funding, role managemen
 weekly limits, invitations, organization-bound keys and responsive layout. Run
 `shared.cjs` and `accounting-references.cjs` for shared connection and report regressions.
 
+Run `UI_MEMBER_ROLE_ONLY=1 node scripts/ui/organizations.cjs` and repeat with
+`UI_BROWSER_ENGINE=webkit` for existing-user assignment with every organization
+role, the safe Member default, failure/retry and pending guards, invitation role
+serialization, restricted role choices, keyboard controls and both themes at
+1440/390/320px. `UI_EVIDENCE_DIR` retains screenshots and geometry;
+`UI_SOURCE_DIR` with `UI_BASELINE=1` captures the prior form. It reuses synthetic
+organization APIs and never invites real people. `payments.cjs` checks the adjacent
+shared field/action row in both themes and also supports `UI_BROWSER_ENGINE=webkit`.
+
 Run `node scripts/ui/storage-settings.cjs` (also with `UI_BROWSER_ENGINE=webkit`)
 for provider-specific storage fields in personal, shared and organization scopes:
 Backblaze key names and automatic region detection, R2's internal `auto` region,

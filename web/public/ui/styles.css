@@ -1210,9 +1210,9 @@ label:has(> input[type=checkbox]:disabled) { cursor:default; }
 }
 
 /* Inputs, dropdowns and adjacent actions share a row height. */
-.field-action-row { display:flex; align-items:center; gap:12px; min-width:0; }
-.field-action-row > label { flex:1; min-width:0; }
-.field-action-row > button { flex:none; margin:0; white-space:nowrap; }
+.field-action-row { display:flex; flex-wrap:wrap; align-items:center; gap:12px; min-width:0; }
+.field-action-row > label { flex:1 1 200px; min-width:0; }
+.field-action-row > button { flex:none; max-width:100%; margin:0; white-space:nowrap; }
 .control-row { --control-height:58px; }
 .control-row > label { margin:0; }
 table .control-row { --control-height:44px; }
