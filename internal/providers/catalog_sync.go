@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/catalogsync"
@@ -24,22 +25,41 @@ func (m *Manager) EnsureCatalogSchedules(ctx context.Context) error {
 	ctx = catalogContext(ctx)
 	available, err := m.Providers(ctx)
 	if err != nil {
-		return err
+		return errors.Join(catalogsync.ErrRepositoryUnavailable, err)
 	}
+	ids := make([]string, 0, len(available))
 	for id := range available {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	var failures []error
+	for _, id := range ids {
+		if err := ctx.Err(); err != nil {
+			return errors.Join(append(failures, err)...)
+		}
 		d, ok := m.findSpec(id)
 		if !ok || d.Free {
 			continue
 		}
 		record, err := m.loadRecord(ctx, id)
 		if err != nil {
-			return err
+			failures = append(failures, fmt.Errorf("catalogue provider %s: %w", id, err))
+			if _, sharedErr := m.repo.List(ctx); sharedErr != nil {
+				return errors.Join(append(failures, catalogsync.ErrRepositoryUnavailable, sharedErr)...)
+			}
+			continue
 		}
 		if err = m.catalog.EnsureSchedule(ctx, catalogsync.Schedule{Provider: id, Enabled: record.Enabled && !record.Archived, Time: "03:00", Version: 1, Sources: append([]catalogsync.Source{}, d.CatalogSources...)}); err != nil {
-			return err
+			failures = append(failures, fmt.Errorf("catalogue schedule %s: %w", id, err))
+			if errors.Is(err, catalogsync.ErrRepositoryUnavailable) {
+				return errors.Join(failures...)
+			}
+			if _, sharedErr := m.catalog.Settings(ctx); sharedErr != nil {
+				return errors.Join(append(failures, catalogsync.ErrRepositoryUnavailable, sharedErr)...)
+			}
 		}
 	}
-	return nil
+	return errors.Join(failures...)
 }
 func (m *Manager) CaptureCatalog(ctx context.Context, id string) (catalogsync.Capture, error) {
 	ctx = catalogContext(ctx)

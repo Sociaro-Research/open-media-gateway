@@ -7,7 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"maps"
+	"net"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/catalogsync"
@@ -103,7 +105,8 @@ func (r *CatalogRepository) Schedules(ctx context.Context) ([]catalogsync.Schedu
 	}
 	return result, rows.Err()
 }
-func (r *CatalogRepository) EnsureSchedule(ctx context.Context, s catalogsync.Schedule) error {
+func (r *CatalogRepository) EnsureSchedule(ctx context.Context, s catalogsync.Schedule) (err error) {
+	defer func() { err = catalogRepositoryError(err) }()
 	if err := s.Validate(); err != nil {
 		return err
 	}
@@ -196,10 +199,11 @@ func (r *CatalogRepository) Request(ctx context.Context, actor, provider string)
 	}
 	return tx.Commit()
 }
-func (r *CatalogRepository) State(ctx context.Context, provider string) (catalogsync.State, error) {
+func (r *CatalogRepository) State(ctx context.Context, provider string) (_ catalogsync.State, err error) {
+	defer func() { err = catalogRepositoryError(err) }()
 	s := catalogsync.State{Models: map[string]catalogsync.Entry{}, Observations: map[string]catalogsync.Observation{}, Warnings: []catalogsync.Warning{}}
 	var data []byte
-	err := r.db.QueryRowContext(ctx, `SELECT payload FROM catalog_sync_state WHERE provider=$1`, provider).Scan(&data)
+	err = r.db.QueryRowContext(ctx, `SELECT payload FROM catalog_sync_state WHERE provider=$1`, provider).Scan(&data)
 	if errors.Is(err, sql.ErrNoRows) {
 		return s, nil
 	}
@@ -209,7 +213,8 @@ func (r *CatalogRepository) State(ctx context.Context, provider string) (catalog
 	err = json.Unmarshal(data, &s)
 	return s, err
 }
-func (r *CatalogRepository) Commit(ctx context.Context, schedule catalogsync.Schedule, state catalogsync.State, run catalogsync.Run, next time.Time) error {
+func (r *CatalogRepository) Commit(ctx context.Context, schedule catalogsync.Schedule, state catalogsync.State, run catalogsync.Run, next time.Time) (err error) {
+	defer func() { err = catalogRepositoryError(err) }()
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -277,6 +282,28 @@ func (r *CatalogRepository) Commit(ctx context.Context, schedule catalogsync.Sch
 		return err
 	}
 	return tx.Commit()
+}
+
+// Classify known shared failures without mistaking a provider's invalid JSON,
+// schedule conflict or constraint violation for an outage of every provider.
+func catalogRepositoryError(err error) error {
+	if err == nil {
+		return nil
+	}
+	var sqlState interface{ SQLState() string }
+	var network net.Error
+	// Operation deadlines (for example one provider's admission lock) are
+	// local. Parent cancellation is handled separately by the runner.
+	operationCanceled := errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
+	shared := errors.Is(err, driver.ErrBadConn) || errors.Is(err, sql.ErrConnDone) || !operationCanceled && errors.As(err, &network)
+	if errors.As(err, &sqlState) {
+		code := sqlState.SQLState()
+		shared = shared || code == "25006" || code == "57P01" || code == "57P02" || code == "57P03" || code == "57P04" || strings.HasPrefix(code, "08") || strings.HasPrefix(code, "53") || strings.HasPrefix(code, "58")
+	}
+	if shared {
+		return errors.Join(catalogsync.ErrRepositoryUnavailable, err)
+	}
+	return err
 }
 func (r *CatalogRepository) Runs(ctx context.Context, provider string, limit, offset int) ([]catalogsync.Run, error) {
 	rows, err := r.db.QueryContext(ctx, `SELECT payload,email_status FROM catalog_sync_runs WHERE ($1='' OR provider=$1) ORDER BY completed_at DESC,id DESC LIMIT $2 OFFSET $3`, provider, limit, offset)

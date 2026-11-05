@@ -20,6 +20,10 @@ import (
 var ErrSettings = errors.New("invalid catalogue synchronization settings")
 var ErrBusy = errors.New("a catalogue synchronization is already running")
 
+// ErrRepositoryUnavailable identifies shared infrastructure failures, including
+// write outages where reads may still succeed. A runner must stop this pass.
+var ErrRepositoryUnavailable = errors.New("catalogue repository unavailable")
+
 type Settings struct {
 	Timezone string `json:"timezone"`
 	Email    string `json:"email"`

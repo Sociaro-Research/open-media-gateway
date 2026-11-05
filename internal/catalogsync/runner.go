@@ -3,12 +3,14 @@ package catalogsync
 import (
 	"context"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"html"
 	"log/slog"
 	"net/http"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
@@ -20,6 +22,9 @@ type Runner struct {
 	Providers Provider
 	Client    *http.Client
 	Mailer    Mailer
+
+	mu          sync.Mutex
+	lastAttempt string
 }
 
 func (r *Runner) Run(ctx context.Context) {
@@ -38,46 +43,93 @@ func (r *Runner) Run(ctx context.Context) {
 }
 func (r *Runner) Tick(ctx context.Context, now time.Time) error {
 	_, err := r.Repo.WithLock(ctx, func(ctx context.Context) error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		var failures []error
 		if bootstrap, ok := r.Providers.(interface{ EnsureCatalogSchedules(context.Context) error }); ok {
 			if err := bootstrap.EnsureCatalogSchedules(ctx); err != nil {
-				return err
+				failures = append(failures, fmt.Errorf("catalogue schedules: %w", err))
+				if errors.Is(err, ErrRepositoryUnavailable) {
+					return errors.Join(failures...)
+				}
 			}
+		}
+		if err := ctx.Err(); err != nil {
+			return errors.Join(append(failures, err)...)
 		}
 		settings, err := r.Repo.Settings(ctx)
 		if err != nil {
-			return err
+			return errors.Join(append(failures, err)...)
 		}
 		schedules, err := r.Repo.Schedules(ctx)
 		if err != nil {
-			return err
+			return errors.Join(append(failures, err)...)
 		}
-		for _, schedule := range schedules {
+		// Rotate even failed attempts without altering durable schedule intent or
+		// evidence. A persistent first-name failure must not starve later work.
+		schedules = append([]Schedule(nil), schedules...)
+		sort.Slice(schedules, func(i, j int) bool { return schedules[i].Provider < schedules[j].Provider })
+		r.mu.Lock()
+		start := sort.Search(len(schedules), func(i int) bool { return schedules[i].Provider > r.lastAttempt })
+		r.mu.Unlock()
+		attempts := 0
+		for i := 0; i < len(schedules); i++ {
+			schedule := schedules[(start+i)%len(schedules)]
+			if err := ctx.Err(); err != nil {
+				return errors.Join(append(failures, err)...)
+			}
 			if !schedule.Requested && (!schedule.Enabled || schedule.NextCheck == nil || schedule.NextCheck.After(now)) {
 				continue
 			}
+			r.mu.Lock()
+			r.lastAttempt = schedule.Provider
+			r.mu.Unlock()
+			attempts++
 			if err := r.check(ctx, schedule, settings, now); err != nil {
-				return err
+				failures = append(failures, fmt.Errorf("catalogue provider %s: %w", schedule.Provider, err))
+				if errors.Is(err, ErrRepositoryUnavailable) {
+					return errors.Join(failures...)
+				}
+				if err := ctx.Err(); err != nil {
+					return errors.Join(append(failures, err)...)
+				}
+				// Check the shared repository before attempting independent work.
+				// A provider's invalid state/transaction is local; an unavailable
+				// settings store stops the pass rather than amplifying an outage.
+				if _, err := r.Repo.Settings(ctx); err != nil {
+					return errors.Join(append(failures, err)...)
+				}
+				if attempts < 2 {
+					continue
+				}
 			}
-			// One provider per tick bounds concurrency and spreads catch-up work.
+			// One successful check, or two failed attempts, bounds each tick.
 			break
+		}
+		if err := ctx.Err(); err != nil {
+			return errors.Join(append(failures, err)...)
 		}
 		if settings.Email != "" && r.Mailer != nil {
 			pending, err := r.Repo.PendingEmails(ctx)
 			if err != nil {
-				return err
+				return errors.Join(append(failures, err)...)
 			}
 			for _, run := range pending {
+				if err := ctx.Err(); err != nil {
+					return errors.Join(append(failures, err)...)
+				}
 				subject, text, markup := Report(run)
 				status := "sent"
 				if err := r.Mailer.SendCatalogReport(ctx, settings.Email, subject, text, markup, "catalog-"+run.ID); err != nil {
 					status = "retry"
 				}
 				if err := r.Repo.EmailResult(ctx, run.ID, status); err != nil {
-					return err
+					return errors.Join(append(failures, err)...)
 				}
 			}
 		}
-		return nil
+		return errors.Join(failures...)
 	})
 	return err
 }
@@ -86,6 +138,9 @@ func (r *Runner) check(parent context.Context, schedule Schedule, settings Setti
 	defer cancel()
 	previous, err := r.Repo.State(ctx, schedule.Provider)
 	if err != nil {
+		return err
+	}
+	if err := parent.Err(); err != nil {
 		return err
 	}
 	capture, err := r.Providers.CaptureCatalog(ctx, schedule.Provider)
@@ -116,6 +171,9 @@ func (r *Runner) check(parent context.Context, schedule Schedule, settings Setti
 	}
 	observations = append(observations, apiObservation)
 	for _, source := range schedule.Sources {
+		if err := parent.Err(); err != nil {
+			return err
+		}
 		if resolver, ok := r.Providers.(interface {
 			ResolveCatalogSource(context.Context, string, Source) Source
 		}); ok {
@@ -156,6 +214,9 @@ func (r *Runner) check(parent context.Context, schedule Schedule, settings Setti
 	run.Provider = schedule.Provider
 	run.StartedAt = now
 	run.CompletedAt = time.Now().UTC()
+	if err := parent.Err(); err != nil {
+		return err
+	}
 	commitCtx, cancelCommit := context.WithTimeout(parent, 30*time.Second)
 	defer cancelCommit()
 	return r.Repo.Commit(commitCtx, schedule, next, run, NextDaily(run.CompletedAt, schedule.Time, settings.Timezone))

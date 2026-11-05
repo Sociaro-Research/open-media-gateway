@@ -45,6 +45,17 @@ occurrence, once; a skipped local time moves to the first valid time after it.
 Concurrent manual requests coalesce. Source fetches have time/body limits, use
 public-network destination checks and send no provider API credentials.
 
+A provider state or publication failure is returned to the scheduler log while
+independent checks and pending reports can still progress. Each tick attempts at
+most two providers and stops after its first successful check. Attempts rotate
+in memory between ticks, including failures; restart resets this cursor. Failed
+checks retain their requested flag, due time and last published evidence. Schedule
+bootstrap also collects provider-specific errors and runs within the retrying
+runner rather than blocking gateway startup. Cancellation, known shared database
+failures (including read-only mode), or failure to read the shared settings store
+stops the pass. The advisory lock and atomic,
+version-checked publication still apply.
+
 ## Evidence, publication and warnings
 
 Each source observation records its URL, parser, content hash, normalized

@@ -115,9 +115,8 @@ func run() error {
 	if err := emailSender.Bootstrap(ctx, cfg.ResendAPIKey, cfg.EmailFrom); err != nil {
 		return fmt.Errorf("bootstrap email delivery: %w", err)
 	}
-	if err := providerManager.EnsureCatalogSchedules(ctx); err != nil {
-		return fmt.Errorf("bootstrap catalogue synchronization: %w", err)
-	}
+	// The runner bootstraps schedules on its immediate first tick and retries
+	// failures; one invalid provider schedule must not prevent gateway startup.
 	catalogRunner := &catalogsync.Runner{Repo: catalogRepository, Providers: providerManager, Client: httpclient.NewPublic(30 * time.Second), Mailer: emailSender}
 	go catalogRunner.Run(ctx)
 	loginProviders := userauth.NewLoginProviderManager(postgres.NewSystemRepository(db), credentialsCipher, cfg.AuthPublicURL)
