@@ -62,8 +62,12 @@ For recovery, a server operator can use `admin grant --user-id USER_UUID` or `ad
 After browser owner creation, the setup guide offers **For myself**, **Service
 for companies**, or **Sociaro**. Skip, Escape and closing the guide perform no
 settings write. Dismissal lasts for the browser session; **Settings → System →
-Choose setup** reopens it. Existing installations keep their settings and do not
-open the guide automatically on upgrade.
+Change Mode** reopens it on ordinary installations. Existing installations keep
+their settings and do not open the guide automatically on upgrade.
+
+On the central server, the separate **Settings → System → Configure company
+service** action appears only when company-service setup is needed. It offers
+**Service for companies** only and is hidden once setup is complete.
 
 | Scenario | `personal_providers` | `shared_resources` |
 | --- | --- | --- |

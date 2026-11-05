@@ -23,6 +23,57 @@ class PlaygroundKeyDocumentation(unittest.TestCase):
                          "Playground vault guide must name the actual environment variable")
 
 
+class SharedResourceDocumentation(unittest.TestCase):
+    def test_content_access_and_deletion_follow_organization_roles(self):
+        root = Path(__file__).resolve().parents[2]
+        guide = (root / "docs/shared-resources.md").read_text()
+        rows = [tuple(cell.strip() for cell in line.strip("|").split("|"))
+                for line in guide.splitlines() if line.startswith("| ")]
+        permissions = {row[0]: row[1:] for row in rows[2:]}
+        self.assertEqual(permissions, {
+            "Supermanager": ("All, with content", "All", "Any"),
+            "Manager": ("All, without content", "None", "None"),
+            "Content Officer": ("All, with content", "All, read-only", "None"),
+            "Developer": ("Own, with content", "Own only", "Own only"),
+            "Member": ("Own, with content", "Own only", "Own only"),
+        }, "Organization ownership must not imply shared content or deletion rights")
+
+        organizations = (root / "docs/organizations.md").read_text()
+        matrix = [tuple(cell.strip() for cell in line.strip("|").split("|"))
+                  for line in organizations.splitlines() if line.startswith("| ")]
+        canonical = {row[0]: row[1:] for row in matrix[2:]}
+        roles = matrix[0][1:]
+        self.assertEqual(tuple(permissions[role][0] for role in roles),
+                         canonical["Request logs"])
+        self.assertEqual(tuple(permissions[role][2] for role in roles),
+                         canonical["Delete generation results and input files"])
+
+
+class SetupActionDocumentation(unittest.TestCase):
+    def test_setup_paths_match_ordinary_and_central_ui_actions(self):
+        root = Path(__file__).resolve().parents[2]
+        selector = (root / "web/public/ui/setup-selector.js").read_text()
+        actions = re.search(
+            r"section\.button\.textContent=central\(state\)\?'([^']+)':'([^']+)'",
+            selector)
+        self.assertIsNotNone(actions, "Locate the central and ordinary setup actions")
+        central, ordinary = actions.groups()
+        self.assertEqual((central, ordinary), ("Configure company service", "Change Mode"))
+        for name in ("system-administration.md", "shared-resources.md"):
+            with self.subTest(guide=name):
+                guide = " ".join((root / "docs" / name).read_text().split())
+                for action in (ordinary, central):
+                    self.assertTrue(f"Settings → System → {action}" in guide,
+                                    f"{name} must document the {action} path")
+
+    def test_public_guides_do_not_name_the_obsolete_setup_action(self):
+        root = Path(__file__).resolve().parents[2]
+        for path in sorted((root / "docs").rglob("*.md")) + sorted(root.glob("*.md")):
+            with self.subTest(guide=str(path.relative_to(root))):
+                self.assertIsNone(re.search(r"\bChoose\s+setup\b", path.read_text()),
+                                  "Use the current setup action from the UI")
+
+
 class ReleaseDocumentation(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()

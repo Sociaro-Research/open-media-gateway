@@ -413,11 +413,36 @@ func TestOrganizationNewMembersInheritDefaultWeeklyLimit(t *testing.T) {
 				}
 				t.Fatal("member missing")
 			}
-			// The assignment form supplies a role without an individual limit.
-			if err = repo.SetOrganizationMember(ctx, admin.ID, o.ID, direct.Email, "supermanager", nil, false, false); err != nil {
+			// The assignment form supplies the selected role without an individual
+			// limit. Every role must survive email/ID assignment and restoration.
+			for _, selected := range []string{org.MemberRole, org.Developer, org.ContentOfficer, org.Manager, org.Supermanager} {
+				for _, target := range []string{direct.Email, direct.ID} {
+					for _, actor := range []identity.User{invited, outsider} {
+						if err = repo.SetOrganizationMember(ctx, actor.ID, o.ID, target, selected, nil, false, false); err == nil {
+							t.Fatal("nonmember assigned an existing user")
+						}
+					}
+					if err = repo.SetOrganizationMember(ctx, admin.ID, o.ID, target, selected, nil, false, false); err != nil {
+						t.Fatal(err)
+					}
+					var stored string
+					if err = db.QueryRow(`SELECT role FROM organization_members WHERE organization_id=$1 AND user_id=$2 AND removed_at IS NULL`, o.ID, direct.ID).Scan(&stored); err != nil || stored != selected {
+						t.Fatalf("selected=%s persisted=%s error=%v", selected, stored, err)
+					}
+					check(direct.ID, tc.limit)
+					if err = repo.SetOrganizationMember(ctx, admin.ID, o.ID, target, org.MemberRole, nil, false, true); err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
+			for _, invalid := range []string{"", "system_admin", "owner", "Member"} {
+				if err = repo.SetOrganizationMember(ctx, admin.ID, o.ID, direct.Email, invalid, nil, false, false); !errors.Is(err, org.ErrInvalid) {
+					t.Fatalf("invalid role %q: %v", invalid, err)
+				}
+			}
+			if err = repo.SetOrganizationMember(ctx, admin.ID, o.ID, direct.Email, org.MemberRole, nil, false, false); err != nil {
 				t.Fatal(err)
 			}
-			check(direct.ID, tc.limit)
 			invitation, err := repo.CreateOrganizationInvite(ctx, admin.ID, o.ID)
 			if err != nil {
 				t.Fatal(err)

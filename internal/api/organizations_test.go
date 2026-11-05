@@ -7,6 +7,7 @@ import (
 	"github.com/Sociaro-Research/open-media-gateway/internal/money"
 	org "github.com/Sociaro-Research/open-media-gateway/internal/organization"
 	"github.com/Sociaro-Research/open-media-gateway/internal/system"
+	"net/http"
 	"strings"
 	"testing"
 )
@@ -186,11 +187,27 @@ type memberLimitFixture struct {
 	*organizationFixture
 	called, provided bool
 	limit            *money.USD
+	role             string
 }
 
-func (f *memberLimitFixture) SetOrganizationMember(_ context.Context, _, _, _, _ string, limit *money.USD, provided, _ bool) error {
+func (f *memberLimitFixture) SetOrganizationMember(_ context.Context, _, _, _, role string, limit *money.USD, provided, _ bool) error {
 	f.called, f.provided, f.limit = true, provided, limit
+	f.role = role
 	return nil
+}
+
+func TestOrganizationMemberSelectedRole(t *testing.T) {
+	for _, role := range []string{org.MemberRole, org.Developer, org.ContentOfficer, org.Manager, org.Supermanager} {
+		t.Run(role, func(t *testing.T) {
+			s, _ := newPersonalTestServer()
+			f := &memberLimitFixture{organizationFixture: &organizationFixture{systemFixture: &systemFixture{settings: system.Defaults(), admins: map[string]bool{"alice": true}}}}
+			s.system = f
+			w := sendTest(s.handler(), "PUT", "/v1/organizations/"+fixtureOrg+"/members/existing%40example.test", `{"role":"`+role+`"}`, "alice", "")
+			if w.Code != http.StatusNoContent || !f.called || f.role != role || f.provided {
+				t.Fatalf("status=%d called=%v role=%q limit provided=%v: %s", w.Code, f.called, f.role, f.provided, w.Body.String())
+			}
+		})
+	}
 }
 
 func TestOrganizationMemberOptionalWeeklyLimit(t *testing.T) {

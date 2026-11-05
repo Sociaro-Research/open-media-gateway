@@ -1,12 +1,41 @@
 # Shared providers and storage
 
-System administrators enable **shared providers and storage** through **Settings → System → Choose setup → Service for companies**. Company service disables personal provider access for every role; there is no hybrid override. Advanced settings has no duplicate policy switches. Shared credentials belong to a stable installation identity; changing administrator roles never transfers or removes them. Administrators configure these connections under System. Personal connections remain under Configuration when personal provider access is enabled.
+On ordinary installations, system administrators enable **shared providers and
+storage** through **Settings → System → Change Mode → Service for companies**.
+The central server uses **Service for companies**. Its separate **Settings →
+System → Configure company service** action appears only when company-service
+setup is needed, offers only that scenario and is hidden once setup is complete.
+
+Company service disables personal provider access for every role; there is no hybrid override. Advanced settings has no duplicate policy switches. Shared credentials belong to a stable installation identity; changing administrator roles never transfers or removes them. Administrators configure these connections under System. Personal connections remain under Configuration when personal provider access is enabled.
 
 Every new API key must belong to an organization and one of its members. Provider and storage choices are immutable: use a new key for a different combination. The Generation screen creates a real key for the selected organization and remembers it in the tab for up to 24 hours.
 
 ## Ownership and funding
 
-Organizations own reference metadata, generation records and files. All active members share the organization journal and reference library. They can reuse references, download results and delete stored files; financial administration remains restricted to administrators. The author and originating key remain recorded. New storage paths use `<organization-id>/references/` and `<organization-id>/results/`. Personal S3 connections may also hold organization-owned files; their original connection identity is retained for reads and deletion.
+Organizations own reference metadata, generation records and files. Access follows
+the user's current organization role:
+
+| Role | Request journal | Reference library and result files | Delete reference and result files |
+| --- | --- | --- | --- |
+| Supermanager | All, with content | All | Any |
+| Manager | All, without content | None | None |
+| Content Officer | All, with content | All, read-only | None |
+| Developer | Own, with content | Own only | Own only |
+| Member | Own, with content | Own only | Own only |
+
+Administrators with system access can read all retained organization content and
+delete files. Managers see operational and accounting metadata, without prompts,
+input materials or generated content. Developers and Members can reuse references,
+download results and delete files only for their own content. Content Officers
+can read retained content across the organization but cannot delete files.
+Minimized request logging and file deletion still limit what content is retained.
+See [Organization roles](organizations.md#organization-roles) for the full matrix
+and system-access requirements.
+
+The author and originating key remain recorded. New storage paths use
+`<organization-id>/references/` and `<organization-id>/results/`. Personal S3
+connections may also hold organization-owned files; their original connection
+identity is retained for authorized reads and deletion.
 
 Shared-provider requests check the organization balance plus Credit Limit and the member weekly allowance against completed spending. Estimates and pending tasks do not reserve funds. Provider packages do not restore spending authority. See [Organizations](organizations.md) for funding, role, invitation and migration details. Personal provider calls are funded by the member's own provider account and do not debit the shared organization balance.
 
