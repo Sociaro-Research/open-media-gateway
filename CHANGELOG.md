@@ -49,6 +49,11 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Preserve password selection when showing or hiding a password.
+- Prevent manual generation-key loss during workspace initialization while
+  keeping validated company credentials available for connected bootstrap.
+- Preserve the active portal draft when fragment-only browser history dismisses
+  a dialog without changing its underlying route.
 - Preserve literal free-form reference prompts with advisory diagnostics while
   retaining mandatory prompt, media and template validation.
 - Keep API-key status filtering distinct from its usage month, remove redundant
