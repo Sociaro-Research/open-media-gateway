@@ -488,31 +488,76 @@ async function api(path, options = {}) {
 
   const management = path.startsWith('/provider-assets/') || path.startsWith('/v1/workspace-authorizations/') || path.startsWith('/v1/workspace-installations') || path.startsWith('/v1/sales/') || /^\/v1\/(client-onboardings(?:[/?]|$)|organizations(?:[/?]|$)|invitations\/|audit\/|shared\/|system\/|admin\/|api-keys(?:[/?]|$)|me(?:[/?]|$))/.test(path);
   const useKey = options.providerLogoGeneration || !management || authMode === 'api_key';
-  if (useKey) await window.GenerationKey.ensureSession(options.method === 'POST');
+  const readOnly = ['GET','HEAD','OPTIONS'].includes((options.method || 'GET').toUpperCase());
+  const recovery = readOnly ? 'Try again later; contact your Gateway administrator if it continues.' : 'The result is unconfirmed. Check the original task or saved state before repeating this action; keep the original request for any retry.';
+  const failure = (message, code, status) => Object.assign(new Error(message), {code, status, isGatewayError:true});
+  if (useKey) {
+    const sessionVersion = generationKeyVersion;
+    try { await window.GenerationKey.ensureSession(options.method === 'POST'); }
+    catch (error) {
+      options.signal?.throwIfAborted();
+      if (error.name === 'AbortError') throw error;
+      // This local session diagnostic deliberately clears the saved key.
+      if (error.message === 'Your sign-in session ended or changed. Refresh and sign in again.') throw failure(error.message, 'session_changed', 401);
+      if (sessionVersion !== generationKeyVersion) throw new DOMException('API key changed', 'AbortError');
+      if (error.name === 'TypeError') throw failure('Sign-in could not be checked. Check your connection and whether the Gateway is reachable. The requested action was not sent.', 'network_error');
+      if (error.name === 'SyntaxError') throw failure('The sign-in check returned an unreadable response. Contact your Gateway administrator. The requested action was not sent.', 'invalid_response');
+      throw failure('Sign-in could not be checked. Sign in again; contact your Gateway administrator if it continues. The requested action was not sent.', 'request_failed');
+    }
+  }
   const key = useKey ? window.GenerationKey.value() : '';
   const keyVersion = generationKeyVersion;
+  const checkContext = () => {
+    if (useKey && (key !== window.GenerationKey.value() || keyVersion !== generationKeyVersion)) throw new DOMException('API key changed', 'AbortError');
+    options.signal?.throwIfAborted();
+  };
+  const transportFailure = error => {
+    checkContext();
+    if (error.name === 'AbortError') throw error;
+    if (error.isGatewayError) return error;
+    if (error.message === 'Use the connected company key in this interface.') return failure(error.message, 'company_key_required');
+    // Fetch cannot identify DNS, TLS, CORS, offline or proxy faults reliably.
+    return error.name === 'TypeError'
+      ? failure('The request could not be completed. Check your connection and whether the Gateway is reachable. '+recovery, 'network_error')
+      : failure('The request could not be completed. Contact your Gateway administrator if it continues. '+recovery, 'request_failed');
+  };
+  const httpMessage = status => {
+    if (status === 401) return useKey ? 'The Gateway API key is invalid, expired or revoked. Enter a valid key in the budget section.' : 'Sign-in is required or your session has expired. Sign in again.';
+    if (status === 403) return 'Access denied. Check the selected workspace and your permissions, or ask an administrator.';
+    if (status === 404) return 'The requested item is unavailable. Check the selected workspace and whether the item still exists.';
+    if (status === 429) return 'Too many requests (HTTP 429). Wait before trying again; ask your Gateway administrator to check limits if it continues.';
+    if (status >= 500 || status === 408) return `The Gateway or an upstream service could not complete the request (HTTP ${status}). `+recovery;
+    return `The request was rejected (HTTP ${status}). Check the submitted fields and your access; contact your Gateway administrator if it continues.`;
+  };
   if (useKey && !key) {
-    const error = new Error('Enter a Gateway API key in the budget section below.'); error.status = 401; throw error;
+    throw failure('Enter a Gateway API key in the budget section below.', undefined, 401);
   }
   if (options.expectedKey !== undefined && options.expectedKey !== key) throw new DOMException('API key changed', 'AbortError');
   options.signal?.throwIfAborted();
   const response = await fetch(path, {
     ...options, credentials: useKey ? 'omit' : 'same-origin',
     headers: {...(useKey ? {Authorization: 'Bearer ' + key} : {}), ...(options.body && !(options.body instanceof FormData) ? {'Content-Type':'application/json'} : {}), ...(options.headers || {})}
-  });
-  if (useKey && (key !== window.GenerationKey.value() || keyVersion !== generationKeyVersion)) throw new DOMException('API key changed', 'AbortError');
+  }).catch(error => { throw transportFailure(error); });
+  checkContext();
   if (useKey && response.status === 401) window.GenerationKey.forget('This key is invalid, expired or revoked. Paste a valid key or generate a new one.');
-  const body = options.responseType==='blob'&&response.ok ? await response.blob() : await response.json().catch(() => ({}));
+  let body;
+  try {
+    body = response.ok && ([204,205].includes(response.status) || options.method?.toUpperCase() === 'HEAD') ? {} : options.responseType==='blob'&&response.ok ? await response.blob() : await response.json();
+  } catch (error) {
+    checkContext();
+    if (error.name === 'AbortError') throw error;
+    if (response.ok && error.name !== 'SyntaxError') throw transportFailure(error);
+    if (response.ok) throw failure('The Gateway returned an unreadable response. '+recovery, 'invalid_response', response.status);
+    // Never display HTML, proxy response bodies or parse exceptions.
+  }
   // Body downloads can outlive key changes, including a return to the same key.
-  if (useKey && (key !== window.GenerationKey.value() || keyVersion !== generationKeyVersion)) throw new DOMException('API key changed', 'AbortError');
-  options.signal?.throwIfAborted();
+  checkContext();
   if (!response.ok) {
     if(response.status===401||response.status===403)ProviderLogos.clear();
-    const error = new Error(body.error?.message || `HTTP ${response.status}`);
-    error.status = response.status;
-    error.code = body.error?.code;
-    error.param = body.error?.param;
-    error.templates = body.error?.templates;
+    const detail = body?.error;
+    const error = failure(typeof detail?.message === 'string' && detail.message.trim() ? detail.message : httpMessage(response.status), detail?.code, response.status);
+    error.param = detail?.param;
+    error.templates = detail?.templates;
     throw error;
   }
   return body;
