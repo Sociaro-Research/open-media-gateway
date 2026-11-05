@@ -10,6 +10,14 @@ info:
     Agnes AI image and video models use the same endpoints and catalog contract;
     select agnes/model-name from the model catalog. Provider key checks cannot
     verify Agnes access because its upstream model catalog is public.
+    Router-generated errors under /v1 and /auth use an application/json error
+    object with code and message (plus type and param for routing errors).
+    An unknown endpoint returns HTTP 404 with code not_found; an unsupported
+    method returns HTTP 405 with code method_not_allowed and the router's Allow
+    header. HEAD preserves status and representation headers without a body.
+    Authentication, browser origin checks and endpoint-specific error codes
+    remain authoritative. Public documents, static assets, capability media,
+    health probes and forwarded upstream responses retain their own contracts.
   license:
     name: Apache-2.0
     identifier: Apache-2.0

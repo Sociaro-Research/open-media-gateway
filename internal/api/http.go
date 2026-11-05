@@ -394,7 +394,7 @@ func (s *Server) handler() http.Handler {
 	protection.SetDenyHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusForbidden, "cross_origin_request", "cross-origin browser mutations are not allowed")
 	}))
-	return requestLogging(headResponses(recoverPanic(protection.Handler(mux))))
+	return requestLogging(headResponses(recoverPanic(protection.Handler(apiRoutingErrors(mux)))))
 }
 
 func (s *Server) info(w http.ResponseWriter, r *http.Request) {

@@ -116,18 +116,18 @@ func (m *Manager) Login(w http.ResponseWriter, r *http.Request) {
 	}
 	state, err := randomToken(32)
 	if err != nil {
-		http.Error(w, "authentication unavailable", http.StatusServiceUnavailable)
+		emailError(w, http.StatusServiceUnavailable, "auth_unavailable", "Google sign-in is temporarily unavailable.")
 		return
 	}
 	nonce, err := randomToken(32)
 	if err != nil {
-		http.Error(w, "authentication unavailable", http.StatusServiceUnavailable)
+		emailError(w, http.StatusServiceUnavailable, "auth_unavailable", "Google sign-in is temporarily unavailable.")
 		return
 	}
 	payload := statePayload{State: state, Nonce: nonce, ExpiresAt: time.Now().Add(10 * time.Minute).Unix(), ConfigVersion: google.version}
 	sealed, err := m.sealState(payload)
 	if err != nil {
-		http.Error(w, "authentication unavailable", http.StatusServiceUnavailable)
+		emailError(w, http.StatusServiceUnavailable, "auth_unavailable", "Google sign-in is temporarily unavailable.")
 		return
 	}
 	http.SetCookie(w, &http.Cookie{

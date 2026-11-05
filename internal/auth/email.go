@@ -153,7 +153,7 @@ func (m *Manager) Email(w http.ResponseWriter, r *http.Request) {
 	}
 	action := r.PathValue("action")
 	if action != "register" && action != "login" && action != "forgot" && action != "verify" && action != "reset" && action != "registration" && action != "complete" {
-		http.NotFound(w, r)
+		emailError(w, http.StatusNotFound, "not_found", "Authentication endpoint not found.")
 		return
 	}
 	if in.InvitationToken != "" {

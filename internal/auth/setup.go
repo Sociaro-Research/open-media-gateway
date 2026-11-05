@@ -87,7 +87,7 @@ func (m *Manager) setupRequired(ctx context.Context) (bool, error) {
 
 func (m *Manager) Setup(w http.ResponseWriter, r *http.Request) {
 	if m.setup == nil || m.email == nil {
-		http.NotFound(w, r)
+		emailError(w, http.StatusNotFound, "not_found", "Authentication endpoint not found.")
 		return
 	}
 	state, err := m.setup.InstallationSetup(r.Context())

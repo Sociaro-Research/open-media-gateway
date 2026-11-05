@@ -150,6 +150,9 @@ func TestRegisteredRoutesRejectUnsupportedMethods(t *testing.T) {
 			if method == "HEAD" && w.Body.Len() != 0 {
 				t.Fatal("unsupported HEAD returned a body")
 			}
+			if method != "HEAD" && (strings.HasPrefix(path, "/v1/") || strings.HasPrefix(path, "/auth/")) {
+				assertRoutingError(t, w, "method_not_allowed")
+			}
 		}
 		t.Logf("route %s methods=%s", pattern, strings.Join(methods, ","))
 	}
