@@ -49,6 +49,7 @@ and the project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Prevent duplicate resource-library rows when background updates overlap loading.
 - Preserve password selection when showing or hiding a password.
 - Prevent manual generation-key loss during workspace initialization while
   keeping validated company credentials available for connected bootstrap.

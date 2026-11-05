@@ -72,22 +72,28 @@
     const choose=button('Use '+(item.name||title(item.kind)),()=>{if(!current()||!dialog.open||!selectable(item)||selected.has(item.id))return;const target=onSelect(item);dialog.close();requestAnimationFrame(()=>{if(current()&&target?.isConnected&&!target.disabled)target.focus();});});choose.disabled=!selectable(item)||selected.has(item.id);choose.setAttribute('aria-pressed',String(selected.has(item.id)));actions.append(choose);
     card.append(actions);return card;
    }
+   function publish(items,replace=false){
+    const visible=new Set(),existing=new Map([...list.children].map(card=>[card.dataset.updateKey,card]));
+    for(const item of items.filter(item=>accepts(item,schema))){visible.add(item.id);const old=existing.get(item.id);if(old?.resourceFingerprint===JSON.stringify(item))continue;const next=row(item),focused=old?.contains(document.activeElement)?document.activeElement.textContent:null;if(old){for(const article of old.querySelectorAll('article'))article.mediaController?.abort();old.replaceWith(next);}else list.append(next);existing.set(item.id,next);if(focused)([...next.querySelectorAll('button')].find(b=>!b.disabled&&b.textContent===focused)||next.querySelector('button:not(:disabled)'))?.focus();}
+    if(replace)for(const [id,card]of existing)if(!visible.has(id)){for(const article of card.querySelectorAll('article'))article.mediaController?.abort();card.remove();}
+   }
    async function load(){
-    if(official()){await loadPresets();return;}if(loading||!current())return;loading=true;const version=++readVersion;more.disabled=true;note.textContent='Loading…';
-    try{const data=await request('/v1/provider-resources?provider='+encodeURIComponent(provider.id)+'&limit=50&offset='+offset);if(!current()||!dialog.open||official()||version!==readVersion)return;const page=data.data||[];for(const item of page)if(accepts(item,schema))list.append(row(item));offset+=page.length;more.hidden=page.length<50;more.textContent='Load more';note.textContent=list.children.length?'':'No resources in this connection.';}
+    if(official()){await loadPresets();return;}if(loading||!current()||!dialog.open)return;
+    // Foreground pagination owns publication until settled. Cancel any older
+    // watcher snapshot before it can replace the newly loaded page.
+    loading=true;updates.invalidate();const version=++readVersion;readAbort?.abort();readAbort=new AbortController();more.disabled=true;note.textContent='Loading…';
+    try{const data=await request('/v1/provider-resources?provider='+encodeURIComponent(provider.id)+'&limit=50&offset='+offset,{signal:readAbort.signal});if(!current()||!dialog.open||official()||version!==readVersion)return;const page=data.data||[];publish(page);offset+=page.length;more.hidden=page.length<50;more.textContent='Load more';note.textContent=list.children.length?'':'No resources in this connection.';}
     catch(e){if(current()&&dialog.open&&!official()&&version===readVersion&&e.name!=='AbortError'){note.textContent=e.message;more.textContent='Retry loading';more.hidden=false;}}
     finally{if(version===readVersion){loading=false;more.disabled=false;}}
    }
-   const updates=GatewayAutoUpdate.watch({root:dialog,active:()=>current()&&!importing&&!importUncertain,load:async({signal,current:fresh})=>{
+   const updates=GatewayAutoUpdate.watch({root:dialog,active:()=>current()&&(official()||!loading)&&!importing&&!importUncertain,load:async({signal,current:fresh})=>{
     if(official()){await loadPresets();return;}
+    const version=readVersion;
     try{
      const items=[];let position=0,page=[];
-     do{const data=await request('/v1/provider-resources?provider='+encodeURIComponent(provider.id)+'&limit=50&offset='+position,{signal});if(!fresh())return;page=data.data||[];items.push(...page);position+=page.length;}while(page.length===50&&position<Math.max(offset,50));
-     const visible=new Set(),existing=new Map([...list.children].map(card=>[card.dataset.updateKey,card]));
-     for(const item of items.filter(item=>accepts(item,schema))){visible.add(item.id);const old=existing.get(item.id);if(old?.resourceFingerprint===JSON.stringify(item))continue;const next=row(item),focused=old?.contains(document.activeElement)?document.activeElement.textContent:null;if(old){for(const article of old.querySelectorAll('article'))article.mediaController?.abort();old.replaceWith(next);}else list.append(next);if(focused)([...next.querySelectorAll('button')].find(b=>!b.disabled&&b.textContent===focused)||next.querySelector('button:not(:disabled)'))?.focus();}
-     for(const [id,card]of existing)if(!visible.has(id)){for(const article of card.querySelectorAll('article'))article.mediaController?.abort();card.remove();}
-     offset=position;more.hidden=page.length<50;note.textContent=list.children.length?'':'No resources in this connection.';
-    }catch(e){if(fresh()&&e.name!=='AbortError')note.textContent='Could not update resources. Retrying automatically. '+e.message;}
+     do{const data=await request('/v1/provider-resources?provider='+encodeURIComponent(provider.id)+'&limit=50&offset='+position,{signal});if(!fresh()||version!==readVersion||official())return;page=data.data||[];items.push(...page);position+=page.length;}while(page.length===50&&position<Math.max(offset,50));
+     publish(items,true);offset=position;more.hidden=page.length<50;more.textContent='Load more';note.textContent=list.children.length?'':'No resources in this connection.';
+    }catch(e){if(fresh()&&version===readVersion&&e.name!=='AbortError')note.textContent='Could not update resources. Retrying automatically. '+e.message;}
    }});
    dialog.addEventListener('close',()=>{readVersion++;readAbort?.abort();updates.stop();},{once:true});dialog.showModal();load();
   }
