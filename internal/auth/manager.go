@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"strings"
 	"sync"
@@ -29,7 +30,7 @@ const (
 var ErrUnauthenticated = errors.New("user is not authenticated")
 
 type Repository interface {
-	UpsertGoogleUser(context.Context, string, string, string, string) (identity.User, error)
+	SignInGoogleUser(context.Context, GoogleIdentity) (identity.User, error)
 	CreateSession(context.Context, []byte, string, time.Time) error
 	UserBySession(context.Context, []byte, time.Time) (identity.User, error)
 	DeleteSession(context.Context, []byte) error
@@ -179,6 +180,7 @@ func (m *Manager) Callback(w http.ResponseWriter, r *http.Request) {
 		Subject       string `json:"sub"`
 		Email         string `json:"email"`
 		EmailVerified bool   `json:"email_verified"`
+		HostedDomain  string `json:"hd"`
 		Name          string `json:"name"`
 		Picture       string `json:"picture"`
 		Nonce         string `json:"nonce"`
@@ -201,8 +203,18 @@ func (m *Manager) Callback(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	user, err := m.repo.UpsertGoogleUser(r.Context(), claims.Subject, strings.ToLower(claims.Email), claims.Name, claims.Picture)
+	user, err := m.repo.SignInGoogleUser(r.Context(), GoogleIdentity{
+		Subject: claims.Subject, Email: strings.ToLower(strings.TrimSpace(claims.Email)),
+		EmailVerified: claims.EmailVerified, HostedDomain: claims.HostedDomain,
+		Name: claims.Name, Picture: claims.Picture,
+	})
 	if err != nil {
+		reason := "account_storage"
+		if errors.Is(err, ErrGoogleAccountConflict) {
+			reason = "account_conflict"
+		}
+		// Do not log claims, tokens, database errors or OAuth query parameters.
+		slog.WarnContext(r.Context(), "Google sign-in failed", "stage", "account", "reason", reason)
 		m.redirectFailure(w, r)
 		return
 	}

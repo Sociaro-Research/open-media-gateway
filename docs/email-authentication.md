@@ -99,9 +99,26 @@ another login method cannot be overwritten or silently linked.
 Registering an existing account never replaces its password or owner ID. Existing
 Google users can choose **Forgot password?**, prove mailbox ownership and set an
 email password for the same account. Google sign-in remains available to them.
-A new Google subject is never automatically linked to an email-only account just
-because its address matches; use email sign-in for that account. Linking such a
-Google identity would require a separate authenticated account-linking flow.
+Google sign-in reuses an existing email-only account when the verified ID token
+proves that Google is authoritative for the same mailbox: a `@gmail.com` address,
+or `email_verified=true` with a nonempty Google Workspace `hd` claim. The callback
+validates the token's signature, issuer, audience, expiry and nonce before passing
+these claims to account resolution. The link retains the user's ID, profile,
+password, role flags, memberships and saved data. Repeated sign-in uses Google's
+stable `sub`, even when the email later changes. An account already bound to a
+different Google subject is never reassigned or merged.
+
+For an external address without `hd`, `email_verified=true` alone does not prove
+current mailbox ownership. Such an identity may create a new account or return
+to its previously linked account, but cannot take over a matching email-only
+account. Use email sign-in or mailbox recovery for that account. An explicit
+authenticated linking flow for these external addresses is not provided.
+See [Google's email-ownership guidance](https://developers.google.com/identity/gsi/web/guides/verify-google-id-token).
+
+Concurrent first sign-ins resolve through the unique email index: matching
+subjects reuse one owner, while competing subjects cannot replace the winner.
+Account-resolution failures are logged with a safe reason (`account_conflict`
+or `account_storage`), without email addresses, tokens or database error details.
 
 ## Passwords, tokens and sessions
 
@@ -150,7 +167,9 @@ Expired limits and challenges are cleaned during subsequent requests.
 `internal/postgres/email_auth_test.go` runs the full lifecycle against an isolated
 PostgreSQL database with an in-memory mail sink. It covers single-use concurrency,
 the email-first boundary, legacy links, grant expiry, password reset/session invalidation, Google-account recovery, lack of
-implicit identity linking, throttling and disabled delivery. Resend tests use a
+unproven identity linking, throttling and disabled delivery. The Google tests
+add authoritative Gmail/Workspace linking, retained account data and credentials,
+immutable subject bindings and simultaneous sign-ins. Resend tests use a
 fake HTTP transport; UI tests use local API fixtures. No tests send real email.
 
 Run `make verify`, `make release-check`, and the PostgreSQL test with
