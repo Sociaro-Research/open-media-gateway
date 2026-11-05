@@ -129,8 +129,11 @@ type StablecoinRepository interface {
 }
 
 func (m *Manager) saveStablecoin(ctx context.Context, actor, id string, in ProviderUpdate) (ProviderView, error) {
-	if strings.TrimSpace(in.Name) == "" || len(in.Name) > 100 || in.Stablecoin.Validate() != nil {
-		return ProviderView{}, ErrInvalid
+	if strings.TrimSpace(in.Name) == "" || len(in.Name) > 100 {
+		return ProviderView{}, invalidProviderName()
+	}
+	if err := in.Stablecoin.Validate(); err != nil {
+		return ProviderView{}, invalid("stablecoin.wallets", "provide 1–3 wallets on distinct supported networks, each with a nonzero EVM address and 1–2 distinct supported tokens")
 	}
 	if in.Enabled {
 		repo, ok := m.Repo.(VATRepository)
@@ -162,8 +165,11 @@ func (m *Manager) saveStablecoin(ctx context.Context, actor, id string, in Provi
 	return m.view(p), err
 }
 func (m *Manager) StablecoinCheckout(ctx context.Context, actor, org string, in StablecoinInput, key string) (Payment, error) {
-	if _, err := Cents(in.Amount); err != nil || !ValidReference(key) {
-		return Payment{}, ErrInvalid
+	if _, err := Cents(in.Amount); err != nil {
+		return Payment{}, err
+	}
+	if !ValidReference(key) {
+		return Payment{}, invalidReference("Idempotency-Key")
 	}
 	if !validBilling(in.Billing) {
 		return Payment{}, ErrInvalid

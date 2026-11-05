@@ -35,7 +35,16 @@ func paymentError(w http.ResponseWriter, e error) {
 	case errors.Is(e, payments.ErrAmountExhausted):
 		writeError(w, 409, "payment_amount_exhausted", "No unused payment amounts remain. Choose another top-up amount.")
 	case errors.Is(e, payments.ErrInvalid):
-		writeError(w, 400, "invalid_payment", "Use USD with whole cents, between $1 and $10,000, and the documented payment fields.")
+		var validation *payments.ValidationError
+		if errors.As(e, &validation) {
+			field, message := validation.Diagnostic()
+			writeAPIError(w, 400, "invalid_payment", message, &field)
+		} else {
+			writeError(w, 400, "invalid_payment", "Check the documented fields for this payment operation and correct the request. If it persists, ask an administrator to check the payment provider configuration.")
+		}
+	case errors.Is(e, payments.ErrCallbackOrigin):
+		field := "AUTH_PUBLIC_URL"
+		writeAPIError(w, 503, "service_unavailable", "Ask an administrator to set AUTH_PUBLIC_URL to an HTTPS origin without a path, query, fragment or embedded credentials before saving the payment provider.", &field)
 	case errors.Is(e, payments.ErrForbidden):
 		writeError(w, 403, "forbidden", "This payment operation is not permitted.")
 	case errors.Is(e, payments.ErrSignature):
@@ -50,9 +59,9 @@ func paymentError(w http.ResponseWriter, e error) {
 		orgError(w, e)
 	}
 }
-func paymentID(w http.ResponseWriter, id string) bool {
+func paymentID(w http.ResponseWriter, id, field string) bool {
 	if _, e := uuid.Parse(id); e != nil {
-		paymentError(w, payments.ErrInvalid)
+		writeAPIError(w, 400, "invalid_payment", field+": use a valid UUID", &field)
 		return false
 	}
 	return true
@@ -104,7 +113,7 @@ func (s *Server) paymentProviders(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id := r.PathValue("id")
-	if id != "" && !paymentID(w, id) {
+	if id != "" && !paymentID(w, id, "id") {
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 12*time.Second)
@@ -177,7 +186,7 @@ func (s *Server) organizationPayments(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	org := r.PathValue("org")
-	if !paymentID(w, org) {
+	if !paymentID(w, org, "org") {
 		return
 	}
 	if bound := credentialOrganization(r.Context()); bound != "" && bound != org {
@@ -230,7 +239,7 @@ func (s *Server) organizationPayments(w http.ResponseWriter, r *http.Request) {
 	}
 	id := r.PathValue("id")
 	if id != "" {
-		if !paymentID(w, id) {
+		if !paymentID(w, id, "id") {
 			return
 		}
 		p, e := s.payments.Repo.Payment(ctx, id)
@@ -329,7 +338,7 @@ func (s *Server) organizationPayments(w http.ResponseWriter, r *http.Request) {
 		Token      string                  `json:"token"`
 		Billing    payments.BillingProfile `json:"billing"`
 	}
-	if !decodeSystem(w, r, &in) || !paymentID(w, in.ProviderID) {
+	if !decodeSystem(w, r, &in) || !paymentID(w, in.ProviderID, "provider_id") {
 		return
 	}
 	var p payments.Payment
@@ -345,7 +354,7 @@ func (s *Server) organizationPayments(w http.ResponseWriter, r *http.Request) {
 	s.writeViewerJSON(w, r, 201, p)
 }
 func (s *Server) paymentWebhook(w http.ResponseWriter, r *http.Request) {
-	if !s.paymentsAvailable(w) || !paymentID(w, r.PathValue("id")) {
+	if !s.paymentsAvailable(w) || !paymentID(w, r.PathValue("id"), "id") {
 		return
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 256<<10)
@@ -364,7 +373,7 @@ func (s *Server) paymentWebhook(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(204)
 }
 func (s *Server) externalSettlement(w http.ResponseWriter, r *http.Request) {
-	if !s.paymentsAvailable(w) || !paymentID(w, r.PathValue("id")) {
+	if !s.paymentsAvailable(w) || !paymentID(w, r.PathValue("id"), "id") {
 		return
 	}
 	// Separate trust domain: browser sessions, gateway keys, and Stripe secrets

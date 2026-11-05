@@ -46,7 +46,7 @@ func (s *Server) organizationVATVerification(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	org := r.PathValue("org")
-	if !paymentID(w, org) {
+	if !paymentID(w, org, "org") {
 		return
 	}
 	if bound := credentialOrganization(r.Context()); bound != "" && bound != org {

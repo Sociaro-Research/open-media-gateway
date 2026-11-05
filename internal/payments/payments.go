@@ -156,10 +156,28 @@ type ExternalInput struct {
 
 func (s ExternalInput) Validate() error {
 	if _, err := uuid.Parse(s.OrganizationID); err != nil {
-		return ErrInvalid
+		return invalid("organization_id", "use a valid organization UUID")
 	}
-	if !ValidReference(s.ExternalID) || s.Currency != "usd" || s.AmountCents < MinCents || s.AmountCents > MaxCents || s.Revision < 1 || s.FeeCents < 0 || s.FeeCents > s.AmountCents || s.RefundedCents < 0 || s.HeldCents < 0 || s.RefundedCents > s.AmountCents || s.HeldCents > s.AmountCents {
-		return ErrInvalid
+	if !ValidReference(s.ExternalID) {
+		return invalidReference("external_id")
+	}
+	if s.Currency != "usd" {
+		return invalid("currency", "use usd")
+	}
+	if s.AmountCents < MinCents || s.AmountCents > MaxCents {
+		return invalid("amount_cents", "use an integer between 100 and 1000000 cents ($1–$10,000)")
+	}
+	if s.Revision < 1 {
+		return invalid("revision", "use an integer of at least 1")
+	}
+	if s.FeeCents < 0 || s.FeeCents > s.AmountCents {
+		return invalid("fee_cents", "use an integer from 0 through amount_cents")
+	}
+	if s.RefundedCents < 0 || s.RefundedCents > s.AmountCents {
+		return invalid("refunded_cents", "use an integer from 0 through amount_cents")
+	}
+	if s.HeldCents < 0 || s.HeldCents > s.AmountCents {
+		return invalid("held_cents", "use an integer from 0 through amount_cents")
 	}
 	return nil
 }
@@ -168,11 +186,11 @@ func ValidReference(s string) bool {
 }
 func Cents(u money.USD) (int64, error) {
 	if u%10000 != 0 {
-		return 0, ErrInvalid
+		return 0, invalidAmount()
 	}
 	v := int64(u) / 10000
 	if v < MinCents || v > MaxCents {
-		return 0, ErrInvalid
+		return 0, invalidAmount()
 	}
 	return v, nil
 }
@@ -245,8 +263,14 @@ func (m *Manager) Save(ctx context.Context, actor, id string, in ProviderUpdate)
 	if in.Kind == "stablecoin" {
 		return m.saveStablecoin(ctx, actor, id, in)
 	}
-	if (in.FeeMode != "service" && in.FeeMode != "organization") || in.Kind != "stripe" || strings.TrimSpace(in.Name) == "" || len(in.Name) > 100 {
-		return ProviderView{}, ErrInvalid
+	if in.FeeMode != "service" && in.FeeMode != "organization" {
+		return ProviderView{}, invalid("fee_mode", "choose service or organization")
+	}
+	if in.Kind != "stripe" {
+		return ProviderView{}, invalid("kind", "choose stripe or stablecoin; create external integrations through /v1/system/payment-integrations")
+	}
+	if strings.TrimSpace(in.Name) == "" || len(in.Name) > 100 {
+		return ProviderView{}, invalidProviderName()
 	}
 	p := Provider{ID: uuid.NewString(), Kind: in.Kind, CreatedBy: actor}
 	c := Credentials{}
@@ -272,12 +296,15 @@ func (m *Manager) Save(ctx context.Context, actor, id string, in ProviderUpdate)
 	if in.WebhookSecret != "" {
 		c.WebhookSecret = strings.TrimSpace(in.WebhookSecret)
 	}
-	if len(c.SecretKey) > 512 || len(c.WebhookSecret) > 512 || (in.Enabled && c.WebhookSecret == "" || c.WebhookSecret != "" && !strings.HasPrefix(c.WebhookSecret, "whsec_")) || strings.ContainsAny(c.SecretKey+c.WebhookSecret, " \r\n\t") || !(strings.HasPrefix(c.SecretKey, "sk_") || strings.HasPrefix(c.SecretKey, "rk_")) {
-		return ProviderView{}, ErrInvalid
+	if len(c.SecretKey) > 512 || strings.ContainsAny(c.SecretKey, " \r\n\t") || !(strings.HasPrefix(c.SecretKey, "sk_") || strings.HasPrefix(c.SecretKey, "rk_")) {
+		return ProviderView{}, invalid("secret_key", "provide a Stripe restricted key (rk_) or secret key (sk_) of at most 512 bytes without whitespace; keep the key private")
+	}
+	if len(c.WebhookSecret) > 512 || in.Enabled && c.WebhookSecret == "" || c.WebhookSecret != "" && !strings.HasPrefix(c.WebhookSecret, "whsec_") || strings.ContainsAny(c.WebhookSecret, " \r\n\t") {
+		return ProviderView{}, invalid("webhook_secret", "provide a whsec_ signing secret of at most 512 bytes without whitespace; it is required when enabled and must remain private")
 	}
 	u, e := url.Parse(m.PublicURL)
 	if e != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.Path != "" {
-		return ProviderView{}, errors.New("payment callbacks require AUTH_PUBLIC_URL to be an HTTPS origin")
+		return ProviderView{}, ErrCallbackOrigin
 	}
 	a, e := m.adapters[p.Kind].Check(ctx, c)
 	if e != nil {
@@ -319,7 +346,7 @@ func (m *Manager) Check(ctx context.Context, id string) (Account, error) {
 	}
 	adapter, ok := m.adapters[p.Kind]
 	if !ok {
-		return Account{}, ErrInvalid
+		return Account{}, invalid("kind", "ask an administrator to check that this payment provider has a supported adapter")
 	}
 	a, e := adapter.Check(ctx, c)
 	if e == nil && (a.ID != p.AccountID || a.Live != p.Live) {
@@ -332,8 +359,14 @@ func (m *Manager) Checkout(ctx context.Context, actor, org, provider string, amo
 }
 func (m *Manager) CheckoutBilling(ctx context.Context, actor, org, provider string, amount money.USD, key, feeMode string, profile BillingProfile) (result Payment, resultErr error) {
 	cents, e := Cents(amount)
-	if e != nil || !ValidReference(key) || (feeMode != "service" && feeMode != "organization") {
-		return Payment{}, ErrInvalid
+	if e != nil {
+		return Payment{}, e
+	}
+	if !ValidReference(key) {
+		return Payment{}, invalidReference("Idempotency-Key")
+	}
+	if feeMode != "service" && feeMode != "organization" {
+		return Payment{}, invalid("fee_mode", "choose service or organization")
 	}
 	var p Payment
 	if repo, ok := m.Repo.(LocalInvoiceRepository); ok {
@@ -499,7 +532,7 @@ func (m *Manager) Webhook(ctx context.Context, provider string, body []byte, sig
 // NewIntegration returns its bearer credential once; only a digest is retained.
 func (m *Manager) NewIntegration(ctx context.Context, actor, name string, live bool) (Provider, string, error) {
 	if strings.TrimSpace(name) == "" || len(name) > 100 {
-		return Provider{}, "", ErrInvalid
+		return Provider{}, "", invalidProviderName()
 	}
 	b := make([]byte, 32)
 	if _, e := rand.Read(b); e != nil {
