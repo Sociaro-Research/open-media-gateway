@@ -125,9 +125,10 @@ code before explicitly choosing **Connect**; the supplied name/address is not
 verified ownership. Sign-in, inspection or closing the dialog grants nothing.
 The customer who initiated the connection approves it; a central operator does
 not approve on another customer's behalf or become its default billing account.
-The compact permission text discloses generation-only access, up to 30 days,
-and charges against the installation company's Sociaro balance, without adding
-credit or account administration.
+For a new `company-api-v1` approval, the permission text discloses access to the
+company's generation, members, billing and API keys, active until revoked. It
+does not add credit or grant system administration. Existing `generation-v1`
+approvals retain their separate generation-only permission text and expiry.
 
 Approval shows a plain return instruction. There is no redirect to the reported
 installation address or wildcard cross-window messaging. The local UI shows
@@ -165,8 +166,9 @@ Preserve the database and encryption key when restoring an installation; a
 cloned database retains its installation identity and must be treated as a
 restore, not as a distinct new installation.
 
-The local backend polls with a random 32-byte device secret; the browser sees
-only a short verification code and safe metadata. No inbound callback, public
+The local backend polls with a random 32-byte device secret that is never
+returned to the browser. The approval window shows a short verification code
+and safe request metadata. No inbound callback, public
 self-hosted domain, CORS expansion or shared client secret is required, so
 localhost/LAN clients work through outbound HTTPS. Requests expire after ten
 minutes and enforce polling/rate limits. This is a bounded device-style protocol
@@ -176,16 +178,39 @@ hashes are stored on the host.
 
 After browser approval and proof of the device secret, the host rechecks current
 company ownership, account role and policy. It uses the existing API-key issuer
-to create one shared, company-bound, **generation-only** customer key, valid for
-30 days. Existing per-key request limits, active-key limits, company funds and
+to create one shared, company-bound customer key. New `company-api-v1` approvals
+issue the scopes `generation`, `organizations:manage` and `keys:manage`, with
+no fixed expiry. Existing per-key request limits, active-key limits, company funds and
 member allowance apply. A lost successful response returns the same credential,
 not another key. Delivery ciphertext is inaccessible after request expiry and is
 cleared during subsequent starts or explicit revocation/cancellation. The local
 backend verifies `/v1/key` before atomically saving its encrypted credential.
-The browser never receives that credential; upstream provider keys stay on the
-host. Protect database backups and keep the existing encryption key stable.
+The approved access version is retained on retries; replaying an existing
+approval or issued key never silently expands its scopes or removes its expiry.
+Upstream provider keys stay on the host. Protect database backups and keep the
+existing encryption key stable.
 
-Every proxy call carries the opaque `context` from the connection the user
+#### Current company interface
+
+The owning local Administrator's signed-in browser receives the saved company
+key from `/auth/company-connection` in a `no-store, private` response. Other local
+users cannot retrieve it. It is an ordinary bearer credential accessible to that
+browser and its JavaScript, so use HTTPS outside loopback development. The fixed
+central proxy requires that owner's local session, the exact saved bearer key
+and `X-Company-Context`; writes also require the local Origin. Central APIs keep
+their existing scopes, membership and role checks. The key remains encrypted at
+rest locally. See [Frontend separation](frontend-separation.md#connect-the-existing-ui-to-sociaro)
+for the current interface, media transport and failure behavior.
+
+#### Legacy generation workspace
+
+Existing `generation-v1` approvals remain generation-only, valid for up to
+30 days. This access version is separate from the installation's
+`legacy`/`dedicated` provisioning state; an older dedicated generation grant
+does not gain company-management scopes. The legacy generation proxy keeps its
+saved bearer credential in the backend.
+
+Every call through that generation proxy carries the opaque `context` from the connection the user
 reviewed, including its revision, remote origin, company and account binding.
 `X-Workspace-Context` is required; GET/HEAD result links can instead use the
 `workspace_context` query value. Missing context returns 428; a changed context
@@ -194,10 +219,10 @@ keeps that original destination/credential even if the saved connection changes
 later. Response links carry the admitted snapshot context. The token is a
 precondition, not an authentication credential.
 
-The customer's daily catalogue, estimate, asynchronous generation, latest 20
+In that workspace, the customer's daily catalogue, estimate, asynchronous generation, latest 20
 history items, balance and result downloads remain in the local interface.
 The host remains authoritative for membership, model grants, prices/markup,
-reservations, billing, files and retention. There is no local task mirror or
+funding and allowances, billing, files and retention. There is no local task mirror or
 second local debit. Uncertain submissions retain their frozen payload and
 operation key in browser session storage across reload and same-account/company
 renewal, including renewed local sign-in. Their storage scope excludes connection
@@ -228,12 +253,15 @@ payments. The connection wizard performs no top-up transaction and introduces no
 new identity or billing system. Registration/email delivery, provider rights and
 host configuration remain prerequisites.
 
-**Reconnect** confirms a replacement generation-only key for the same
+**Reconnect** confirms a replacement key for the same
 installation company, preserving the current connection until verification
 succeeds. The customer may explicitly revoke this installation's own prior key
 as the replacement is issued. Keys from another installation cannot be rotated
-through this request, even when the customer owns both companies. Automatic
-renewal and refresh tokens are outside this flow; reauthorize before expiry.
+through this request, even when the customer owns both companies. New company
+access requires explicit `company-api-v1` consent and has no fixed expiry;
+retained `generation-v1` approvals keep their original scopes and expiry.
+Automatic renewal and refresh tokens are outside this flow. For an expiring
+generation grant, reauthorize explicitly before expiry.
 
 The account menu shows **Installation access** only when that account has
 issued grant records. It lists that customer's own installation/company access,
@@ -283,9 +311,9 @@ dropping these structures, grants, credits or task snapshots. Old binaries do
 not understand dedicated onboarding: avoid starting new onboarding while running
 an older release, and keep a verified backup for an explicit disaster restore.
 
-### Transfer and failure boundaries
+### Legacy generation proxy limits
 
-The proxy permits only catalogue, current credential/balance, generation
+The legacy generation proxy permits only catalogue, current credential/balance, generation
 estimate/submission/history/status and authorized result downloads. It has no
 arbitrary management, payment or credential-creation proxy. Remote JSON is limited
 to 4 MiB and downloads to 512 MiB. Tokens go only to the configured origin; API

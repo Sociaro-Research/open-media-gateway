@@ -39,3 +39,27 @@ class GoogleAuthenticationDocumentation(unittest.TestCase):
         self.assertNotIn("bootstrap the first key", spec)
         self.assertNotIn("Only registered when Google OAuth is configured", spec)
         self.assertIn("Sign-in does not create an API key", spec)
+
+
+class CompanyConnectionDocumentation(unittest.TestCase):
+    def test_current_company_access_is_distinct_from_generation_access(self):
+        administration = guide("system-administration.md")
+        self.assertIn("`company-api-v1`", administration)
+        for scope in ("generation", "organizations:manage", "keys:manage"):
+            self.assertIn(f"`{scope}`", administration)
+        self.assertIn("no fixed expiry", administration)
+        self.assertIn("`/auth/company-connection`", administration)
+        self.assertIn("`X-Company-Context`", administration)
+        self.assertIn("no-store, private", administration)
+        self.assertIn("ordinary bearer credential", administration)
+
+    def test_generation_proxy_limits_and_context_remain_explicitly_scoped(self):
+        text = (ROOT / "docs/system-administration.md").read_text()
+        legacy = re.search(
+            r"^#### Legacy generation workspace\n(.*?)(?=^### )",
+            text, re.MULTILINE | re.DOTALL)
+        self.assertIsNotNone(legacy, "Keep the earlier generation workspace separate")
+        legacy = " ".join(legacy[1].split())
+        for term in ("`generation-v1`", "generation-only", "30 days", "`X-Workspace-Context`"):
+            self.assertIn(term, legacy)
+        self.assertIn("### Legacy generation proxy limits", text)
