@@ -54,6 +54,10 @@ const upstream=http.createServer((req,res)=>{
  await request('/site.json',404,docs,'POST');
  browser=await chromium.launch({headless:true,...(process.env.UI_BROWSER_ENGINE!=='webkit'&&process.env.UI_BROWSER_PATH?{executablePath:process.env.UI_BROWSER_PATH}:{})});
  const context=await browser.newContext(),page=await context.newPage(),errors=[];page.on('pageerror',e=>{if(process.env.UI_BROWSER_ENGINE==='webkit'&&e.message==='ResizeObserver loop completed with undelivered notifications.'){console.warn('WebKit resize notice: '+e.message);return;}errors.push(e.message);});
+ // Keep the configured public Console origin in the browser, serving its real
+ // responses from this isolated Caddy instance rather than making external I/O.
+ const consoleNavigations=[];
+ await context.route('https://console.example.test/**',async route=>{const target=new URL(route.request().url());if(route.request().isNavigationRequest())consoleNavigations.push(target.href);const response=await route.fetch({url:base+target.pathname+target.search});await route.fulfill({response});});
  const screenshots=process.env.UI_SCREENSHOT_DIR||path.join(tmp,'screenshots');fs.mkdirSync(screenshots,{recursive:true});
  for(const theme of ['dark','light'])for(const width of [1440,390,320]){
   await page.setViewportSize({width,height:1000});await page.emulateMedia({colorScheme:theme});await page.goto(base+'/');await page.evaluate(()=>GatewaySite.ready);
@@ -68,20 +72,33 @@ const upstream=http.createServer((req,res)=>{
   await page.setViewportSize({width,height:1000});await page.emulateMedia({colorScheme:theme});
   const cssResponse=page.waitForResponse(r=>new URL(r.url()).pathname==='/ui/legal.css');
   await page.goto(base+legal);await page.evaluate(()=>GatewaySite.ready);
+  await page.evaluate(mode=>GatewayTheme.apply(mode),theme);
   assert.equal((await cssResponse).status(),200,'Anonymous legal stylesheet');
   await page.getByRole('heading',{name:legal==='/privacy'?'Privacy Policy':'Terms of Use',exact:true}).waitFor();
-  const layout=await page.locator('main').evaluate(n=>({padding:getComputedStyle(n).paddingTop,width:n.getBoundingClientRect().width,bodyWidth:document.body.getBoundingClientRect().width,clientWidth:document.documentElement.clientWidth}));
-  assert.equal(layout.padding,'64px','Legal stylesheet applied');
-  if(Math.abs(layout.width-Math.min(760,width-40))>=1)console.log('Legal viewport measurement',JSON.stringify({legal,theme,viewportWidth:width,...layout}));
-  assert.ok(Math.abs(layout.width-Math.min(760,layout.bodyWidth-40))<1,'Legal content width '+JSON.stringify(layout));
+  await page.waitForFunction(()=>[...document.querySelectorAll('.brand img')].every(n=>n.complete&&n.naturalHeight));
+  await page.evaluate(()=>document.fonts.ready);await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
+  const header=page.getByRole('banner'),nav=header.getByRole('navigation',{name:'Main navigation'}),brandLink=header.locator('.brand');
+  assert.equal(await header.count(),1);assert.equal(await nav.locator('[aria-current]').count(),0,'Legal navigation must not mark Console or Docs current');
+  const consoleLink=nav.getByRole('link',{name:'Console',exact:true}),docsLink=nav.getByRole('link',{name:'Docs',exact:true});
+  const target=new URL(await consoleLink.getAttribute('href')),docsTarget=new URL(await docsLink.getAttribute('href'));
+  assert.equal(target.origin,'https://console.example.test');assert.equal(target.pathname,'/');assert.equal(docsTarget.origin,target.origin);assert.equal(docsTarget.pathname,'/docs');
+  assert.equal(await brandLink.getAttribute('href'),target.href);assert.equal(await brandLink.getAttribute('aria-label'),brand.name);
+  assert.equal(target.searchParams.get('theme'),theme,'Configured navigation transfers the selected display mode');
+  const layout=await page.evaluate(()=>{const main=document.querySelector('main'),shell=document.querySelector('.shell').getBoundingClientRect(),box=main.getBoundingClientRect(),header=document.querySelector('.topbar').getBoundingClientRect(),footer=document.querySelector('.site-footer').getBoundingClientRect(),style=getComputedStyle(main);return {padding:parseFloat(style.paddingTop),bottom:parseFloat(style.paddingBottom),section:parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--space-section')),width:box.width,left:box.left,right:box.right,top:box.top,bottomEdge:box.bottom,shellWidth:shell.width,shellLeft:shell.left,shellRight:shell.right,headerLeft:header.left,headerRight:header.right,headerBottom:header.bottom,footerTop:footer.top};});
+  assert.equal(layout.section,32);assert.equal(layout.padding,layout.section,'Legal top spacing uses the shared section token');assert.equal(layout.bottom,80,'Legal bottom spacing');
+  assert.ok(Math.abs(layout.width-Math.min(760,layout.shellWidth))<1,'Legal content width inside shared shell '+JSON.stringify(layout));
+  assert.ok(Math.abs((layout.left-layout.shellLeft)-(layout.shellRight-layout.right))<1,'Legal content remains centered');
+  assert.ok(Math.abs(layout.headerLeft-layout.shellLeft)<1&&Math.abs(layout.headerRight-layout.shellRight)<1,'Shared header aligns with shell');
+  assert.ok(layout.headerBottom<=layout.top&&layout.bottomEdge<=layout.footerTop+1,'Header, document and footer must not overlap');
+  if(width<=760)assert.ok(Math.abs(layout.shellLeft-12)<1,'Mobile shell keeps the shared12px gutter');
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Legal page overflow '+legal+' '+width);
   await page.screenshot({path:path.join(screenshots,`${legal.slice(1)}-${theme}-${width}.png`)});
-  const home=page.locator('a.back[href="/"]');assert.equal(await home.getAttribute('aria-label'),brand.name);await home.focus();assert.ok(await home.evaluate(n=>n===document.activeElement));await page.keyboard.press('Enter');
-  await page.waitForURL(base+'/');await page.getByText('Sign in to get started',{exact:true}).waitFor();
+  const home=legal==='/privacy'?brandLink:consoleLink;await home.focus();assert.ok(await home.evaluate(n=>n===document.activeElement&&n.matches(':focus-visible')));const navigationsBefore=consoleNavigations.length;await page.keyboard.press('Enter');
+  await page.waitForURL(u=>u.origin===target.origin&&u.pathname==='/');assert.equal(consoleNavigations.length,navigationsBefore+1,'Every keyboard activation must visit the configured origin');assert.equal(consoleNavigations.at(-1),target.href,'Keyboard follows the configured Console destination');await page.getByText('Sign in to get started',{exact:true}).waitFor();
  }
  await context.addCookies([{name:'test_session',value:'alice',url:base}]);
  for(const width of [1440,390,320]){await page.setViewportSize({width,height:1000});await page.goto(base+'/');await page.evaluate(()=>GatewaySite.ready);await page.locator('#generationView').waitFor();assert.deepEqual(await page.evaluate(()=>({authState,consoleInitialized,initializationPending,connected:CompanyConnection.active()})),{authState:'authenticated',consoleInitialized:true,initializationPending:false,connected:false});await page.waitForFunction(()=>[...document.querySelectorAll('.brand img')].every(n=>n.complete&&n.naturalHeight));await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));const mark=await page.locator('.brand').boundingBox(),nav=await page.locator('#sectionNav').boundingBox();assert.ok(mark.x+mark.width<=nav.x+1||mark.y+mark.height<=nav.y+1,'Brand overlaps navigation '+width);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Console overflow '+width);await page.screenshot({path:path.join(screenshots,`console-${width}.png`)});}
  await page.goto('http://localhost:'+port+'/');await page.evaluate(()=>GatewaySite.ready);await page.waitForFunction(()=>document.title.includes('White <Label>'));
  await page.getByRole('heading',{name:'Build with Gateway.',exact:true}).waitFor();assert.equal(await page.locator('.operation-error').count(),0);await page.locator('#docsSearch').fill('patch');await page.locator('#docsMenu a').filter({hasText:'PATCH'}).click();await page.getByRole('heading',{name:'Update profile',exact:true}).waitFor();assert.ok((await page.locator('#docsContent').innerText()).includes('GATEWAY_COOKIE_JAR'));assert.ok(!(await page.locator('#docsContent').innerText()).includes('Bearer $GATEWAY_API_KEY'));const reverse=new URL(await page.locator('[data-console-link]').first().getAttribute('href'));assert.equal(reverse.origin,'https://console.example.test');assert.equal(reverse.pathname,'/');assert.equal(reverse.searchParams.get('theme'),'system');assert.equal(await page.locator('meta[name="gateway-url"]').getAttribute('content'),'https://api.example.test');
- await page.screenshot({path:path.join(screenshots,'docs-320.png')});assert.deepEqual(errors,[]);console.log('PASS: independent Caddy UI, anonymous styled Privacy/Terms and keyboard Home, private session gating, API/capability proxying, docs isolation, branding, both themes and 1440/390/320px layouts. Screenshots: '+screenshots);
+ await page.screenshot({path:path.join(screenshots,'docs-320.png')});assert.deepEqual(errors,[]);console.log('PASS: independent Caddy UI, anonymous styled Privacy/Terms with shared header/token spacing and configured keyboard Console navigation, private session gating, API/capability proxying, docs isolation, branding, both themes and1440/390/320px layouts. Screenshots: '+screenshots);
 })().catch(error=>{console.error(error);process.exitCode=1}).finally(async()=>{await browser?.close();upstream.close();if(caddy&&caddy.exitCode===null){caddy.kill('SIGTERM');await new Promise(r=>caddy.once('exit',r))}});

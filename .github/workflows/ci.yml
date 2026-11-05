@@ -250,7 +250,8 @@ jobs:
           UI_BROWSER_ENGINE=webkit node scripts/ui/automatic-update-dom.cjs
           node scripts/ui/templates.cjs
           UI_BROWSER_ENGINE=webkit node scripts/ui/templates.cjs
-          node scripts/ui/separation.cjs
+          UI_SCREENSHOT_DIR=ui-performance-results/separation/chromium node scripts/ui/separation.cjs
+          UI_SCREENSHOT_DIR=ui-performance-results/separation/webkit UI_BROWSER_ENGINE=webkit node scripts/ui/separation.cjs
           node scripts/ui/monitoring.cjs
           node scripts/ui/origin-security.cjs
           node scripts/ui/log-security.cjs
