@@ -1,10 +1,17 @@
 // Actual request helper + archived media renderer; all routes are synthetic.
-const {chromium,webkit}=require('playwright'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),crypto=require('node:crypto');
+const {chromium,webkit}=require('playwright'),fs=require('node:fs'),path=require('node:path'),http=require('node:http'),assert=require('node:assert/strict'),crypto=require('node:crypto');
 const root=path.resolve(process.env.UI_SOURCE_DIR||'web/public/ui'),engine=process.env.UI_BROWSER_ENGINE||'chromium',baseline=process.env.UI_BASELINE==='1';
 const out=path.resolve(process.env.UI_EVIDENCE_DIR||'.local/portal-errors/'+engine);fs.mkdirSync(out,{recursive:true});
 const app=fs.readFileSync(path.join(root,'app.js'),'utf8'),api=app.slice(app.indexOf('async function api('),app.indexOf('\nProviderLogos.configure('));
 const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGNoaGgAAAMEAYFL09IQAAAAAElFTkSuQmCC','base64');
 const deferred=()=>{let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve}};
+// WebKit downloads leave route interception; serve the actual attachment bytes
+// on loopback so both engines must emit a real download event.
+const server=http.createServer((req,res)=>{
+ const url=new URL(req.url,'http://fixture');
+ if(url.pathname==='/signed/file'&&url.searchParams.has('download'))return res.writeHead(200,{'Content-Type':'application/octet-stream','Content-Disposition':'attachment; filename=synthetic.bin'}).end('synthetic');
+ res.writeHead(404).end();
+});
 const html=`<!doctype html><html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/styles.css"><body><main class="shell"><section class="panel"><h2>Journal</h2><article id="task"><div class="task-result"></div></article></section><section class="panel"><h2>Settings</h2><button id="settings" class="secondary">Save settings</button><p id="settings-status" class="form-message" role="status"></p></section><section class="panel"><h2>Keys</h2><button id="keys" class="secondary">Create key</button><p id="keys-status" class="form-message" role="status"></p></section></main><script src="/generation-artifacts.js"></script><script>
 let sharedConfiguration=false,authMode='google',generationKeyVersion=0;
 window.GenerationKey={ensureSession:async()=>{},value:()=> 'synthetic-key',forget:()=>{}};window.ProviderLogos={clear:()=>{}};
@@ -13,10 +20,10 @@ window.render=kind=>{const article=document.querySelector('#task');article.media
 for(const id of ['settings','keys'])document.querySelector('#'+id).onclick=async()=>{try{await api(id==='settings'?'/v1/system/settings':'/v1/api-keys',{method:id==='settings'?'PATCH':'POST',body:'{}'});document.querySelector('#'+id+'-status').textContent='Saved';}catch(e){document.querySelector('#'+id+'-status').textContent=e.message;}};
 </script></html>`;
 (async()=>{
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));const base='http://127.0.0.1:'+server.address().port;
  const browser=await ({chromium,webkit}[engine]).launch({headless:true,...(process.env.UI_BROWSER_PATH?{executablePath:process.env.UI_BROWSER_PATH}:{})});
  const page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[],external=[],checks=[],metrics=[];page.setDefaultTimeout(10000);page.on('pageerror',e=>errors.push(e.message));
  let issue=null,accessGate=null,textGate=null,textStatus=200,reads=0,grant=0;
- const base='https://portal.test';
  await page.route('**/*',async route=>{
   const url=new URL(route.request().url());if(url.origin!==base){external.push(url.origin);return route.abort();}
   if(url.pathname==='/')return route.fulfill({contentType:'text/html',body:html});
@@ -27,7 +34,7 @@ for(const id of ['settings','keys'])document.querySelector('#'+id).onclick=async
    const token=++grant;return route.fulfill({contentType:'application/json',body:JSON.stringify({artifacts:[{id:'1',preview_url:'/signed/file?grant='+token+'&variant=%2F',download_url:'/signed/file?grant='+token+'&download=1'}]})});
   }
   if(url.pathname==='/signed/file'){
-   if(url.searchParams.has('download'))return route.fulfill({headers:{'Content-Type':'application/octet-stream','Content-Disposition':'attachment; filename=synthetic.bin'},body:'synthetic'});
+   if(url.searchParams.has('download'))return route.continue();
    if(textGate){const held=textGate;held.started?.resolve();await held.promise;try{return await route.fulfill({status:textStatus,contentType:'text/plain',body:'Safe synthetic text'});}catch{return;}}
    return route.fulfill({status:textStatus,contentType:'image/png',body:png});
   }
@@ -79,5 +86,5 @@ for(const id of ['settings','keys'])document.querySelector('#'+id).onclick=async
   assert.deepEqual(errors,[]);assert.deepEqual(external,[]);
   fs.writeFileSync(path.join(out,'results.json'),JSON.stringify({engine,baseline,checks,metrics,errors,external,reads,hashes:Object.fromEntries(['app.js','generation-artifacts.js','styles.css'].map(f=>[f,crypto.createHash('sha256').update(fs.readFileSync(path.join(root,f))).digest('hex')]))},null,2));
  }catch(error){await page.screenshot({path:path.join(out,'failure.png'),fullPage:true});throw error;}
- finally{accessGate?.resolve();textGate?.resolve();await browser.close();}
-})().catch(e=>{console.error(e);process.exitCode=1});
+ finally{accessGate?.resolve();textGate?.resolve();await browser.close();server.closeAllConnections();server.close();}
+})().catch(e=>{console.error(e);server.closeAllConnections();server.close();process.exitCode=1});

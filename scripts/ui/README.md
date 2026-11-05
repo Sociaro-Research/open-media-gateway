@@ -25,7 +25,8 @@ preview/download feedback. The DOM fixture does not establish browser behavior
 or visual acceptance.
 
 `node scripts/ui/portal-errors.cjs` exercises the same helper and renderer in a
-browser with entirely synthetic intercepted routes, including failed Open popup
+browser with synthetic intercepted routes and a loopback attachment server,
+including failed Open popup
 cleanup, expired-link retry, pending text/action races, plain-text diagnosis and
 adjacent settings/key feedback. Repeat with `UI_BROWSER_ENGINE=webkit`; use
 `UI_EVIDENCE_DIR` for results, asset hashes and both-theme screenshots at
