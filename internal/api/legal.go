@@ -40,7 +40,7 @@ func (s *Server) legalSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	kind := r.PathValue("kind")
 	if !legal.ValidKind(kind) {
-		http.NotFound(w, r)
+		writeError(w, http.StatusNotFound, "not_found", "Legal document not found. Use privacy or terms as the document kind.")
 		return
 	}
 	store, ok := s.system.(legal.Store)
