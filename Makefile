@@ -1,5 +1,8 @@
 .PHONY: help build build-ui ui-update-check test test-race test-isolated test-recovery performance benchmark vet mod-check vulncheck fmt fmt-check verify verify-ci release-check up down logs
 
+# Whole-package suite budget; individual operation deadlines stay unchanged.
+TEST_TIMEOUT ?= 20m
+
 help:
 	@echo "Media Gateway development commands:"
 	@echo "  make verify     Check modules, formatting, vet, vulnerabilities, tests, and builds"
@@ -23,10 +26,10 @@ build:
 	go build ./cmd/gateway ./cmd/worker ./cmd/webhook-receiver
 
 test:
-	go test ./...
+	go test -timeout=$(TEST_TIMEOUT) ./...
 
 test-race:
-	go test -race $(TEST_FLAGS) ./...
+	go test -race -timeout=$(TEST_TIMEOUT) $(TEST_FLAGS) ./...
 
 vet:
 	go vet ./...

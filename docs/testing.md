@@ -20,6 +20,12 @@ versions/source identity and removes service data afterward. It never connects
 to existing application services. `make verify-ci` includes module/format checks,
 vet, vulnerability checks, race/integration tests and binary builds.
 
+The full `test` and `test-race` targets use a bounded 20-minute package budget
+(`TEST_TIMEOUT`, configurable for a scoped run). This is cumulative time for all
+tests in one package, not an extension of individual operation, network or lease
+deadlines. The hosted Go job has a separate 30-minute outer budget for setup,
+checks and builds; dedicated recovery and browser jobs retain their own limits.
+
 Plain `make verify` skips database/Redis integration tests without their test
 URLs. Do not report those skipped checks as passing.
 
