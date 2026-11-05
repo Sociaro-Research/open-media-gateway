@@ -58,7 +58,7 @@ func TestWebhookWorkerRespectsDeliveryDeadline(t *testing.T) {
 		{"future", now.Add(time.Nanosecond), 0},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			repo := &deliveryRepositoryStub{delivery: core.WebhookDelivery{ID: "delivery-1", Status: core.WebhookPending, NextAttemptAt: tc.due}}
+			repo := &deliveryRepositoryStub{delivery: core.WebhookDelivery{Payload: fixtureWebhookPayload(), ID: "delivery-1", Status: core.WebhookPending, NextAttemptAt: tc.due}}
 			sender := &countingSender{}
 			worker := NewWorker(repo, nil, sender, 3, time.Second)
 			worker.now = func() time.Time { return now }
@@ -73,7 +73,7 @@ func TestWebhookWorkerRespectsDeliveryDeadline(t *testing.T) {
 }
 
 func TestWebhookWorkerMarksSuccessfulDelivery(t *testing.T) {
-	repo := &deliveryRepositoryStub{delivery: core.WebhookDelivery{ID: "delivery-1", Status: core.WebhookPending}}
+	repo := &deliveryRepositoryStub{delivery: core.WebhookDelivery{Payload: fixtureWebhookPayload(), ID: "delivery-1", Status: core.WebhookPending}}
 	worker := NewWorker(repo, nil, senderStub{}, 3, time.Second)
 	if err := worker.process(context.Background(), repo.delivery.ID); err != nil {
 		t.Fatal(err)
@@ -84,7 +84,7 @@ func TestWebhookWorkerMarksSuccessfulDelivery(t *testing.T) {
 }
 
 func TestWebhookWorkerSchedulesRetryAndStopsAtLimit(t *testing.T) {
-	repo := &deliveryRepositoryStub{delivery: core.WebhookDelivery{ID: "delivery-1", Status: core.WebhookPending, Attempts: 1}}
+	repo := &deliveryRepositoryStub{delivery: core.WebhookDelivery{Payload: fixtureWebhookPayload(), ID: "delivery-1", Status: core.WebhookPending, Attempts: 1}}
 	worker := NewWorker(repo, nil, senderStub{err: errors.New("temporary failure")}, 2, time.Second)
 	worker.now = func() time.Time { return time.Unix(100, 0) }
 	if err := worker.process(context.Background(), repo.delivery.ID); err != nil {
@@ -150,7 +150,7 @@ func TestWebhookWorkerRetryDeadlineArithmetic(t *testing.T) {
 		{"terminal", time.Second, 1, 2, 2 * time.Second},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			repo := &deliveryRepositoryStub{delivery: core.WebhookDelivery{ID: "delivery-1", Status: core.WebhookPending, Payload: []byte(`{}`), Attempts: tc.attempts}}
+			repo := &deliveryRepositoryStub{delivery: core.WebhookDelivery{Payload: fixtureWebhookPayload(), ID: "delivery-1", Status: core.WebhookPending, Attempts: tc.attempts}}
 			worker := NewWorker(repo, nil, senderStub{err: errors.New("fixture 503")}, tc.limit, tc.base)
 			worker.now = func() time.Time { return now }
 			if err := worker.process(context.Background(), repo.delivery.ID); err != nil {
@@ -161,4 +161,8 @@ func TestWebhookWorkerRetryDeadlineArithmetic(t *testing.T) {
 			}
 		})
 	}
+}
+
+func fixtureWebhookPayload() []byte {
+	return []byte(`{"object":"event","type":"generation.failed","data":{"object":"generation","id":"fixture-generation","error":null}}`)
 }

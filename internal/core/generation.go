@@ -78,7 +78,9 @@ func GenerationView(task Task) Generation {
 		v.CompletedAt = &t
 	}
 	if task.Error != nil {
-		v.Error = map[string]string{"code": "generation_failed", "message": *task.Error}
+		safe := PublicGenerationFailure(*task.Error)
+		v.Task.Error = &safe
+		v.Error = map[string]string{"code": "generation_failed", "message": safe}
 	}
 	if task.MediaType == "video" {
 		seconds := float64(task.Options.Duration)
@@ -131,6 +133,11 @@ func (v Generation) MarshalJSON() ([]byte, error) {
 	decoder.UseNumber()
 	if err = decoder.Decode(&fields); err != nil {
 		return nil, err
+	}
+	if v.Error != nil {
+		fields["error"] = PublicGenerationError(v.Error)
+	} else if v.Task.Error != nil {
+		fields["error"] = PublicGenerationError(v.Task.Error)
 	}
 	fields["model"] = v.PublicModel
 	if v.PublicModel == "" {

@@ -5,8 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/Sociaro-Research/open-media-gateway/internal/diagnostics"
 	"io"
 	"maps"
+	"strconv"
+	"strings"
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/httpclient"
 )
@@ -56,12 +59,35 @@ const (
 // name and an exact reviewed code table. Never supply response/configuration
 // values as the policy name or add response-derived codes to its table.
 type FailurePolicy struct {
-	name  string
-	codes map[string]FailureKind
+	name     string
+	codes    map[string]FailureKind
+	wrappers []string
+	tails    map[string]Failure
 }
 
-func NewFailurePolicy(name string, codes map[string]FailureKind) *FailurePolicy {
-	return &FailurePolicy{name: name, codes: maps.Clone(codes)}
+func NewFailurePolicy(name string, codes map[string]FailureKind, wrappers ...string) *FailurePolicy {
+	p := &FailurePolicy{name: name, codes: maps.Clone(codes), wrappers: append([]string(nil), wrappers...), tails: map[string]Failure{}}
+	for kind := FailureUnknown; kind <= FailureExpired; kind++ {
+		issues := []ResponseIssue{ResponseJSON}
+		if kind == FailureMalformed {
+			issues = []ResponseIssue{ResponseJSON, ResponseRead, ResponseLimit, ResponseTaskID, ResponseMediaURL, ResponseStatus}
+		}
+		causes := []error{nil}
+		if kind == FailureConfiguration {
+			causes = append(causes, httpclient.ErrOutboundDNS, httpclient.ErrOutboundPrivateDestination, httpclient.ErrOutboundDestination)
+		}
+		for phase := FailureCheck; phase <= FailureTerminal; phase++ {
+			for _, issue := range issues {
+				for _, cause := range causes {
+					e := Failure{provider: name, kind: kind, phase: phase, issue: issue, classification: cause}
+					tail := strings.TrimPrefix(e.Error(), name+": ")
+					p.tails[tail] = e
+				}
+			}
+		}
+	}
+	diagnostics.Register("provider/"+name, p.ProjectStored)
+	return p
 }
 
 // Failure holds only safe, bounded classification. It deliberately retains no
@@ -269,4 +295,82 @@ func (p *FailurePolicy) UnreadableResponse(phase FailurePhase, err error) error 
 		e.classification = io.ErrUnexpectedEOF
 	}
 	return e
+}
+
+// ProjectStored recognizes only a complete canonical form from this trusted
+// policy. Header values are validated against the registered table/bounded HTTP
+// range, then the full message is reconstructed. Arbitrary suffixes never pass.
+func (p *FailurePolicy) ProjectStored(raw string) (string, bool) {
+	if len(raw) > diagnostics.MaxStoredMessageBytes {
+		return "", false
+	}
+	for _, prefix := range p.wrappers {
+		if strings.HasPrefix(raw, prefix) {
+			raw = strings.TrimPrefix(raw, prefix)
+			break
+		}
+	}
+	original := raw
+	if !strings.HasPrefix(raw, p.name) {
+		return "", false
+	}
+	raw = strings.TrimPrefix(raw, p.name)
+	status := 0
+	if strings.HasPrefix(raw, " (HTTP ") {
+		digits, rest, ok := strings.Cut(strings.TrimPrefix(raw, " (HTTP "), ")")
+		n, err := strconv.Atoi(digits)
+		if !ok || err != nil || n < 100 || n > 599 || strconv.Itoa(n) != digits {
+			return "", false
+		}
+		status = n
+		raw = rest
+	}
+	code := ""
+	if strings.HasPrefix(raw, " [") {
+		value, rest, ok := strings.Cut(strings.TrimPrefix(raw, " ["), "]")
+		if !ok || p.codes[value] == FailureUnknown {
+			return "", false
+		}
+		code = value
+		raw = rest
+	}
+	if !strings.HasPrefix(raw, ": ") {
+		return "", false
+	}
+	tail := strings.TrimPrefix(raw, ": ")
+	e, ok := p.tails[tail]
+	if !ok {
+		return "", false
+	}
+	if code != "" && e.kind != p.codes[code] {
+		return "", false
+	}
+	if code == "" && status != 0 && e.kind != p.HTTPFailure(FailureCheck, status, nil).kind {
+		return "", false
+	}
+	e.status = status
+	e.code = code
+	safe := e.Error()
+	if safe != original {
+		return "", false
+	}
+	return safe, true
+}
+
+// ProjectLegacyHTTP retains only a trusted producer prefix and canonical status.
+// The arbitrary historical response body is discarded, including native codes.
+func (p *FailurePolicy) ProjectLegacyHTTP(raw, prefix string, phase FailurePhase) (string, bool) {
+	if len(raw) > diagnostics.MaxStoredMessageBytes {
+		return "", false
+	}
+	rest, ok := strings.CutPrefix(raw, prefix)
+	if !ok {
+		return "", false
+	}
+	digits, _, ok := strings.Cut(rest, ": ")
+	status, err := strconv.Atoi(digits)
+	if !ok || err != nil || status < 100 || status > 599 || status >= 200 && status < 300 || strconv.Itoa(status) != digits {
+		return "", false
+	}
+	return p.HTTPFailure(phase, status, nil).Error(), true
 }

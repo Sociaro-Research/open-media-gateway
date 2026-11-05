@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/Sociaro-Research/open-media-gateway/internal/apikey"
+	"github.com/Sociaro-Research/open-media-gateway/internal/core"
 	"io"
 	"net/http"
 	"net/url"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
 	remote "github.com/Sociaro-Research/open-media-gateway/internal/remoteworkspace"
+	"github.com/google/uuid"
 )
 
 func remoteError(w http.ResponseWriter, err error) {
@@ -186,6 +188,9 @@ func (s *Server) remoteWorkspaceProxy(w http.ResponseWriter, r *http.Request) {
 			writeError(w, 502, "remote_invalid_response", "Remote response is not valid JSON")
 			return
 		}
+		if remoteGenerationRecordPath(path) {
+			core.ProjectGenerationPayload(value)
+		}
 		remote.Rewrite(value, record.Origin, token, record.SnapshotID())
 		writeJSON(w, response.StatusCode, value)
 		return
@@ -213,4 +218,19 @@ func (s *Server) remoteWorkspaceProxy(w http.ResponseWriter, r *http.Request) {
 			panic(http.ErrAbortHandler)
 		}
 	}
+}
+
+// Only record responses carry diagnostics. Generated JSON content may itself
+// contain generation-shaped user data and must never enter this projection.
+func remoteGenerationRecordPath(path string) bool {
+	if path == "/v1/generations" || path == "/v1/videos" {
+		return true
+	}
+	for _, prefix := range []string{"/v1/generations/", "/v1/videos/"} {
+		if id, ok := strings.CutPrefix(path, prefix); ok && !strings.Contains(id, "/") {
+			_, err := uuid.Parse(id)
+			return err == nil
+		}
+	}
+	return false
 }

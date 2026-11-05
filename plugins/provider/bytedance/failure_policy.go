@@ -32,4 +32,4 @@ var failurePolicy = providerkit.NewFailurePolicy("BytePlus", map[string]provider
 	"OutputVideoSensitiveContentDetected":   providerkit.FailureContentPolicy,
 	"OutputAudioSensitiveContentDetected":   providerkit.FailureContentPolicy,
 	"InternalServiceError":                  providerkit.FailureService,
-})
+}, "create ByteDance video task: ", "create ByteDance image: ", "get ByteDance video task: ", "list ByteDance models: ")

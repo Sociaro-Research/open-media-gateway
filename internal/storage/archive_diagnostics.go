@@ -8,6 +8,8 @@ import (
 	"syscall"
 )
 
+const archiveRecoveryAction = ". The provider may already have completed the generation; check the original task before creating another paid generation."
+
 // archiveDiagnostic is constructed only from local constants, numeric limits
 // and the existing sanitized S3 classification, never an arbitrary error string.
 type archiveDiagnostic struct {
@@ -45,5 +47,5 @@ func PublicArchiveError(err error) string {
 		message = "result storage is full; ask an operator to free space or expand the configured storage"
 
 	}
-	return message + ". The provider may already have completed the generation; check the original task before creating another paid generation."
+	return message + archiveRecoveryAction
 }

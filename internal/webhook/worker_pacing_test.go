@@ -27,7 +27,7 @@ type pacingFixture struct {
 
 func newPacingFixture(fault string) *pacingFixture {
 	return &pacingFixture{fault: fault, deliveryRepositoryStub: deliveryRepositoryStub{delivery: core.WebhookDelivery{
-		ID: "pacing-event", Status: core.WebhookPending, Payload: []byte(`{"fixture":true}`),
+		ID: "pacing-event", Status: core.WebhookPending, Payload: fixtureWebhookPayload(),
 	}}}
 }
 func (f *pacingFixture) activeFault() string {

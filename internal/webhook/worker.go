@@ -2,7 +2,6 @@ package webhook
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"time"
@@ -123,11 +122,13 @@ func (w *Worker) process(ctx context.Context, id string) error {
 		return nil
 	}
 	// Sanitize at delivery time, including pending payloads from older releases.
-	delivery.Payload, err = core.CustomerJSON(json.RawMessage(delivery.Payload))
-	if err != nil {
-		return err
+	delivery.Payload, err = core.PublicWebhookPayload(delivery.Payload)
+	if err == nil {
+		err = w.sender.Send(ctx, delivery)
 	}
-	if err := w.sender.Send(ctx, delivery); err != nil {
+	// Invalid stored envelopes use the existing bounded delivery-failure path;
+	// they must not become indefinitely requeued infrastructure failures.
+	if err != nil {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}

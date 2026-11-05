@@ -149,10 +149,10 @@ func TestNativeTaskMessagesRemainPrivateThroughPublicProjection(t *testing.T) {
 // Assert the public error schema stays unchanged even though the internal
 // classification is richer.
 func TestPublicDiagnosticEnvelopeStaysCompatible(t *testing.T) {
-	message := "safe failure"
+	message := "provider task timed out"
 	data, _ := json.Marshal(core.GenerationView(core.Task{Error: &message}))
 	var v struct{ Error map[string]string }
-	if json.Unmarshal(data, &v) != nil || len(v.Error) != 2 || v.Error["code"] != "generation_failed" || v.Error["message"] != message {
+	if json.Unmarshal(data, &v) != nil || len(v.Error) != 2 || v.Error["code"] != "generation_failed" || v.Error["message"] != core.PublicGenerationFailure(message) {
 		t.Fatal("generation error contract changed")
 	}
 }

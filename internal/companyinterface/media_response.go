@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
+	"github.com/Sociaro-Research/open-media-gateway/internal/providerassets"
 	"github.com/Sociaro-Research/open-media-gateway/internal/templates"
 )
 
@@ -95,6 +96,13 @@ func mapMediaArray(f mediaFields, key string, apply func(mediaFields) error) err
 	return nil
 }
 func mapGenerationMedia(f mediaFields, company, central string) error {
+	if raw, ok := f["error"]; ok {
+		var value any
+		if json.Unmarshal(raw, &value) != nil {
+			return ErrUnavailable
+		}
+		f["error"], _ = json.Marshal(core.PublicGenerationError(value))
+	}
 	id, e := fieldString(f, "id")
 	if e != nil || !validID(id) {
 		return ErrUnavailable
@@ -157,7 +165,7 @@ func mediaJSONResponse(c Contract, status int, method, path, company, central st
 		return raw, nil
 	}
 	switch c.ResponseURLs {
-	case "generation", "template-generations", "resource-generation", "generations", "media-access", "reference-list", "template-gallery", "template-detail", "template-editing", "report-detail", "catalog":
+	case "asset", "assets", "generation", "template-generations", "resource-generation", "generations", "media-access", "reference-list", "template-gallery", "template-detail", "template-editing", "report-detail", "catalog":
 	default:
 		return raw, nil
 	}
@@ -174,6 +182,10 @@ func mediaJSONResponse(c Contract, status int, method, path, company, central st
 		})
 	}
 	switch c.ResponseURLs {
+	case "asset":
+		e = projectAssetFailure(f)
+	case "assets":
+		e = mapMediaArray(f, "data", projectAssetFailure)
 	case "generation", "template-generations", "resource-generation":
 		e = mapGenerationMedia(f, company, central)
 	case "generations":
@@ -325,4 +337,18 @@ func mapCentralInputURL(raw, company, central string) (string, error) {
 		return raw, nil
 	}
 	return mapMediaURL(raw, central, company, func(string, url.Values) bool { return true })
+}
+
+func projectAssetFailure(f mediaFields) error {
+	if raw, ok := f["error"]; ok {
+		if string(raw) == "null" {
+			return nil
+		}
+		var failure string
+		if json.Unmarshal(raw, &failure) != nil {
+			failure = "unverified stored asset diagnostic"
+		}
+		f["error"], _ = json.Marshal(providerassets.PublicFailure(failure))
+	}
+	return nil
 }

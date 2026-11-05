@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -120,6 +121,10 @@ func (s *Server) assetInventory(w http.ResponseWriter, r *http.Request) {
 		s.assetError(w, err)
 		return
 	}
+	page.Items = slices.Clone(page.Items)
+	for i := range page.Items {
+		page.Items[i] = providerassets.PublicAsset(page.Items[i])
+	}
 	s.writeViewerJSON(w, r, 200, page)
 }
 func (s *Server) importAsset(w http.ResponseWriter, r *http.Request) {
@@ -138,7 +143,7 @@ func (s *Server) importAsset(w http.ResponseWriter, r *http.Request) {
 		s.assetError(w, err)
 		return
 	}
-	s.writeViewerJSON(w, r, 201, a)
+	s.writeViewerJSON(w, r, 201, providerassets.PublicRecord(a))
 }
 func (s *Server) listProviderAssets(w http.ResponseWriter, r *http.Request) {
 	offset, err := strconv.Atoi(r.URL.Query().Get("offset"))
@@ -155,7 +160,7 @@ func (s *Server) listProviderAssets(w http.ResponseWriter, r *http.Request) {
 		s.assetError(w, err)
 		return
 	}
-	s.writeViewerJSON(w, r, 200, map[string]any{"data": items, "has_more": more, "next_offset": offset + len(items)})
+	s.writeViewerJSON(w, r, 200, map[string]any{"data": publicAssetRecords(items), "has_more": more, "next_offset": offset + len(items)})
 }
 func (s *Server) registerProviderAsset(w http.ResponseWriter, r *http.Request) {
 	var in struct {
@@ -207,7 +212,7 @@ func (s *Server) registerProviderAsset(w http.ResponseWriter, r *http.Request) {
 		s.assetError(w, err)
 		return
 	}
-	s.writeViewerJSON(w, r, 202, record)
+	s.writeViewerJSON(w, r, 202, providerassets.PublicRecord(record))
 }
 func (s *Server) getProviderAsset(w http.ResponseWriter, r *http.Request) {
 	a, err := s.providerAssets.Get(r.Context(), r.PathValue("provider"), r.PathValue("id"))
@@ -215,7 +220,7 @@ func (s *Server) getProviderAsset(w http.ResponseWriter, r *http.Request) {
 		s.assetError(w, err)
 		return
 	}
-	s.writeViewerJSON(w, r, 200, a)
+	s.writeViewerJSON(w, r, 200, providerassets.PublicRecord(a))
 }
 func (s *Server) deleteProviderAsset(w http.ResponseWriter, r *http.Request) {
 	var err error
@@ -229,4 +234,12 @@ func (s *Server) deleteProviderAsset(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(204)
+}
+
+func publicAssetRecords(records []providerassets.Record) []providerassets.Record {
+	result := make([]providerassets.Record, len(records))
+	for i, record := range records {
+		result[i] = providerassets.PublicRecord(record)
+	}
+	return result
 }
