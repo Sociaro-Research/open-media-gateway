@@ -43,7 +43,25 @@ const server=http.createServer(async(req,res)=>{
  try{
   await page.goto(base);await page.waitForFunction(()=>authState==='authenticated');await useFixtureKey(page,'fixture-key');await page.waitForFunction(()=>selectedModel()?.id==='fixture');await page.locator('#chooseReferences').click();await dialog.locator('[data-id="existing"]').waitFor();await ready();
   if(process.env.UI_REVIEW_CASE){
-   if(process.env.UI_REVIEW_CASE==='focus'){
+   if(process.env.UI_REVIEW_CASE==='reopen-loading'){
+    await dialog.getByRole('button',{name:'Close library',exact:true}).click();holdRead=true;await page.locator('#chooseReferences').click();await wait(()=>readGates.length>0);
+    const locked=await dialog.locator('[data-upload]').evaluate(button=>({buttonDisabled:button.disabled,inputDisabled:document.querySelector('#referenceLibrary input[type=file]').disabled}));
+    await start(['reopen-race.png']);await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+    const beforeRelease={...locked,pending:await pending().count(),received:received.includes('reopen-race.png')};
+    assert.equal(beforeRelease.pending,0,'no pending card while the list is held');assert.equal(beforeRelease.received,false,'no upload request while the list is held');
+    const refreshed=page.waitForResponse(response=>response.request().method()==='GET'&&new URL(response.url()).pathname==='/v1/references');holdRead=false;for(const done of readGates.splice(0))done();await refreshed;await ready();
+    await start(['reopen-race.png']);await wait(()=>received.includes('reopen-race.png'));const afterRelease={pending:await pending().count(),received:received.filter(name=>name==='reopen-race.png').length};
+    assert.equal(afterRelease.pending,1,'one pending card after the refresh');assert.equal(afterRelease.received,1,'the same file starts exactly one transfer after the refresh');
+    await pending().getByRole('button',{name:'Cancel upload reopen-race.png',exact:true}).click();await wait(()=>aborted===1);release();await ready();
+    console.log('REOPEN_LOADING_DIAGNOSTIC '+JSON.stringify({beforeRelease,afterRelease,aborted}));
+    assert.equal(beforeRelease.buttonDisabled,true,'Upload must be visibly disabled while the reopened library is loading');assert.equal(beforeRelease.inputDisabled,true,'file input must share the library loading lock');pass('reopened library synchronously locks upload controls during a held list read');
+    holdRead=true;await dialog.getByRole('button',{name:'Close library',exact:true}).click();await page.locator('#chooseReferences').click();await wait(()=>readGates.length>0);
+    assert.equal(await dialog.locator('[data-upload]').isDisabled(),true);const closedRead=page.waitForEvent('requestfailed',{predicate:request=>request.method()==='GET'&&new URL(request.url()).pathname==='/v1/references'});
+    await dialog.getByRole('button',{name:'Close library',exact:true}).click();await closedRead;await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+    const closedControls=await page.evaluate(()=>({pickerUpload:document.querySelector('#uploadReference').disabled,pickerInput:document.querySelector('#referenceFiles').disabled,libraryUpload:document.querySelector('#referenceLibrary [data-upload]').disabled,libraryInput:document.querySelector('#referenceLibrary input[type=file]').disabled}));console.log('CLOSE_LOADING_DIAGNOSTIC '+JSON.stringify(closedControls));
+    assert.deepEqual(closedControls,{pickerUpload:false,pickerInput:false,libraryUpload:false,libraryInput:false},'closing a held read synchronously unlocks both widgets');
+    holdRead=false;for(const done of readGates.splice(0))done();await page.locator('#chooseReferences').click();await ready();assert.equal(await pending().count(),0);assert.equal(received.filter(name=>name==='reopen-race.png').length,1);assert.equal(aborted,1);pass('close aborts a held list read and unlocks both widgets for a clean reopen without extra upload');
+   }else if(process.env.UI_REVIEW_CASE==='focus'){
     await start(['focus-active.png','focus-queued.png']);await wait(()=>received.includes('focus-active.png'));const queued=pending().filter({hasText:'focus-queued.png'}).getByRole('button');await queued.focus();await queued.press('Enter');assert.equal(await pending().getByRole('button').evaluate(n=>n===document.activeElement),true,'cancel returns focus to remaining upload');const close=dialog.getByRole('button',{name:'Close library',exact:true});await close.focus();release();await ready();assert.equal(await close.evaluate(n=>n===document.activeElement),true,'completion must not steal focus after the user moved');pass('queued cancel restores focus once, later completion preserves user focus');
    }else{
     await start(['old-final.png']);await wait(()=>received.includes('old-final.png'));holdRead=true;release();await wait(()=>readGates.length>0);const abortedRead=page.waitForEvent('requestfailed',{predicate:req=>req.method()==='GET'&&new URL(req.url()).pathname==='/v1/references'});

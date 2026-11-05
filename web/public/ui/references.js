@@ -260,6 +260,7 @@ function hashReferenceFile(file,signal){
     if (busy) return;
     const sequence=++listSequence,requestedShared=sharedLibrary;listController?.abort();listController=new AbortController();
     const currentEpoch = epoch; loading = true; more.disabled = true; message('Loading library…');
+    pickerUI.sync();libraryUI.sync();
     try {
       const data = await api(`${requestedShared?"/v1/system/template-references":"/v1/references"}?offset=${append ? offset : 0}`, {signal:AbortSignal.any([controller.signal,listController.signal])});
       if (currentEpoch !== epoch || sequence!==listSequence) return;
@@ -402,7 +403,7 @@ function hashReferenceFile(file,signal){
   library.querySelectorAll('[data-close]').forEach(node => node.addEventListener('click', () => {cancelVoice();library.close();}));
   library.addEventListener('cancel',cancelVoice);
   // Native close events may be queued until after the picker has reopened.
-  library.addEventListener('close',()=>{if(!library.open){listSequence++;listController?.abort();loading=false;cancelVoice();if(pendingUploads.length)render();const label=returnFocus?.getAttribute('aria-label');const trigger=returnFocus?.isConnected?returnFocus:label?[...document.querySelectorAll('button[aria-label]')].find(n=>n.getAttribute('aria-label')===label):null;const active=document.activeElement;if(trigger&&!trigger.disabled&&!trigger.closest('[hidden]')&&(active===document.body||active===previousFocus||active===returnFocus||library.contains(active)))trigger.focus();}});
+  library.addEventListener('close',()=>{if(!library.open){listSequence++;listController?.abort();loading=false;pickerUI.sync();libraryUI.sync();cancelVoice();if(pendingUploads.length)render();const label=returnFocus?.getAttribute('aria-label');const trigger=returnFocus?.isConnected?returnFocus:label?[...document.querySelectorAll('button[aria-label]')].find(n=>n.getAttribute('aria-label')===label):null;const active=document.activeElement;if(trigger&&!trigger.disabled&&!trigger.closest('[hidden]')&&(active===document.body||active===previousFocus||active===returnFocus||library.contains(active)))trigger.focus();}});
   more.addEventListener('click', () => load(true));
   field.addEventListener('input', render);
   function describe(url, index) {
