@@ -1,6 +1,12 @@
 # Shared providers and storage
 
-System administrators enable **shared providers and storage** through **Settings → System → Choose setup → Service for companies**. Company service disables personal provider access for every role; there is no hybrid override. Advanced settings has no duplicate policy switches. Shared credentials belong to a stable installation identity; changing administrator roles never transfers or removes them. Administrators configure these connections under System. Personal connections remain under Configuration when personal provider access is enabled.
+On ordinary installations, system administrators enable **shared providers and
+storage** through **Settings → System → Change Mode → Service for companies**.
+The central server uses **Service for companies**. Its separate **Settings →
+System → Configure company service** action appears only when company-service
+setup is needed, offers only that scenario and is hidden once setup is complete.
+
+Company service disables personal provider access for every role; there is no hybrid override. Advanced settings has no duplicate policy switches. Shared credentials belong to a stable installation identity; changing administrator roles never transfers or removes them. Administrators configure these connections under System. Personal connections remain under Configuration when personal provider access is enabled.
 
 Every new API key must belong to an organization and one of its members. Provider and storage choices are immutable: use a new key for a different combination. The Generation screen creates a real key for the selected organization and remembers it in the tab for up to 24 hours.
 
