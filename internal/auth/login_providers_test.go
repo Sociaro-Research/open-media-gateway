@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
@@ -8,6 +9,7 @@ import (
 	"errors"
 	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
 	"github.com/go-jose/go-jose/v4"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -170,17 +172,24 @@ func TestGoogleRuntimeUsesFreshCredentialsAndRejectsChangedFlow(t *testing.T) {
 type oauthSessionFixture struct {
 	Repository
 	users, sessions int
+	google          GoogleIdentity
+	err             error
 }
 
-func (f *oauthSessionFixture) UpsertGoogleUser(_ context.Context, subject, email, name, picture string) (identity.User, error) {
+func (f *oauthSessionFixture) SignInGoogleUser(_ context.Context, google GoogleIdentity) (identity.User, error) {
 	f.users++
-	return identity.User{ID: "signed-in-user"}, nil
+	f.google = google
+	return identity.User{ID: "signed-in-user"}, f.err
 }
 func (f *oauthSessionFixture) CreateSession(context.Context, []byte, string, time.Time) error {
 	f.sessions++
 	return nil
 }
 func TestGoogleCallbackWithDynamicCredentials(t *testing.T) {
+	var diagnostics bytes.Buffer
+	previousLogger := slog.Default()
+	slog.SetDefault(slog.New(slog.NewJSONHandler(&diagnostics, nil)))
+	t.Cleanup(func() { slog.SetDefault(previousLogger) })
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		t.Fatal(err)
@@ -191,6 +200,7 @@ func TestGoogleCallbackWithDynamicCredentials(t *testing.T) {
 	}
 	var nonce string
 	verified := true
+	email, hostedDomain := "user@example.test", ""
 	audience := "client.apps.googleusercontent.com"
 	var server *httptest.Server
 	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -207,7 +217,7 @@ func TestGoogleCallbackWithDynamicCredentials(t *testing.T) {
 				w.WriteHeader(401)
 				return
 			}
-			claims, _ := json.Marshal(map[string]any{"iss": "https://accounts.google.com", "sub": "google-subject", "aud": audience, "exp": time.Now().Add(time.Hour).Unix(), "iat": time.Now().Unix(), "email": "user@example.test", "email_verified": verified, "name": "Test User", "picture": "https://example.test/avatar", "nonce": nonce})
+			claims, _ := json.Marshal(map[string]any{"iss": "https://accounts.google.com", "sub": "google-subject", "aud": audience, "exp": time.Now().Add(time.Hour).Unix(), "iat": time.Now().Unix(), "email": email, "email_verified": verified, "hd": hostedDomain, "name": "Test User", "picture": "https://example.test/avatar", "nonce": nonce})
 			signed, e := signer.Sign(claims)
 			if e != nil {
 				t.Error(e)
@@ -238,10 +248,23 @@ func TestGoogleCallbackWithDynamicCredentials(t *testing.T) {
 		aud           string
 		badNonce      bool
 		success       bool
-	}{{"valid", true, "client.apps.googleusercontent.com", false, true}, {"unverified email", false, "client.apps.googleusercontent.com", false, false}, {"wrong audience", true, "other.apps.googleusercontent.com", false, false}, {"wrong nonce", true, "client.apps.googleusercontent.com", true, false}} {
+		email, hd     string
+		repoError     error
+	}{
+		{"valid third-party identity", true, "client.apps.googleusercontent.com", false, true, "user@example.test", "", nil},
+		{"Gmail", true, "client.apps.googleusercontent.com", false, true, "User@GMAIL.COM", "", nil},
+		{"Workspace", true, "client.apps.googleusercontent.com", false, true, "User@company.example", "company.example", nil},
+		{"unverified email", false, "client.apps.googleusercontent.com", false, false, "user@gmail.com", "", nil},
+		{"unverified Workspace", false, "client.apps.googleusercontent.com", false, false, "user@company.example", "company.example", nil},
+		{"wrong audience", true, "other.apps.googleusercontent.com", false, false, "user@gmail.com", "", nil},
+		{"wrong nonce", true, "client.apps.googleusercontent.com", true, false, "user@gmail.com", "", nil},
+		{"account conflict", true, "client.apps.googleusercontent.com", false, false, "user@gmail.com", "", ErrGoogleAccountConflict},
+		{"account storage failure", true, "client.apps.googleusercontent.com", false, false, "user@gmail.com", "", errors.New("private storage failure")},
+	} {
 		t.Run(tc.name, func(t *testing.T) {
 			verified = tc.emailVerified
 			audience = tc.aud
+			email, hostedDomain, repo.err = tc.email, tc.hd, tc.repoError
 			w := httptest.NewRecorder()
 			m.Login(w, httptest.NewRequest("GET", "/auth/google", nil))
 			if w.Code != 302 {
@@ -265,12 +288,33 @@ func TestGoogleCallbackWithDynamicCredentials(t *testing.T) {
 				if w.Header().Get("Location") != "https://ui.example.test/" || repo.sessions != before+1 {
 					t.Fatal("valid callback failed", w.Code, w.Body)
 				}
+				if repo.google.Subject != "google-subject" || repo.google.Email != strings.ToLower(tc.email) || !repo.google.EmailVerified || repo.google.HostedDomain != tc.hd {
+					t.Fatal("verified claims not passed to account resolution")
+				}
 			} else if w.Header().Get("Location") != "https://ui.example.test/?auth_error=1" || repo.sessions != before {
 				t.Fatal("invalid identity accepted", w.Code, w.Body)
 			}
+			if !tc.success {
+				for _, cookie := range w.Result().Cookies() {
+					if cookie.Name == sessionCookieName {
+						t.Fatal("failed callback issued a session cookie")
+					}
+				}
+			}
 		})
 	}
-	if repo.users != 1 || repo.sessions != 1 {
+	if repo.users != 5 || repo.sessions != 3 {
 		t.Fatal("unexpected account/session writes", repo.users, repo.sessions)
+	}
+	log := diagnostics.String()
+	for _, reason := range []string{"account_conflict", "account_storage"} {
+		if !strings.Contains(log, reason) {
+			t.Fatal("account-resolution diagnostic missing", reason)
+		}
+	}
+	for _, private := range []string{"private storage failure", "client-secret", "google-subject", "user@gmail.com", "fixture", nonce} {
+		if strings.Contains(log, private) {
+			t.Fatal("private authentication detail leaked in diagnostics")
+		}
 	}
 }
