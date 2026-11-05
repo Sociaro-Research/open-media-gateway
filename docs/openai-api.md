@@ -210,6 +210,36 @@ the same generation object as the HTTP response. Event types are
 `generation.queued`, `generation.in_progress`, `generation.completed`, and
 `generation.failed`; envelope `created_at` is also Unix seconds.
 
+### Archived results
+
+For viewers with content access, a completed generation can include `artifacts`,
+an ordered array of archived outputs. Each entry has a local `id`, `media_type`,
+`content_url`, `content_type`, `size_bytes` and `sha256`; `format`, `duration` and
+`group_id` appear when available. Related format variants can share an opaque
+`group_id`. Artifact IDs and group IDs do not expose provider identities or
+storage paths. Use the returned values unchanged.
+
+The generation's common `content_url` downloads the first archived result. To
+retrieve every output or format variant, download each artifact's `content_url`:
+`GET /v1/generations/{id}/artifacts/{artifact}/content` (also supports `HEAD`).
+Authenticate these routes with an authorized generation key. Direct-storage
+responses may redirect to a temporary signed URL; do not forward Gateway
+credentials to the storage host. Jobs using the scalar result contract can omit
+`artifacts` and retain their common `content_url`.
+
+The worker archives the complete result array before publishing `completed`;
+queued, running, failed and deleted results do not expose artifact arrays.
+An interrupted or failed archive can leave private objects or recovery
+checkpoints. Provider usage can already have been recorded, so an archive failure
+does not establish a refund. Status, usage and cost belong to the generation;
+counting artifact entries or format variants does not establish a billable count.
+
+`GET /v1/generations/{id}/media-access` returns expiring preview/download URLs
+for the primary result and, when present, each artifact. The root `expires_at`
+applies to those URLs; `last_frame_url` is optional. Successful result deletion
+removes all stored outputs and last frames for the job, hides `artifacts` and
+makes their download routes unavailable, while retaining history and costs.
+
 ## Deliberate differences from OpenAI
 
 - **Asynchronous only:** no immediate image/base64 or speech file response, SSE,

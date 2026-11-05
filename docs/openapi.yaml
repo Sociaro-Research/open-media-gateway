@@ -9998,6 +9998,7 @@ components:
           - "null"
         content_url:
           type: string
+          description: Authorized route for the first archived result. Available from admission but returns 404 until successful archival or after deletion. Use artifacts[].content_url for every archived output or format variant; scalar-result jobs can omit artifacts.
         cost:
           $ref: '#/components/schemas/TaskCost'
         created_at:
@@ -11339,6 +11340,7 @@ components:
         sha256: {type: string}
     MediaAccess:
       type: object
+      description: Expiring signed access to the primary archived result and optional individual artifacts. The root expires_at applies to all URLs. Result deletion invalidates access; history and task-level cost records remain.
       required:
       - preview_url
       - download_url
@@ -11347,6 +11349,7 @@ components:
         artifacts:
           type: array
           maxItems: 64
+          description: Optional signed links for each archived output or format variant, using local IDs from the completed generation. Omitted for scalar-only results. Each format field is present but may be empty.
           items:
             type: object
             required: [id, media_type, format, preview_url, download_url]
@@ -11361,11 +11364,14 @@ components:
           description: Signed browser URL for an archived video last frame, when available.
         preview_url:
           type: string
+          description: Signed preview URL for the first archived result.
         download_url:
           type: string
+          description: Signed download URL for the first archived result.
         expires_at:
           type: string
           format: date-time
+          description: Expiration shared by the primary, artifact and optional last-frame URLs in this response.
     ErrorResponse:
       type: object
       description: >-
