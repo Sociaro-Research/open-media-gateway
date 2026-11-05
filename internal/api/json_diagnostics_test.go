@@ -140,6 +140,28 @@ func TestGenerationJSONDiagnosticsPreserveEnvelopeAndSafeFields(t *testing.T) {
 	}
 }
 
+func TestSpeechKnownUnsupportedControlAndUnknownNameDiagnostics(t *testing.T) {
+	// speed is an explicitly documented unsupported compatibility control, not
+	// a name taken from arbitrary caller JSON (docs/openai-api.md).
+	for _, tc := range []struct{ name, body, param, hint string }{
+		{"known control", `{"model":"mock/speech","input":"hello","speed":2}`, "speed", "unsupported parameter: speed"},
+		{"arbitrary name", `{"model":"mock/speech","input":"hello","sk_live_private-value":2}`, "body", "Unsupported JSON field"},
+		{"lookalike name", `{"model":"mock/speech","input":"hello","speed_private-value":2}`, "body", "Unsupported JSON field"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			svc := openAIFixture()
+			w := openAIRequest(New(svc, healthStub{}, "secret"), "/v1/audio/speech", tc.body)
+			assertJSONDiagnostic(t, w, tc.param, tc.hint)
+			if svc.calls != 0 || !strings.Contains(w.Body.String(), "options.parameters") || !strings.Contains(w.Body.String(), "advertised by the model") {
+				t.Fatal("lost remediation or dispatched rejected control", svc.calls, w.Body)
+			}
+			if tc.param == "speed" && (!strings.Contains(w.Body.String(), "remove this top-level field") || !strings.Contains(w.Body.String(), "GET /v1/models")) {
+				t.Fatal("known control lost its specific corrective action", w.Body)
+			}
+		})
+	}
+}
+
 func assertJSONDiagnostic(t *testing.T, w *httptest.ResponseRecorder, param, hint string) {
 	t.Helper()
 	var got struct {

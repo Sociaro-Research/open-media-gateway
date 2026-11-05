@@ -11337,8 +11337,10 @@ components:
         Shared JSON request decoder errors retain HTTP 400 invalid_request and
         this envelope. Messages distinguish malformed or incomplete JSON,
         unsupported fields, wrong JSON types, trailing content and the endpoint's
-        byte limit. Known schema fields may use a dotted path with [] for array
-        elements. Unknown field names and rejected values are never echoed.
+        byte limit. Known public fields may use a dotted path with [] for array
+        elements. A documented unsupported control can retain its reviewed
+        parameter name and corrective action. Arbitrary unknown field names and
+        rejected values are never echoed.
         Positions, when available for syntax or unsupported fields, are one-based
         byte offsets in the original body. No original position is claimed after
         internal field reconstruction or for custom field decoder type errors.

@@ -515,9 +515,13 @@ func (s *Server) openAIInput(r *http.Request, fields map[string]json.RawMessage)
 		return fail("image", "image is required for an edit")
 	}
 	for key := range fields {
-		// Only schema-owned public names may be echoed. Unknown keys can be
+		// Only reviewed public names may be echoed, including deliberately
+		// unsupported controls documented in openai-api.md. Unknown keys can be
 		// arbitrarily long or contain credentials accidentally pasted as keys.
-		if slices.Contains([]string{"provider", "media_type", "input", "voice", "instructions", "size", "seconds", "quality", "background", "output_format", "response_format", "image", "input_reference", "stream", "n"}, key) {
+		if slices.Contains([]string{"provider", "media_type", "input", "voice", "instructions", "size", "seconds", "quality", "background", "output_format", "response_format", "image", "input_reference", "stream", "n", "speed"}, key) {
+			if key == "speed" {
+				return fail("speed", "unsupported parameter: speed; remove this top-level field and inspect GET /v1/models. Provider-specific controls belong in options.parameters and must be advertised by the model")
+			}
 			return fail(key, "unsupported parameter: "+key+"; provider-specific controls belong in options.parameters and must be advertised by the model")
 		}
 		return fail("body", "Unsupported JSON field. Remove fields not listed in the endpoint documentation; provider-specific controls belong in options.parameters and must be advertised by the model")
