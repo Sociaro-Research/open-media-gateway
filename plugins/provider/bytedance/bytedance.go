@@ -16,6 +16,7 @@ import (
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
 	"github.com/Sociaro-Research/open-media-gateway/internal/httpclient"
 	"github.com/Sociaro-Research/open-media-gateway/internal/modelcatalog"
+	"github.com/Sociaro-Research/open-media-gateway/internal/providerkit"
 )
 
 const (
@@ -183,7 +184,7 @@ func (a *Adapter) Generate(ctx context.Context, request core.MediaRequest) (core
 		return core.ProviderTask{}, fmt.Errorf("create ByteDance video task: %w", err)
 	}
 	if response.ID == "" {
-		return core.ProviderTask{}, fmt.Errorf("create ByteDance video task: response has no id")
+		return core.ProviderTask{}, failurePolicy.InvalidResponse(providerkit.FailureSubmit, providerkit.ResponseTaskID)
 	}
 	return core.ProviderTask{ID: response.ID}, nil
 }
@@ -235,10 +236,10 @@ func (a *Adapter) createImage(ctx context.Context, request core.MediaRequest) (c
 		return core.ProviderTask{}, fmt.Errorf("create ByteDance image: %w", err)
 	}
 	if response.Error != nil {
-		return core.ProviderTask{}, fmt.Errorf("create ByteDance image: %s: %s", response.Error.Code, response.Error.Message)
+		return core.ProviderTask{}, failurePolicy.NativeFailure(providerkit.FailureSubmit, response.Error.Code)
 	}
 	if len(response.Data) == 0 || response.Data[0].URL == "" {
-		return core.ProviderTask{}, fmt.Errorf("create ByteDance image: response has no URL")
+		return core.ProviderTask{}, failurePolicy.InvalidResponse(providerkit.FailureSubmit, providerkit.ResponseMediaURL)
 	}
 	return core.ProviderTask{ID: valueOr(response.ID, "immediate"), ResultURL: response.Data[0].URL, Usage: core.NormalizeProviderUsage(response.Usage)}, nil
 }
@@ -451,32 +452,36 @@ func (a *Adapter) GetTask(ctx context.Context, providerTaskID string) (core.Prov
 		return core.ProviderResult{Status: core.ProviderRunning, Usage: core.NormalizeProviderUsage(response.Usage)}, nil
 	case "succeeded":
 		if response.Content.VideoURL == "" {
-			return core.ProviderResult{}, fmt.Errorf("ByteDance task succeeded without video_url")
+			return core.ProviderResult{}, failurePolicy.InvalidResponse(providerkit.FailurePoll, providerkit.ResponseMediaURL)
 		}
 		return core.ProviderResult{Status: core.ProviderSucceeded, ResultURL: response.Content.VideoURL, LastFrameURL: response.Content.LastFrameURL, Usage: core.NormalizeProviderUsage(response.Usage)}, nil
 	case "failed", "cancelled", "expired":
-		message := strings.TrimSpace(response.Error.Message)
-		if message == "" {
-			message = "ByteDance task ended with status " + response.Status
-		}
+		message := failurePolicy.TaskFailure(response.Error.Code, response.Status).Error()
 		return core.ProviderResult{Status: core.ProviderFailed, Error: message, Usage: core.NormalizeProviderUsage(response.Usage)}, nil
 	default:
-		return core.ProviderResult{}, fmt.Errorf("unknown ByteDance task status %q", response.Status)
+		return core.ProviderResult{}, failurePolicy.InvalidResponse(providerkit.FailurePoll, providerkit.ResponseStatus)
 	}
 }
 
 func (a *Adapter) do(ctx context.Context, method, path string, input, output any) error {
+	phase := providerkit.FailurePoll
+	if method != http.MethodGet {
+		phase = providerkit.FailureSubmit
+	}
+	if path == "/models" {
+		phase = providerkit.FailureCheck
+	}
 	var body io.Reader
 	if input != nil {
 		encoded, err := json.Marshal(input)
 		if err != nil {
-			return err
+			return failurePolicy.InvalidLocalRequest()
 		}
 		body = bytes.NewReader(encoded)
 	}
 	request, err := http.NewRequestWithContext(ctx, method, a.baseURL+path, body)
 	if err != nil {
-		return err
+		return failurePolicy.InvalidConnection()
 	}
 	request.Header.Set("Authorization", "Bearer "+a.apiKey)
 	request.Header.Set("Content-Type", "application/json")
@@ -491,25 +496,27 @@ func (a *Adapter) do(ctx context.Context, method, path string, input, output any
 	}
 	response, err := httpclient.Do(client, request)
 	if err != nil {
-		return err
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return failurePolicy.TransportFailure(phase, err)
 	}
 	defer response.Body.Close()
-	limited := io.LimitReader(response.Body, 1<<20)
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		data, _ := io.ReadAll(limited)
-		return fmt.Errorf("HTTP %d: %s", response.StatusCode, strings.TrimSpace(string(data)))
+		data, _ := io.ReadAll(io.LimitReader(response.Body, 1<<20))
+		return failurePolicy.HTTPFailure(phase, response.StatusCode, data)
 	}
 	// Validate the entire HTTP body, not only the first JSON value. One extra
 	// byte distinguishes an oversized response from EOF at the existing limit.
 	data, err := io.ReadAll(io.LimitReader(response.Body, (1<<20)+1))
 	if err != nil {
-		return fmt.Errorf("read response: %w", err)
+		return failurePolicy.UnreadableResponse(phase, err)
 	}
 	if len(data) > 1<<20 {
-		return fmt.Errorf("response exceeds 1 MiB limit")
+		return failurePolicy.InvalidResponse(phase, providerkit.ResponseLimit)
 	}
 	if err := json.Unmarshal(data, output); err != nil {
-		return fmt.Errorf("decode response: %w", err)
+		return failurePolicy.InvalidResponse(phase, providerkit.ResponseJSON)
 	}
 	return nil
 }

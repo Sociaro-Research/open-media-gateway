@@ -28,7 +28,7 @@ func TestFailedPollingResultsRedactConfiguredAndBuiltinSecrets(t *testing.T) {
 				if r.Method != http.MethodGet {
 					t.Fatalf("unexpected paid request method: %s", r.Method)
 				}
-				data, _ := json.Marshal(map[string]any{"status": "failed", "error": map[string]string{"message": "upstream rejected " + strings.Join(secrets, " ")}})
+				data, _ := json.Marshal(map[string]any{"status": "failed", "error": map[string]string{"code": "AuthenticationError", "message": "upstream rejected " + strings.Join(secrets, " ")}})
 				return &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(string(data))), Request: r}, nil
 			})
 			adapter, err := manager.buildAdapter("bytedance", credentials)
@@ -49,7 +49,7 @@ func TestFailedPollingResultsRedactConfiguredAndBuiltinSecrets(t *testing.T) {
 					t.Fatal("synthetic saved secret escaped into persisted/public failure text")
 				}
 			}
-			if !strings.Contains(result.Error, "upstream rejected") || !strings.Contains(result.Error, "[redacted]") {
+			if strings.Contains(result.Error, "upstream rejected") || !strings.Contains(result.Error, "[AuthenticationError]") || !strings.Contains(result.Error, "API key") {
 				t.Fatal("safe failure context was lost")
 			}
 		})

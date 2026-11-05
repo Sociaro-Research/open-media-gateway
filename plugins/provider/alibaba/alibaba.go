@@ -16,6 +16,7 @@ import (
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
 	"github.com/Sociaro-Research/open-media-gateway/internal/httpclient"
 	"github.com/Sociaro-Research/open-media-gateway/internal/modelcatalog"
+	"github.com/Sociaro-Research/open-media-gateway/internal/providerkit"
 )
 
 const (
@@ -252,7 +253,7 @@ func (a *Adapter) createAsync(ctx context.Context, path string, payload any) (co
 		return core.ProviderTask{}, err
 	}
 	if response.Output.TaskID == "" {
-		return core.ProviderTask{}, responseError("DashScope task response has no task_id", response)
+		return core.ProviderTask{}, responseError(providerkit.ResponseTaskID, response)
 	}
 	return core.ProviderTask{ID: response.Output.TaskID, Usage: core.NormalizeProviderUsage(response.Usage)}, nil
 }
@@ -264,7 +265,7 @@ func (a *Adapter) createImmediate(ctx context.Context, baseURL, apiKey, path str
 	}
 	resultURL := response.resultURL()
 	if resultURL == "" {
-		return core.ProviderTask{}, responseError("DashScope response has no media URL", response)
+		return core.ProviderTask{}, responseError(providerkit.ResponseMediaURL, response)
 	}
 	id := response.RequestID
 	if response.Output.Audio.ID != "" {
@@ -289,20 +290,18 @@ func (a *Adapter) GetTask(ctx context.Context, providerTaskID string) (core.Prov
 	case "SUCCEEDED":
 		resultURL := response.resultURL()
 		if resultURL == "" {
-			return core.ProviderResult{}, fmt.Errorf("DashScope task succeeded without a media URL")
+			return core.ProviderResult{}, failurePolicy.InvalidResponse(providerkit.FailurePoll, providerkit.ResponseMediaURL)
 		}
 		return core.ProviderResult{Status: core.ProviderSucceeded, ResultURL: resultURL, Usage: core.NormalizeProviderUsage(response.Usage)}, nil
 	case "FAILED", "CANCELED", "CANCELLED", "UNKNOWN":
-		message := response.Output.Message
-		if message == "" {
-			message = response.Message
+		code := response.Output.Code
+		if code == "" {
+			code = response.Code
 		}
-		if message == "" {
-			message = "DashScope task ended with status " + response.Output.TaskStatus
-		}
+		message := failurePolicy.TaskFailure(code, response.Output.TaskStatus).Error()
 		return core.ProviderResult{Status: core.ProviderFailed, Error: message, Usage: core.NormalizeProviderUsage(response.Usage)}, nil
 	default:
-		return core.ProviderResult{}, fmt.Errorf("unknown DashScope task status %q", response.Output.TaskStatus)
+		return core.ProviderResult{}, failurePolicy.InvalidResponse(providerkit.FailurePoll, providerkit.ResponseStatus)
 	}
 }
 
@@ -371,36 +370,36 @@ func (r dashResponse) resultURL() string {
 	return ""
 }
 
-func responseError(fallback string, response dashResponse) error {
-	message := strings.TrimSpace(response.Message)
-	if message == "" {
-		message = strings.TrimSpace(response.Output.Message)
-	}
-	if message == "" {
-		message = fallback
-	}
+func responseError(issue providerkit.ResponseIssue, response dashResponse) error {
 	code := response.Code
 	if code == "" {
 		code = response.Output.Code
 	}
 	if code != "" {
-		return fmt.Errorf("%s: %s", code, message)
+		return failurePolicy.NativeFailure(providerkit.FailureSubmit, code)
 	}
-	return fmt.Errorf("%s", message)
+	return failurePolicy.InvalidResponse(providerkit.FailureSubmit, issue)
 }
 
 func (a *Adapter) do(ctx context.Context, baseURL, apiKey, method, path string, input any, async bool, output any) error {
+	phase := providerkit.FailurePoll
+	if method != http.MethodGet {
+		phase = providerkit.FailureSubmit
+	}
+	if strings.HasPrefix(path, "/models?") {
+		phase = providerkit.FailureCheck
+	}
 	var body io.Reader
 	if input != nil {
 		encoded, err := json.Marshal(input)
 		if err != nil {
-			return err
+			return failurePolicy.InvalidLocalRequest()
 		}
 		body = bytes.NewReader(encoded)
 	}
 	request, err := http.NewRequestWithContext(ctx, method, baseURL+path, body)
 	if err != nil {
-		return err
+		return failurePolicy.InvalidConnection()
 	}
 	request.Header.Set("Authorization", "Bearer "+apiKey)
 	request.Header.Set("Content-Type", "application/json")
@@ -409,22 +408,25 @@ func (a *Adapter) do(ctx context.Context, baseURL, apiKey, method, path string, 
 	}
 	response, err := httpclient.Do(a.client, request)
 	if err != nil {
-		return err
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return failurePolicy.TransportFailure(phase, err)
 	}
 	defer response.Body.Close()
 	const limit = 2 << 20
 	data, err := io.ReadAll(io.LimitReader(response.Body, limit+1))
 	if err != nil {
-		return fmt.Errorf("read DashScope response: %w", err)
+		return failurePolicy.UnreadableResponse(phase, err)
 	}
 	if len(data) > limit {
-		return fmt.Errorf("DashScope response exceeds %d bytes", limit)
+		return failurePolicy.InvalidResponse(phase, providerkit.ResponseLimit)
 	}
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return fmt.Errorf("DashScope HTTP %d: %s", response.StatusCode, strings.TrimSpace(string(data)))
+		return failurePolicy.HTTPFailure(phase, response.StatusCode, data)
 	}
 	if err := json.Unmarshal(data, output); err != nil {
-		return fmt.Errorf("decode DashScope response: %w", err)
+		return failurePolicy.InvalidResponse(phase, providerkit.ResponseJSON)
 	}
 	return nil
 }
