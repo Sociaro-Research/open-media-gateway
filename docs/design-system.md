@@ -902,6 +902,11 @@ including a monetary approximation when applicable. Pending, invalid and unavail
 estimates replace the amount immediately; allowance/errors remain adjacent feedback.
 The confirmation retains its separate review and authoritative admission checks.
 
+Live action labels use `FormUI.setText` on a plain text label node. It preserves
+the existing Text node during both unchanged and changed updates, so a native
+press survives a blur-triggered estimate refresh. Keep icons in separate nodes;
+do not replace the button's label subtree or defer price updates while pressed.
+
 Journal Copy and Try again actions do not depend on catalogue load order. Check
 current availability on activation; keep the draft and saved generation unchanged
 when the check fails or the model is unavailable. Session mutation retries retain

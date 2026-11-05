@@ -12,6 +12,16 @@
   function disclosure(summary,text){if(!summary||summary.dataset.disclosureLabel===text)return;summary.dataset.disclosureLabel=text;const label=document.createElement('span'),chevron=document.createElement('span');label.textContent=text;chevron.className='select-chevron';chevron.setAttribute('aria-hidden','true');summary.replaceChildren(label,chevron);}
   function message(target,text='',type=''){target.dataset.messageType=type;target.textContent=text;target.setAttribute('role','status');}
 
+  // Keep the native press target alive while a plain action label changes.
+  // Rich buttons pass their dedicated label node, never the icon container.
+  function setText(target,value){
+    if(!target)return;
+    const text=String(value??''),child=target.firstChild;
+    if(!child){target.append(document.createTextNode(text));return;}
+    if(child.nodeType!==Node.TEXT_NODE||child.nextSibling)throw new TypeError('Use a plain text label target');
+    if(child.data!==text)child.data=text;
+  }
+
   // API credentials are not login passwords. All credential editors share the
   // saved mask and omit it from updates; the server never returns saved secrets.
   const credentialInputs=new WeakSet(),credentialMask='************';
@@ -255,6 +265,6 @@
     return state;
   }
   function setLabel(control,text){enhance(control);const label=control.closest('.floating-field')?.querySelector('.floating-label');if(label&&label.textContent!==text)label.textContent=text;}
-  window.FormUI={sectionHeading,dialogHeading,disclosure,message,valid,watch,commit,snapshot,saved,update,refresh,setLabel,promptState,updatePrompt,copyButton,placeAction,credentials:{setup:setupCredential,render:renderCredential,replacement:credentialReplacement,updateValue:credentialUpdate},passwords:{hide:hidePassword}};
+  window.FormUI={sectionHeading,dialogHeading,disclosure,message,valid,watch,commit,snapshot,saved,update,refresh,setLabel,setText,promptState,updatePrompt,copyButton,placeAction,credentials:{setup:setupCredential,render:renderCredential,replacement:credentialReplacement,updateValue:credentialUpdate},passwords:{hide:hidePassword}};
   new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['disabled']});refresh();
 })();

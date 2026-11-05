@@ -54,7 +54,7 @@ const server=http.createServer((req,res)=>{if(req.url.startsWith('/preview/')){r
  assert.equal(await page.locator('#promptReferenceError').innerText(),'Missing image references: @Image4, @Image5.');
  assert.equal(await page.locator('.prompt-reference-token.missing').first().evaluate(e=>getComputedStyle(e).color),await page.evaluate(()=>{const e=document.createElement('span');e.style.color='var(--red)';document.body.append(e);const color=getComputedStyle(e).color;e.remove();return color}));
  assert.equal(await page.locator('#prompt').evaluate(e=>e.validity.valid),true);
- await page.locator('#submitButton').click();await page.locator('#confirmDialog[open]').waitFor();assert.equal(await page.locator('#confirmReferenceWarning').innerText(),'Missing image references: @Image4, @Image5.');assert.equal(generationPosts,0);
+ await page.locator(process.env.UI_PRICE_LABEL_HIT==='1'?'#priceValue':'#submitButton').click();await page.locator('#confirmDialog[open]').waitFor();assert.equal(await page.locator('#confirmReferenceWarning').innerText(),'Missing image references: @Image4, @Image5.');assert.equal(generationPosts,0);
  await page.screenshot({path:path.join(out,'missing-references-review.png')});await page.locator('#cancelConfirm').click();
  // Programmatic submit follows the same advisory policy without generating.
  await page.locator('#taskForm').evaluate(e=>e.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));await page.locator('#confirmDialog[open]').waitFor();assert.equal(await page.locator('#confirmReferenceWarning').isVisible(),true);assert.equal(generationPosts,0);await page.locator('#cancelConfirm').click();

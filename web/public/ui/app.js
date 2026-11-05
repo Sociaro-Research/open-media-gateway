@@ -110,6 +110,7 @@ let pendingSubmission = null;
 let submitting = false;
 const dialog = document.querySelector('#confirmDialog');
 const confirmButton = document.querySelector('#confirmSubmit');
+const confirmLabel = document.querySelector('#confirmSubmitLabel'), confirmArrow = document.querySelector('#confirmSubmitArrow');
 const cancelButton = document.querySelector('#cancelConfirm');
 const closeButton = document.querySelector('#closeConfirm');
 const confirmStatus = document.querySelector('#confirmStatus');
@@ -771,7 +772,7 @@ function updateJournalPagination() {
   if (!showButton && document.activeElement === button) count.focus({preventScroll:true});
   button.hidden = !showButton;
   button.disabled = !!loading;
-  button.textContent = journalPage.error ? 'Retry loading' : 'Load more';
+  FormUI.setText(button,journalPage.error ? 'Retry loading' : 'Load more');
   elements.taskList.setAttribute('aria-busy', loading ? 'true' : 'false');
 }
 function resetJournal() {
@@ -1071,7 +1072,7 @@ function updateModelSelection(preferred = elements.model.value||(renderedPlaygro
 }
 
 function updateCatalogUI() {
-  elements.submitLabel.textContent = 'Generate';
+  FormUI.setText(elements.submitLabel,'Generate');
   updateModelSelection();
 }
 
@@ -1133,8 +1134,8 @@ function formatPrice(value) {
 }
 
 function setActionEstimate(value, priced=false) {
- elements.priceValue.textContent=value;
- document.querySelector('#priceSeparator').textContent=priced?' for ':' — ';
+ FormUI.setText(elements.priceValue,value);
+ FormUI.setText(document.querySelector('#priceSeparator'),priced?' for ':' — ');
 }
 
 function setEstimateFeedback(message='',type='') {
@@ -1574,7 +1575,7 @@ async function openGenerationConfirmation(source, trigger) {
   document.querySelector('#confirmPrice').textContent = 'Calculating…';
   confirmButton.disabled=true;
   confirmStatus.hidden = true; confirmStatus.className = '';
-  confirmButton.textContent = request.resource_create?'Confirm and create resource →':request.session_action?'Confirm session action →':'Confirm and generate →';
+  FormUI.setText(confirmLabel,request.resource_create?'Confirm and create resource':request.session_action?'Confirm session action':'Confirm and generate');confirmArrow.hidden=false;
   setMessage(''); dialog.showModal(); cancelButton.focus();
   const submission=pendingSubmission;
   try {
@@ -1637,7 +1638,7 @@ confirmButton.addEventListener('click', async () => {
   dialog.setAttribute('aria-busy', 'true');
   confirmStatus.hidden = false; confirmStatus.className = 'sending';
   confirmStatus.textContent = 'Preparing and sending your request…';
-  confirmButton.textContent = 'Sending…';
+  FormUI.setText(confirmLabel,'Sending…');confirmArrow.hidden=true;
   let accepted = false;
   try {
     // Keep the same idempotency key for retries after uncertain network failures.
@@ -1657,7 +1658,7 @@ confirmButton.addEventListener('click', async () => {
     } else {
       confirmStatus.className = 'error';
       confirmStatus.textContent = `Could not submit: ${error.message}`;
-      confirmButton.textContent = 'Retry submission →';
+      FormUI.setText(confirmLabel,'Retry submission');confirmArrow.hidden=false;
       if(submission.request.session_action){dialog.close();pendingSubmission=null;const resources=playgroundResources;if(!error.status||error.status>=500)resources?.admitted();queueMicrotask(()=>{if(resources===playgroundResources)resources?.refresh();});setMessage((!error.status||error.status>=500?'Session operation outcome is unconfirmed. No mutation will be retried. Read its current state before explicit recovery. ':'Session changed or the operation was rejected. Review its current state. ')+error.message,'error');return;}
       if(submission.request.template&&error.code==='template_conflict'){dialog.close();pendingSubmission=null;await window.GatewayTemplates?.currentChanged(submission.request.template.id,submission.request.template.revision);}
       else if(['estimate_changed','budget_exceeded','pricing_unavailable'].includes(error.code)) {
