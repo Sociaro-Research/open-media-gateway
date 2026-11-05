@@ -83,25 +83,37 @@
  }
  function organizationActions(companies,isCurrent){
   const actions=new Map();if(!adminAccess())return actions;
-  let loading=false,failed=false;
+  const feedback=node('div',undefined,'form-actions'),status=node('p'),retry=node('button','Retry installation access','secondary');
+  feedback.hidden=true;status.setAttribute('role','status');retry.type='button';feedback.append(status,retry);actions.feedback=feedback;
+  let loading=false;
   const current=()=>isCurrent()&&adminAccess();
   async function refresh(){
-   if(loading||!current())return;loading=true;
+   if(loading||!current())return;
+   let restoreFocus=document.activeElement===retry;loading=true;retry.disabled=true;
+   const focusEvents=['focusin','pointerdown','keydown'],cancelFocusRestore=()=>{restoreFocus=false;};
+   if(restoreFocus)for(const event of focusEvents)document.addEventListener(event,cancelFocusRestore,true);
    for(const button of actions.values())button.disabled=true;
    try{
-    const result=await api('/v1/system/installation-access');if(!current())return;failed=false;
+    const result=await api('/v1/system/installation-access');if(!current())return;
     const active=new Map(result.data.map(item=>[item.organization_id,item.active_count]));
-    for(const [id,button]of actions){button.textContent='Revoke';button.disabled=!(active.get(id)>0);}
-   }catch{if(current()){failed=true;for(const button of actions.values()){button.textContent='Retry access';button.disabled=false;}}}
-   finally{loading=false;}
+    for(const [id,button]of actions){button.hidden=!(active.get(id)>0);button.disabled=button.hidden;}
+    feedback.hidden=true;
+    if(restoreFocus){const target=[...actions.values()].find(button=>!button.hidden&&!button.disabled)||feedback.parentElement?.querySelector('tbody button');target?.focus({preventScroll:true});}
+   }catch{if(current()){
+    for(const button of actions.values()){button.hidden=true;button.disabled=true;}
+    FormUI.message(status,'Installation access could not be loaded.','error');feedback.hidden=false;
+   }}
+   finally{for(const event of focusEvents)document.removeEventListener(event,cancelFocusRestore,true);loading=false;if(current())retry.disabled=false;}
   }
+  retry.onclick=()=>{void refresh();};
   for(const company of companies){
-   const revoke=node('button','Revoke','secondary danger');revoke.type='button';revoke.disabled=true;revoke.setAttribute('aria-label','Revoke installation access for '+company.name);
-   revoke.onclick=()=>{if(!current()||!revoke.isConnected)return;if(failed){void refresh();return;}void grants(company,()=>current()&&revoke.isConnected,refresh);};
+   const revoke=node('button','Revoke','secondary danger');revoke.type='button';revoke.hidden=true;revoke.disabled=true;revoke.setAttribute('aria-label','Revoke installation access for '+company.name);
+   revoke.onclick=()=>{if(!current()||!revoke.isConnected||revoke.hidden||revoke.disabled)return;void grants(company,()=>current()&&revoke.isConnected,refresh);};
    actions.set(company.id,revoke);
   }
   queueMicrotask(refresh);return actions;
  }
+
  capture();
  window.addEventListener('popstate',()=>{clearCompletion();if(authorizationRevision===revision){revision++;dialog?.close();}});
  window.addEventListener('hashchange',()=>{clearCompletion();if(/^#workspace_authorize=[A-Z2-7]{13}$/.test(location.hash)){const code=capture();if(actor&&code)void authorize(code);}});

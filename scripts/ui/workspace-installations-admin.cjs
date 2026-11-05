@@ -7,7 +7,7 @@ const out=path.resolve(process.env.UI_EVIDENCE_DIR||'/tmp/gw290-ui-'+engine);
 const company='11111111-1111-4111-8111-111111111111',historyCompany='22222222-2222-4222-8222-222222222222',emptyCompany='33333333-3333-4333-8333-333333333333';
 const key='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',legacyKey='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 let longName=false;const longHost=['a'.repeat(63),'b'.repeat(63),'c'.repeat(63),'d'.repeat(61)].join('.')+':65535';
-let central=true,admin=true,theme='dark',failRead=false,failWrite=false,loseWrite=false,holdWrite=false,releaseWrite,holdRead=false,releaseRead;
+let central=true,admin=true,theme='dark',failRead=false,failWrite=false,loseWrite=false,holdWrite=false,releaseWrite,holdRead=false,releaseRead,holdSummary=false,releaseSummary,summaryReady;
 const calls=[],errors=[],checks=[],screens=[];
 const issued='2026-11-01T10:00:00Z',expires='2099-12-01T00:00:00Z';
 const org=id=>({id,name:id===company?(longName?longHost:'Connected studio'):id===historyCompany?'Revoked studio':'Ordinary company',role:'system_admin',balance_usd:0,credit_limit_usd:0,storage_bytes:0});
@@ -30,7 +30,9 @@ const server=http.createServer(async(req,res)=>{
  if(p==='/v1/organizations/'+company)return json(res,200,org(company));
  if(p==='/v1/system/installation-access'){
   if(failRead){failRead=false;return json(res,503,{error:{message:'Access list temporarily unavailable'}});}
-  return json(res,200,{data:[{organization_id:company,active_count:grants.filter(g=>!g.revoked_at&&(!g.expires_at||Date.parse(g.expires_at)>Date.now())).length}]});
+  const result={data:[{organization_id:company,active_count:grants.filter(g=>!g.revoked_at&&(!g.expires_at||Date.parse(g.expires_at)>Date.now())).length}]};
+  if(holdSummary){holdSummary=false;releaseSummary=()=>json(res,200,result);summaryReady?.();summaryReady=null;return;}
+  return json(res,200,result);
  }
  if(p.startsWith('/v1/system/organizations/')){
   const m=p.match(/^\/v1\/system\/organizations\/([^/]+)\/installation-access(?:\/([^/]+))?$/);assert.ok(m,'exact scoped route');
@@ -69,8 +71,8 @@ const server=http.createServer(async(req,res)=>{
  const choose=()=>modal.locator('.remote-job').filter({hasText:'Company access'});
  try{
   await open();assert.equal(await page.locator('#workspaceGrantsButton').count(),0);assert.equal(calls.filter(x=>x.path==='/v1/workspace-installations').length,0);
-  assert.equal(await action(historyCompany).isDisabled(),true);assert.equal(await action(emptyCompany).isDisabled(),true);
-  checks.push('personal entry absent; history-only/empty companies disabled');
+  assert.equal(await action(historyCompany).count(),0);assert.equal(await action(emptyCompany).count(),0);
+  checks.push('personal entry absent; history-only and ordinary companies have no visible/accessibility Revoke');
   await reveal();await action(company).press('Enter');await choose().waitFor();assert.equal(await modal.locator('.remote-job').count(),2);
   await page.keyboard.press('Escape');await modal.waitFor({state:'hidden'});assert.equal(writeCount(),0);
   checks.push('company row keyboard opens scoped permanent/legacy list; Escape nonmutating');
@@ -96,21 +98,43 @@ const server=http.createServer(async(req,res)=>{
   await modal.getByText('Response lost; retry to confirm',{exact:true}).waitFor();
   page.once('dialog',d=>d.accept());await legacy.getByRole('button',{name:'Revoke',exact:true}).click();
   await legacy.getByRole('button',{name:'Revoked',exact:true}).waitFor();await dialogClose();
-  await page.waitForFunction(name=>{const b=[...document.querySelectorAll('#systemContent button')].find(b=>b.getAttribute('aria-label')===name);return b?.disabled;},'Revoke installation access for '+org(company).name);
-  checks.push('lost response same-key retry; revoked-only row disabled');
+  await page.waitForFunction(name=>{const b=[...document.querySelectorAll('#systemContent button')].find(b=>b.getAttribute('aria-label')===name);return b?.hidden&&b.disabled;},'Revoke installation access for '+org(company).name);
+  assert.equal(await action(company).count(),0);checks.push('lost response same-key retry; all-revoked row action removed without removing history');
 
   reset();await open();await reveal();holdRead=true;await action(company).click();await modal.getByText('Loading…',{exact:true}).waitFor();await dialogClose();releaseRead();
   await reveal();await action(company).click();await choose().waitFor();assert.equal(await modal.locator('.remote-job').count(),2);await dialogClose();
   checks.push('closed slow read cannot append to reopened dialog');
-  failRead=true;await page.locator('[data-system-page="organizations"]').click();await row(company).getByRole('button',{name:'Revoke installation access for '+org(company).name}).filter({hasText:'Retry access'}).waitFor();
-  await reveal();await action(company).click();await page.waitForFunction(()=>[...document.querySelectorAll('#systemContent button')].some(b=>b.textContent==='Revoke'&&!b.disabled));
-  checks.push('row access-read failure retries without mutation');
+  failRead=true;await page.locator('[data-system-page="organizations"]').click();const summaryRetry=page.getByRole('button',{name:'Retry installation access',exact:true});await summaryRetry.waitFor();
+  assert.equal(await page.getByRole('button',{name:/^Revoke installation access for/}).count(),0);assert.equal(await row(emptyCompany).getByRole('button',{name:'Manage',exact:true}).count(),1);
+  await summaryRetry.focus();await summaryRetry.press('Enter');await action(company).waitFor();assert.equal(await action(company).evaluate(e=>document.activeElement===e),true);assert.equal(await summaryRetry.isVisible(),false);
+  checks.push('summary failure has one keyboard-accessible retry, no per-company action; successful retry restores focus without writes');
+
+  for(const interaction of ['keyboard','pointer']){
+   failRead=true;await page.locator('[data-system-page="organizations"]').click();await summaryRetry.waitFor();
+   holdSummary=true;let retryHeld=new Promise(resolve=>{summaryReady=resolve;});await summaryRetry.focus();await summaryRetry.press('Enter');await retryHeld;
+   const nameInput=page.locator('#systemContent .organization-create input').first();
+   if(interaction==='keyboard'){await nameInput.focus();await page.keyboard.press('Tab');}else await nameInput.click();
+   const newerFocus=interaction==='keyboard'?page.locator('#systemContent .organization-create input').nth(1):nameInput;
+   assert.equal(await newerFocus.evaluate(e=>document.activeElement===e),true);const beforeRetryWrites=writeCount();
+   releaseSummary();await action(company).waitFor();assert.equal(await newerFocus.evaluate(e=>document.activeElement===e),true,'late summary must preserve newer '+interaction+' focus');assert.equal(writeCount(),beforeRetryWrites);
+  }
+  checks.push('held retry preserves newer keyboard and pointer focus instead of stealing it when the summary completes');
+
+  holdSummary=true;releaseSummary=undefined;let held=new Promise(resolve=>{summaryReady=resolve;});await page.locator('[data-system-page="organizations"]').click();await row(company).waitFor();await held;assert.equal(typeof releaseSummary,'function');
+  assert.equal(await page.getByRole('button',{name:/^Revoke installation access for/}).count(),0);assert.equal(await page.getByRole('button',{name:'Retry installation access',exact:true}).count(),0);
+  releaseSummary();await action(company).waitFor();assert.equal(await action(emptyCompany).count(),0);checks.push('initial loading hides every unconfirmed Revoke; confirmed active company alone is shown');
+
+  holdSummary=true;releaseSummary=undefined;held=new Promise(resolve=>{summaryReady=resolve;});await page.locator('[data-system-page="organizations"]').click();await row(company).waitFor();await held;assert.equal(typeof releaseSummary,'function');const oldSummary=releaseSummary;
+  for(const grant of grants)grant.revoked_at=new Date().toISOString();const refreshedSummary=page.waitForResponse(r=>r.url().endsWith('/v1/system/installation-access'));await page.locator('[data-system-page="organizations"]').click();await row(company).waitFor();await refreshedSummary;
+  const staleSummary=page.waitForResponse(r=>r.url().endsWith('/v1/system/installation-access'));oldSummary();await staleSummary;await page.waitForLoadState('networkidle');assert.equal(await page.getByRole('button',{name:/^Revoke installation access for/}).count(),0);checks.push('late previous summary cannot restore actions in a newer all-revoked list');reset();await open();
+
 
   for(const mode of ['dark','light'])for(const width of [1440,390,320]){
    theme=mode;await page.setViewportSize({width,height:1100});await open();await reveal();
    const geometry=await row(company).locator('.form-actions').evaluate(el=>{const b=[...el.querySelectorAll('button')].map(x=>x.getBoundingClientRect());return {gap:getComputedStyle(el).gap,buttons:b.map(x=>({x:x.x,y:x.y,w:x.width,h:x.height})),documentWidth:document.documentElement.scrollWidth,viewport:innerWidth};});
    assert.equal(geometry.gap,'12px');assert.ok(geometry.buttons.every(b=>b.h>=44));assert.ok(geometry.documentWidth<=width+1,'no page overflow');
    const listFile=path.join(out,mode+'-'+width+'-organizations.png');await page.screenshot({path:listFile,fullPage:true});screens.push(listFile);
+   await row(emptyCompany).hover();await row(emptyCompany).getByRole('button',{name:'Manage',exact:true}).focus();assert.equal(await row(emptyCompany).getByRole('button').count(),1);assert.equal(await action(emptyCompany).count(),0);const ordinaryFile=path.join(out,mode+'-'+width+'-ordinary.png');await page.screenshot({path:ordinaryFile,fullPage:true});screens.push(ordinaryFile);await reveal();
    await action(company).click();await choose().waitFor();
    const dialogRect=await modal.boundingBox();assert.ok(dialogRect.x>=0&&dialogRect.x+dialogRect.width<=width+1,'dialog fits viewport');
    const grantTargets=await modal.locator('.remote-job button').evaluateAll(buttons=>buttons.map(b=>({width:b.getBoundingClientRect().width,height:b.getBoundingClientRect().height})));assert.ok(grantTargets.length>=2&&grantTargets.every(b=>b.width>=44&&b.height>=44),'all modal grant targets at least 44px');
