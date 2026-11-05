@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"slices"
 
@@ -72,7 +71,7 @@ func (s *Server) referenceUploadLimit(r *http.Request, target *referencevalidati
 // limits (including the reviewed extension) cannot be borrowed by another kind.
 func validateResourceSourceFile(model core.MediaModel, subtype string, file referencevalidation.File) error {
 	if model.ResourceOperation == nil {
-		return fmt.Errorf("%w: no resource source schema", core.ErrOptionsInvalid)
+		return &resourceSourceValidationError{hint: "This preparation has no resource source schema. Ask an operator to check the model configuration."}
 	}
 	scoped := model
 	scoped.ReferenceMediaLimits = nil
@@ -81,16 +80,16 @@ func validateResourceSourceFile(model core.MediaModel, subtype string, file refe
 			continue
 		}
 		if len(variant.SourceKinds) > 0 && !slices.Contains(variant.SourceKinds, file.Type) {
-			return fmt.Errorf("%w: unsupported resource source kind", core.ErrOptionsInvalid)
+			return &resourceSourceValidationError{hint: "The reference file type is unsupported by this preparation. Choose a file type listed in the selected preparation's source schema."}
 		}
 		if len(variant.AllowedDimensions) > 0 && !slices.Contains(variant.AllowedDimensions, core.MediaDimensions{Width: file.Info.Width, Height: file.Info.Height}) {
-			return fmt.Errorf("%w: unsupported resource source dimensions", core.ErrOptionsInvalid)
+			return &resourceSourceValidationError{hint: resourceDimensionsHint(file.Info.Width, file.Info.Height, variant.AllowedDimensions)}
 		}
 		scoped.ReferenceMediaLimits = variant.Limits
 		break
 	}
 	if err := referencevalidation.ValidateFiles(scoped, []referencevalidation.File{file}, false); err != nil {
-		return fmt.Errorf("%w: %v", core.ErrOptionsInvalid, err)
+		return &resourceSourceValidationError{hint: resourceFileHint(scoped, file)}
 	}
 	return nil
 }

@@ -59,7 +59,7 @@ func CloneResourceCreation(in *ResourceCreateRequest) *ResourceCreateRequest {
 }
 func ValidateResourceCreationIntent(model MediaModel, o MediaOptions, deferResolution bool) error {
 	invalid := func() error {
-		return fmt.Errorf("%w: invalid or unresolved resource creation intent", ErrOptionsInvalid)
+		return resourceIntentError("", "could not be resolved for this model; review the preparation inputs and estimate again")
 	}
 	if model.ResourceOperation == nil {
 		if o.ResourceIntent != nil || o.ResourceCreation != nil {
@@ -68,49 +68,78 @@ func ValidateResourceCreationIntent(model MediaModel, o MediaOptions, deferResol
 		return nil
 	}
 	intent := o.ResourceIntent
-	if intent == nil || intent.Kind != model.ResourceOperation.Kind || strings.TrimSpace(intent.Name) == "" || len(intent.Name) > 256 || len(intent.Description) > 4096 || len(intent.ReferenceIDs) > 64 || len(intent.Tags) > 32 || len(model.ResourceOperation.Subtypes) > 0 && !slices.Contains(model.ResourceOperation.Subtypes, intent.Subtype) {
-		return invalid()
-	}
 	schema := model.ResourceOperation
+	if intent == nil {
+		return resourceIntentError("", "is required; supply the preparation inputs")
+	}
+	if intent.Kind != schema.Kind {
+		return resourceIntentError("kind", "does not match this preparation; choose a supported preparation kind")
+	}
+	if strings.TrimSpace(intent.Name) == "" {
+		return resourceIntentError("name", "must be nonempty; supply a resource name")
+	}
+	if len(intent.Name) > 256 {
+		return resourceIntentError("name", fmt.Sprintf("has %d bytes; maximum 256 bytes. Shorten the name", len(intent.Name)))
+	}
+	if len(intent.Description) > 4096 {
+		return resourceIntentError("description", fmt.Sprintf("has %d bytes; maximum 4096 bytes. Shorten the description", len(intent.Description)))
+	}
+	if len(intent.ReferenceIDs) > 64 {
+		return resourceIntentError("reference_ids", "must contain at most 64 sources; remove extra sources")
+	}
+	if len(intent.Tags) > 32 {
+		return resourceIntentError("tags", "must contain at most 32 tags; remove extra tags")
+	}
+	if len(schema.Subtypes) > 0 && !slices.Contains(schema.Subtypes, intent.Subtype) {
+		hint := "is unsupported; choose a documented preparation subtype"
+		if choices, ok := parameterChoices(schema.Subtypes); ok {
+			hint = "must be one of: " + choices + ". Choose a supported subtype"
+		}
+		return resourceIntentError("subtype", hint)
+	}
 	if schema.NameMaxCharacters > 0 && utf8.RuneCountInString(intent.Name) > schema.NameMaxCharacters {
-		return invalid()
+		return resourceIntentError("name", fmt.Sprintf("has %d characters; maximum %d Unicode code points. Shorten the name", utf8.RuneCountInString(intent.Name), schema.NameMaxCharacters))
 	}
 	if schema.NameMaxCharacters > 0 && !schema.SupportsDescription && intent.Description != "" {
-		return invalid()
+		return resourceIntentError("description", "is not supported by this preparation; omit it")
 	}
 	if schema.DescriptionRequired && strings.TrimSpace(intent.Description) == "" {
-		return invalid()
+		return resourceIntentError("description", "is required; supply a nonempty description")
 	}
 	if schema.DescriptionMaxCharacters > 0 && utf8.RuneCountInString(intent.Description) > schema.DescriptionMaxCharacters {
-		return invalid()
+		return resourceIntentError("description", fmt.Sprintf("has %d characters; maximum %d Unicode code points. Shorten the description", utf8.RuneCountInString(intent.Description), schema.DescriptionMaxCharacters))
 	}
 	if schema.MaxTags > 0 && len(intent.Tags) > schema.MaxTags {
-		return invalid()
+		return resourceIntentError("tags", fmt.Sprintf("must contain at most %d tags; remove extra tags", schema.MaxTags))
 	}
 	seen := map[string]bool{}
-	for _, id := range intent.ReferenceIDs {
-		if _, err := uuid.Parse(id); err != nil || seen[id] {
-			return invalid()
+	for i, id := range intent.ReferenceIDs {
+		if _, err := uuid.Parse(id); err != nil {
+			return resourceIntentError(fmt.Sprintf("reference_ids.%d", i), "must be a UUID; select an uploaded reference")
+		}
+		if seen[id] {
+			return resourceIntentError(fmt.Sprintf("reference_ids.%d", i), "is a duplicate source; remove the duplicate reference")
 		}
 		seen[id] = true
 	}
-	for _, id := range []string{intent.GeneratedTaskID, intent.BoundVoiceBindingID} {
+	for i, id := range []string{intent.GeneratedTaskID, intent.BoundVoiceBindingID} {
 		if id != "" {
 			if _, err := uuid.Parse(id); err != nil {
-				return invalid()
+				field := []string{"generated_task_id", "bound_voice_binding_id"}[i]
+				return resourceIntentError(field, "must be a UUID; select an available source")
 			}
 		}
 	}
 	if intent.GeneratedArtifactID != "" && (intent.GeneratedTaskID == "" || !ValidGeneratedArtifactID(intent.GeneratedArtifactID)) {
-		return invalid()
+		return resourceIntentError("generated_artifact_id", "requires generated_task_id and a valid artifact identifier; select an output of the source generation")
 	}
-	for _, tag := range intent.Tags {
+	for i, tag := range intent.Tags {
 		if len(tag) > 128 {
-			return invalid()
+			return resourceIntentError(fmt.Sprintf("tags.%d", i), "must contain at most 128 bytes; shorten this tag")
 		}
 	}
 	if len(intent.ReferenceIDs) == 0 && intent.GeneratedTaskID == "" {
-		return invalid()
+		return resourceIntentError("reference_ids", "requires at least one source; select an uploaded reference or supply generated_task_id")
 	}
 	if deferResolution {
 		return nil

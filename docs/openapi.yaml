@@ -11188,6 +11188,7 @@ components:
               'x': {type: number, minimum: 0, maximum: 1}
               'y': {type: number, minimum: 0, maximum: 1}
     ProviderResourceCreate:
+      description: Preparation input validation preserves trusted local field constraints in the existing error envelope. error.param names a request field or zero-based reference_ids item; rejected names, tags, source identifiers and private provider diagnostics are not echoed.
       type: object
       additionalProperties: false
       required: [provider, workflow_model, kind, name]

@@ -10,6 +10,14 @@ import (
 
 // Generation option diagnostics use the same public field names as admission.
 func generationValidationError(w http.ResponseWriter, input core.CreateMediaInput, err error) {
+	if field, hint, ok := core.ResourceValidationDetails(err); ok {
+		path := "options.resource_intent"
+		if field != "" {
+			path += "." + field
+		}
+		invalidParameter(w, path, path+" "+hint)
+		return
+	}
 	if hint, ok := core.PromptValidationHint(err); ok {
 		field := "prompt"
 		if input.MediaType == "speech" {

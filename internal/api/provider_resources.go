@@ -51,6 +51,9 @@ func (s *Server) resourceError(w http.ResponseWriter, err error) {
 	case errors.Is(err, providerresources.ErrConflict), errors.Is(err, providerresources.ErrInUse):
 		writeError(w, 409, "resource_in_use", "The resource is in use or its lifecycle changed. Refresh before retrying.")
 	case errors.Is(err, providerresources.ErrInvalid), errors.Is(err, core.ErrOptionsInvalid):
+		if writeResourceValidationError(w, "invalid_resource", err) {
+			return
+		}
 		writeError(w, 400, "invalid_resource", "Invalid provider resource request.")
 	default:
 		writeError(w, 503, "resource_service_unavailable", "The resource operation could not be confirmed. Read its job before retrying.")
@@ -258,7 +261,7 @@ func (s *Server) resolveResourceCreation(r *http.Request, intent *core.ResourceI
 	if s.references == nil || s.mediaSigner == nil {
 		return nil, providerresources.ErrInvalid
 	}
-	for _, id := range intent.ReferenceIDs {
+	for index, id := range intent.ReferenceIDs {
 		ref, readContext, err := s.generationReference(r.Context(), id)
 		if err != nil {
 			return nil, err
@@ -271,6 +274,10 @@ func (s *Server) resolveResourceCreation(r *http.Request, intent *core.ResourceI
 			request.ReferenceSources = append(request.ReferenceSources, *inspected.Source)
 		}
 		if err := validateResourceSourceFile(model, intent.Subtype, inspected); err != nil {
+			var detail *resourceSourceValidationError
+			if errors.As(err, &detail) {
+				return nil, &resourceSourceValidationError{hint: detail.hint, index: &index}
+			}
 			return nil, err
 		}
 		sourceURL, err := references.CanonicalReferenceURL(s.assetPublicURL, s.mediaSigner.secret, identity.OwnerID(readContext), ref.ID)
@@ -373,7 +380,17 @@ func (s *Server) resourceAdmissionError(w http.ResponseWriter, err error) {
 	case errors.Is(err, core.ErrIdempotencyConflict):
 		writeError(w, 409, "idempotency_conflict", core.ErrIdempotencyConflict.Error())
 	case errors.Is(err, core.ErrCostLimitInvalid), errors.Is(err, core.ErrOptionsInvalid), errors.Is(err, core.ErrModelUnavailable), errors.Is(err, core.ErrProviderUnavailable), errors.Is(err, core.ErrIdempotencyKey):
-		writeError(w, 400, "invalid_request", err.Error())
+		if writeResourceValidationError(w, "invalid_request", err) {
+			return
+		}
+		message := "Invalid provider resource request. Review the preparation inputs and estimate again."
+		for _, known := range []error{core.ErrCostLimitInvalid, core.ErrModelUnavailable, core.ErrProviderUnavailable, core.ErrIdempotencyKey} {
+			if errors.Is(err, known) {
+				message = known.Error()
+				break
+			}
+		}
+		writeError(w, 400, "invalid_request", message)
 	default:
 		writeError(w, 503, "resource_service_unavailable", "The generation could not be admitted.")
 	}
