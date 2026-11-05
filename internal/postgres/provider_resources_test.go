@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -78,6 +79,8 @@ func (f *providerResourceFixture) scope(context.Context, string) (core.ProviderC
 
 func TestProviderResourcePersistenceIdempotencyPrivacyAndScope(t *testing.T) {
 	f := newProviderResourceFixture(t)
+	// A valid local UUID may contain the provider's untrusted duration sentinel.
+	f.job.Intent.Sources[0].ReferenceID = "00000999-0000-4000-8000-000000000001"
 	j := f.start(t, "create-once")
 	if _, err := f.repo.GetBinding(f.ctx, j.BindingID); !errors.Is(err, providerresources.ErrNotFound) {
 		t.Fatal("unconfirmed remote create became a binding", err)
@@ -148,8 +151,36 @@ func TestProviderResourcePersistenceIdempotencyPrivacyAndScope(t *testing.T) {
 	if err = f.db.QueryRow(`SELECT intent::text FROM provider_resource_jobs WHERE id=$1`, j.ID).Scan(&raw); err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(raw, "https://") || strings.Contains(raw, "999") {
-		t.Fatal("unverified provider data replaced trusted intent", raw)
+	wantJSON, err := json.Marshal(f.job.Intent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var wantIntent any
+	if err := json.Unmarshal(wantJSON, &wantIntent); err != nil {
+		t.Fatal(err)
+	}
+	matchesTrustedIntent := func(raw string) bool {
+		t.Helper()
+		var gotIntent any
+		if err := json.Unmarshal([]byte(raw), &gotIntent); err != nil {
+			t.Fatal(err)
+		}
+		return reflect.DeepEqual(gotIntent, wantIntent)
+	}
+	if !matchesTrustedIntent(raw) {
+		t.Fatalf("persisted resource intent differs from trusted local input: got %s; want %s", raw, wantJSON)
+	}
+	// Negative control in this disposable fixture: the same assertion must reject
+	// an actual changed source duration, even when its UUID legitimately has 999.
+	if _, err := f.db.Exec(`UPDATE provider_resource_jobs SET intent=jsonb_set(intent, '{sources,0,duration}', '999') WHERE id=$1`, j.ID); err != nil {
+		t.Fatal(err)
+	}
+	var corrupted string
+	if err := f.db.QueryRow(`SELECT intent::text FROM provider_resource_jobs WHERE id=$1`, j.ID).Scan(&corrupted); err != nil {
+		t.Fatal(err)
+	}
+	if matchesTrustedIntent(corrupted) {
+		t.Fatal("trusted-intent assertion accepted an unverified source duration", corrupted)
 	}
 	if stored.Warning == "" || strings.Contains(stored.Warning, "secret") {
 		t.Fatal("raw warning retained", stored.Warning)
