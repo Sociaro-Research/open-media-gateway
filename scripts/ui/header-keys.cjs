@@ -69,8 +69,14 @@ const server=http.createServer((req,res)=>{
   for(const role of ['supermanager','admin','developer','system_admin'])await run('Existing '+role+' key capability',{role,entry:'/api-keys'},async({page})=>{await keysReady(page);assert.equal(await page.locator('#keysNav').isVisible(),true);});
   for(const role of ['member','content_officer','client_manager'])await run('No key page for '+role,{role,entry:'/api-keys'},async({page,requests})=>{
    await page.waitForFunction(()=>currentConsoleRoute==='organizations');assert.equal(await page.locator('#keysNav').isVisible(),false);assert.equal(await page.locator('#organizationsContent .keys-form').count(),0);
-   // Billing legitimately reads scoped key labels; it must not open key management.
-   if(role!=='client_manager')assert.ok(!requests.some(r=>r.path==='/v1/api-keys'));assert.equal(new URL(page.url()).pathname,'/organizations');
+   // Requests/Billing may read eligible key labels for the fixed company filter.
+   // This grants no key-management page, issuance or unrelated company scope.
+   await page.getByText('No requests yet.',{exact:true}).waitFor();
+   const labelReads=requests.filter(r=>r.path==='/v1/api-keys');
+   assert.ok(labelReads.every(r=>r.method==='GET'&&r.query==='?organization_id='+b));
+   assert.equal(await page.locator('#newKeyName').count(),0);
+   assert.equal(await page.getByRole('tab',{name:'API keys',exact:true}).count(),0);
+   assert.equal(new URL(page.url()).pathname,'/organizations');
   });
   await run('Existing direct organization route remains intact',{entry:'/organizations'},async({page})=>{await page.locator('#organizationsContent .member-limit-form').first().waitFor();assert.equal(new URL(page.url()).pathname,'/organizations');assert.equal(await page.locator('#keysNav').getAttribute('aria-current'),null);});
   await run('Legacy configuration Keys resolves current workspace',{entry:'/configuration#keys'},async({page})=>{await keysReady(page);assert.equal(await page.locator('#organizationsContent h1').innerText(),'Organization B');});
