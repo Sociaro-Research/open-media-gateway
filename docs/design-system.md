@@ -114,7 +114,9 @@ section spacing as the portal's configuration and documentation content.
 The standalone documentation uses the console's shared palette, header measurement,
 logo, divider and navigation components. Its header links are **Console** and
 **Docs**, with Docs marked as the current page using the shared active underline.
-It has no separate theme selector and uses the installation's public default color
+Public legal pages reuse the same header with Console and Docs links, neither
+marked current, and retain their readable document width inside the shared shell.
+Documentation has no separate theme selector and uses the installation's public default color
 preset. The saved or transferred Light/Dark/System mode follows the documented
 preference rules in [Public sites](public-sites.md#documentation-display-theme);
 System follows live OS changes. Documentation does not request account preferences.

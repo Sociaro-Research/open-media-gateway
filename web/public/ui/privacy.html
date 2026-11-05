@@ -5,12 +5,17 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title data-page-title="Privacy Policy">Privacy Policy · Media gateway</title>
-  <link rel="stylesheet" href="/ui/styles.css?v=20260911-logo-consistency">
-  <link rel="stylesheet" href="/ui/legal.css?v=20260911-console-consistency">
+  <link rel="stylesheet" href="/ui/styles.css?v=20261102-shared-shell">
+  <link rel="stylesheet" href="/ui/legal.css?v=20261105-shared-shell">
 <script src="/ui/site.js" defer></script><script src="/ui/legal.js" defer></script></head>
 <body>
-  <main>
-    <a class="brand back" href="/" aria-label="Home"><img class="brand-mark" alt="" hidden></a>
+  <div class="shell">
+    <header class="topbar">
+      <a class="brand" data-console-link href="/" aria-label="Home"><img class="brand-mark brand-wordmark" alt="" hidden><img class="brand-mark brand-symbol" alt="" hidden></a>
+      <nav class="section-nav" aria-label="Main navigation"><a class="nav-button" data-console-link href="/">Console</a><a class="nav-button" data-docs-link href="/docs">Docs</a></nav>
+      <div class="topbar-actions"></div>
+    </header>
+  <main class="legal-content">
     <h1>Privacy Policy</h1>
     <div data-legal-default="privacy">
 
@@ -39,5 +44,6 @@
     <p>[OPERATOR: explain how changes to this notice will be dated and communicated.]</p>
     </div>
 </main>
+  </div>
 </body>
 </html>

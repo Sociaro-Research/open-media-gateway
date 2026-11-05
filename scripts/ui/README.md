@@ -931,6 +931,10 @@ checks configured central/staging origins, self-hosted paths, delayed/failed/hun
 configuration, stale navigation, reverse theme transfer, blocked storage and
 Back/Forward. It checks the shared header, active Docs, footer/legal targets,
 actual public/private asset policy and light/dark 1440/390/320px screenshots.
+Its `public legal shell` scenarios check both public legal pages before sign-in,
+their shared header/keyboard navigation, configured and same-origin destinations,
+custom/default content, load failure/retry and responsive footer spacing. Select
+these alone with `UI_SCENARIO='public legal shell'`.
 `UI_BASELINE_DIR` optionally binds preserved pre-change app/site scripts for the
 two-document before measurement. Keep evidence outside tracked source and inspect
 the rendered screenshots; source assertions alone do not establish visual acceptance.
