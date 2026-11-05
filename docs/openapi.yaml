@@ -9069,8 +9069,8 @@ components:
       required: [provider, model]
       description: Model identity and selected generation settings, not client-provided limits. The server resolves current authorized capabilities. Input URLs are ignored. reference_ids are existing owned inputs for aggregate checks during another upload. No context means common library checks only. Average FPS follows inspected container timing; nominal FPS and upstream provider acceptance are not inferred.
       properties:
-        provider: {type: string}
-        model: {type: string}
+        provider: {type: string, description: Exact provider connection ID; must match the selected model.}
+        model: {type: string, description: Exact public ID from GET /v1/models (including custom aliases) or the legacy native model ID on this provider connection. Ambiguous matches are rejected.}
         options: {$ref: '#/components/schemas/MediaOptions'}
         reference_ids: {type: array, maxItems: 64, items: {type: string, format: uuid}}
         role: {type: string, enum: ['', reference_voice], description: Per-visual voice intent is checked against the native workflow and its separate voice file contract; it never consumes a free audio slot.}
