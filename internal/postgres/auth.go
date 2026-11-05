@@ -5,10 +5,13 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 
+	"github.com/Sociaro-Research/open-media-gateway/internal/auth"
 	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
 )
 
@@ -21,17 +24,50 @@ func NewAuthRepository(db *sql.DB) *AuthRepository {
 }
 
 func (r *AuthRepository) UpsertGoogleUser(ctx context.Context, subject, email, name, picture string) (identity.User, error) {
+	return r.upsertGoogleUser(ctx, subject, email, name, picture, false)
+}
+
+// SignInGoogleUser only accepts verified Google claims. Email-based linking is
+// allowed when Google is authoritative for the mailbox, never on address alone.
+func (r *AuthRepository) SignInGoogleUser(ctx context.Context, google auth.GoogleIdentity) (identity.User, error) {
+	if google.Subject == "" || strings.TrimSpace(google.Email) == "" || !google.EmailVerified {
+		return identity.User{}, auth.ErrUnauthenticated
+	}
+	return r.upsertGoogleUser(ctx, google.Subject, google.Email, google.Name, google.Picture, google.AuthoritativeEmail())
+}
+
+func (r *AuthRepository) upsertGoogleUser(ctx context.Context, subject, email, name, picture string, allowEmailLink bool) (identity.User, error) {
+	email = strings.ToLower(strings.TrimSpace(email))
+	// The stable Google subject takes precedence over a possibly changed email.
 	user, err := scanProfile(r.db.QueryRowContext(ctx, `
-		INSERT INTO users (id, google_subject, email, display_name, picture_url, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
-		ON CONFLICT (google_subject) DO UPDATE SET
-			email = EXCLUDED.email,
-			display_name = CASE WHEN users.custom_display_name THEN users.display_name ELSE EXCLUDED.display_name END,
-			picture_url = COALESCE(EXCLUDED.picture_url, users.picture_url),
+		UPDATE users SET
+			email = $2,
+			display_name = CASE WHEN custom_display_name THEN display_name ELSE $3 END,
+			picture_url = COALESCE($4, picture_url),
 			updated_at = NOW()
+		WHERE google_subject = $1
 		RETURNING id, email, display_name, COALESCE(picture_url, ''), theme, report_columns, color_preset, contacts`,
-		uuid.NewString(), subject, email, name, nullableString(picture),
+		subject, email, name, nullableString(picture),
 	))
+	if errors.Is(err, sql.ErrNoRows) {
+		// The unique email index serializes concurrent first logins. Only an
+		// unbound account may gain a subject; an existing binding is immutable.
+		// Preserve the original profile, credentials, memberships and role flags.
+		user, err = scanProfile(r.db.QueryRowContext(ctx, `
+			INSERT INTO users (id, google_subject, email, display_name, picture_url, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+			ON CONFLICT (LOWER(email)) DO UPDATE SET
+				google_subject = EXCLUDED.google_subject, updated_at = NOW()
+			WHERE (users.google_subject IS NULL AND $6) OR users.google_subject = EXCLUDED.google_subject
+			RETURNING id, email, display_name, COALESCE(picture_url, ''), theme, report_columns, color_preset, contacts`,
+			uuid.NewString(), subject, email, name, nullableString(picture), allowEmailLink,
+		))
+	}
+	var conflict *pgconn.PgError
+	if errors.Is(err, sql.ErrNoRows) || (errors.As(err, &conflict) && conflict.Code == "23505" &&
+		(conflict.ConstraintName == "users_email_unique_idx" || conflict.ConstraintName == "users_google_subject_key")) {
+		return identity.User{}, auth.ErrGoogleAccountConflict
+	}
 	if err != nil {
 		return identity.User{}, fmt.Errorf("upsert Google user: %w", err)
 	}

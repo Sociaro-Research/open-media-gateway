@@ -7116,8 +7116,13 @@ paths:
       - Account
       summary: Complete Google sign-in
       description: Browser callback with a one-time code and state. Validates identity,
-        establishes an HttpOnly session and redirects to UI_PUBLIC_URL/. Only registered when Google
-        OAuth is configured.
+        establishes an HttpOnly session and redirects to UI_PUBLIC_URL/. A verified
+        Gmail address or verified Workspace identity with a nonempty hd claim can
+        link to an existing email-only account without changing its ID, permissions
+        or password. An existing different Google subject is never replaced;
+        third-party addresses without hd cannot link by email alone. Failures
+        redirect to UI_PUBLIC_URL/?auth_error=1 without issuing a session.
+        Only registered when Google OAuth is configured.
       security: []
       responses:
         '302':

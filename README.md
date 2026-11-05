@@ -86,6 +86,8 @@ docker compose exec -T gateway /gateway admin setup-code
 Open [http://localhost:8088](http://localhost:8088), enter the private setup code in
 **Create owner account**, and choose your name, email, and password. You are
 signed in as Administrator; email delivery and Google sign-in are optional.
+Google sign-in can later reuse that account when Google proves ownership of the
+same Gmail or Workspace address; see [account linking](docs/email-authentication.md#identity-and-verification).
 
 ### 3. Try a free generation
 
