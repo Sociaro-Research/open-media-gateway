@@ -220,7 +220,10 @@
     if(!validation)return;const {control,target,popup}=validation;
     if(!control.isConnected||!control.willValidate||control.validity.valid||!target.getClientRects().length){clearValidation();return;}
     const box=target.getBoundingClientRect();
-    if(box.bottom<0||box.top>innerHeight){clearValidation();return;}
+    // A background layout/viewport change does not correct the user's input.
+    // Keep its invalid state and description while only the bubble is offscreen.
+    if(box.bottom<0||box.top>innerHeight){popup.hidden=true;return;}
+    popup.hidden=false;
     popup.style.left=Math.max(12,Math.min(box.left,innerWidth-popup.offsetWidth-12))+'px';
     popup.style.top=Math.max(12,box.bottom+8+popup.offsetHeight<=innerHeight-12?box.bottom+8:box.top-popup.offsetHeight-8)+'px';
   }

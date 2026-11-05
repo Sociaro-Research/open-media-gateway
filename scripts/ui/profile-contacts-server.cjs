@@ -44,7 +44,27 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
   await page.goto(base+'/profile');await Promise.race([organizationHeld,new Promise((_,reject)=>organizationTimer=setTimeout(()=>reject(new Error('Organization bootstrap read did not arrive')),6000))]);clearTimeout(organizationTimer);await form.waitFor();
   assert.equal(await page.evaluate(()=>Workspace.ready()),false);await add().click();await label().fill('Bootstrap draft');await link().fill('bootstrap@@example.test');await save().waitFor({state:'visible'});await save().click();await page.getByRole('alert').filter({hasText:'mailto:'}).waitFor();assert.equal(await link().getAttribute('aria-invalid'),'true');assert.equal(writes.length,0);
   const firstForm=await form.elementHandle();assert.equal(await link().evaluate(el=>el===document.activeElement),true);await capture('bootstrap-before');
-  releaseOrganization();await page.waitForFunction(()=>Workspace.ready());await page.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))));await form.waitFor();await capture('bootstrap-after');
+  // Background header/content growth can move a focused invalid input outside
+  // the viewport. It must hide only the bubble, retaining the draft's semantics.
+  const validationID=await link().getAttribute('aria-describedby');
+  const geometry=await page.evaluate(()=>{
+   const form=document.querySelector('.profile-contacts'),input=form.querySelector('[name=contact_url]'),spacer=document.createElement('div');
+   spacer.dataset.validationLayoutShift='';spacer.setAttribute('aria-hidden','true');spacer.style.height=(innerHeight+32)+'px';
+   const anchor=document.documentElement.style.overflowAnchor,y=scrollY;document.documentElement.style.overflowAnchor='none';form.before(spacer);scrollTo(0,y);FormUI.refresh();
+   return {anchor,y,offscreen:input.getBoundingClientRect().top>innerHeight};
+  });
+  try{
+   assert.equal(geometry.offscreen,true,'fixture must exercise the offscreen layout boundary');
+   assert.equal(await link().getAttribute('aria-invalid'),'true','layout alone must retain invalid semantics');
+   assert.equal(await link().getAttribute('aria-describedby'),validationID);
+   assert.equal(await link().evaluate(el=>el===document.activeElement),true);assert.equal(await page.evaluate(()=>scrollY),geometry.y);assert.equal(writes.length,0);
+   assert.equal(await page.locator('.field-validation:visible').count(),0,'offscreen validation must not leave a floating bubble');
+   releaseOrganization();await page.waitForFunction(()=>Workspace.ready());await page.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))));
+   assert.equal(await link().getAttribute('aria-invalid'),'true','bootstrap must retain offscreen validation semantics');
+  }finally{
+   await page.evaluate(({anchor,y})=>{document.querySelector('[data-validation-layout-shift]')?.remove();document.documentElement.style.overflowAnchor=anchor;scrollTo(0,y);FormUI.refresh();},geometry);
+  }
+  await form.waitFor();await page.getByRole('alert').filter({hasText:'mailto:'}).waitFor();assert.equal(await link().getAttribute('aria-describedby'),validationID);await capture('bootstrap-after');
   assert.equal(await firstForm.evaluate(el=>el.isConnected),true,'workspace bootstrap must retain the editable Profile form');assert.equal(await form.locator('tbody tr').count(),1);assert.equal(await label().inputValue(),'Bootstrap draft');assert.equal(await link().inputValue(),'bootstrap@@example.test');assert.equal(await link().getAttribute('aria-invalid'),'true');assert.equal(await link().evaluate(el=>el===document.activeElement),true);assert.equal(writes.length,0);
   await form.getByRole('button',{name:'Remove contact',exact:true}).click();assert.equal(await form.locator('tbody tr').count(),0);assert.equal(await save().isVisible(),false);
   await page.goto(base+'/');await page.waitForFunction(()=>window.Workspace?.ready());await page.locator('#userMenuToggle').press('ArrowDown');await page.getByRole('menuitem',{name:'Profile',exact:true}).press('Enter');await form.waitFor();

@@ -16,6 +16,13 @@ ignored `.local/` or `dist/`; record limits explicitly.
 
 ## Available fixtures
 
+`node scripts/ui/validation-layout.cjs` checks the shared native validation state
+through offscreen layout changes, popup restoration, correction, focus changes,
+Escape and inactive views. Repeat with `UI_BROWSER_ENGINE=webkit` and retain
+`UI_EVIDENCE_DIR` screenshots for both themes at 1440/390/320px. The real
+`TestProfileContactsBrowserWorkflow` also checks this boundary during delayed
+workspace initialization against disposable PostgreSQL and actual profile APIs.
+
 `node --test scripts/ui/api-errors.test.cjs scripts/ui/media-errors.test.cjs
 scripts/ui/media-error-flows.test.cjs` checks the actual shared request helper and
 saved-media renderer with synthetic responses and a minimal DOM boundary fixture.

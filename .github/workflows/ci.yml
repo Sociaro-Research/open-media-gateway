@@ -242,6 +242,8 @@ jobs:
           GATEWAY_PERF_OUTPUT: ui-performance-results
         run: |
           make build-ui
+          UI_EVIDENCE_DIR=ui-performance-results/validation-layout/chromium node scripts/ui/validation-layout.cjs
+          UI_EVIDENCE_DIR=ui-performance-results/validation-layout/webkit UI_BROWSER_ENGINE=webkit node scripts/ui/validation-layout.cjs
           node --test scripts/ui/auto-update-test.cjs
           node scripts/ui/generation-page-fixture.test.cjs
           node scripts/ui/automatic-update-dom.cjs
