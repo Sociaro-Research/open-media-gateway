@@ -298,8 +298,8 @@ jobs:
           node scripts/ui/stablecoins.cjs
           UI_BROWSER=webkit node scripts/ui/stablecoins.cjs
           node scripts/ui/organizations.cjs
-          UI_MEMBER_ROLE_ONLY=1 node scripts/ui/organizations.cjs
-          UI_MEMBER_ROLE_ONLY=1 UI_BROWSER_ENGINE=webkit node scripts/ui/organizations.cjs
+          UI_EVIDENCE_DIR=ui-performance-results/member-roles/chromium UI_MEMBER_ROLE_ONLY=1 node scripts/ui/organizations.cjs
+          UI_EVIDENCE_DIR=ui-performance-results/member-roles/webkit UI_MEMBER_ROLE_ONLY=1 UI_BROWSER_ENGINE=webkit node scripts/ui/organizations.cjs
           node scripts/ui/organization-roles.cjs
           UI_BROWSER_ENGINE=webkit node scripts/ui/organization-roles.cjs
           node scripts/ui/sales.cjs
