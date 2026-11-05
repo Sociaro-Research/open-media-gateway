@@ -175,10 +175,35 @@ const server=http.createServer((req,res)=>{
     await referenceMode('References');assert.equal(await page.locator('#audioReferenceFiles').isDisabled(),false);assert.equal(await page.locator('#audioURL').isDisabled(),false);
     await model('Wan 2.7');assert.equal(await page.locator('#audioReferenceFiles').isDisabled(),true);
    });
+   await run('native chooser mode roundtrip preserves media and eligible voice mappings',async({page,dialog,model,referenceMode,voice,read,origin})=>{
+    const media=await page.locator('#selectedReferences img').elementHandles();assert.equal(media.length,2);
+    const sameMedia=async()=>{for(let i=0;i<media.length;i++)assert.equal(await media[i].evaluate((n,index)=>n.isConnected&&n===document.querySelectorAll('#selectedReferences img')[index],i),true,'mode changes retain the selected image node');};
+    for(const name of ['first.png','last.png']){await voice(name);await dialog.getByRole('button',{name:'Use voice.mp3 in generation',exact:true}).press('Enter');await dialog.waitFor({state:'hidden'});}
+    const allVoices={[origin+'/references/test/i1']:origin+'/references/test/a1',[origin+'/references/test/i2']:origin+'/references/test/a1'};
+    assert.deepEqual((await read()).voices,allVoices);
+    await referenceMode('First frame and references');await sameMedia();
+    assert.equal(await page.getByRole('button',{name:'Voice reference for first.png',exact:true}).count(),0);
+    assert.equal(await page.getByRole('button',{name:'Clear voice for first.png',exact:true}).count(),0);
+    assert.equal(await page.getByRole('button',{name:'Voice reference for last.png',exact:true}).innerText(),'Change voice reference');
+    assert.match(await page.locator('#selectedReferences .reference-name').nth(0).innerText(),/^First frame: /);
+    assert.deepEqual((await read()).voices,{[origin+'/references/test/i2']:origin+'/references/test/a1'});
+    await page.screenshot({path:path.join(output,'voice-first-frame-exclusion.png'),fullPage:true});
+    await referenceMode('References');await sameMedia();assert.deepEqual((await read()).voices,allVoices);
+    assert.equal(await page.locator('#selectedReferences .reference-voice').count(),2);
+    await model('Seedance 2.0');await sameMedia();assert.equal(await page.locator('.reference-voice,.reference-clear-voice').count(),0);assert.deepEqual((await read()).voices,{});
+    await referenceMode('First and last frames');await sameMedia();assert.equal(await page.locator('.reference-voice,.reference-clear-voice').count(),0);
+    assert.equal(await page.locator('#selectedReferences .reference-name').nth(0).innerText(),'@Image1 · first.png');assert.equal(await page.locator('#selectedReferences .reference-name').nth(1).innerText(),'@Image2 · last.png');
+    await model('Wan 2.7');await sameMedia();assert.deepEqual((await read()).voices,allVoices);assert.equal(await page.locator('#selectedReferences .reference-voice').count(),2);
+    await page.screenshot({path:path.join(output,'voice-mode-restored.png'),fullPage:true});
+    for(const node of media)await node.dispose();
+   });
    await run('native chooser busy guard prevents repeated chooser and upload',async({page,dialog,voice,startVoiceUpload,waitUpload,holdUpload,operations,read,origin})=>{
     const gate=holdUpload();await voice();await startVoiceUpload();await gate.arrived.promise;
     let extraChoosers=0;const unexpected=()=>extraChoosers++;page.on('filechooser',unexpected);
-    await dialog.locator('[data-upload]').click();await dialog.locator('[data-upload]').press('Enter');await page.evaluate(()=>new Promise(requestAnimationFrame));page.off('filechooser',unexpected);
+    const disabledUpload=dialog.locator('[data-upload]');assert.equal(await disabledUpload.isDisabled(),true);assert.equal(await dialog.locator('input[type=file]').isDisabled(),true);
+    const box=await disabledUpload.boundingBox();assert.ok(box);await page.mouse.click(box.x+box.width/2,box.y+box.height/2);
+    assert.equal(await disabledUpload.evaluate(n=>n===document.activeElement),false,'disabled Upload cannot receive native pointer focus');
+    await page.keyboard.press('Enter');await page.keyboard.press('Space');await page.evaluate(()=>new Promise(requestAnimationFrame));page.off('filechooser',unexpected);
     assert.equal(extraChoosers,0);assert.deepEqual(operations(),{preparations:1,uploads:1,choosers:1});
     gate.release.resolve();await gate.finished.promise;await waitUpload();
     assert.deepEqual((await read()).voices,{[origin+'/references/test/i1']:origin+'/references/test/upload1'});
@@ -187,11 +212,14 @@ const server=http.createServer((req,res)=>{
     useExisting();await voice();await startVoiceUpload();await waitUpload('Already in your library');
     assert.deepEqual(operations(),{preparations:1,uploads:0,choosers:1});assert.deepEqual((await read()).voices,{[origin+'/references/test/i1']:origin+'/references/test/a1'});assert.equal((await read()).audio,'');
    });
-   await run('native chooser validation preserves type size and retry',async({voice,openChooser,startVoiceUpload,waitUpload,operations,read,origin})=>{
-    await voice();let chooser=await openChooser(true);await chooser.setFiles({name:'invalid.txt',mimeType:'text/plain',buffer:audio});await waitUpload('use a supported audio file');
+   await run('native chooser validation preserves type size and retry',async({page,dialog,voice,openChooser,startVoiceUpload,waitUpload,operations,read,origin})=>{
+    const validation=dialog.locator('[data-reference-upload] [role=status]');
+    async function rejected(text){await page.waitForFunction(text=>document.querySelector('#audioReferenceLibrary [data-reference-upload] [role=status]').textContent===text,text);assert.equal(await validation.isVisible(),true);assert.equal(await dialog.locator('input[type=file]').inputValue(),'');assert.equal(await dialog.locator('[data-upload]').isEnabled(),true);}
+    await voice();let chooser=await openChooser(true);await chooser.setFiles({name:'invalid.txt',mimeType:'text/plain',buffer:audio});await rejected('invalid.txt: unsupported audio format text/plain. Use MP3, AAC, M4A, WAV, OGG, FLAC. No new reference assigned.');
     assert.equal(operations().preparations,0);assert.equal(operations().uploads,0);assert.deepEqual((await read()).voices,{});
+    await page.screenshot({path:path.join(output,'voice-invalid-file.png'),fullPage:true});
     const oversized=path.join(output,'oversized.mp3');fs.closeSync(fs.openSync(oversized,'w'));fs.truncateSync(oversized,50*1024*1024+1);
-    try{chooser=await openChooser(true);await chooser.setFiles(oversized);await waitUpload('maximum 52428800 bytes');}finally{fs.unlinkSync(oversized);}
+    try{chooser=await openChooser(true);await chooser.setFiles(oversized);await rejected('oversized.mp3: size 52428801 bytes; use a nonempty audio file at most 52428800 bytes. Reduce the file size. No new reference assigned.');}finally{fs.unlinkSync(oversized);}
     assert.equal(operations().preparations,0);assert.equal(operations().uploads,0);
     await startVoiceUpload();await waitUpload();assert.deepEqual((await read()).voices,{[origin+'/references/test/i1']:origin+'/references/test/upload1'});assert.equal((await read()).audio,'');
    });
