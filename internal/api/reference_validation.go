@@ -49,7 +49,7 @@ func (s *Server) referenceValidator(r *http.Request) referencevalidation.Validat
 		} else {
 			files = append(files, baseFiles...)
 		}
-		model, ok := templateModel(catalog, target.Provider, target.Model)
+		model, ok := referenceTargetModel(catalog, target.Provider, target.Model)
 		if !ok {
 			return referencevalidation.Invalid("References", "The selected model is unavailable to this account or key. Choose an available model.")
 		}

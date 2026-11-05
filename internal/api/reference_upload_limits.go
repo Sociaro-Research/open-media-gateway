@@ -23,7 +23,7 @@ func (s *Server) referenceUploadLimit(r *http.Request, target *referencevalidati
 	if target == nil {
 		return references.MaxBytes, nil
 	}
-	model, ok := templateModel(s.visibleCatalog(r), target.Provider, target.Model)
+	model, ok := referenceTargetModel(s.visibleCatalog(r), target.Provider, target.Model)
 	if !ok {
 		return 0, referencevalidation.Invalid("References", "The selected model is unavailable to this account or key. Choose an available model.")
 	}
