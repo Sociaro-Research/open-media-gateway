@@ -32,6 +32,9 @@ func TestParameterUncorrectableSchemasIdentifyOperatorAction(t *testing.T) {
 		{"required long key", ParameterField{Key: longKey, Type: "text", Required: true}, nil},
 		{"invalid long key value", ParameterField{Key: longKey, Type: "number"}, map[string]any{longKey: "private-input"}},
 		{"empty choices", ParameterField{Key: "style", Type: "select"}, map[string]any{"style": "private-input"}},
+		{"missing required empty choices", ParameterField{Key: "style", Type: "select", Required: true}, nil},
+		{"empty required value without choices", ParameterField{Key: "style", Type: "select", Required: true}, map[string]any{"style": ""}},
+		{"wrong type without choices", ParameterField{Key: "style", Type: "select"}, map[string]any{"style": true}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := NormalizeParameters([]ParameterField{tc.field}, tc.values)
@@ -47,5 +50,10 @@ func TestParameterUncorrectableSchemasIdentifyOperatorAction(t *testing.T) {
 	}
 	if _, err := NormalizeParameters([]ParameterField{{Key: "style", Type: "select"}}, nil); err != nil {
 		t.Fatal("absent optional schema became an admission failure", err)
+	}
+	_, err := NormalizeParameters([]ParameterField{{Key: "style", Type: "select", Required: true, Choices: []string{"ink"}}}, nil)
+	var detail *OptionValidationError
+	if !errors.As(err, &detail) || detail.Field != "parameters.style" || !strings.Contains(detail.Hint, "required") {
+		t.Fatal("valid required select lost its caller correction", err)
 	}
 }

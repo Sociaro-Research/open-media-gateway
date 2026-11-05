@@ -42,6 +42,9 @@ func parameterChoices(choices []string) (string, bool) {
 // Called only after the unchanged validator rejects a value. Diagnosing an
 // invalid schema here must not change which optional fields/defaults are used.
 func invalidParameterValue(f ParameterField, value any) error {
+	if f.Type == "select" && len(f.Choices) == 0 {
+		return parameterSchemaError()
+	}
 	bad := func(hint string) error { return parameterError(f.Key, hint) }
 	length := func(n int) string {
 		return fmt.Sprintf("has %d characters; maximum %d. Shorten the value", n, f.MaxLength)
@@ -59,9 +62,6 @@ func invalidParameterValue(f ParameterField, value any) error {
 			return bad("is required; supply a nonempty string")
 		}
 		if f.Type == "select" {
-			if len(f.Choices) == 0 {
-				return parameterSchemaError()
-			}
 			if choices, ok := parameterChoices(f.Choices); ok {
 				return bad("must be one of: " + choices + ". Choose a supported value")
 			}

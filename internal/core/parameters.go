@@ -38,6 +38,9 @@ func NormalizeParameters(fields []ParameterField, values map[string]any) (map[st
 		}
 		if !ok {
 			if f.Required {
+				if f.Type == "select" && len(f.Choices) == 0 {
+					return nil, parameterSchemaError()
+				}
 				return nil, parameterError(f.Key, "is required; supply the documented value")
 			}
 			continue
