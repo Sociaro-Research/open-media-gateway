@@ -11,7 +11,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[2]
 MARKER = "# Exact independently reviewed non-secret source lines."
 BINARY = os.environ.get("GITLEAKS_BIN") or shutil.which("gitleaks")
-REVIEWED = [('internal/postgres/remote_workspace.go', 52, 'd21e9820ce4b59fa0f5c15ca0c6e7de0c6660a0e24861fa3748395c87f166a3d'), ('plugins/provider/kling/definition.go', 36, 'c5c633700ca5def01e514c14f2d2f3b138e65da8d42c282fdc69be4490dc3e35'), ('plugins/provider/kling/definition.go', 37, '0a7d3ab58ec15e69c3c819d8ef22db50a9162578db86d19040e889c47cc5db74'), ('internal/postgres/override_sound_test.go', 22, 'e58793faab44d3f61b0a46708cb13f75a1762ec48183aacabc91b7fe82a3dd3a'), ('docs/openapi.yaml', 826, '00e782246cb94b8a9681eda775beb8bc23cc7569e53a4451b90df2c8c1fca293')]
+REVIEWED = [('internal/postgres/remote_workspace.go', 52, 'd21e9820ce4b59fa0f5c15ca0c6e7de0c6660a0e24861fa3748395c87f166a3d'), ('plugins/provider/kling/definition.go', 36, 'c5c633700ca5def01e514c14f2d2f3b138e65da8d42c282fdc69be4490dc3e35'), ('plugins/provider/kling/definition.go', 37, '0a7d3ab58ec15e69c3c819d8ef22db50a9162578db86d19040e889c47cc5db74'), ('internal/postgres/override_sound_test.go', 22, 'e58793faab44d3f61b0a46708cb13f75a1762ec48183aacabc91b7fe82a3dd3a'), ('docs/openapi.yaml', 834, '00e782246cb94b8a9681eda775beb8bc23cc7569e53a4451b90df2c8c1fca293')]
 # This exact SQL exception protects a historical line changed by later schema
 # work. Read its immutable, HEAD-reachable blob instead of weakening its hash.
 # These full-history scanner tests require a complete Git checkout.
