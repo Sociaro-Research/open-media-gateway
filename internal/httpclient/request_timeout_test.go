@@ -25,6 +25,7 @@ func TestPerRequestTimeoutIncludesHeadersAndBodyWithoutRetries(t *testing.T) {
 	const watchdog = 5 * time.Second
 	var calls atomic.Int32
 	canceled := make(chan string, 8)
+	releaseCanceledHandlers := make(chan struct{})
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
 		if r.URL.Path == "/body" {
@@ -35,6 +36,9 @@ func TestPerRequestTimeoutIncludesHeadersAndBodyWithoutRetries(t *testing.T) {
 			// Negative cases have no timer that can race cancellation to success.
 			<-r.Context().Done()
 			canceled <- label
+			// Returning now could finish a successful response with EOF while
+			// the client's canceled TLS connection is still closing.
+			<-releaseCanceledHandlers
 			return
 		}
 		select {
@@ -46,21 +50,25 @@ func TestPerRequestTimeoutIncludesHeadersAndBodyWithoutRetries(t *testing.T) {
 	}))
 	defer server.Close()
 	defer server.CloseClientConnections()
+	// Release before server shutdown, including on an assertion/watchdog failure.
+	defer close(releaseCanceledHandlers)
 	client := server.Client()
 	client.Timeout = 30 * time.Millisecond
 	type observation struct {
 		at, deadline time.Time
 		hasDeadline  bool
 		method, path string
+		ctx          context.Context
 	}
 	observed := make(chan observation, 8)
 	client.Transport = timeoutObservingTransport{next: client.Transport, observe: func(request *http.Request) {
 		deadline, ok := request.Context().Deadline()
-		observed <- observation{time.Now(), deadline, ok, request.Method, request.URL.Path}
+		observed <- observation{time.Now(), deadline, ok, request.Method, request.URL.Path, request.Context()}
 	}}
 	type result struct {
-		body []byte
-		err  error
+		body   []byte
+		err    error
+		status int
 	}
 	run := func(request *http.Request) (result, observation) {
 		t.Helper()
@@ -71,11 +79,13 @@ func TestPerRequestTimeoutIncludesHeadersAndBodyWithoutRetries(t *testing.T) {
 		go func() {
 			response, err := Do(client, request)
 			var body []byte
+			status := 0
 			if err == nil {
+				status = response.StatusCode
 				body, err = io.ReadAll(response.Body)
 				response.Body.Close()
 			}
-			completed <- result{body, err}
+			completed <- result{body: body, err: err, status: status}
 		}()
 		timer := time.NewTimer(watchdog)
 		defer timer.Stop()
@@ -130,7 +140,7 @@ func TestPerRequestTimeoutIncludesHeadersAndBodyWithoutRetries(t *testing.T) {
 		started = time.Now()
 		value, trace = run(r)
 		if !errors.Is(value.err, context.DeadlineExceeded) {
-			t.Fatalf("expected request deadline, got %v", value.err)
+			t.Fatalf("%s: expected request deadline, got %v (status=%d body=%q transport_context=%v calls=%d)", path, value.err, value.status, value.body, trace.ctx.Err(), calls.Load()-before)
 		}
 		if trace.deadline.Before(started.Add(20*time.Millisecond)) || trace.deadline.After(trace.at.Add(20*time.Millisecond)) {
 			t.Fatal("generation override did not install the twenty-millisecond deadline")
