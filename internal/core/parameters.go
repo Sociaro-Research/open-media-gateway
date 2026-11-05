@@ -86,7 +86,7 @@ func NormalizeParameters(fields []ParameterField, values map[string]any) (map[st
 	}
 	for k := range values {
 		if !known[k] {
-			return nil, parameterError(k, "is not supported by this model; omit it")
+			return nil, optionError("parameters", "contains an unsupported field; omit undocumented fields and inspect the selected model's parameter schema")
 		}
 	}
 	if len(result) == 0 {

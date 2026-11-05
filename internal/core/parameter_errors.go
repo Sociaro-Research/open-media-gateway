@@ -11,9 +11,10 @@ func parameterSchemaError() error {
 }
 
 func parameterError(key, hint string) error {
-	// Unknown keys are caller data. Never reflect an arbitrary path or huge key.
+	// Only declared schema keys reach this helper. A diagnostic cannot render an
+	// unbounded or unsafe schema key, and omitting a required key cannot fix it.
 	if len(key) > 64 || !parameterKey.MatchString(key) {
-		return optionError("parameters", "contains an unsupported field; omit undocumented fields")
+		return parameterSchemaError()
 	}
 	return optionError("parameters."+key, hint)
 }
@@ -58,6 +59,9 @@ func invalidParameterValue(f ParameterField, value any) error {
 			return bad("is required; supply a nonempty string")
 		}
 		if f.Type == "select" {
+			if len(f.Choices) == 0 {
+				return parameterSchemaError()
+			}
 			if choices, ok := parameterChoices(f.Choices); ok {
 				return bad("must be one of: " + choices + ". Choose a supported value")
 			}

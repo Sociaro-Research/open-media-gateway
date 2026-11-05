@@ -28,6 +28,8 @@ func TestParameterAndPromptDiagnosticsReachAdmissionAPI(t *testing.T) {
 		{"mock-image-v1", "/v1/images/generations", "options.parameters.strength", `{"parameters":{"strength":"private-input"}}`, "safe", "JSON number"},
 		{"mock-image-v1", "/v1/images/generations", "options.parameters.strength", `{"parameters":{"strength":2}}`, "safe", "between 0 and 1"},
 		{"mock-image-v1", "/v1/images/generations", "options.parameters.tags.1", `{"parameters":{"tags":["a",7]}}`, "safe", "string"},
+		{"mock-image-v1", "/v1/images/generations", "options.parameters", `{"parameters":{"sk_live_private_value":true}}`, "safe", "omit undocumented fields"},
+		{"mock-image-v1", "/v1/images/generations", "options.parameters", `{"parameters":{"unrecognized_name":"private-input"}}`, "safe", "omit undocumented fields"},
 		{"mock-image-v1", "/v1/images/generations", "prompt", `{}`, strings.Repeat("秘", 11), "11 characters; maximum 10"},
 		{"mock-speech-v1", "/v1/audio/speech", "input", `{}`, strings.Repeat("秘", 50), "50 characters; maximum 10"},
 	} {
@@ -56,7 +58,7 @@ func TestParameterAndPromptDiagnosticsReachAdmissionAPI(t *testing.T) {
 				if w.Code != 400 || got.Error.Code != "invalid_request" || got.Error.Param != tc.field || !strings.Contains(got.Error.Message, tc.hint) {
 					t.Fatalf("%d %s", w.Code, w.Body)
 				}
-				if strings.Contains(w.Body.String(), "private-input") || strings.Contains(w.Body.String(), "秘") || repo.creates != 0 || len(queue.ids) != 0 || provider.generateCalls != 0 {
+				if strings.Contains(w.Body.String(), "private-input") || strings.Contains(w.Body.String(), "sk_live_private_value") || strings.Contains(w.Body.String(), "unrecognized_name") || strings.Contains(w.Body.String(), "秘") || repo.creates != 0 || len(queue.ids) != 0 || provider.generateCalls != 0 {
 					t.Fatal("reject leaked input or reached admission", w.Body)
 				}
 				w = openAIRequest(server, path, body("safe", `{"parameters":{"strength":1,"tags":["界界界"]}}`))
