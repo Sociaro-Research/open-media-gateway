@@ -46,3 +46,68 @@ func TestSpecificationReferencesResolve(t *testing.T) {
 		t.Fatal("unexpected OpenAPI version")
 	}
 }
+
+func TestResponseObjectsPreserveDescriptions(t *testing.T) {
+	data, err := JSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var spec map[string]any
+	if err := json.Unmarshal(data, &spec); err != nil {
+		t.Fatal(err)
+	}
+	check := func(name string, value any) {
+		t.Run(name, func(t *testing.T) {
+			response := value.(map[string]any)
+			_, reference := response["$ref"]
+			if !reference {
+				description, ok := response["description"].(string)
+				if !ok || strings.TrimSpace(description) == "" {
+					t.Error("Response Object requires a nonempty string description")
+				}
+			}
+			for field := range response {
+				if strings.HasPrefix(field, "x-") {
+					continue
+				}
+				if reference {
+					if field != "$ref" && field != "summary" && field != "description" {
+						t.Errorf("unexpected Reference Object field %q", field)
+					}
+					continue
+				}
+				if field != "description" && field != "headers" && field != "content" && field != "links" {
+					t.Errorf("unexpected Response Object field %q; quote punctuation in flow descriptions", field)
+				}
+			}
+		})
+	}
+	paths := spec["paths"].(map[string]any)
+	for path, value := range paths {
+		item := value.(map[string]any)
+		for _, method := range []string{"get", "put", "post", "delete", "options", "head", "patch", "trace"} {
+			operation, ok := item[method].(map[string]any)
+			if !ok {
+				continue
+			}
+			for status, response := range operation["responses"].(map[string]any) {
+				check(method+" "+path+" "+status, response)
+			}
+		}
+	}
+	components := spec["components"].(map[string]any)
+	for name, response := range components["responses"].(map[string]any) {
+		check("components.responses."+name, response)
+	}
+	for _, example := range []struct{ path, status, description string }{
+		{"/v1/playground-key/create", "503", "Encryption, authentication or storage unavailable; no automatic replacement."},
+		{"/v1/references/validate", "200", "References are valid, body contains valid=true"},
+		{"/v1/references/validate", "400", "Invalid reference with the affected file, actual value, allowed bound and corrective action"},
+	} {
+		operation := paths[example.path].(map[string]any)["post"].(map[string]any)
+		response := operation["responses"].(map[string]any)[example.status].(map[string]any)
+		if response["description"] != example.description {
+			t.Errorf("%s %s description = %q, want %q", example.path, example.status, response["description"], example.description)
+		}
+	}
+}

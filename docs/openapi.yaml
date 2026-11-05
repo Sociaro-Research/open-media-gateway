@@ -65,10 +65,10 @@ paths:
       parameters:
         - {in: header, name: X-Company-Context, required: true, schema: {type: string}}
       responses:
-        '200': {description: Central response, including its content type and disposition}
+        '200': {description: "Central response, including its content type and disposition"}
         '206': {description: Central ranged media response}
         '401': {description: Login or key rejected}
-        '403': {description: Origin, owner, scope or central permission denied}
+        '403': {description: "Origin, owner, scope or central permission denied"}
         '409': {description: Connection context changed}
         '410': {description: Confirmed central key revocation durably disconnected this exact saved company connection (company_connection_revoked); do not replay the request locally}
         '502': {description: Central request unavailable}
@@ -79,10 +79,10 @@ paths:
       parameters:
         - {in: header, name: X-Company-Context, required: true, schema: {type: string}}
       responses:
-        '200': {description: Central response, including its content type and disposition}
+        '200': {description: "Central response, including its content type and disposition"}
         '206': {description: Central ranged media response}
         '401': {description: Login or key rejected}
-        '403': {description: Origin, owner, scope or central permission denied}
+        '403': {description: "Origin, owner, scope or central permission denied"}
         '409': {description: Connection context changed}
         '410': {description: Confirmed central key revocation durably disconnected this exact saved company connection (company_connection_revoked); do not replay the request locally}
         '502': {description: Central request unavailable}
@@ -93,10 +93,10 @@ paths:
       parameters:
         - {in: header, name: X-Company-Context, required: true, schema: {type: string}}
       responses:
-        '200': {description: Central response, including its content type and disposition}
+        '200': {description: "Central response, including its content type and disposition"}
         '206': {description: Central ranged media response}
         '401': {description: Login or key rejected}
-        '403': {description: Origin, owner, scope or central permission denied}
+        '403': {description: "Origin, owner, scope or central permission denied"}
         '409': {description: Connection context changed}
         '410': {description: Confirmed central key revocation durably disconnected this exact saved company connection (company_connection_revoked); do not replay the request locally}
         '502': {description: Central request unavailable}
@@ -107,10 +107,10 @@ paths:
       parameters:
         - {in: header, name: X-Company-Context, required: true, schema: {type: string}}
       responses:
-        '200': {description: Central response, including its content type and disposition}
+        '200': {description: "Central response, including its content type and disposition"}
         '206': {description: Central ranged media response}
         '401': {description: Login or key rejected}
-        '403': {description: Origin, owner, scope or central permission denied}
+        '403': {description: "Origin, owner, scope or central permission denied"}
         '409': {description: Connection context changed}
         '410': {description: Confirmed central key revocation durably disconnected this exact saved company connection (company_connection_revoked); do not replay the request locally}
         '502': {description: Central request unavailable}
@@ -121,10 +121,10 @@ paths:
       parameters:
         - {in: header, name: X-Company-Context, required: true, schema: {type: string}}
       responses:
-        '200': {description: Central response, including its content type and disposition}
+        '200': {description: "Central response, including its content type and disposition"}
         '206': {description: Central ranged media response}
         '401': {description: Login or key rejected}
-        '403': {description: Origin, owner, scope or central permission denied}
+        '403': {description: "Origin, owner, scope or central permission denied"}
         '409': {description: Connection context changed}
         '410': {description: Confirmed central key revocation durably disconnected this exact saved company connection (company_connection_revoked); do not replay the request locally}
         '502': {description: Central request unavailable}
@@ -135,10 +135,10 @@ paths:
       parameters:
         - {in: header, name: X-Company-Context, required: true, schema: {type: string}}
       responses:
-        '200': {description: Central response, including its content type and disposition}
+        '200': {description: "Central response, including its content type and disposition"}
         '206': {description: Central ranged media response}
         '401': {description: Login or key rejected}
-        '403': {description: Origin, owner, scope or central permission denied}
+        '403': {description: "Origin, owner, scope or central permission denied"}
         '409': {description: Connection context changed}
         '410': {description: Confirmed central key revocation durably disconnected this exact saved company connection (company_connection_revoked); do not replay the request locally}
         '502': {description: Central request unavailable}
@@ -158,7 +158,7 @@ paths:
         '200': {description: Existing central response after local body fence}
         '201': {description: Existing central creation result}
         '204': {description: Existing central mutation completed}
-        '403': {description: Browser, tenant, key or exact route contract rejected}
+        '403': {description: "Browser, tenant, key or exact route contract rejected"}
         '409': {description: Complete capability unavailable or context changed}
         '503': {description: Uncertain remote result retained; no mutation redispatch}
     head:
@@ -170,7 +170,7 @@ paths:
         '200': {description: Existing central response after local body fence}
         '201': {description: Existing central creation result}
         '204': {description: Existing central mutation completed}
-        '403': {description: Browser, tenant, key or exact route contract rejected}
+        '403': {description: "Browser, tenant, key or exact route contract rejected"}
         '409': {description: Complete capability unavailable or context changed}
         '503': {description: Uncertain remote result retained; no mutation redispatch}
     post:
@@ -182,7 +182,7 @@ paths:
         '200': {description: Existing central response after local body fence}
         '201': {description: Existing central creation result}
         '204': {description: Existing central mutation completed}
-        '403': {description: Browser, tenant, key or exact route contract rejected}
+        '403': {description: "Browser, tenant, key or exact route contract rejected"}
         '409': {description: Complete capability unavailable or context changed}
         '503': {description: Uncertain remote result retained; no mutation redispatch}
     put:
@@ -194,7 +194,7 @@ paths:
         '200': {description: Existing central response after local body fence}
         '201': {description: Existing central creation result}
         '204': {description: Existing central mutation completed}
-        '403': {description: Browser, tenant, key or exact route contract rejected}
+        '403': {description: "Browser, tenant, key or exact route contract rejected"}
         '409': {description: Complete capability unavailable or context changed}
         '503': {description: Uncertain remote result retained; no mutation redispatch}
     patch:
@@ -206,7 +206,7 @@ paths:
         '200': {description: Existing central response after local body fence}
         '201': {description: Existing central creation result}
         '204': {description: Existing central mutation completed}
-        '403': {description: Browser, tenant, key or exact route contract rejected}
+        '403': {description: "Browser, tenant, key or exact route contract rejected"}
         '409': {description: Complete capability unavailable or context changed}
         '503': {description: Uncertain remote result retained; no mutation redispatch}
     delete:
@@ -218,7 +218,7 @@ paths:
         '200': {description: Existing central response after local body fence}
         '201': {description: Existing central creation result}
         '204': {description: Existing central mutation completed}
-        '403': {description: Browser, tenant, key or exact route contract rejected}
+        '403': {description: "Browser, tenant, key or exact route contract rejected"}
         '409': {description: Complete capability unavailable or context changed}
         '503': {description: Uncertain remote result retained; no mutation redispatch}
   /auth/company-interface/v1/customer-browser/{path}:
@@ -379,7 +379,7 @@ paths:
           application/json:
             schema: {"$ref": "#/components/schemas/CompanyInterfaceRefresh"}
       responses:
-        '200': {description: Exact typed terminal acknowledgement, no user credentials}
+        '200': {description: "Exact typed terminal acknowledgement, no user credentials"}
         '403': {description: Proof or binding rejected}
         '409': {description: Conflicting operation}
         '503': {description: Unknown result; retain original proof}
@@ -738,7 +738,7 @@ paths:
       responses:
         '200': {description: 'Backend-only token, organization_id, key_id, provisioning (dedicated or legacy) and installation_id (proof digest); the ordinary company key is available only to the connecting local account through its authenticated bootstrap.'}
         '403': {description: Host policy or membership no longer permits issuance}
-        '410': {description: Expired, denied, cancelled or revoked authorization}
+        '410': {description: "Expired, denied, cancelled or revoked authorization"}
         '428': {description: Browser authorization pending}
         '429': {description: Slow down or rate limit}
   /auth/workspace/cancel:
@@ -769,7 +769,7 @@ paths:
       responses:
         '200': {description: 'request metadata with provisioning=new|renewal and bound organization_id/company_name for renewal; companies is empty; can_create indicates new provisioning'}
         '401': {description: Sign in or register through existing host identity flows}
-        '403': {description: Key authentication, sales account or disabled host}
+        '403': {description: "Key authentication, sales account or disabled host"}
         '410': {description: Missing or expired user code}
   /v1/workspace-authorizations/approve:
     post:
@@ -793,8 +793,8 @@ paths:
                 replace_previous: {type: boolean, default: false}
       responses:
         '200': {description: Approved or denied metadata; no credential}
-        '403': {description: Missing consent, wrong origin, role or company ownership}
-        '409': {description: Changed request, legacy protocol or installation binding conflict}
+        '403': {description: "Missing consent, wrong origin, role or company ownership"}
+        '409': {description: "Changed request, legacy protocol or installation binding conflict"}
         '410': {description: Expired or unavailable authorization}
   /v1/workspace-installations:
     get:
@@ -937,7 +937,7 @@ paths:
                 connection_revision: {type: integer, minimum: 0}
                 consent: {type: boolean, const: true}
       responses:
-        '200': {description: Immutable transition id, original origin, resulting version/revision and unresolved state}
+        '200': {description: "Immutable transition id, original origin, resulting version/revision and unresolved state"}
         '400': {description: Invalid request or missing explicit consent}
         '401': {description: Verified local browser sign-in required}
         '403': {description: Local Administrator required}
@@ -989,7 +989,7 @@ paths:
       summary: Read this administrator's saved remote-company connection
       description: No remote request. Credentials and remote grants are never returned. Connected describes a saved verified connection, not current remote availability.
       responses:
-        '200': {description: Saved connection metadata including opaque context (revision/destination/account) and stable operation_scope, or connected false}
+        '200': {description: "Saved connection metadata including opaque context (revision/destination/account) and stable operation_scope, or connected false"}
     post:
       operationId: connectRemoteWorkspace
       summary: Replace a key for an existing active legacy company connection
@@ -1108,7 +1108,7 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/LegalDocument'}
-        '400': {description: Invalid text, version or request body}
+        '400': {description: "Invalid text, version or request body"}
         '401': {description: Authentication required}
         '403': {description: Administrator required}
         '409': {description: Document changed since it was opened}
@@ -2603,7 +2603,7 @@ paths:
       - {name: model, in: path, required: true, schema: {type: string}}
       - {name: provider, in: query, required: true, schema: {type: string}}
       responses:
-        '200': {description: Workflow-scoped preparation schemas, never standalone executable models.}
+        '200': {description: "Workflow-scoped preparation schemas, never standalone executable models."}
         '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '503': {$ref: '#/components/responses/ServiceUnavailable'}
@@ -3037,7 +3037,7 @@ paths:
               schema: {$ref: '#/components/schemas/ClientOnboarding'}
         '400': {description: Invalid fields}
         '403': {description: Not a client manager or explicit API credential}
-        '409': {description: Reused operation with different input, or duplicate normalized name or website. Duplicate error includes criterion and manager; organization ID appears only within the caller's scope.}
+        '409': {description: "Reused operation with different input, or duplicate normalized name or website. Duplicate error includes criterion and manager; organization ID appears only within the caller's scope."}
         '429': {description: 20 distinct companies changed within the rolling last hour}
   "/v1/client-onboardings/{org}/{action}":
     post:
@@ -3067,7 +3067,7 @@ paths:
             application/json:
               schema: {$ref: '#/components/schemas/ClientOnboarding'}
         '403': {description: Outside current scope}
-        '409': {description: Version conflict, operation mismatch or invitation already accepted}
+        '409': {description: "Version conflict, operation mismatch or invitation already accepted"}
         '429': {description: Manual distinct-company limit reached}
   "/v1/organizations":
     "get":
@@ -3098,7 +3098,7 @@ paths:
           "description": "Insufficient role, membership or scope"
         "409":
           "description": "Last supermanager, used invitation or conflicting payment ID"
-        "400": {description: Invalid view, dates or timezone}
+        "400": {description: "Invalid view, dates or timezone"}
         "503": {description: Usage summary is unavailable}
       "parameters":
         -
@@ -5690,8 +5690,8 @@ paths:
                 validation: {$ref: '#/components/schemas/ReferenceValidationTarget'}
                 reference_ids: {type: array, maxItems: 64, items: {type: string, format: uuid}}
       responses:
-        '200': {description: References are valid, body contains valid=true}
-        '400': {description: Invalid reference with the affected file, actual value, allowed bound and corrective action}
+        '200': {description: "References are valid, body contains valid=true"}
+        '400': {description: "Invalid reference with the affected file, actual value, allowed bound and corrective action"}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {description: Reference is unavailable to this owner or content author}
@@ -5941,7 +5941,7 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
-        '409': {description: Library not configured, registration unresolved, or asset in use/shared.}
+        '409': {description: "Library not configured, registration unresolved, or asset in use/shared."}
         '502': {description: Provider asset operation failed; an uncertain registration must not be repeated blindly.}
     post:
       operationId: create_provider_asset_group
@@ -5967,7 +5967,7 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
-        '409': {description: Library not configured, registration unresolved, or asset in use/shared.}
+        '409': {description: "Library not configured, registration unresolved, or asset in use/shared."}
         '502': {description: Provider asset operation failed; an uncertain registration must not be repeated blindly.}
   "/v1/references/providers/{provider}/inventory":
     parameters:
@@ -5999,7 +5999,7 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
-        '409': {description: Library not configured, registration unresolved, or asset in use/shared.}
+        '409': {description: "Library not configured, registration unresolved, or asset in use/shared."}
         '502': {description: Provider asset operation failed; an uncertain registration must not be repeated blindly.}
   "/v1/references/providers/{provider}/import":
     parameters:
@@ -6033,7 +6033,7 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
-        '409': {description: Library not configured, registration unresolved, or asset in use/shared.}
+        '409': {description: "Library not configured, registration unresolved, or asset in use/shared."}
         '502': {description: Provider asset operation failed; an uncertain registration must not be repeated blindly.}
   "/v1/references/providers/{provider}/assets":
     parameters:
@@ -6061,7 +6061,7 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
-        '409': {description: Library not configured, registration unresolved, or asset in use/shared.}
+        '409': {description: "Library not configured, registration unresolved, or asset in use/shared."}
         '502': {description: Provider asset operation failed; an uncertain registration must not be repeated blindly.}
     post:
       operationId: register_provider_asset
@@ -6089,7 +6089,7 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
-        '409': {description: Library not configured, registration unresolved, or asset in use/shared.}
+        '409': {description: "Library not configured, registration unresolved, or asset in use/shared."}
         '502': {description: Provider asset operation failed; an uncertain registration must not be repeated blindly.}
   "/v1/references/providers/{provider}/assets/{id}":
     parameters:
@@ -6117,7 +6117,7 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
-        '409': {description: Library not configured, registration unresolved, or asset in use/shared.}
+        '409': {description: "Library not configured, registration unresolved, or asset in use/shared."}
         '502': {description: Provider asset operation failed; an uncertain registration must not be repeated blindly.}
     delete:
       operationId: delete_workspace_provider_asset
@@ -6135,7 +6135,7 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
-        '409': {description: Library not configured, registration unresolved, or asset in use/shared.}
+        '409': {description: "Library not configured, registration unresolved, or asset in use/shared."}
         '502': {description: Provider asset operation failed; an uncertain registration must not be repeated blindly.}
   "/v1/references/{id}":
     parameters:
@@ -6606,7 +6606,7 @@ paths:
                       contacts: {$ref: '#/components/schemas/ContactLinks'}
         '400': {description: Query selectors are not accepted}
         '401': {description: Valid API key required}
-        '403': {description: Company key, scope or current membership required}
+        '403': {description: "Company key, scope or current membership required"}
         '503': {description: Support contacts unavailable}
 
   "/v1/me":
@@ -6716,7 +6716,7 @@ paths:
         "409": {description: Superseded request or active-key limit.}
         "410": {description: This creation request refers to a revoked or expired key.}
         "429": {description: Key creation request limit.}
-        "503": {description: Encryption, authentication or storage unavailable; no automatic replacement.}
+        "503": {description: "Encryption, authentication or storage unavailable; no automatic replacement."}
   "/v1/playground-key/restore":
     post:
       operationId: restoreManagedPlaygroundKey
@@ -7468,7 +7468,7 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
-        '409': {description: Idempotency conflict, active work or changed estimate.}
+        '409': {description: "Idempotency conflict, active work or changed estimate."}
         '422': {description: Verified price unavailable.}
         '503': {$ref: '#/components/responses/ServiceUnavailable'}
   "/v1/provider-resources/{id}/actions/{action}/estimate":
@@ -7495,7 +7495,7 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
-        '409': {description: Idempotency conflict, active work or changed estimate.}
+        '409': {description: "Idempotency conflict, active work or changed estimate."}
         '422': {description: Verified price unavailable.}
         '503': {$ref: '#/components/responses/ServiceUnavailable'}
   "/v1/provider-resources/{id}":
@@ -8534,7 +8534,7 @@ paths:
                   asset_error: {type: string}
         '400': {description: Invalid revision query}
         '409': {description: Template changed before or during validation}
-        '404': {description: Unpublished, removed or unavailable template}
+        '404': {description: "Unpublished, removed or unavailable template"}
   /v1/templates/{template}/metadata:
     parameters:
     - {in: path, name: template, required: true, schema: {type: string, format: uuid}}
@@ -8558,7 +8558,7 @@ paths:
                   validation_status: {type: string, enum: [pending]}
         '401': {description: A valid generation key is required; browser sign-in alone is insufficient}
         '403': {description: Generation scope or existing policy denied access}
-        '404': {description: Unpublished, removed or unavailable template}
+        '404': {description: "Unpublished, removed or unavailable template"}
   /v1/templates/{template}/estimate:
     parameters:
     - {in: path, name: template, required: true, schema: {type: string, format: uuid}}
@@ -8574,7 +8574,7 @@ paths:
             schema: {$ref: '#/components/schemas/TemplateGenerationRequest'}
       responses:
         '200': {description: Existing generation cost estimate and budget response}
-        '400': {description: Invalid binding, actual file, model or unsupported override}
+        '400': {description: "Invalid binding, actual file, model or unsupported override"}
         '409': {description: Published revision changed; review again}
   /v1/templates/{template}/generations:
     parameters:
@@ -8599,10 +8599,10 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/Generation'}
-        '400': {description: Invalid input, override, model or missing confirmation/idempotency key}
+        '400': {description: "Invalid input, override, model or missing confirmation/idempotency key"}
         '401': {description: An explicit active generation bearer key is required}
         '402': {description: Existing generation budget exhausted}
-        '409': {description: Revision, estimate or idempotency conflict}
+        '409': {description: "Revision, estimate or idempotency conflict"}
   /v1/system/templates:
     get:
       tags: [Templates]
@@ -8632,7 +8632,7 @@ paths:
               - {required: [draft]}
       responses:
         '201': {description: Created unpublished TemplateRecord in an available model's References workflow}
-        '400': {description: Missing or unsupported default model, output or reference workflow}
+        '400': {description: "Missing or unsupported default model, output or reference workflow"}
         '200': {description: Existing current record recovered by the same create ID}
         '403': {description: Administrator required; company roles do not grant publishing}
   /v1/system/template-references:
@@ -8644,7 +8644,7 @@ paths:
       parameters:
       - {in: query, name: offset, schema: {type: integer, minimum: 0, maximum: 1000000}}
       responses:
-        '200': {description: data with id, name, content_type, size_bytes, created_at, sha256 and authenticated url; has_more and next_offset}
+        '200': {description: "data with id, name, content_type, size_bytes, created_at, sha256 and authenticated url; has_more and next_offset"}
         '403': {description: Template creator permission required}
     post:
       tags: [Templates]
@@ -8659,7 +8659,7 @@ paths:
       responses:
         '201': {description: Shared source metadata and authenticated content URL}
         '200': {description: Existing identical shared source; no private source is adopted}
-        '400': {description: Unsupported, malformed, empty or oversized media}
+        '400': {description: "Unsupported, malformed, empty or oversized media"}
         '403': {description: Creator permission or shared storage quota restriction}
         '429': {description: Multipart upload admission busy; retry later}
   /v1/system/template-references/{id}:
@@ -8752,7 +8752,7 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/TemplateRecord'}
-        '400': {description: Conflicting aliases or invalid content; publish and published Save require valid slots, model, media and an explicit image/video cover. No content is changed on failure.}
+        '400': {description: "Conflicting aliases or invalid content; publish and published Save require valid slots, model, media and an explicit image/video cover. No content is changed on failure."}
         '404': {description: Template or selected shared media unavailable; previous current content remains unchanged}
         '403': {description: Administrator required}
         '409': {description: Concurrent edit; reload the current record and review local changes}
@@ -8792,7 +8792,7 @@ paths:
                   syntax: {type: string}
                   slots: {$ref: '#/components/schemas/TemplateDefinition/properties/slots'}
                   warning: {type: string, description: Advisory actual and maximum slot counts for the selected model.}
-        '400': {description: Unsupported workflow, missing references, or invalid, unsafe or gapped numeric marker}
+        '400': {description: "Unsupported workflow, missing references, or invalid, unsafe or gapped numeric marker"}
   /v1/system/templates/{template}/assets:
     parameters:
     - {in: path, name: template, required: true, schema: {type: string, format: uuid}}
@@ -8856,7 +8856,7 @@ paths:
       responses:
         '200': {description: Sandboxed media; capability remains valid for queued/history inputs after unpublish}
         '307': {description: Short-lived direct storage delivery}
-        '404': {description: Missing, invalid or never-published capability}
+        '404': {description: "Missing, invalid or never-published capability"}
   "/v1/admin/providers/{providerId}/logo":
     parameters:
     - "$ref": "#/components/parameters/ProviderID"
@@ -8901,7 +8901,7 @@ paths:
                 type: object
                 properties:
                   icon_url: {type: string}
-        '400': {description: Unsupported content type, malformed PNG, exceeded byte/dimension limit or incomplete upload; previous logo retained}
+        '400': {description: "Unsupported content type, malformed PNG, exceeded byte/dimension limit or incomplete upload; previous logo retained"}
         '401': {description: Authentication required}
         '403': {description: Administrator permission and applicable API-key scopes required}
         '404': {description: Provider not found}
@@ -8951,7 +8951,7 @@ paths:
                 type: object
                 properties:
                   icon_url: {type: string}
-        '400': {description: Unsupported content type, malformed PNG, exceeded byte/dimension limit or incomplete upload; previous logo retained}
+        '400': {description: "Unsupported content type, malformed PNG, exceeded byte/dimension limit or incomplete upload; previous logo retained"}
         '401': {description: Authentication required}
         '403': {description: Administrator permission and applicable API-key scopes required}
         '404': {description: Provider not found}
