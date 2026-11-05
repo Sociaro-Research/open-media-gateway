@@ -2483,6 +2483,8 @@ paths:
                   type: array
                 model:
                   type: string
+                "n":
+                  $ref: '#/components/schemas/GenerationRequest/properties/n'
                 timeout_seconds: {type: integer, format: int64, minimum: 1, maximum: 9223372036}
                 options:
                   description: JSON-encoded MediaOptions
@@ -10024,7 +10026,7 @@ components:
           - generation
           type: string
         options:
-          $ref: '#/components/schemas/MediaOptions'
+          $ref: '#/components/schemas/GenerationOptions'
         prompt:
           type: string
         provider:
@@ -10132,10 +10134,10 @@ components:
           description: Exact public ID from GET /v1/models. Defaults to provider/model and can be renamed by the administrator. Separate provider and media_type request fields are not accepted.
           type: string
         "n":
-          description: One image per asynchronous job.
-          enum:
-          - 1
+          description: Image output count, from 1 through the selected model's max_outputs (one when omitted from the catalog). One asynchronous generation may return multiple archived artifacts. Ordinary requests reject options.output_count; use this top-level field.
           type: integer
+          minimum: 1
+          default: 1
         options:
           $ref: '#/components/schemas/MediaOptions'
         output_format:
@@ -10667,7 +10669,7 @@ components:
       description: Optional built-in controls accept null as omission. Values inside parameters follow the advertised provider parameter schema.
       type: object
       additionalProperties: false
-      properties:
+      properties: &MediaOptionFields
         override_sound_id:
           type: string
           description: Optional accessible audio reference ID for video output. Replaces all generated audio after generation. Longer audio is trimmed and shorter audio is padded with silence; video packets and timing are preserved. Not a provider input or audio-generation toggle. Internal storage source fields are rejected.
@@ -10739,6 +10741,17 @@ components:
         format:
           type: [string, "null"]
           description: Output format from the model’s formats list.
+    GenerationOptions:
+      type: object
+      additionalProperties: false
+      description: Retained normalized options in a generation response, subject to content permissions and logging minimization. Standard controls have their response locations at the top level. This is not the ordinary generation request options schema.
+      properties:
+        <<: *MediaOptionFields
+        output_count:
+          type: integer
+          minimum: 1
+          readOnly: true
+          description: Saved image output count when retained. The normalized default single output is omitted. Ordinary generation requests must use top-level n and reject options.output_count.
     ProviderUsage:
       type: object
       properties:
@@ -10836,6 +10849,10 @@ components:
             max_points: {type: integer, minimum: 1}
             frame_index_base: {type: integer, const: 0}
         public_id: {type: string, description: Public model identifier used for generation requests}
+        max_outputs:
+          type: integer
+          minimum: 1
+          description: Optional image output-count ceiling for top-level n. When absent, the effective maximum is one. This is not a promise that the completed artifacts array has this length; providers may also return format variants.
 
         metadata:
           $ref: '#/components/schemas/ModelMetadata'

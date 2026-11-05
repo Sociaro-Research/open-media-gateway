@@ -120,6 +120,12 @@ hashing/admission.
 }
 ```
 
+For image requests, `n` is a positive integer up to the selected model's
+`capabilities.max_outputs` from `/v1/models`; an omitted capability means a maximum
+of one. Omitting `n` selects one output. The saved response options may contain
+`output_count` for a larger count; the normalized single-output default is omitted.
+Ordinary generation requests reject `options.output_count`: send top-level `n`.
+
 For edits, add `image`: a URL, `{ "image_url": "https://…" }`,
 `{ "file_id": "REFERENCE_ID" }`, or an array. Reference IDs come from the existing
 `POST /v1/references/uploads` direct-upload library, and are checked against the requesting owner.
@@ -208,8 +214,9 @@ the same generation object as the HTTP response. Event types are
 
 - **Asynchronous only:** no immediate image/base64 or speech file response, SSE,
   partial images or synchronous mode. `stream: true` is rejected.
-- **One result per job:** `n` can only be 1, matching the existing single-result
-  task/storage/billing contract. Submit multiple jobs for multiple results.
+- **Model-dependent output count:** image `n` follows the model's `max_outputs`;
+  other media requests reject `n`. Multiple outputs still belong to one
+  asynchronous generation, with one task-level status, usage and cost record.
 - **Provider controls:** capabilities and parameter limits come from our model
   catalog. Unsupported OpenAI controls (such as masks, input fidelity, speed or
   user tracking when not implemented) are rejected, not silently discarded.
