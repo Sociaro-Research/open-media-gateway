@@ -3,7 +3,6 @@ package storage
 import (
 	"bufio"
 	"context"
-	"errors"
 	"io"
 	"mime"
 	"net/http"
@@ -40,14 +39,14 @@ func (r artifactContextReader) Read(p []byte) (int, error) {
 		return n, cancelled
 	}
 	if err != nil && err != io.EOF {
-		return n, errors.New("provider artifact stream could not be read")
+		return n, archiveDiagnostic{message: "provider artifact stream could not be read; ask an operator to check provider output and adapter stream compatibility"}
 	}
 	return n, err
 }
 
 func (s *Local) ArchiveSource(ctx context.Context, id string, source core.ArtifactSource) (core.StoredMedia, error) {
 	if source.Reader == nil {
-		return core.StoredMedia{}, errors.New("provider artifact stream is missing")
+		return core.StoredMedia{}, archiveDiagnostic{message: "provider artifact stream is missing; ask an operator to check provider output and adapter stream compatibility"}
 	}
 	var once sync.Once
 	closeSource := func() { once.Do(func() { _ = source.Reader.Close() }) }
@@ -55,17 +54,17 @@ func (s *Local) ArchiveSource(ctx context.Context, id string, source core.Artifa
 	defer func() { stop(); closeSource() }()
 	kind, params, err := mime.ParseMediaType(source.ContentType)
 	if err != nil || len(params) > 0 && !(kind == "text/plain" && len(params) == 1 && strings.EqualFold(params["charset"], "utf-8")) || !(supportedMediaType(kind) || kind == "text/plain" || kind == "application/json" || kind == "application/octet-stream") {
-		return core.StoredMedia{}, errors.New("provider artifact stream has an unsupported content type")
+		return core.StoredMedia{}, archiveDiagnostic{message: "provider artifact stream has an unsupported content type; ask an operator to check provider output and adapter stream compatibility"}
 	}
 	if source.SizeBytes < -1 {
-		return core.StoredMedia{}, errors.New("provider artifact stream size is invalid")
+		return core.StoredMedia{}, archiveDiagnostic{message: "provider artifact stream size is invalid; ask an operator to check provider output and adapter stream compatibility"}
 	}
 	return s.archiveReaderChecked(ctx, id, artifactContextReader{ctx, source.Reader}, kind, source.SizeBytes, "", true)
 }
 
 func validateArtifactFile(ctx context.Context, f *os.File, kind string) error {
 	if _, err := f.Seek(0, io.SeekStart); err != nil {
-		return errors.New("provider artifact validation failed")
+		return archiveDiagnostic{message: "provider artifact validation failed; ask an operator to check provider output and adapter stream compatibility"}
 	}
 	reader := bufio.NewReader(artifactContextReader{ctx, f})
 	if kind == "application/json" {
@@ -73,7 +72,7 @@ func validateArtifactFile(ctx context.Context, f *os.File, kind string) error {
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
-			return errors.New("provider artifact stream contains invalid JSON")
+			return archiveDiagnostic{message: "provider artifact stream contains invalid JSON; ask an operator to check provider output and adapter stream compatibility"}
 		}
 		return nil
 	}
@@ -90,7 +89,7 @@ func validateArtifactFile(ctx context.Context, f *os.File, kind string) error {
 	// Unknown binary signatures retain the existing media policy, while recognized
 	// HTML/text or a different media family cannot masquerade as a typed artifact.
 	if detected != "application/octet-stream" && detected != kind && !(kind == "audio/wav" && detected == "audio/wave") && !(kind == "audio/x-wav" && detected == "audio/wave") {
-		return errors.New("provider artifact stream does not match its declared content type")
+		return archiveDiagnostic{message: "provider artifact stream does not match its declared content type; ask an operator to check provider output and adapter stream compatibility"}
 	}
 	return nil
 }
@@ -101,14 +100,14 @@ func (s *S3) ArchiveSource(ctx context.Context, id string, source core.ArtifactS
 		if source.Reader != nil {
 			_ = source.Reader.Close()
 		}
-		return core.StoredMedia{}, errors.New("invalid task storage key")
+		return core.StoredMedia{}, archiveDiagnostic{message: "invalid task storage key; ask an operator to check provider output and adapter stream compatibility"}
 	}
 	dir, cleanup, err := s.stagingDirectory()
 	if err != nil {
 		if source.Reader != nil {
 			_ = source.Reader.Close()
 		}
-		return core.StoredMedia{}, errors.New("create S3 upload staging directory")
+		return core.StoredMedia{}, archiveDiagnostic{message: "create S3 upload staging directory; ask an operator to check worker temporary-storage permissions and free space"}
 	}
 	defer cleanup()
 	local, err := NewLocal(dir, s.sourceClient, s.maxBytes)
@@ -151,7 +150,7 @@ func (m *Manager) ArchiveSource(ctx context.Context, id string, source core.Arti
 		if source.Reader != nil {
 			_ = source.Reader.Close()
 		}
-		return core.StoredMedia{}, errors.New("trusted artifact stream storage is unavailable")
+		return core.StoredMedia{}, archiveDiagnostic{message: "trusted artifact stream storage is unavailable; ask an operator to check trusted-stream support in the selected storage backend"}
 	}
 	return target.ArchiveSource(ctx, id, source)
 }
@@ -162,7 +161,7 @@ func (s *versionedStore) ArchiveSource(ctx context.Context, id string, source co
 		if source.Reader != nil {
 			_ = source.Reader.Close()
 		}
-		return core.StoredMedia{}, errors.New("trusted artifact stream storage is unavailable")
+		return core.StoredMedia{}, archiveDiagnostic{message: "trusted artifact stream storage is unavailable; ask an operator to check trusted-stream support in the selected storage backend"}
 	}
 	ctx = identity.WithResourceOwners(ctx, identity.ProviderOwnerID(ctx), s.storageOwnerID)
 	media, err := target.ArchiveSource(ctx, s.ownerID+"/results/"+id, source)

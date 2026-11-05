@@ -343,15 +343,15 @@ func safeS3Error(operation string, err error) error {
 		case "NoSuchKey", "NotFound":
 			return ErrObjectNotFound
 		case "AccessDenied", "InvalidAccessKeyId", "SignatureDoesNotMatch":
-			return fmt.Errorf("S3 %s denied; check credentials and bucket permissions", operation)
+			return archiveDiagnostic{message: fmt.Sprintf("S3 %s denied; check credentials and bucket permissions", operation)}
 		}
 	}
 	if errors.Is(err, httpclient.ErrOutboundPrivateDestination) {
-		return fmt.Errorf("S3 %s failed: %w", operation, ErrPrivateEndpoint)
+		return archiveDiagnostic{message: fmt.Sprintf("S3 %s failed: %s", operation, ErrPrivateEndpoint), cause: ErrPrivateEndpoint}
 	}
 	if errors.Is(err, httpclient.ErrOutboundDNS) {
-		return fmt.Errorf("S3 %s failed: %w", operation, ErrEndpointDNS)
+		return archiveDiagnostic{message: fmt.Sprintf("S3 %s failed: %s", operation, ErrEndpointDNS), cause: ErrEndpointDNS}
 	}
 	// SDK errors can contain endpoint URLs, access key IDs and remote response text.
-	return fmt.Errorf("S3 %s failed; check endpoint, region, bucket and network connectivity", operation)
+	return archiveDiagnostic{message: fmt.Sprintf("S3 %s failed; check endpoint, region, bucket and network connectivity", operation)}
 }

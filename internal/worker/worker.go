@@ -393,7 +393,7 @@ func (w *Worker) archiveResults(ctx, archiveCtx context.Context, task core.Task,
 		if archiveCtx.Err() != nil && ctx.Err() != nil {
 			return ctx.Err()
 		}
-		return w.repo.MarkFailed(context.WithoutCancel(ctx), task.ID, "store provider result: "+archiveErr.Error())
+		return w.repo.MarkFailed(context.WithoutCancel(ctx), task.ID, "store provider result: "+storage.PublicArchiveError(archiveErr))
 	}
 
 	primary := core.ProviderArtifact{URL: resultURL, MediaType: task.MediaType}
@@ -439,7 +439,7 @@ func (w *Worker) archiveResults(ctx, archiveCtx context.Context, task core.Task,
 				if ctx.Err() != nil {
 					return ctx.Err()
 				}
-				return w.repo.MarkFailed(context.WithoutCancel(ctx), task.ID, fmt.Sprintf("store provider artifact %d: %s", i+2, err.Error()))
+				return w.repo.MarkFailed(context.WithoutCancel(ctx), task.ID, fmt.Sprintf("store provider artifact %d: %s", i+2, storage.PublicArchiveError(err)))
 			}
 			if !artifactMatchesMedia(a, item) {
 				return w.repo.MarkFailed(ctx, task.ID, "stored artifact does not match its declared media type")

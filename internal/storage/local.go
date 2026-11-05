@@ -89,7 +89,7 @@ func (s *Local) archiveReaderChecked(ctx context.Context, taskID string, reader 
 		return core.StoredMedia{}, err
 	}
 	if size > s.maxBytes {
-		return core.StoredMedia{}, fmt.Errorf("provider result exceeds STORAGE_MAX_BYTES (%d)", s.maxBytes)
+		return core.StoredMedia{}, oversizedResult(s.maxBytes)
 	}
 	buffered := bufio.NewReader(reader)
 	if contentType == "" || contentType == "application/octet-stream" && !trustedStream {
@@ -100,7 +100,7 @@ func (s *Local) archiveReaderChecked(ctx context.Context, taskID string, reader 
 		}
 	}
 	if !supportedMediaType(contentType) && contentType != "application/octet-stream" && !(trustedStream && (contentType == "text/plain" || contentType == "application/json")) {
-		return core.StoredMedia{}, fmt.Errorf("provider returned unsupported content type %q", contentType)
+		return core.StoredMedia{}, archiveDiagnostic{message: "provider result has an unsupported content type; ask an operator to check the provider output format"}
 	}
 
 	baseName, extension := mediaFileName(contentType)
@@ -135,14 +135,14 @@ func (s *Local) archiveReaderChecked(ctx context.Context, taskID string, reader 
 		return core.StoredMedia{}, fmt.Errorf("copy provider result: %w", err)
 	}
 	if written > s.maxBytes {
-		return core.StoredMedia{}, fmt.Errorf("provider result exceeds STORAGE_MAX_BYTES (%d)", s.maxBytes)
+		return core.StoredMedia{}, oversizedResult(s.maxBytes)
 	}
 	if written == 0 {
-		return core.StoredMedia{}, errors.New("provider returned an empty media file")
+		return core.StoredMedia{}, archiveDiagnostic{message: "provider returned an empty media file; ask an operator to check the original provider output"}
 	}
 	if trustedStream {
 		if size >= 0 && written != size {
-			return core.StoredMedia{}, errors.New("provider artifact stream size does not match its declared size")
+			return core.StoredMedia{}, archiveDiagnostic{message: "provider artifact stream size does not match its declared size; ask an operator to check adapter compatibility"}
 		}
 		if err := validateArtifactFile(ctx, temporary, contentType); err != nil {
 			return core.StoredMedia{}, err
