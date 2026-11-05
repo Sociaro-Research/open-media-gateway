@@ -378,6 +378,12 @@ HTML using fixture links, without sending email. Both purposes are checked at
 Run `node scripts/ui/payments.cjs` for Stripe provider configuration, both processing
 fee modes, credential masks, administrator visibility, payment history, idempotent
 retries, Checkout returns and 1440/390/320 px layout. It uses only mocked APIs.
+Its Settings composition regression measures the notifications → seller → legal
+documents → providers section gaps, compact legal actions and keyboard focus in
+both themes at 1440/1024/768/600/390/320px, including dirty, error and Saved states.
+Use `UI_PAYMENT_SETTINGS_LAYOUT_ONLY=1` for this focused subset and
+`UI_EVIDENCE_DIR` for screenshots and geometry. `UI_SOURCE_DIR` with
+`UI_BASELINE=1` captures historical geometry without asserting acceptance.
 
 Run `node scripts/ui/provider-connections.cjs` for independent connection creation,
 custom headers and endpoints, manual model profiles, masked-secret preservation,

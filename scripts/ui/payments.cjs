@@ -8,11 +8,14 @@ const server=http.createServer((req,res)=>{if(req.method==='GET'&&new URL(req.ur
  await new Promise(r=>server.listen(0,'127.0.0.1',r));const browser=await chromium.launch({headless:true,...(process.env.UI_BROWSER_PATH?{executablePath:process.env.UI_BROWSER_PATH}:{})}),page=await browser.newPage({viewport:{width:1440,height:1080}});page.setDefaultTimeout(10000);
  const org='22222222-2222-4222-8222-222222222222',pid='55555555-5555-4555-8555-555555555555',uid='11111111-1111-4111-8111-111111111111';
  const policy={shared_resources:true,generation_ui:true,personal_providers:true,available_providers:[],version:1};let returnReads=0,failToggle=false,invoiceReady=false,providers=[],writes=[],member=false,administrator=true,checkoutFail=true,noticeConflict=false,noticeSettings={critical_emails:[],success_emails:[],version:1,email_enabled:false,delivery:{pending:0,retrying:0}};const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ let billing={version:1,seller:{legal_name:'Fixture company',email:'billing@example.test',address:{country:'GB',line1:'1 Test Street',city:'London'},vat_number:'GB123456789',vat_registered:true},rules:[{country:'domestic',status:'any',treatment:'standard',rate_percent:20}]};
  const company=()=>({id:org,name:'Payments team',role:member?'member':'admin',balance_usd:50,credit_limit_usd:0,weekly_limit_usd:null,default_weekly_limit_usd:0,storage_bytes:0});
  await page.route('**/v1/**',async route=>{const req=route.request(),url=new URL(req.url()),p=url.pathname,method=req.method(),data=req.postData()?req.postDataJSON():null,json=value=>route.fulfill({json:value});
   if(p==='/v1/info')return json({auth_mode:'google',provider:'mock',console:policy});
   if(p==='/v1/me')return json({id:uid,name:'Tester',email:'test@example.test',is_system_admin:administrator&&!member});
   if(p==='/v1/system/settings')return json(policy);
+  if(p==='/v1/system/billing'){if(method==='PUT')billing={...data,version:billing.version+1};return json(billing)}
+  if(/^\/v1\/system\/legal\/(privacy|terms)$/.test(p))return json({text:'Fixture legal document.',version:1});
   if(p==='/v1/organizations')return json({data:[company()]});
   if(p==='/v1/organizations/'+org)return json(company());
   if(p==='/v1/system/payment-notifications'){if(method==='PUT'){if(noticeConflict)return route.fulfill({status:409,json:{error:{message:'conflict'}}});writes.push({notifications:data});noticeSettings={...noticeSettings,...data,version:data.version+1}}return json(noticeSettings)}
@@ -37,17 +40,49 @@ const server=http.createServer((req,res)=>{if(req.method==='GET'&&new URL(req.ur
  });
  await page.route('**/auth/methods',r=>r.fulfill({json:{google:true,email:false}}));
  const base='http://127.0.0.1:'+server.address().port;
+ const layoutMetrics=[];
+ async function settingsLayout(state){
+  for(const theme of ['dark','light'])for(const width of [1440,1024,768,600,390,320]){
+   await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);await page.setViewportSize({width,height:1100});await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
+   const geometry=await page.locator('#settings-panel-payments').evaluate(panel=>{
+    const notices=panel.querySelector('.payment-notification-settings'),seller=panel.querySelector('.seller-vat-settings'),form=seller.querySelector('form'),head=form.querySelector('.form-heading'),legal=seller.querySelector(':scope > .settings-form-group'),providers=panel.querySelector('.payment-provider-settings'),rect=e=>{const r=e.getBoundingClientRect();return {x:r.x,y:r.y+scrollY,width:r.width,height:r.height,right:r.right,bottom:r.bottom+scrollY}},buttons=[...legal.querySelectorAll('button')].map(rect);
+    return {sectionToken:parseFloat(getComputedStyle(panel).getPropertyValue('--space-section')),sellerGap:rect(head).y-rect(notices).bottom,legalGap:rect(legal).y-rect(form).bottom,providersGap:rect(providers).y-rect(seller).bottom,legalContentGap:buttons[0].y-rect(legal.querySelector('h3')).bottom,buttons,legal:rect(legal),panel:rect(panel),sellerHead:rect(head),noticeBottom:rect(notices).bottom,overflow:document.documentElement.scrollWidth>innerWidth};
+   });
+   layoutMetrics.push({state,theme,width,...geometry});
+   if(!process.env.UI_BASELINE){
+    assert.equal(geometry.sellerGap,geometry.sectionToken,'notifications → Seller section gap');
+    assert.equal(geometry.legalGap,geometry.sectionToken,'VAT form → Public legal documents gap');
+    assert.equal(geometry.providersGap,geometry.sectionToken,'Public legal documents → providers gap');
+    assert.equal(geometry.legalContentGap,16,'legal heading → actions gap');assert.equal(geometry.overflow,false,'Payments page overflow at '+width);
+    const [privacy,terms]=geometry.buttons;for(const button of geometry.buttons){assert.ok(button.height>=44,'legal action touch target');assert.ok(button.x>=geometry.legal.x&&button.right<=geometry.legal.right+1,'legal action fits section');}
+    if(width>=390)assert.equal(privacy.y,terms.y,'legal actions share one row');
+    if(privacy.y===terms.y){assert.equal(terms.x-privacy.right,12,'legal action gap');assert.ok(privacy.width<200&&terms.width<200,'legal actions retain compact widths');}
+    else assert.ok(terms.y>=privacy.bottom+12,'legal actions wrap with a clear gap');
+   }
+   for(const [name,top,bottom]of [['seller',geometry.noticeBottom-64,geometry.sellerHead.bottom+100],['legal',geometry.legal.y-80,geometry.legal.bottom+24]]){
+    await page.screenshot({path:evidencePath(`/tmp/gateway-payment-section-layout/${state}-${theme}-${width}-${name}.png`),fullPage:true,clip:{x:geometry.panel.x,y:Math.max(0,top),width:geometry.panel.width,height:bottom-Math.max(0,top)}});
+   }
+  }
+  fs.writeFileSync(evidencePath('/tmp/gateway-payment-section-layout/metrics.json'),JSON.stringify(layoutMetrics,null,2));
+ }
  try{
   await page.goto(base+'/system');await page.getByRole('tab',{name:'Payments',exact:true}).click();
   await page.locator('.payment-provider-settings').waitFor();
   assert.equal(await page.getByRole('button',{name:'Configure',exact:true}).count(),0);
   assert.ok(await page.locator('.payment-notification-settings').evaluate(e=>!!(e.compareDocumentPosition(document.querySelector('.payment-provider-settings'))&Node.DOCUMENT_POSITION_FOLLOWING)));
   const notices=page.locator('.payment-notification-settings');await notices.getByText('Email delivery is disabled.',{exact:false}).waitFor();
+  await settingsLayout('clean');
+  if(process.env.UI_BASELINE&&process.env.UI_PAYMENT_SETTINGS_LAYOUT_ONLY){console.log('Captured historical Payments section geometry; baseline is not an acceptance run.');return;}
+  // Both legal actions keep native keyboard activation and return focus on close.
+  for(const [name,key]of [['Edit Privacy Policy','Enter'],['Edit Terms of Use','Space']]){const open=page.getByRole('button',{name,exact:true});await open.focus();await page.keyboard.press(key);await page.getByRole('dialog').waitFor();await page.waitForFunction(()=>!document.querySelector('.legal-editor textarea').disabled);await page.keyboard.press('Escape');await page.locator('.legal-editor').waitFor({state:'detached'});assert.equal(await open.evaluate(e=>e===document.activeElement),true);}
   await notices.getByLabel('Critical payment errors',{exact:true}).fill('ADMIN@example.test, ops@example.test');
   await notices.getByLabel('Successful balance top-ups',{exact:true}).fill('finance@example.test');
   await notices.getByRole('button',{name:'Save',exact:true}).click();await page.waitForFunction(()=>document.querySelector('.payment-notification-settings textarea').value==='admin@example.test\nops@example.test');
   assert.deepEqual(writes.at(-1).notifications,{critical_emails:['admin@example.test','ops@example.test'],success_emails:['finance@example.test'],version:1});
   noticeConflict=true;await notices.getByLabel('Successful balance top-ups',{exact:true}).fill('');await notices.getByRole('button',{name:'Save',exact:true}).click();await notices.getByText('Another administrator changed these lists. Reopen Settings before saving.',{exact:true}).waitFor();noticeConflict=false;
+  const seller=page.locator('.seller-vat-settings');await seller.getByLabel('Legal entity name',{exact:true}).fill('Changed fixture company');await seller.getByRole('button',{name:'Save',exact:true}).waitFor();await seller.getByRole('button',{name:'Remove',exact:true}).press('Enter');await settingsLayout('dirty-feedback-empty-rules');
+  await seller.getByRole('button',{name:'Save',exact:true}).press('Enter');await seller.getByRole('button',{name:'Saved',exact:true}).waitFor();assert.equal(billing.seller.legal_name,'Changed fixture company');await settingsLayout('saved');
+  if(process.env.UI_PAYMENT_SETTINGS_LAYOUT_ONLY){assert.deepEqual(errors,[]);console.log('PASS: actual Settings composition, section gaps, compact responsive legal actions, keyboard/focus, dirty/error/saved states, both themes at 1440/1024/768/600/390/320px.');return;}
   for(const width of [1440,390,320]){await page.setViewportSize({width,height:1100});await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'notifications overflow');await notices.screenshot({path:evidencePath(`/tmp/gateway-payment-notifications-${width}.png`)})}
   await page.setViewportSize({width:1440,height:1080});await page.getByRole('button',{name:'Add provider'}).click();let form=page.locator('.payment-provider-editor');await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));await form.getByLabel('Secret API key',{exact:true}).fill('sk_live_fixture');for(const theme of ['dark','light'])for(const width of [1440,390,320]){await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);await page.setViewportSize({width,height:1100});await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));const g=await form.evaluate(form=>{const header=form.querySelector('.provider-detail-header'),buttons=[...header.querySelectorAll('button')],save=header.querySelector('button[type=submit]');return {heights:buttons.map(b=>b.getBoundingClientRect().height),width:save.getBoundingClientRect().width,gap:buttons[1].getBoundingClientRect().left-buttons[0].getBoundingClientRect().right,bound:save.form===form}});assert.ok(g.heights.every(h=>h===40));assert.ok(g.width<=100);assert.equal(g.gap,12);assert.equal(g.bound,true);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Stripe heading overflow '+width);await page.locator('.payment-provider-card').screenshot({path:evidencePath('/tmp/gateway-stripe-provider-actions-')+theme+'-'+width+'.png'})}await page.setViewportSize({width:1440,height:1080});await form.getByRole('button',{name:'Save',exact:true}).press('Enter');await form.getByRole('textbox',{name:/Webhook endpoint/}).waitFor();assert.equal(writes.at(-1).enabled,false);assert.equal(await form.getByLabel('Secret API key',{exact:true}).inputValue(),'************');
   await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));await form.getByLabel('Webhook signing secret',{exact:true}).fill('whsec_fixture');assert.equal(await form.getByLabel('Webhook signing secret',{exact:true}).inputValue(),'whsec_fixture');await form.locator('select').selectOption('organization',{force:true});await form.getByRole('button',{name:'Save',exact:true}).click();await page.waitForFunction(()=>Array.from(document.querySelectorAll('.payment-provider-editor input')).filter(e=>e.value==='************').length===2);

@@ -10,7 +10,7 @@
  const scopes=[['*','All countries'],['domestic','Seller’s country'],['EU','European Union'],['non_eu','Outside the EU'],...countries];
  window.VATSettingsUI={countries,
   async mount(parent,api,current){
-   const section=el('section',undefined,'seller-vat-settings'),status=el('p');status.role='status';parent.append(section);
+   const section=el('section',undefined,'seller-vat-settings settings-form-sections'),status=el('p');status.role='status';parent.append(section);
    try{let data=await api('/v1/system/billing');if(!current())return;let busy=false,uploading=false,invoiceLogo=data.seller?.invoice_logo||null;
     const form=el('form',undefined,'provider-settings-form settings-section-form'),head=el('div',undefined,'form-heading console-section-heading'),save=el('button','Save','primary compact');save.type='submit';head.append(el('h2','Seller company and VAT'),save);form.append(head);
     const groups=el('div',undefined,'settings-form-sections'),identity=el('div',undefined,'settings-form-group'),seller=data.seller||{},address=seller.address||{},grid=el('div',undefined,'provider-form-grid');identity.append(grid);groups.append(identity);form.append(groups);

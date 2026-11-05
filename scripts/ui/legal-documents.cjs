@@ -10,14 +10,14 @@ const server=http.createServer(async(req,res)=>{
   if(req.method==='PUT'){let raw='';for await(const c of req)raw+=c;writes++;await new Promise(r=>setTimeout(r,delay));const data=JSON.parse(raw);saved[kind]={text:data.text,version:saved[kind].version+1}}
   return json(200,admin?saved[kind]:{text:saved[kind].text});
  }
- if(url==='/editor')return res.end('<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><link rel="stylesheet" href="/ui/styles.css"></head><body><main id="editor"></main><script src="/ui/form-ui.js"></script><script src="/ui/legal.js"></script><script>LegalTextUI.mount(document.querySelector("main"),async(path,options)=>{const r=await fetch(path,options),data=await r.json();if(!r.ok){const e=Error(data.error.message);e.status=r.status;throw e}return data});</script></body></html>');
+ if(url==='/editor')return res.end('<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><link rel="stylesheet" href="/ui/styles.css"></head><body><main id="editor"></main><script src="/ui/file-size.js"></script><script src="/ui/form-ui.js"></script><script src="/ui/legal.js"></script><script>LegalTextUI.mount(document.querySelector("main"),async(path,options)=>{const r=await fetch(path,options),data=await r.json();if(!r.ok){const e=Error(data.error.message);e.status=r.status;throw e}return data});</script></body></html>');
  const name=url==='/privacy'?'privacy.html':url==='/terms'?'terms.html':path.basename(url),file=path.join(root,name);
  if(!fs.existsSync(file))return res.writeHead(404).end();
  res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html');res.end(fs.readFileSync(file));
 });
 (async()=>{
  fs.mkdirSync(out,{recursive:true});await new Promise(r=>server.listen(0,'127.0.0.1',r));
- const browser=await engine.launch({headless:true}),page=await browser.newPage(),base='http://127.0.0.1:'+server.address().port,errors=[];
+ const browser=await engine.launch({headless:true,executablePath:process.env.UI_BROWSER_PATH}),page=await browser.newPage(),base='http://127.0.0.1:'+server.address().port,errors=[];
  page.on('pageerror',e=>errors.push(e.message));page.setDefaultTimeout(8000);
  try{
  for(const theme of ['dark','light'])for(const width of [1440,390,320]){

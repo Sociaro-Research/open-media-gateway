@@ -603,6 +603,7 @@ button, input, textarea, select { font-family: inherit; }
 .keys-revoke-dialog { width: min(470px, calc(100% - 32px)); }
 .keys-revoke-dialog h2 { margin: 0 0 16px; }
 .form-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.form-actions.compact { justify-self:start; max-width:100%; }
 .form-actions > button { min-height:44px; }
 .form-actions p { margin: 0; flex: 1 1 200px; font-size: 13px; line-height: 1.5; }
 .form-actions .primary.compact { min-width: 0; justify-content: center; }
@@ -1036,7 +1037,7 @@ button.save-confirmation { color:var(--success)!important; background:transparen
   .form-heading > [role=status] { flex: 1 0 100%; order: 1; }
 }
 
-.payment-provider-settings { margin-top:32px; min-width:0; }
+.payment-provider-settings { min-width:0; }
 .payment-provider-list { display:grid; gap:24px; }
 .provider-settings-card { padding:24px; min-width:0; }
 .provider-settings-card .provider-detail-header { flex-direction:row; align-items:center; }
@@ -1048,6 +1049,7 @@ button.save-confirmation { color:var(--success)!important; background:transparen
 .provider-settings-form > .form-heading { margin:0; }
 .settings-section-form { margin-top:0; gap:24px; }
 .settings-form-sections { display:grid; gap:var(--space-section); min-width:0; }
+.settings-form-sections > * { margin-block:0; }
 .settings-form-group { display:grid; gap:16px; min-width:0; }
 .settings-form-group > :is(h3,p) { margin:0; }
 .settings-form-group > h3 { font-size:var(--type-group); line-height:1.4; }
@@ -1534,7 +1536,7 @@ body:has(.detail-dialog[open]) { overflow:hidden; }
  .stablecoin-billing-details .provider-form-grid { grid-template-columns:minmax(0,1fr); }
 }
 .stablecoin-address-qr { width:192px; height:192px; max-width:100%; justify-self:center; image-rendering:pixelated; }
-.seller-vat-settings { margin-bottom:32px; min-width:0; }
+.seller-vat-settings { min-width:0; }
 .seller-vat-settings .provider-form-grid, .organization-vat-verification .provider-form-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px; }
 .vat-rule-table { min-width:840px; }
 .vat-rule-table td:nth-child(4) { min-width:130px; }

@@ -14,9 +14,9 @@
   }await load();
  }
  window.LegalTextUI={mount(parent,api,current=()=>true){
-  const group=el('div',undefined,'settings-form-group');group.append(el('h3','Public legal documents'));parent.append(group);
+  const group=el('div',undefined,'settings-form-group'),documentActions=el('div',undefined,'form-actions compact');group.append(el('h3','Public legal documents'),documentActions);parent.append(group);
   for(const [kind,title] of Object.entries(titles)){
-   const open=el('button','Edit '+title,'secondary');open.type='button';group.append(open);
+   const open=el('button','Edit '+title,'secondary');open.type='button';documentActions.append(open);
    open.onclick=async()=>{
     if(open.disabled)return;open.disabled=true;
     const dialog=el('dialog',undefined,'keys-revoke-dialog sales-dialog legal-editor'),form=el('form'),status=el('p'),actions=el('div',undefined,'dialog-actions'),save=el('button','Save','primary'),cancel=el('button','Cancel','secondary'),reset=el('button','Use default template','secondary'),text=el('textarea'),label=el('label',title),help=el('p','Plain text only; line breaks are preserved. HTML and links are displayed as text. Up to '+FileSize.limit(65536)+'. Saving publishes immediately. An empty document uses the bundled template.','field-explanation');

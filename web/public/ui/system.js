@@ -41,6 +41,7 @@
       await window.RequestLimits.mount(sections.limits.panel,api,{current:()=>token===epoch});if(token!==epoch)return;
       await window.EmailDeliverySettings.mount(sections.email.panel,api,()=>token===epoch);if(token!==epoch)return;
       await window.CatalogSync?.settings(sections.catalog.panel,api,()=>token===epoch);if(token!==epoch)return;
+      sections.payments.panel.classList.add('settings-form-sections');
       await window.PaymentNotificationSettings.mount(sections.payments.panel,api,()=>token===epoch);if(token!==epoch)return;
       await window.PaymentProviderSettings.mount(sections.payments.panel,api,()=>token===epoch);if(token!==epoch)return;
       await window.LoginMethodSettings.mount(sections.login.panel,api,()=>token===epoch);
