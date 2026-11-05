@@ -44,7 +44,15 @@ const results=[];
  async function footer(page){await loaded(page);const f=page.getByRole('contentinfo');assert.equal(await f.count(),1);assert.equal(await f.getByRole('link',{name:'Terms of Use',exact:true}).getAttribute('href'),ui+'/terms');assert.equal(await f.getByRole('link',{name:'Privacy Policy',exact:true}).getAttribute('href'),ui+'/privacy');}
  async function clickDocs(page,documents){await page.locator('#docsNav').waitFor({state:'visible'});documents.length=0;await page.locator('#docsNav').click();await page.waitForURL(u=>u.origin===docs&&(!u.searchParams.has('theme')));await page.locator('#docsContent h1').waitFor();return documents.slice();}
  try{
-  await scenario('actual Console click document count',{ui:'https://console.sociaro.ai',docs:'https://docs.sociaro.ai'},async({page,documents})=>{await page.goto(ui+'/');await loaded(page);await page.evaluate(()=>history.replaceState(null,'','/#docs/authentication'));const docsSeen=await clickDocs(page,documents);assert.equal(docsSeen.length,process.env.UI_BASELINE_DIR?2:1);assert.equal(page.url(),docs+'/#docs/authentication');});
+  await scenario('actual Console click document count',{ui:'https://console.sociaro.ai',docs:'https://docs.sociaro.ai'},async({page,documents})=>{
+   await page.goto(ui+'/');await loaded(page);
+   // Site configuration alone does not finish authentication/workspace bootstrap.
+   // Seed the legacy fragment after the native generation field is ready, so the
+   // normal Console URL reconciliation cannot erase test setup before the click.
+   await page.locator('#apiKey:enabled').waitFor({state:'visible'});
+   await page.evaluate(()=>history.replaceState(null,'','/#docs/authentication'));
+   const docsSeen=await clickDocs(page,documents);assert.equal(docsSeen.length,process.env.UI_BASELINE_DIR?2:1);assert.equal(page.url(),docs+'/#docs/authentication');
+  });
   if(!process.env.UI_BASELINE_DIR){
    for(const pair of [['https://console.sociaro.ai','https://docs.sociaro.ai'],['https://console-staging.sociaro.ai','https://docs-staging.sociaro.ai']])for(const color of ['light','dark'])await scenario('shared shell '+pair[0]+' '+color,{ui:pair[0],docs:pair[1],mode:color},async({page,documents})=>{
     await page.goto(ui+'/');await footer(page);await clickDocs(page,documents);await footer(page);assert.equal(await page.locator('html').getAttribute('data-theme'),color);assert.equal(await page.getByRole('link',{name:'Docs',exact:true}).getAttribute('aria-current'),'page');assert.equal(await page.getByRole('link',{name:'Console',exact:true}).count(),1);
