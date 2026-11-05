@@ -6,7 +6,30 @@ Every new API key must belong to an organization and one of its members. Provide
 
 ## Ownership and funding
 
-Organizations own reference metadata, generation records and files. All active members share the organization journal and reference library. They can reuse references, download results and delete stored files; financial administration remains restricted to administrators. The author and originating key remain recorded. New storage paths use `<organization-id>/references/` and `<organization-id>/results/`. Personal S3 connections may also hold organization-owned files; their original connection identity is retained for reads and deletion.
+Organizations own reference metadata, generation records and files. Access follows
+the user's current organization role:
+
+| Role | Request journal | Reference library and result files | Delete reference and result files |
+| --- | --- | --- | --- |
+| Supermanager | All, with content | All | Any |
+| Manager | All, without content | None | None |
+| Content Officer | All, with content | All, read-only | None |
+| Developer | Own, with content | Own only | Own only |
+| Member | Own, with content | Own only | Own only |
+
+Administrators with system access can read all retained organization content and
+delete files. Managers see operational and accounting metadata, without prompts,
+input materials or generated content. Developers and Members can reuse references,
+download results and delete files only for their own content. Content Officers
+can read retained content across the organization but cannot delete files.
+Minimized request logging and file deletion still limit what content is retained.
+See [Organization roles](organizations.md#organization-roles) for the full matrix
+and system-access requirements.
+
+The author and originating key remain recorded. New storage paths use
+`<organization-id>/references/` and `<organization-id>/results/`. Personal S3
+connections may also hold organization-owned files; their original connection
+identity is retained for authorized reads and deletion.
 
 Shared-provider requests check the organization balance plus Credit Limit and the member weekly allowance against completed spending. Estimates and pending tasks do not reserve funds. Provider packages do not restore spending authority. See [Organizations](organizations.md) for funding, role, invitation and migration details. Personal provider calls are funded by the member's own provider account and do not debit the shared organization balance.
 
