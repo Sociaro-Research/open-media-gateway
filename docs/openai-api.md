@@ -98,9 +98,23 @@ fixed camera, last frame, language, lyrics, gender, catalog-advertised music/aud
 format, music/audio duration and advertised
 `parameters`. Singular `video_url` and `audio_url` are not accepted.
 
-`prompt_optional` permits an empty prompt on media-driven models; `no_prompt`
-requires it to be omitted or empty. Respect the model's duration bounds and
-`duration_from_input`: a reference-driven duration cannot be overridden.
+For routes that use `prompt`, Gateway trims surrounding whitespace and normally
+requires nonblank text. An empty prompt is admitted when the selected model
+advertises `prompt_optional` or `no_prompt`, or for music with `supports_lyrics`
+and nonblank `options.lyrics`. The selected model and effective reference mode
+still have to pass native validation: `prompt_optional` does not waive every
+mode's requirements. A `no_prompt` model rejects text that remains after trimming.
+JSON `prompt: null` behaves as omission on these routes; multipart `prompt=null`
+is literal text. Speech uses `input` and rejects `prompt`, including JSON null.
+
+Use the model's `max_prompt_characters` and any reviewed `prompt_policy`; limits
+count Unicode code points **after trimming**, separately from transport byte
+limits. Ordinary models use the 10,000 ceiling or a lower native bound; manual
+models retain 10,000. Only an explicit reviewed native policy can extend it, up
+to 40,000.
+See [prompt limits](prompt-limits.md) for mixed ASCII/non-ASCII budgets. Respect
+the model's duration bounds and `duration_from_input`: a reference-driven duration
+cannot be overridden.
 
 `webhook_url` and `max_expected_cost_usd` stay top-level gateway extensions.
 The price ceiling includes markup. Use the same `Idempotency-Key` when retrying

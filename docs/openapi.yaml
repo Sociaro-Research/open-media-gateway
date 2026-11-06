@@ -2492,6 +2492,7 @@ paths:
                 output_format:
                   type: string
                 prompt:
+                  description: Text direction after surrounding-whitespace trimming. Required unless the selected model and effective mode permit no prompt; see GenerationRequest.prompt. Literal null is text.
                   type: string
                 quality:
                   type: string
@@ -2499,7 +2500,6 @@ paths:
                   type: string
               required:
               - model
-              - prompt
               - image
               type: object
         required: true
@@ -2741,6 +2741,7 @@ paths:
                   description: JSON-encoded MediaOptions
                   type: string
                 prompt:
+                  description: Text direction after surrounding-whitespace trimming. Required unless the selected model and effective mode permit no prompt; see GenerationRequest.prompt. Literal null is text.
                   type: string
                 seconds:
                   type: string
@@ -2748,7 +2749,6 @@ paths:
                   type: string
               required:
               - model
-              - prompt
               type: object
         required: true
       responses:
@@ -10117,7 +10117,7 @@ components:
       additionalProperties: false
       description: OpenAI-style naming with Gateway extensions. Use only fields appropriate
         for the media type. Standard fields are accepted only at the top level; only advertised options.parameters
-        keys are accepted. JSON limit 64 KiB. Null prompt, webhook_url and max_expected_cost_usd behave as omission; model-specific prompt requirements still apply.
+        keys are accepted. JSON limit 64 KiB. Null webhook_url and max_expected_cost_usd behave as omission. On prompt-based routes null prompt also behaves as omission; speech instead uses input and rejects prompt, including null. Model and effective-mode requirements still apply.
       properties:
         project_id: {type: string, format: uuid, description: Optional project shared within the current company, or owned by the authenticated actor in Profile. Omit to leave a generation ungrouped. Part of idempotency matching; does not affect prompt or result retention.}
         timeout_seconds:
@@ -10131,8 +10131,7 @@ components:
         image:
           $ref: '#/components/schemas/GenerationImageInput'
         input:
-          description: Text to synthesize.
-          maxLength: 10000
+          description: Speech text to synthesize. Surrounding whitespace is trimmed before model-specific Unicode code-point limits are checked; transport byte limits apply separately. Null is rejected. Use input instead of prompt for speech.
           type: string
         input_reference:
           $ref: '#/components/schemas/GenerationImageInput'
@@ -10157,8 +10156,7 @@ components:
           description: Image output encoding supported by the model, e.g. png/jpeg/webp.
           type: string
         prompt:
-          maxLength: 10000
-          description: Text direction, subject to the model's limits. May be omitted or empty when prompt_optional or no_prompt is advertised; no_prompt rejects nonempty text.
+          description: Text direction for image/video/music/audio routes; speech uses input and rejects prompt. Surrounding whitespace is trimmed before checking requirements and counting Unicode code points. Normally nonblank; omission, null or blank text is admitted for prompt_optional or no_prompt models, or music with supports_lyrics and nonblank options.lyrics, subject to selected-model and effective-mode native validation. no_prompt rejects remaining nonblank text. Use max_prompt_characters and any reviewed prompt_policy; ordinary models use a 10000 ceiling or a lower native bound, manual models retain 10000, and only explicit reviewed native policies may extend it up to 40000. Transport byte limits apply separately; a raw-string maxLength cannot express trim-before-count.
           type: [string, "null"]
         quality:
           type: string
@@ -10883,15 +10881,15 @@ components:
         max_prompt_characters:
           type: integer
           minimum: 1
-          maximum: 10000
+          maximum: 40000
           readOnly: true
-          description: Effective known gateway/adapter prompt input ceiling in Unicode code points, not bytes, UTF-16 units, grapheme clusters or a documented vendor maximum. Runtime model catalogues combine the gateway 10000-code-point cap with a lower existing native adapter rule when applicable. Unknown upstream bounds do not imply unlimited input; the known gateway ceiling still applies. Manual models bypass native adapter rules and use the gateway ceiling. Omitted for no_prompt models; absence on older servers is unknown metadata. Admission trims surrounding whitespace before counting; template publication also validates stored raw prompt length. See prompt-limits.md.
+          description: Effective known gateway/adapter prompt input ceiling in Unicode code points, not bytes, UTF-16 units, grapheme clusters or a documented vendor maximum. Ordinary models use the 10000 ceiling or a lower native bound; an explicit reviewed native prompt_policy may set a ceiling up to 40000 and an additional mixed ASCII/non-ASCII budget. Manual models bypass native policies and retain 10000. Omitted for no_prompt models; absence on older servers is unknown metadata. Admission trims surrounding whitespace before counting. Template publication separately checks the raw prompt and its own constraints. See prompt-limits.md.
         prompt_optional:
           type: boolean
-          description: The model accepts an empty prompt, for example when direction comes from reference media.
+          description: Gateway admits an empty prompt after surrounding-whitespace trimming, for example when direction comes from reference media. Selected-model and effective-mode native validation still applies.
         no_prompt:
           type: boolean
-          description: The model operates on media inputs without a text prompt. Omit prompt or use an empty string.
+          description: The model operates on media inputs without a text prompt. Omit prompt or send text that is empty after surrounding-whitespace trimming; remaining nonblank text is rejected.
         reference_prompt_syntax:
           type: string
           enum: [numbered, picture, bracket, kling-id]

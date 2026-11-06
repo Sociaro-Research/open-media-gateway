@@ -17,20 +17,28 @@ or provider display names are not a reason for a client to infer a different cap
 Missing metadata on an older server means unknown. A `no_prompt` model omits the
 field because text entry does not apply; `prompt_optional` still has a ceiling.
 
-The common gateway ceiling is 10,000 Unicode code points. Existing native checks
-can make it lower: Kling 3 operations enforce 3,072, Sonilo prompt-accepting
-operations enforce 2,000, and OpenAI speech operations enforce 4,096. OpenAI image
-operations accept up to 32,000 in their native adapter validator, but Gateway
-admission limits their effective input to 10,000. Kling 4 operations retain the
-existing 10,000 Gateway ceiling. These values report existing code enforcement;
-they do not introduce or claim new vendor documentation limits. Other models keep
-the known Gateway ceiling even when a vendor-specific bound is unknown.
+Ordinary models use a 10,000-code-point Gateway ceiling, or a lower applicable
+native bound. For example, OpenAI speech uses 4,096 and OpenAI image requests
+retain 10,000. A larger provider-advertised limit alone does not extend admission.
+Only an explicit reviewed native `prompt_policy` may set a different ceiling, up
+to 40,000. MiniMax H3 base-video regeneration declares 40,000; reviewed Kling 4
+Flash/Omni operations declare 26,000 with an additional mixed-character budget.
+Use the selected operation's current metadata rather than inferring a limit from
+its provider or family name.
 
-Administrator-defined manual models bypass native profile validation. Their
-runtime metadata therefore reports the Gateway ceiling, rather than a lower
-limit copied from the request profile. No generation, quote or validation rule is
-changed by this capability. Lyrics, negative prompts, instructions, JSON timeline
-segments and other separate parameter fields keep their own existing contracts.
+When `prompt_policy` supplies `ascii_budget` and `non_ascii_budget`, both limits
+apply together: `ASCII / ascii_budget + non-ASCII / non_ascii_budget <= 1`.
+ASCII means code points below 128, including punctuation and whitespace; every
+other code point belongs to the non-ASCII count. Kling's reviewed 26,000/11,000
+budget therefore allows 26,000 ASCII or 11,000 non-ASCII code points, or a weighted
+mixture within that inequality, also subject to `max_prompt_characters`. These
+are Gateway enforcement rules, not a vendor tokenizer or a language classifier.
+
+Administrator-defined manual models bypass native profile/policy validation and
+retain the 10,000 Gateway ceiling. No generation, quote or validation rule is
+changed by publishing these capabilities. Lyrics, negative prompts, instructions,
+JSON timeline segments and other separate parameter fields keep their own
+existing contracts.
 
 ## Counting and route semantics
 
@@ -40,11 +48,19 @@ accent is two. A JavaScript counter can use `Array.from(prompt).length`.
 
 Create, estimate and validation share Gateway admission, which trims surrounding
 whitespace before counting and passes that trimmed prompt to native validation.
-Template publication additionally validates the raw stored prompt against the
-same common 10,000 ceiling before validating the effective native request. An
-editor may count its raw input conservatively; this capability does not instruct
-it to rewrite or truncate the user's prompt. Existing request-body byte limits
-remain separate transport limits.
+Consequently a raw JSON Schema `maxLength` cannot exactly describe admission:
+outer whitespace does not consume the character budget. JSON generation bodies
+are limited to 64 KiB total, and multipart scalar fields to 64 KiB each, so a
+Unicode prompt within its character budget may still exceed a transport limit.
+Multipart generation forms also retain their 32 MiB total limit.
+
+Template publication separately checks the raw stored prompt against the
+selected model's effective character ceiling, requires nonblank text with no
+surrounding whitespace, and applies its grammar and other template constraints.
+Legacy/native-syntax reference-slot inference has a separate 40,000-byte guard;
+a 40,000-code-point model capability does not promise that every such template can publish. An editor
+may count raw input conservatively; this capability does not instruct it to
+rewrite or truncate the user's prompt.
 
 An empty field may display `Prompt (10,000 characters max)` and a nonempty field
 `Prompt (5,550 / 10,000 characters)` using the selected model's advertised value.
