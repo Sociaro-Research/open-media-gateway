@@ -1,9 +1,11 @@
 # Direct S3 file transfers
 
-The gateway authorizes access and exchanges metadata. It does not relay S3 file
-bytes for library uploads, previews, downloads or provider reference inputs.
-Local storage still necessarily uses the gateway. Workers retain their bounded
-provider-result download/archive path where providers cannot write to our bucket.
+Library upload bodies travel directly from the client to S3. The gateway
+authorizes transfers and reads bounded object bytes to validate completed uploads
+before library registration. S3 previews, downloads and provider reference inputs
+are delivered directly from storage. Local storage still necessarily uses the
+gateway. Workers retain their bounded provider-result download/archive path where
+providers cannot write to our bucket.
 
 ## Upload protocol
 
@@ -29,9 +31,13 @@ Other services retain the presigned URL. Always send every returned target heade
 Storage validates the received bytes against that signed digest. Completion checks S3's
 part metadata, completes that exact part and checks the completed object's metadata.
 Completing consumes the upload ID, so a still-valid URL cannot overwrite a saved
-file. No staging copy or server-side file download is necessary. Declared MIME
-must be an allowed media type; direct uploads do not inspect content bytes on the
-server. The object is served with that fixed media type, never as HTML or SVG.
+file. No staging copy is necessary. After completion, the gateway reads the actual
+object bytes with bounded size and concurrency. It checks the exact size and
+SHA-256, detects the MIME type and parses media metadata before inserting or
+deduplicating the library reference. The declared MIME must match an allowed
+detected media type; any pinned model context is also checked against current
+authorized limits. The object is served with the validated declared media type,
+never as HTML or SVG.
 
 Preparation records the unique destination before contacting S3. PostgreSQL row
 and per-owner/digest locks serialize competing completions and cleanup, while
