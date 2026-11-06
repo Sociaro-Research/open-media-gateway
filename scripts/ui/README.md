@@ -1041,3 +1041,24 @@ and mutation interlocks. It never creates real grants or invokes storage cleanup
 The real handler, authorization and transactional restart contracts are covered
 separately by `TestLegacyRecovery*` in the API and PostgreSQL suites. A recovered
 legacy attempt does not activate full-company mode or confirm remote revocation.
+
+## Per-profile large-table controls
+
+`node --test scripts/ui/profile-preferences.test.cjs` checks masked profile
+confirmations, per-key FIFO, failed later saves, authoritative reset and stale
+identity/session/company-connection fencing without browser or database mocks
+being confused with real persistence. PostgreSQL/API/company-interface tests cover
+real persistence, migration, concurrent partial PATCHes and BrowserActor boundaries.
+
+`node scripts/ui/table-controls.cjs` exercises shared column/viewport controls with
+synthetic loopback profile APIs: form/node/draft preservation, native validation
+recovery, failed saves, navigation during pending saves, profile isolation and
+cleanup. `node scripts/ui/table-renderers.cjs` uses actual portal assets and all
+22 logical renderer integrations (23 member/editable variants), not generated
+stand-in tables. It checks table IDs, columns, DOM/form preservation, polling,
+chooser bounds and actual viewport geometry. `UI_TABLE_CASES` selects a comma-
+separated bounded group; `UI_SOURCE_DIR` selects immutable prior public assets
+for before screenshots. Repeat both browser fixtures with `UI_BROWSER_ENGINE=webkit`.
+Use `UI_EVIDENCE_DIR` for metrics, source identities and screenshots in both themes
+at1440/2560/390/320px; inspect the screenshots before accepting the change.
+Run resource-intensive suites serially and verify available disk space first.

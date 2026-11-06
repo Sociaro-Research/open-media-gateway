@@ -1901,3 +1901,19 @@ input[type=color]:focus-visible { outline:none; box-shadow:none; border:2px soli
 }
 
 .remote-dialog .dialog-actions a.primary { text-decoration:none; }
+
+/* Profile-owned table controls reuse the Requests borderless 44px action. */
+.table-controls-cell { width:104px!important;min-width:104px!important; }
+.table-controls { display:flex;align-items:center;justify-content:flex-end;gap:0; }
+.table-controls button { flex-shrink:0; }
+.table-controls .table-recover { margin-inline-start:12px;font-size:12px;min-height:44px;white-space:normal; }
+.table-preference-status { display:block;font-size:13px;line-height:1.5;margin-top:12px; }
+.table-preference-status:empty { display:none; }
+[data-console-table] :is(th,td)[hidden] { display:none!important; }
+.table-wide-surface { position:relative;max-width:none!important;box-sizing:border-box; }
+.model-info-popup.table-wide-popup { width:calc(100vw - 24px);max-width:calc(100vw - 24px); }
+.model-info-popup.table-wide-popup .table-wide-surface { width:100%;margin-left:0; }
+
+.table-preference-feedback { grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:12px;min-width:0; }
+.table-preference-feedback .table-preference-status { margin:0; }
+.table-preference-feedback .table-recover { min-height:44px; }

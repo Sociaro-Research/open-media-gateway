@@ -29,6 +29,21 @@ func (r *AuthRepository) UpdateProfile(ctx context.Context, id string, in auth.P
 		}
 		columns = string(encoded)
 	}
+	var tables, wide any
+	if in.TableColumns != nil {
+		raw, err := json.Marshal(*in.TableColumns)
+		if err != nil {
+			return identity.User{}, err
+		}
+		tables = string(raw)
+	}
+	if in.TableWide != nil {
+		raw, err := json.Marshal(*in.TableWide)
+		if err != nil {
+			return identity.User{}, err
+		}
+		wide = string(raw)
+	}
 	tx, err := beginAuditTx(ctx, r.db)
 	if err != nil {
 		return identity.User{}, err
@@ -55,8 +70,8 @@ func (r *AuthRepository) UpdateProfile(ctx context.Context, id string, in auth.P
 	}
 	user, err := scanProfile(tx.QueryRowContext(ctx, `UPDATE users SET
  display_name=COALESCE($2,display_name), custom_display_name=custom_display_name OR $2::text IS NOT NULL,
- theme=COALESCE($3,theme), report_columns=COALESCE($4::jsonb,report_columns), color_preset=COALESCE($5,color_preset), contacts=COALESCE($6::jsonb,contacts), updated_at=NOW() WHERE id=$1
- RETURNING id,email,display_name,COALESCE(picture_url,''),theme,report_columns,color_preset,contacts`, id, in.Name, in.Theme, columns, in.ColorPreset, contacts))
+ theme=COALESCE($3,theme), report_columns=COALESCE($4::jsonb,report_columns), color_preset=COALESCE($5,color_preset), contacts=COALESCE($6::jsonb,contacts), table_columns=jsonb_strip_nulls(table_columns || COALESCE($7::jsonb,'{}'::jsonb)), table_wide=table_wide || COALESCE($8::jsonb,'{}'::jsonb), updated_at=NOW() WHERE id=$1
+ RETURNING id,email,display_name,COALESCE(picture_url,''),theme,report_columns,color_preset,contacts,table_columns,table_wide`, id, in.Name, in.Theme, columns, in.ColorPreset, contacts, tables, wide))
 	if err != nil {
 		return user, err
 	}
@@ -65,8 +80,8 @@ func (r *AuthRepository) UpdateProfile(ctx context.Context, id string, in auth.P
 
 func scanProfile(row rowScanner) (identity.User, error) {
 	var user identity.User
-	var columns, contacts []byte
-	if err := row.Scan(&user.ID, &user.Email, &user.Name, &user.Picture, &user.Theme, &columns, &user.ColorPreset, &contacts); err != nil {
+	var columns, contacts, tables, wide []byte
+	if err := row.Scan(&user.ID, &user.Email, &user.Name, &user.Picture, &user.Theme, &columns, &user.ColorPreset, &contacts, &tables, &wide); err != nil {
 		return user, err
 	}
 	if len(columns) > 0 {
@@ -75,6 +90,12 @@ func scanProfile(row rowScanner) (identity.User, error) {
 		}
 	}
 	if err := json.Unmarshal(contacts, &user.Contacts); err != nil {
+		return user, err
+	}
+	if err := json.Unmarshal(tables, &user.TableColumns); err != nil {
+		return user, err
+	}
+	if err := json.Unmarshal(wide, &user.TableWide); err != nil {
 		return user, err
 	}
 	return user, nil

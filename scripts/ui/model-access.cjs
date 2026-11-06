@@ -2,7 +2,7 @@ const {evidencePath} = require('./evidence.cjs');
 // Local fixture: exercises the real provider screen and model-access editor.
 const {chromium}=require('playwright');
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
-const ui=path.resolve(__dirname,'../../web/public/ui'),output=evidencePath('/tmp/gateway-model-access-ui');fs.mkdirSync(output,{recursive:true});
+const ui=process.env.UI_SOURCE_DIR||path.resolve(__dirname,'../../web/public/ui'),output=evidencePath('/tmp/gateway-model-access-ui');fs.mkdirSync(output,{recursive:true});
 const server=http.createServer((req,res)=>{const pathname=new URL(req.url,'http://fixture').pathname;const name=pathname.startsWith('/ui/')||pathname.endsWith('.svg')?path.basename(pathname):'index.html';const f=path.join(ui,name);if(!fs.existsSync(f))return res.writeHead(404).end();res.setHeader('Content-Type',name.endsWith('.js')?'text/javascript':name.endsWith('.css')?'text/css':name.endsWith('.svg')?'image/svg+xml':'text/html');res.end(fs.readFileSync(f));});
 const ids=['11111111-1111-4111-8111-111111111111','22222222-2222-4222-8222-222222222222'];
 let models=[{id:ids[0],provider:'mock',model:'video',name:'Studio Video',public_id:'mock/video',enabled_by_default:true,version:1},{id:ids[1],provider:'mock',model:'image',name:'Studio Image',public_id:'studio-image',enabled_by_default:true,version:1}];

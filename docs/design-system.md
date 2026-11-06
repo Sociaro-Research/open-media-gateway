@@ -15,6 +15,30 @@ screen-specific copies. Exceptions must have a functional reason documented here
 
 **Role names:** use **Administrator** for the system-wide role. Organization roles are **Supermanager**, **Manager** (`admin` in the API), **Content Officer**, **Developer** and **Member**. Sales account roles are **Regional client manager**, **Lead client manager** and **Client manager**, with scoped onboarding and statistics access. Reuse `SalesHierarchy.roles` for sales labels and selectors, and `OrganizationRoles` for organization labels and role selectors; the Role assignment heading reuses `ModelInfo.informationButton` for its permission matrix. Its wider popup is justified by the six-column comparison, with shared styles and horizontal table scrolling on mobile.
 
+## Large-table controls
+
+Every console table with more than three original columns uses `TableUI` from
+`web/public/ui/table-ui.js`. Count its original action column, but not the control
+cell added by this component. Register an explicit stable table ID and stable
+column IDs at the actual renderer; do not derive persistence keys from labels.
+Requests keeps `report_columns` authoritative for compatibility.
+
+The sticky right header action reuses the borderless Requests gear and an adjacent
+monochrome width toggle, both with 44px targets. Reuse `ControlPickers` switches,
+keyboard/focus behavior and viewport-bounded menus. Preserve row actions. Width
+mode expands the table into available viewport space with responsive gutters,
+leaving existing sidebars in place; it does not enter browser fullscreen or lock
+vertical document scrolling. Comparison popups widen their existing panel.
+
+Settings belong to the signed-in profile per logical table. See
+[Table preferences](table-preferences.md) for API and integration details.
+Editable controls, handlers, form association, drafts, validation and pending
+locks must survive column/width toggles. Keep the chooser's backing select outside
+all business forms and their descendant-based snapshots. Hidden editable fields
+have a shared recovery action, and native invalid events reveal the affected
+column before validation tries to focus it. Recovery does not silently overwrite
+saved column choices. Dispose owned controls and observers on unmount.
+
 ## 2. Visual foundations
 
 | Element | Standard |

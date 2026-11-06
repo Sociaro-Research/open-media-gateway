@@ -75,7 +75,7 @@
    try{const result=await api(base+'/balance-history?offset='+offset);if(!current())return;rows.replaceChildren();paging.replaceChildren();FormUI.message(status,'');
     if(!result.data.length){rows.append(el('p','No balance activity yet.'));return}
     const wrap=el('div',undefined,'system-table-wrap'),table=el('table',undefined,'docs-table'),head=el('thead'),h=el('tr'),body=el('tbody');
-    for(const text of ['Date','Description','Payment','Fee','Balance change','Status','']){const th=el('th',text);th.scope='col';h.append(th)}head.append(h);
+    for(const text of ['Date','Description','Payment','Fee','Balance change','Status','']){const th=el('th',text);th.scope='col';h.append(th)}head.append(h);window.TableUI?.attach(table,{id:'payment_ledger',columns:['date','description','payment','fee','balance_change','status','actions']});
     let converted=false;
     for(const entry of result.data){
      const p=entry.payment,initial=p&&entry.kind!=='adjustment',row=el('tr');

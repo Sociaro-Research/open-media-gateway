@@ -23,15 +23,16 @@ func TestGenerationProjectsMigrationIsolationAndRetention(t *testing.T) {
 	if err := goose.UpTo(db, "migrations", 70); err != nil {
 		t.Fatal(err)
 	}
-	people := NewAuthRepository(db)
-	alice, err := people.UpsertGoogleUser(context.Background(), uuid.NewString(), "projects-a@example.test", "Alice", "")
-	if err != nil {
-		t.Fatal(err)
+	legacyUser := func(email, name string) identity.User {
+		u := identity.User{ID: uuid.NewString(), Email: email, Name: name}
+		if _, err := db.Exec(`INSERT INTO users(id,google_subject,email,display_name) VALUES($1,$2,$3,$4)`, u.ID, u.ID, email, name); err != nil {
+			t.Fatal(err)
+		}
+		return u
 	}
-	bob, err := people.UpsertGoogleUser(context.Background(), uuid.NewString(), "projects-b@example.test", "Bob", "")
-	if err != nil {
-		t.Fatal(err)
-	}
+	alice := legacyUser("projects-a@example.test", "Alice")
+	bob := legacyUser("projects-b@example.test", "Bob")
+	var err error
 	a := identity.WithPersonalData(identity.WithUser(context.Background(), alice))
 	b := identity.WithPersonalData(identity.WithUser(context.Background(), bob))
 	old := uuid.NewString()

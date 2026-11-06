@@ -10,14 +10,14 @@
     return el;
   };
   const paragraph = (text, parent = content) => parent.append(node('p', text));
-  function table(headers, rows, parent = content) {
+  function table(id, headers, rows, parent = content) {
     const wrap = node('div', undefined, 'docs-table-wrap');
     const t = node('table', undefined, 'docs-table');
     const head = node('thead'), tr = node('tr');
     headers.forEach(h => { const th = node('th', h); th.scope = 'col'; tr.append(th); }); head.append(tr);
     const body = node('tbody');
     rows.forEach(row => { const r = node('tr'); row.forEach((cell,index) => { const td = node('td',undefined,headers[index]===''?'table-row-actions':undefined); td.append(cell instanceof Node ? cell : document.createTextNode(String(cell))); r.append(td); }); body.append(r); });
-    t.append(head, body); wrap.append(t); parent.append(wrap);
+    t.append(head, body); window.TableUI?.attach(t,{id,columns:id==='organization_keys'?['key','user','issued_by','spending','permissions','activity','status','actions']:['key','spending','permissions','activity','status','actions']}); wrap.append(t); parent.append(wrap);
   }
   async function keyManagement(token) {
     FormUI.sectionHeading(content,'API keys');
@@ -102,7 +102,7 @@
       if(!keys.length) {paragraph('No keys yet.',keyList);return;}
       const selectedStatuses=new Set([...statusFilter.selectedOptions].map(option=>option.value)),currentTime=Date.now(),visibleKeys=keys.filter(key=>selectedStatuses.has(keyStatus(key,currentTime)));
       if(!visibleKeys.length){paragraph('No keys match the selected statuses.',keyList);return;}
-      table(['Key',...(organizationID?['User','Issued by']:[]),'Spending','Permissions','Activity','Status',''],visibleKeys.map(key=>{
+      table(organizationID?'organization_keys':'personal_keys',['Key',...(organizationID?['User','Issued by']:[]),'Spending','Permissions','Activity','Status',''],visibleKeys.map(key=>{
         const state=keyStatus(key,currentTime),revoked=state==='revoked';
         const identity=node('div');identity.append(node('strong',key.name),node('code',key.prefix+'…'));
         const activity=node('div');activity.append(node('small','Created '+new Date(key.created_at).toLocaleDateString()),node('small',key.last_used_at ? 'Used '+new Date(key.last_used_at).toLocaleString() : 'Not used yet'),node('small',key.expires_at ? 'Expires '+new Date(key.expires_at).toLocaleDateString() : 'No expiration'));

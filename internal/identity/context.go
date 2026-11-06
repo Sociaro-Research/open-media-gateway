@@ -8,15 +8,17 @@ import (
 const SystemOwnerID = "00000000-0000-0000-0000-000000000000"
 
 type User struct {
-	Contacts      []Contact `json:"contacts"`
-	ID            string    `json:"id"`
-	Email         string    `json:"email"`
-	Name          string    `json:"name"`
-	Theme         string    `json:"theme,omitempty"`
-	ColorPreset   string    `json:"color_preset"`
-	ReportColumns []string  `json:"report_columns,omitempty"`
-	Picture       string    `json:"picture,omitempty"`
-	SessionID     string    `json:"session_id,omitempty"`
+	Contacts      []Contact           `json:"contacts"`
+	ID            string              `json:"id"`
+	Email         string              `json:"email"`
+	Name          string              `json:"name"`
+	Theme         string              `json:"theme,omitempty"`
+	ColorPreset   string              `json:"color_preset"`
+	ReportColumns []string            `json:"report_columns,omitempty"`
+	TableColumns  map[string][]string `json:"table_columns,omitempty"`
+	TableWide     map[string]bool     `json:"table_wide,omitempty"`
+	Picture       string              `json:"picture,omitempty"`
+	SessionID     string              `json:"session_id,omitempty"`
 	// SourceSessionID is a trusted central database anchor, never a browser field.
 	SourceSessionID string `json:"-"`
 }

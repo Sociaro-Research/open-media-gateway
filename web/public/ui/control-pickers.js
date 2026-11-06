@@ -5,7 +5,7 @@
   // Match the existing monochrome 24px/currentColor SVG convention.
   const menuIcons={rename:'<path d="m16 3 5 5-12 12-6 1 1-6Z"/><path d="m14 5 5 5"/>',delete:'<path d="M3 6h18M9 6V4h6v2M5 6l1 15h12l1-15M10 10v7M14 10v7"/>'};
   const action=(text,fn,label=text)=>{const b=el('button','picker-action',text);b.type='button';b.setAttribute('aria-label',label);b.onclick=fn;return b;};
-  function close(restore=false){window.ModelInfo?.close();if(!active)return;const {panel,trigger}=active;active=active.parent;panel.dispose?.();panel.remove();trigger.setAttribute('aria-expanded','false');if(restore&&trigger.isConnected)trigger.focus();}
+  function close(restore=false){if(!active)return;const {panel,trigger}=active;active=active.parent;window.ModelInfo?.closeWithin?.(panel);panel.dispose?.();panel.remove();trigger.setAttribute('aria-expanded','false');if(restore&&trigger.isConnected)trigger.focus();}
   function position(){
     const chain=[];for(let entry=active;entry;entry=entry.parent)chain.unshift(entry);
     for(const {panel,trigger,side} of chain){
@@ -25,7 +25,7 @@
   // Outside clicks and Escape are handled below. Native auto-dismiss would close
   // the popup before a second trigger click, causing that click to reopen it.
   // Nested filters keep their parent picker open; dismissal unwinds one level.
-  function show(trigger,panel,side=false){while(active&&!active.panel.contains(trigger))close();panel.classList.add('control-popup');panel.id='control-popup-'+(++serial);panel.setAttribute('popover','manual');(trigger.closest('dialog')||document.body).append(panel);active={trigger,panel,parent:active,side};trigger.setAttribute('aria-expanded','true');trigger.setAttribute('aria-controls',panel.id);if(panel.showPopover)panel.showPopover();panel.addEventListener('toggle',e=>{if(e.newState==='closed'&&active?.panel===panel)close();});position();}
+  function show(trigger,panel,side=false){if(!window.ModelInfo?.contains(trigger))window.ModelInfo?.close();while(active&&!active.panel.contains(trigger))close();panel.classList.add('control-popup');panel.id='control-popup-'+(++serial);panel.setAttribute('popover','manual');(trigger.closest('dialog')||document.body).append(panel);active={trigger,panel,parent:active,side};trigger.setAttribute('aria-expanded','true');trigger.setAttribute('aria-controls',panel.id);if(panel.showPopover)panel.showPopover();panel.addEventListener('toggle',e=>{if(e.newState==='closed'&&active?.panel===panel)close();});position();}
   function menu(trigger,{label,items,side=false,focus=true,matchFieldWidth=false,onClose}){
     const panel=el('div','action-menu'),list=el('div'),status=el('p','picker-search-status');if(matchFieldWidth)panel.classList.add('field-width-menu');panel.setAttribute('role','menu');panel.tabIndex=-1;panel.setAttribute('aria-label',label);status.setAttribute('role','status');panel.append(list,status);let busy=false;
     const dismiss=(restore=true)=>{if(active?.panel===panel)close(restore);};
@@ -130,6 +130,6 @@
     if(select){if(!customTrigger){trigger.setAttribute('role','combobox');state.text=el('span','select-value');trigger.append(state.text,el('span','select-chevron'));wrap.classList.add('custom-select');}control.classList.add('picker-source');control.tabIndex=-1;control.setAttribute('aria-hidden','true');}else{trigger.innerHTML='<svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="3" y="4" width="14" height="13" rx="2"/><path d="M3 8h14M6 2v4M14 2v4"/></svg>';wrap.classList.add('custom-date');}
     if(!customTrigger)wrap.append(trigger);trigger.onclick=()=>select?selectPicker(control,state):datePicker(control,state);trigger.onkeydown=e=>{if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();select?selectPicker(control,state):datePicker(control,state);}};control.addEventListener('change',()=>sync(control));control.addEventListener('keydown',e=>{if(e.altKey&&e.key==='ArrowDown'){e.preventDefault();datePicker(control,state);}});sync(control);
   }
-  window.ControlPickers={enhance,sync,menu,dismiss(trigger){if(active?.trigger===trigger)close();},search(control,config){searches.set(control,config);enhance(control);controls.get(control)?.trigger.setAttribute('aria-haspopup','dialog');},contains(node){for(let entry=active;entry;entry=entry.parent)if(entry.panel.contains(node)||entry.trigger.contains(node))return true;return false;}};
+  window.ControlPickers={dismissNested(scope){for(let entry=active;entry;entry=entry.parent)if(scope.contains(entry.trigger)){close(true);return true;}return false;},enhance,sync,menu,dismiss(trigger){if(active?.trigger===trigger)close();},search(control,config){searches.set(control,config);enhance(control);controls.get(control)?.trigger.setAttribute('aria-haspopup','dialog');},contains(node,scope){for(let entry=active;entry;entry=entry.parent)if(entry.panel.contains(node)||entry.trigger.contains(node)){if(!scope)return true;for(let owner=entry;owner;owner=owner.parent)if(scope.contains(owner.trigger))return true;}return false;}};
   new MutationObserver(()=>{while(active&&!active.trigger.isConnected)close();}).observe(document.body,{childList:true,subtree:true});
 })();

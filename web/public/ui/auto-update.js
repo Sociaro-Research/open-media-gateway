@@ -37,15 +37,21 @@
  // and focus. Editable forms are never reconciled by background reads.
  function reconcile(parent,next){
   const focused=document.activeElement,owned=parent.contains(focused);
+  // Shared table affordances are owned by TableUI, not the polled data. Keep
+  // their nodes (including a focused/open chooser) while reconciling rows.
+  const auxiliary=node=>node?.nodeType===1&&node.dataset.tableUiOwned==='aux';
   const keyed=new Map([...parent.children].filter(n=>n.dataset.updateKey).map(n=>[n.dataset.updateKey,n]));
   let position=parent.firstChild;
   for(const incoming of [...next.childNodes]){
+   while(auxiliary(position))position=position.nextSibling;
    let node=incoming.nodeType===1&&incoming.dataset.updateKey?keyed.get(incoming.dataset.updateKey):position;
-   if(!node||node.nodeType!==incoming.nodeType||node.nodeName!==incoming.nodeName||(node.nodeType===1&&node.dataset.updateKey!==incoming.dataset.updateKey)){node=incoming;parent.insertBefore(node,position);}
+   // A different logical table has different columns and profile state, even
+   // when the surrounding read-only list uses the same TABLE element shape.
+   if(!node||node.nodeType!==incoming.nodeType||node.nodeName!==incoming.nodeName||(node.nodeType===1&&(node.dataset.updateKey!==incoming.dataset.updateKey||node.dataset.consoleTable!==incoming.dataset.consoleTable))){node=incoming;parent.insertBefore(node,position);}
    else{
     if(node!==position){if(parent.moveBefore)parent.moveBefore(node,position);else parent.insertBefore(node,position);}
     if(node.nodeType===3){if(node.textContent!==incoming.textContent)node.textContent=incoming.textContent;}
-    else if(node.nodeType===1&&!node.classList.contains('copy-icon')){
+    else if(node.nodeType===1&&!node.classList.contains('copy-icon')&&!node.classList.contains('table-controls-cell')){
      for(const attr of [...node.attributes])if(!incoming.hasAttribute(attr.name)&&!(node.tagName==='DETAILS'&&attr.name==='open'))node.removeAttribute(attr.name);
      for(const attr of incoming.attributes)if(!(node.tagName==='DETAILS'&&attr.name==='open')&&node.getAttribute(attr.name)!==attr.value)node.setAttribute(attr.name,attr.value);
      node.onclick=incoming.onclick;
@@ -54,7 +60,8 @@
    }
    position=node.nextSibling;
   }
-  while(position){const next=position.nextSibling;position.remove();position=next;}
+  while(position){const next=position.nextSibling;if(!auxiliary(position))position.remove();position=next;}
+  if(parent.matches?.('table[data-console-table]'))window.TableUI?.refresh(parent);
   if(owned&&focused.isConnected&&document.activeElement!==focused)focused.focus({preventScroll:true});
  }
  window.GatewayAutoUpdate={watch,reconcile};

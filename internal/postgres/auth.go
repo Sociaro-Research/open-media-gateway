@@ -46,7 +46,7 @@ func (r *AuthRepository) upsertGoogleUser(ctx context.Context, subject, email, n
 			picture_url = COALESCE($4, picture_url),
 			updated_at = NOW()
 		WHERE google_subject = $1
-		RETURNING id, email, display_name, COALESCE(picture_url, ''), theme, report_columns, color_preset, contacts`,
+		RETURNING id, email, display_name, COALESCE(picture_url, ''), theme, report_columns, color_preset, contacts, table_columns, table_wide`,
 		subject, email, name, nullableString(picture),
 	))
 	if errors.Is(err, sql.ErrNoRows) {
@@ -59,7 +59,7 @@ func (r *AuthRepository) upsertGoogleUser(ctx context.Context, subject, email, n
 			ON CONFLICT (LOWER(email)) DO UPDATE SET
 				google_subject = EXCLUDED.google_subject, updated_at = NOW()
 			WHERE (users.google_subject IS NULL AND $6) OR users.google_subject = EXCLUDED.google_subject
-			RETURNING id, email, display_name, COALESCE(picture_url, ''), theme, report_columns, color_preset, contacts`,
+			RETURNING id, email, display_name, COALESCE(picture_url, ''), theme, report_columns, color_preset, contacts, table_columns, table_wide`,
 			uuid.NewString(), subject, email, name, nullableString(picture), allowEmailLink,
 		))
 	}
@@ -93,7 +93,7 @@ func (r *AuthRepository) CreateSession(ctx context.Context, tokenHash []byte, us
 
 func (r *AuthRepository) UserBySession(ctx context.Context, tokenHash []byte, now time.Time) (identity.User, error) {
 	user, err := scanProfile(r.db.QueryRowContext(ctx, `
-		SELECT u.id, u.email, u.display_name, COALESCE(u.picture_url, ''), u.theme, u.report_columns, u.color_preset, u.contacts
+		SELECT u.id, u.email, u.display_name, COALESCE(u.picture_url, ''), u.theme, u.report_columns, u.color_preset, u.contacts, u.table_columns, u.table_wide
 		FROM user_sessions s
 		JOIN users u ON u.id = s.user_id
 		WHERE s.token_hash = $1 AND s.expires_at > $2`, tokenHash, now,

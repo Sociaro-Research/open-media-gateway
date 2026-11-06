@@ -12,7 +12,7 @@
    history.replaceChildren();
    if(!items.length){history.append(node('p','Create a company and invite its first Supermanager.','field-explanation'));return;}
    const wrap=node('div',null,'docs-table-wrap'),table=node('table',null,'docs-table'),head=node('thead'),headRow=node('tr'),body=node('tbody');
-   table.style.minWidth='760px';for(const label of ['Company','First Supermanager','Invitation','Expires','']){const th=node('th',label);th.scope='col';headRow.append(th);}head.append(headRow);table.append(head,body);wrap.append(table);history.append(wrap);
+   table.style.minWidth='760px';for(const label of ['Company','First Supermanager','Invitation','Expires','']){const th=node('th',label);th.scope='col';headRow.append(th);}head.append(headRow);table.append(head,body);window.TableUI?.attach(table,{id:'company_invitations',columns:['company','first_supermanager','invitation','expires','actions']});wrap.append(table);history.append(wrap);
    for(const c of items){
     const row=node('tr'),buttons=node('td',null,'table-row-actions');
     for(const value of [c.name,UserUI.identity({email:c.email,name:c.contact_name},{label:c.email}),labels[c.status]||c.status,new Date(c.expires_at).toLocaleString()]){const cell=node('td');cell.append(value instanceof Node?value:document.createTextNode(value));row.append(cell);}

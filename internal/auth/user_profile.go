@@ -15,11 +15,13 @@ import (
 var ErrInvalidProfile = errors.New("invalid profile")
 
 type ProfileUpdate struct {
-	Contacts      *[]identity.Contact `json:"contacts"`
-	Name          *string             `json:"name"`
-	Theme         *string             `json:"theme"`
-	ColorPreset   *string             `json:"color_preset"`
-	ReportColumns *[]string           `json:"report_columns"`
+	Contacts      *[]identity.Contact  `json:"contacts"`
+	Name          *string              `json:"name"`
+	Theme         *string              `json:"theme"`
+	ColorPreset   *string              `json:"color_preset"`
+	ReportColumns *[]string            `json:"report_columns"`
+	TableColumns  *map[string][]string `json:"table_columns"`
+	TableWide     *map[string]*bool    `json:"table_wide"`
 }
 
 type ProfileRepository interface {
@@ -27,8 +29,11 @@ type ProfileRepository interface {
 }
 
 func (m *Manager) UpdateProfile(ctx context.Context, id string, in ProfileUpdate) (identity.User, error) {
-	if in.Name == nil && in.Theme == nil && in.ReportColumns == nil && in.ColorPreset == nil && in.Contacts == nil {
-		return identity.User{}, invalidProfile("body", "provide at least one of name, theme, color_preset, report_columns or contacts")
+	if in.Name == nil && in.Theme == nil && in.ReportColumns == nil && in.ColorPreset == nil && in.Contacts == nil && in.TableColumns == nil && in.TableWide == nil {
+		return identity.User{}, invalidProfile("body", "provide at least one supported profile field: name, theme, color_preset, report_columns, table_columns, table_wide or contacts")
+	}
+	if err := validateTablePreferences(in); err != nil {
+		return identity.User{}, err
 	}
 	if in.Name != nil {
 		name := strings.TrimSpace(*in.Name)

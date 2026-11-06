@@ -73,33 +73,14 @@
       {id:'settlement',label:'Settlement',available:systemAdministrator,value:item=>settlement(item.cost)},
       {id:'customer_charge',label:'Customer charge',available:systemAdministrator,value:item=>usd(item.consumed_usd)}
     ].filter(column=>column.available!==false);
-    const columnPicker=content.querySelector('#reportColumns'),columnStatus=content.querySelector('[data-columns-status]'),columnCell=content.querySelector('.report-columns-cell');
-    // Keep the existing API-key preference ID; old separate User selections now
-    // select the combined identity rather than silently losing that information.
-    let savedColumns=window.GatewayProfile?.reportColumns()||null,rows=[];
-    if(savedColumns?.includes('user'))savedColumns=[...new Set(savedColumns.map(id=>id==='user'?'api_key':id))];
-    function visibleColumns(){return columns.filter(column=>columnPicker.querySelector(`option[value="${column.id}"]`).selected);}
+    const columnCell=content.querySelector('.report-columns-cell');
+    let rows=[];
     function renderRows(){
       if(usage)return;
-      const visible=visibleColumns();body.closest('table').style.minWidth=(visible.reduce((width,column)=>width+({generation_id:300,user:240,date:170,settlement:220}[column.id]||130),52))+'px';content.querySelector('thead tr').replaceChildren(...visible.map(column=>node('th',column.label)),columnCell);body.replaceChildren();
+      const visible=columns;content.querySelector('thead tr').replaceChildren(...visible.map(column=>node('th',column.label)),columnCell);body.replaceChildren();
       for(const item of rows){const tr=node('tr');tr.classList.add('interactive-row');tr.tabIndex=0;tr.setAttribute('aria-label','Open request '+item.id);tr.setAttribute('aria-haspopup','dialog');const openDetails=trigger=>{if(currentMount())ReportDetails.open(endpoint.split('?')[0]+'/'+encodeURIComponent(item.id),trigger||tr,{api,current:()=>currentMount(),onDeleted:()=>load(true)});};tr.onclick=e=>{if(!e.target.closest('button,a,input,select,textarea,summary'))openDetails();};tr.onkeydown=e=>{if(e.target===tr&&(e.key==='Enter'||e.key===' ')){e.preventDefault();openDetails();}};for(const column of visible){const value=column.value(item),td=node('td');td.dataset.column=column.id;if(column.id==='status'||['estimated_cost','cost','confirmed_cost','customer_charge'].includes(column.id))td.classList.add('report-value');if(column.id==='status'&&item.status==='failed')td.classList.add('operation-error');td.append(value instanceof Node?value:document.createTextNode(value??'—'));tr.append(td);}const actions=node('td',undefined,'table-row-actions'),details=node('button','Details','secondary');details.type='button';details.setAttribute('aria-haspopup','dialog');details.onclick=()=>openDetails(details);actions.append(details);tr.append(actions);body.append(tr);}
     }
-    if(!usage){
-      const availableSaved=columns.some(column=>savedColumns?.includes(column.id));
-      for(const column of columns){const option=node('option',column.label);option.value=column.id;option.selected=availableSaved?savedColumns.includes(column.id):!!column.base;columnPicker.append(option);}
-      let confirmed=[...columnPicker.selectedOptions].map(option=>option.value);
-      columnPicker.onchange=async()=>{
-        const selected=[...columnPicker.selectedOptions].map(option=>option.value);
-        if(!selected.length){for(const option of columnPicker.options)option.selected=confirmed.includes(option.value);ControlPickers.sync(columnPicker);FormUI.message(columnStatus,'Keep at least one column visible.','error');return;}
-        // Preserve preferences for columns that are unavailable in this scope.
-        const next=[...(savedColumns||[]).filter(id=>!columns.some(column=>column.id===id)),...selected];
-        columnPicker.disabled=true;ControlPickers.sync(columnPicker);FormUI.message(columnStatus,'Saving columns…');
-        try{const result=await api('/v1/me',{method:'PATCH',body:JSON.stringify({report_columns:next})});if(!currentMount())return;window.GatewayProfile.identify({report_columns:result.report_columns});savedColumns=result.report_columns;confirmed=selected;if(currentMount()){renderRows();FormUI.message(columnStatus,'');}}
-        catch(error){if(currentMount()){for(const option of columnPicker.options)option.selected=confirmed.includes(option.value);FormUI.message(columnStatus,error.message,'error');}}
-        finally{columnPicker.disabled=false;ControlPickers.sync(columnPicker);}
-      };
-      ControlPickers.enhance(columnPicker,{trigger:columnCell.querySelector('button')});FormUI.refresh();renderRows();
-    }
+    if(!usage){renderRows();window.TableUI?.attach(body.closest('table'),{id:'requests',columns:[...columns.map(c=>c.id),'actions'],defaults:columns.filter(c=>c.base).map(c=>c.id),legacy:true,minWidths:{generation_id:300,user:240,date:170,settlement:220},api,status:content.querySelector('[data-columns-status]')});FormUI.refresh();}
     const endpoint=scope?.personal?'/v1/admin/reports?':!organizationID&&shared?'/v1/system/reports?':'/v1/organizations/'+organizationID+'/reports?';
     if(!usage)download.onclick=async()=>{if(!applied)return;download.disabled=true;FormUI.message(status,'Preparing CSV…');try{const query=new URLSearchParams(applied);query.set('format','csv');query.delete('offset');query.delete('limit');const blob=await api(endpoint+query,{responseType:'blob'});if(!currentMount())return;const url=URL.createObjectURL(blob),link=node('a');link.href=url;link.download='requests.csv';link.click();FormUI.message(status,'');setTimeout(()=>URL.revokeObjectURL(url),1000);}catch(e){if(currentMount())FormUI.message(status,e.message,'error');}finally{if(currentMount())download.disabled=false;}};
     async function load(paging=false) {

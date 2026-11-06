@@ -26,7 +26,7 @@
  }
  function close(restore=false){clearTimeout(timer);if(!active)return;const {panel,button}=active;active=null;panel.remove();button.setAttribute('aria-expanded','false');button.removeAttribute('aria-describedby');if(restore&&button.isConnected)button.focus();}
  function position(){if(!active)return;const {panel,button}=active,r=button.getBoundingClientRect();panel.style.maxHeight=Math.max(120,Math.min(560,innerHeight-24))+'px';const b=panel.getBoundingClientRect();const right=r.right+10;panel.style.left=Math.max(12,Math.min(right+b.width<innerWidth-12?right:r.left-b.width-10,innerWidth-b.width-12))+'px';panel.style.top=Math.max(12,Math.min(r.top,innerHeight-b.height-12))+'px';}
- function contains(target){return !!active&&(active.panel.contains(target)||active.button.contains(target));}
+ function contains(target){return !!active&&(active.panel.contains(target)||active.button.contains(target)||window.ControlPickers?.contains(target,active.panel));}
  function open(button,model,pinned=false){
   clearTimeout(timer);
   if(active?.button===button){if(pinned)active.pinned=true;return;}
@@ -83,8 +83,8 @@
   b.onkeydown=e=>{e.stopPropagation();if(e.key==='ArrowRight'||e.key==='F2'){e.preventDefault();open(b,model,true);active.panel.querySelector('button').focus();}};
   return b;
  }
- document.addEventListener('keydown',e=>{if(active&&e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();close(true);}},true);
+ document.addEventListener('keydown',e=>{if(active&&e.key==='Escape'){if(window.ControlPickers?.dismissNested?.(active.panel)){e.preventDefault();e.stopImmediatePropagation();return;}e.preventDefault();e.stopImmediatePropagation();close(true);}},true);
  document.addEventListener('pointerdown',e=>{if(active&&!contains(e.target))close();},true);
  window.addEventListener('resize',position);document.addEventListener('scroll',e=>{if(active&&!active.panel.contains(e.target))position();},true);
- window.ModelInfo={nearestResolution,button,informationButton,close,contains,durationLabel,compare:(a,b)=>{const d=m=>[m.metadata?.release_date||'',m.metadata?.version_date||''].sort().at(-1);return d(b).localeCompare(d(a))||a.display_name.localeCompare(b.display_name);}};
+ window.ModelInfo={closeWithin(scope){if(active&&scope.contains(active.button))close();},reposition:position,nearestResolution,button,informationButton,close,contains,durationLabel,compare:(a,b)=>{const d=m=>[m.metadata?.release_date||'',m.metadata?.version_date||''].sort().at(-1);return d(b).localeCompare(d(a))||a.display_name.localeCompare(b.display_name);}};
 })();

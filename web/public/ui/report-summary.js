@@ -80,7 +80,7 @@
    const wrap=el('div',null,'docs-table-wrap'),table=el('table',null,'docs-table'),head=el('thead'),tr=el('tr'),body=el('tbody');
    for(const text of ['Provider','Spend','Successful','Failed','Tokens']){const th=el('th',text);th.scope='col';tr.append(th);}head.append(tr);
    rows.forEach((row,i)=>{const tr=el('tr'),name=el('td'),dot=el('span',null,'report-provider-dot');dot.style.background=colors[i%colors.length];name.append(dot,document.createTextNode(row.name||'Unknown'));tr.append(name,el('td',row.priced_requests?usd(row.spend_usd):'Pending'),el('td',number(row.successful),'report-success'),el('td',number(row.failed),row.failed?'operation-error':''),el('td',row.token_requests?number(row.tokens):'—'));body.append(tr);});
-   table.append(head,body);wrap.append(table);providerContent.append(donut,wrap);
+   table.append(head,body);window.TableUI?.attach(table,{id:'usage_providers',columns:['provider','spend','successful','failed','tokens']});wrap.append(table);providerContent.append(donut,wrap);
   }
   async function load(nextEndpoint,nextQuery,force=false){
    endpoint=nextEndpoint;query=new URLSearchParams(nextQuery);query.delete('offset');query.delete('limit');query.delete('format');query.set('view','summary');query.set('interval',interval);

@@ -16,7 +16,7 @@
    const scroll=el('div',null,'model-access-scroll'),table=el('table',null,'docs-table model-access-table'),head=el('thead'),header=el('tr'),body=el('tbody');
    table.setAttribute('aria-label','Provider model settings');scroll.tabIndex=0;scroll.setAttribute('role','region');scroll.setAttribute('aria-label','Provider model settings table');
    for(const text of ['Model','Public API name','Available by default','']){const th=el('th',text);th.scope='col';header.append(th)}
-   head.append(header);table.append(head,body);scroll.append(table);parent.append(scroll);
+   head.append(header);table.append(head,body);window.TableUI?.attach(table,{id:'provider_models',columns:['model','public_api_name','available_by_default','actions'],api});scroll.append(table);parent.append(scroll);
    const labels=new Map(ModelPicker.uniqueCatalog([{id:provider.id,name:provider.name,models:models.map(m=>({id:m.model,display_name:m.name||m.model}))}])[0].models.map(m=>[m.id,m.display_name]));
    const rows=[];
    for(let model of models) {

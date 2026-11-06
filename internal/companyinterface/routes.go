@@ -328,7 +328,7 @@ func validateCustomerBody(c Contract, raw []byte, company string) error {
 		}
 		for name := range in {
 			switch name {
-			case "name", "theme", "color_preset", "contacts", "report_columns":
+			case "name", "theme", "color_preset", "contacts", "report_columns", "table_columns", "table_wide":
 			default:
 				return ErrDenied
 			}

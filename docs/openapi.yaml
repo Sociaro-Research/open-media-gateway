@@ -6659,8 +6659,8 @@ paths:
       - sessionAuth: []
       operationId: update_profile
       tags: [Account]
-      summary: Update your display name, appearance, contact links or report columns
-      description: Requires your browser session. API keys cannot update profiles. Contact links are optional and visible to authorized company-member viewers, including the assigned client manager. An empty contacts array removes all links; omission preserves them. Labels and links are trimmed. Custom names, contacts and report columns survive subsequent sign-ins. Report columns are shared across your report views; unavailable columns are hidden for the current role and scope.
+      summary: Update your display name, appearance, contact links or table preferences
+      description: Requires your browser session. API keys cannot update profiles. Contact links are optional and visible to authorized company-member viewers, including the assigned client manager. An empty contacts array removes all links; omission preserves them. Labels and links are trimmed. Custom names, contacts and report columns survive subsequent sign-ins. Requests columns remain authoritative in report_columns and are shared across report views; unavailable selections survive scope changes. Other tables use stable table_columns IDs with arrays of column IDs. Each PATCH merges only supplied table entries atomically; a null table_columns entry restores that table's default columns, and an empty array is invalid. table_wide uses true for viewport width and false for normal width. The two preference maps are independent; omission or whole-field null preserves them. A non-null empty object is invalid. Concurrent edits of different tables and unrelated profile fields do not overwrite one another. API body limit remains 8192 bytes; send bounded partial updates.
       requestBody:
         required: true
         content:
@@ -6674,6 +6674,8 @@ paths:
                 theme: {type: string, enum: [dark, light, system], default: system}
                 color_preset: {type: string, maxLength: 64, description: Published color theme ID. Empty follows the site default; independent of dark/light/system mode.}
                 report_columns: {$ref: "#/components/schemas/ReportColumns"}
+                table_columns: {$ref: "#/components/schemas/TableColumns"}
+                table_wide: {$ref: "#/components/schemas/TableWide"}
                 contacts: {$ref: "#/components/schemas/ContactLinks"}
       responses:
         '200':
@@ -11501,6 +11503,65 @@ components:
         properties:
           label: {type: string, minLength: 1, maxLength: 80}
           url: {type: string, maxLength: 2048, description: Absolute HTTP(S), mailto or tel link, limited to 2048 UTF-8 bytes.}
+    TableColumns:
+      type: object
+      nullable: true
+      minProperties: 1
+      maxProperties: 21
+      additionalProperties: false
+      description: Per-profile table column overrides. PATCH merges supplied entries; null table entry restores defaults. Requests uses report_columns instead. Omitted selections remain stored independently of current role/scope.
+      properties:
+        organizations: {type: array, nullable: true, minItems: 1, maxItems: 4, uniqueItems: true, items: {type: string, enum: [organization, balance, credit_limit, shared_storage]}}
+        client_companies: {type: array, nullable: true, minItems: 1, maxItems: 6, uniqueItems: true, items: {type: string, enum: [organization, balance, spend, last_activity, credit_limit, shared_storage]}}
+        organization_members: {type: array, nullable: true, minItems: 1, maxItems: 5, uniqueItems: true, items: {type: string, enum: [member, role, this_week, total_consumption, weekly_limit]}}
+        organization_invitations: {type: array, nullable: true, minItems: 1, maxItems: 4, uniqueItems: true, items: {type: string, enum: [role, expires, status, accepted_by]}}
+        catalog_sources: {type: array, nullable: true, minItems: 1, maxItems: 3, uniqueItems: true, items: {type: string, enum: [source, url, parser]}}
+        catalog_runs: {type: array, nullable: true, minItems: 1, maxItems: 7, uniqueItems: true, items: {type: string, enum: [checked, provider, result, version, changes, open_warnings, email]}}
+        catalog_warnings: {type: array, nullable: true, minItems: 1, maxItems: 5, uniqueItems: true, items: {type: string, enum: [model_source, issue, first_seen, last_seen, checks]}}
+        audit_events: {type: array, nullable: true, minItems: 1, maxItems: 6, uniqueItems: true, items: {type: string, enum: [time, actor, organization, action, object, result]}}
+        audit_revoked_keys: {type: array, nullable: true, minItems: 1, maxItems: 6, uniqueItems: true, items: {type: string, enum: [revoked, key, organization, owner, revoked_by, spend_at_revocation]}}
+        payment_ledger: {type: array, nullable: true, minItems: 1, maxItems: 6, uniqueItems: true, items: {type: string, enum: [date, description, payment, fee, balance_change, status]}}
+        personal_keys: {type: array, nullable: true, minItems: 1, maxItems: 5, uniqueItems: true, items: {type: string, enum: [key, spending, permissions, activity, status]}}
+        organization_keys: {type: array, nullable: true, minItems: 1, maxItems: 7, uniqueItems: true, items: {type: string, enum: [key, user, issued_by, spending, permissions, activity, status]}}
+        provider_models: {type: array, nullable: true, minItems: 1, maxItems: 3, uniqueItems: true, items: {type: string, enum: [model, public_api_name, available_by_default]}}
+        usage_providers: {type: array, nullable: true, minItems: 1, maxItems: 5, uniqueItems: true, items: {type: string, enum: [provider, spend, successful, failed, tokens]}}
+        company_invitations: {type: array, nullable: true, minItems: 1, maxItems: 4, uniqueItems: true, items: {type: string, enum: [company, first_supermanager, invitation, expires]}}
+        receiving_wallets: {type: array, nullable: true, minItems: 1, maxItems: 3, uniqueItems: true, items: {type: string, enum: [network, receiving_address, tokens]}}
+        payment_requests: {type: array, nullable: true, minItems: 1, maxItems: 4, uniqueItems: true, items: {type: string, enum: [date, method, amount, status]}}
+        provider_headers: {type: array, nullable: true, minItems: 1, maxItems: 3, uniqueItems: true, items: {type: string, enum: [header, value, operation]}}
+        provider_manual_models: {type: array, nullable: true, minItems: 1, maxItems: 3, uniqueItems: true, items: {type: string, enum: [model, api_profile, price_per_request]}}
+        vat_rules: {type: array, nullable: true, minItems: 1, maxItems: 4, uniqueItems: true, items: {type: string, enum: [buyer_location, buyer_vat_status, vat_treatment, rate]}}
+        organization_roles: {type: array, nullable: true, minItems: 1, maxItems: 6, uniqueItems: true, items: {type: string, enum: [function, supermanager, manager, content_officer, developer, member]}}
+    TableWide:
+      type: object
+      nullable: true
+      minProperties: 1
+      maxProperties: 22
+      additionalProperties: false
+      description: Per-profile table width overrides. PATCH merges supplied entries; true expands to available viewport width, false restores normal content width. Does not invoke browser fullscreen or alter vertical document scrolling.
+      properties:
+        requests: {type: boolean}
+        organizations: {type: boolean}
+        client_companies: {type: boolean}
+        organization_members: {type: boolean}
+        organization_invitations: {type: boolean}
+        catalog_sources: {type: boolean}
+        catalog_runs: {type: boolean}
+        catalog_warnings: {type: boolean}
+        audit_events: {type: boolean}
+        audit_revoked_keys: {type: boolean}
+        payment_ledger: {type: boolean}
+        personal_keys: {type: boolean}
+        organization_keys: {type: boolean}
+        provider_models: {type: boolean}
+        usage_providers: {type: boolean}
+        company_invitations: {type: boolean}
+        receiving_wallets: {type: boolean}
+        payment_requests: {type: boolean}
+        provider_headers: {type: boolean}
+        provider_manual_models: {type: boolean}
+        vat_rules: {type: boolean}
+        organization_roles: {type: boolean}
     User:
       type: object
       required:
@@ -11511,6 +11572,8 @@ components:
         theme: {type: string, enum: [dark, light, system], default: system}
         color_preset: {type: string, maxLength: 64, description: Personal color theme ID. Empty follows the site default; unavailable IDs render the site default.}
         report_columns: {$ref: "#/components/schemas/ReportColumns"}
+        table_columns: {$ref: "#/components/schemas/TableColumns"}
+        table_wide: {$ref: "#/components/schemas/TableWide"}
         contacts: {$ref: "#/components/schemas/ContactLinks"}
         is_client_manager: {type: boolean, description: "Sales-account restriction shared by all three sales ranks."}
         sales_role: {$ref: "#/components/schemas/SalesRole"}

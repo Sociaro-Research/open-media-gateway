@@ -1,7 +1,7 @@
 const {evidencePath} = require('./evidence.cjs');
 // Isolated report dashboard checks; no production or provider requests.
 const {chromium}=require('playwright'),http=require('node:http'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
-const root=path.resolve(__dirname,'../../web/public/ui');
+const root=process.env.UI_SOURCE_DIR||path.resolve(__dirname,'../../web/public/ui');
 const server=http.createServer((req,res)=>{const filename=path.basename(req.url.split('?')[0]);const file=path.join(root,filename.includes('.')?filename:'index.html');if(!fs.existsSync(file))return res.writeHead(404).end();res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':file.endsWith('.svg')?'image/svg+xml':'text/html');res.end(fs.readFileSync(file));});
 (async()=>{
  await new Promise(r=>server.listen(0,'127.0.0.1',r));const browser=await chromium.launch({headless:true,executablePath:process.env.UI_BROWSER_PATH}),page=await browser.newPage({viewport:{width:1440,height:1100}});page.setDefaultTimeout(8000);

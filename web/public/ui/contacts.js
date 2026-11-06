@@ -83,10 +83,11 @@
   FormUI.watch(form,save,{read:()=>JSON.stringify(values())});refresh();
   form.onsubmit=async event=>{
    event.preventDefault();if(busy||save.disabled||!form.reportValidity())return;
+   const profile=window.GatewayProfile,captured=profile?.context?.(),active=()=>!captured||profile.sameContext(captured);
    const snapshot=FormUI.snapshot(form),contacts=values().map(c=>({label:c.label.trim(),url:contactURL(c.url.trim())}));busy=true;save.disabled=true;FormUI.message(status,'');for(const control of form.elements)control.disabled=true;
-   try{const result=await api('/v1/me',{method:'PATCH',body:JSON.stringify({contacts})});saveUser({contacts:result.contacts||[]});FormUI.saved(form,snapshot);}
-   catch(error){FormUI.message(status,error.message,'error');}
-   finally{busy=false;for(const control of form.elements)control.disabled=false;refresh();}
+   try{const result=await (profile?.save?profile.save({contacts}):api('/v1/me',{method:'PATCH',body:JSON.stringify({contacts})}));if(!active())return;if(!profile?.save)saveUser({contacts:result.contacts||[]});FormUI.saved(form,snapshot);}
+   catch(error){if(active())FormUI.message(status,error.message,'error');}
+   finally{if(active()){busy=false;for(const control of form.elements)control.disabled=false;refresh();}}
   };
  }
  async function support(parent,api,organization,current){

@@ -24,10 +24,51 @@ func (f *profileAuthFixture) UpdateProfile(_ context.Context, id string, in auth
 	if in.ReportColumns != nil {
 		user.ReportColumns = *in.ReportColumns
 	}
+	if in.TableColumns != nil {
+		user.TableColumns = *in.TableColumns
+	}
+	if in.TableWide != nil {
+		user.TableWide = map[string]bool{}
+		for id, wide := range *in.TableWide {
+			if wide != nil {
+				user.TableWide[id] = *wide
+			}
+		}
+	}
 	if in.ColorPreset != nil {
 		user.ColorPreset = *in.ColorPreset
 	}
 	return user, nil
+}
+
+func TestTablePreferenceOwnBrowserAndBoundedBody(t *testing.T) {
+	s, _ := newPersonalTestServer()
+	fixture := &profileAuthFixture{}
+	s.auth = fixture
+	h := s.handler()
+	body := `{"table_columns":{"organizations":["organization","balance"]},"table_wide":{"organizations":true,"requests":false}}`
+	for _, actor := range []string{"alice", "bob"} {
+		w := sendTest(h, "PATCH", "/v1/me", body, actor, "")
+		if w.Code != 200 || !strings.Contains(w.Body.String(), `"table_columns":{"organizations":["organization","balance"]}`) || !strings.Contains(w.Body.String(), `"organizations":true`) {
+			t.Fatal(w.Code, w.Body)
+		}
+	}
+	if len(fixture.ids) != 2 || fixture.ids[0] != "alice" || fixture.ids[1] != "bob" {
+		t.Fatal("profile owner changed", fixture.ids)
+	}
+	_, key := issueTestKey(t, h, "alice", `{"name":"Profile isolation","scopes":["generation"]}`)
+	if w := sendTest(h, "PATCH", "/v1/me", body, "alice", key); w.Code != 403 {
+		t.Fatal("bearer+cookie profile write", w.Code, w.Body)
+	}
+	if w := sendTest(h, "PATCH", "/v1/me", body, "", ""); w.Code != 401 {
+		t.Fatal("anonymous profile write", w.Code)
+	}
+	if w := sendTest(h, "PATCH", "/v1/me", strings.Repeat(" ", 8192)+body, "alice", ""); w.Code != 400 || !strings.Contains(w.Body.String(), "8192 bytes") {
+		t.Fatal("profile body bound changed", w.Code, w.Body)
+	}
+	if len(fixture.ids) != 2 {
+		t.Fatal("denied request mutated profile", fixture.ids)
+	}
 }
 
 func TestProfileColorThemesMustExist(t *testing.T) {
