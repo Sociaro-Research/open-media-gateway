@@ -24,8 +24,8 @@ payment reconciliation details, including in list responses.
 | --- | --- |
 | Installation | System settings, markups, request limits, branding, email delivery, login methods, payment providers and notifications. |
 | People | Account creation, profile changes, global roles and completed password setup/reset as a fact. |
-| Organizations | Creation, settings, logging policy, membership/limits, invitations, model grants, Client manager assignments, storage, credits and payment reconciliation. |
-| Providers/models | Connection creation/configuration/availability/archive and public model names/default availability. Encrypted connection/storage configuration records a change indicator, not its contents. |
+| Organizations | Creation, settings, logging policy, membership/limits, invitations, model grants, Client manager assignments, storage, credits, payment reconciliation and company-project creation/rename/deletion. Project events contain names and versions, not generation content or task assignments; personal project labels are excluded. |
+| Providers/models | Connection creation/configuration/availability/archive, logo addition/replacement/removal and public model names/default availability. Logo history records presence and byte count, never artwork. Encrypted connection/storage configuration records a change indicator, not its contents. |
 | Keys | Creation and explicit or cascaded revocation, identifying recipient and issuer separately. |
 
 Successful mutations and their events commit in one database transaction. If

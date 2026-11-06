@@ -78,11 +78,15 @@ func auditTarget(details any, fallback string) string {
 	return fallback
 }
 func appendAudit(ctx context.Context, tx *sql.Tx, org, actor, action, kind, target string, details any) error {
+	return appendNamedAudit(ctx, tx, org, actor, action, kind, target, "", details)
+}
+
+func appendNamedAudit(ctx context.Context, tx *sql.Tx, org, actor, action, kind, target, label string, details any) error {
 	data, err := json.Marshal(details)
 	if err != nil {
 		return err
 	}
-	_, err = tx.ExecContext(ctx, `SELECT audit_record($1,$2,$3,$4,$5,'',$6::jsonb)`, org, actor, action, kind, target, data)
+	_, err = tx.ExecContext(ctx, `SELECT audit_record($1,$2,$3,$4,$5,$6,$7::jsonb)`, org, actor, action, kind, target, label, data)
 	return err
 }
 

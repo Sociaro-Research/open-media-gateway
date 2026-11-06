@@ -53,7 +53,7 @@ func (r *TaskRepository) CreateProject(ctx context.Context, name string) (core.P
 	if err = projectWrite(ctx); err != nil {
 		return core.Project{}, err
 	}
-	tx, err := r.db.BeginTx(ctx, nil)
+	tx, err := beginAuditTx(ctx, r.db)
 	if err != nil {
 		return core.Project{}, err
 	}
@@ -67,11 +67,17 @@ func (r *TaskRepository) CreateProject(ctx context.Context, name string) (core.P
 	var p core.Project
 	// Preserve legacy duplicate IDs/names; name retries choose the oldest one.
 	err = tx.QueryRowContext(ctx, `SELECT id,name,created_at,version FROM generation_projects WHERE `+projectScope+` AND lower(name)=lower($4) ORDER BY created_at,id LIMIT 1`, identity.OwnerID(ctx), identity.ActorID(ctx), projectCompany(ctx), name).Scan(&p.ID, &p.Name, &p.CreatedAt, &p.Version)
-	if errors.Is(err, sql.ErrNoRows) {
+	created := errors.Is(err, sql.ErrNoRows)
+	if created {
 		err = tx.QueryRowContext(ctx, `INSERT INTO generation_projects(id,owner_id,actor_id,name) VALUES($1,$2,$3,$4) RETURNING id,name,created_at,version`, uuid.NewString(), identity.OwnerID(ctx), identity.ActorID(ctx), name).Scan(&p.ID, &p.Name, &p.CreatedAt, &p.Version)
 	}
 	if err != nil {
 		return p, projectWriteError(err)
+	}
+	if created {
+		if err = projectAudit(ctx, tx, "project_created", nil, &p); err != nil {
+			return core.Project{}, err
+		}
 	}
 	return p, tx.Commit()
 }
@@ -120,32 +126,32 @@ func projectWriteError(err error) error {
 	}
 	return err
 }
-func lockProject(ctx context.Context, tx *sql.Tx, id string, version int64) error {
+func lockProject(ctx context.Context, tx *sql.Tx, id string, version int64) (core.Project, error) {
 	if err := projectWrite(ctx); err != nil {
-		return err
+		return core.Project{}, err
 	}
 	if _, err := uuid.Parse(id); err != nil || version < 1 {
-		return core.ErrProjectInvalid
+		return core.Project{}, core.ErrProjectInvalid
 	}
-	var current int64
-	err := tx.QueryRowContext(ctx, `SELECT version FROM generation_projects WHERE `+projectScope+` AND id=$4 FOR UPDATE`, identity.OwnerID(ctx), identity.ActorID(ctx), projectCompany(ctx), id).Scan(&current)
+	var current core.Project
+	err := tx.QueryRowContext(ctx, `SELECT id,name,created_at,version FROM generation_projects WHERE `+projectScope+` AND id=$4 FOR UPDATE`, identity.OwnerID(ctx), identity.ActorID(ctx), projectCompany(ctx), id).Scan(&current.ID, &current.Name, &current.CreatedAt, &current.Version)
 	if errors.Is(err, sql.ErrNoRows) {
-		return core.ErrProjectInvalid
+		return core.Project{}, core.ErrProjectInvalid
 	}
 	if err != nil {
-		return err
+		return core.Project{}, err
 	}
-	if current != version {
-		return core.ErrProjectConflict
+	if current.Version != version {
+		return core.Project{}, core.ErrProjectConflict
 	}
-	return nil
+	return current, nil
 }
 func (r *TaskRepository) RenameProject(ctx context.Context, id, name string, version int64) (core.Project, error) {
 	name, err := core.ProjectName(name)
 	if err != nil {
 		return core.Project{}, err
 	}
-	tx, err := r.db.BeginTx(ctx, nil)
+	tx, err := beginAuditTx(ctx, r.db)
 	if err != nil {
 		return core.Project{}, err
 	}
@@ -153,7 +159,8 @@ func (r *TaskRepository) RenameProject(ctx context.Context, id, name string, ver
 	if err = guardCompanyMutation(ctx, tx, identity.OrganizationFromContext(ctx).ID); err != nil {
 		return core.Project{}, err
 	}
-	if err = lockProject(ctx, tx, id, version); err != nil {
+	before, err := lockProject(ctx, tx, id, version)
+	if err != nil {
 		return core.Project{}, err
 	}
 	if err = lockProjectName(ctx, tx, name); err != nil {
@@ -172,13 +179,20 @@ func (r *TaskRepository) RenameProject(ctx context.Context, id, name string, ver
 	if err != nil {
 		return core.Project{}, projectWriteError(err)
 	}
+	// Retain the existing version increment for an unchanged rename, without
+	// inventing a name-change event for that retry.
+	if before.Name != p.Name {
+		if err = projectAudit(ctx, tx, "project_renamed", &before, &p); err != nil {
+			return core.Project{}, err
+		}
+	}
 	if err = tx.Commit(); err != nil {
 		return core.Project{}, err
 	}
 	return p, nil
 }
 func (r *TaskRepository) DeleteProject(ctx context.Context, id string, version int64) error {
-	tx, err := r.db.BeginTx(ctx, nil)
+	tx, err := beginAuditTx(ctx, r.db)
 	if err != nil {
 		return err
 	}
@@ -186,7 +200,8 @@ func (r *TaskRepository) DeleteProject(ctx context.Context, id string, version i
 	if err = guardCompanyMutation(ctx, tx, identity.OrganizationFromContext(ctx).ID); err != nil {
 		return err
 	}
-	if err = lockProject(ctx, tx, id, version); err != nil {
+	before, err := lockProject(ctx, tx, id, version)
+	if err != nil {
 		return err
 	}
 	// Lock order is project, then tasks, matching assignment and admission. This
@@ -197,7 +212,37 @@ func (r *TaskRepository) DeleteProject(ctx context.Context, id string, version i
 	if _, err = tx.ExecContext(ctx, `DELETE FROM generation_projects WHERE id=$1`, id); err != nil {
 		return err
 	}
+	if err = projectAudit(ctx, tx, "project_deleted", &before, nil); err != nil {
+		return err
+	}
 	return tx.Commit()
+}
+
+// Only shared company grouping metadata belongs in the company audit. Personal
+// project labels and the content/assignment of individual generations do not.
+func projectAudit(ctx context.Context, tx *sql.Tx, action string, before, after *core.Project) error {
+	if !projectCompany(ctx) {
+		return nil
+	}
+	var company bool
+	if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM organizations WHERE id=$1)`, identity.OwnerID(ctx)).Scan(&company); err != nil {
+		return err
+	}
+	if !company {
+		return nil
+	}
+	projected := func(p *core.Project) any {
+		if p == nil {
+			return nil
+		}
+		return map[string]any{"name": p.Name, "version": p.Version}
+	}
+	label := after
+	if label == nil {
+		label = before
+	}
+	return appendNamedAudit(ctx, tx, identity.OwnerID(ctx), "", action, "project", label.ID, label.Name,
+		map[string]any{"before": projected(before), "after": projected(after)})
 }
 func (r *TaskRepository) AssignTaskProject(ctx context.Context, id, project string, version int64) (core.ProjectAssignment, error) {
 	if err := projectWrite(ctx); err != nil {
