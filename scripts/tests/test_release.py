@@ -41,10 +41,12 @@ class ReleaseTests(unittest.TestCase):
             (directory / 'docs/local.md').write_text('# Local\n')
             document = directory / 'docs/guide.md'
             document.write_text('[Provider](provider.md#setup) [Local](local.md)\n'
+                                'See the [wrapped provider\nguide](provider.md) too.\n'
                                 '```sh\n[Example](not-a-file.md)\n```\n')
             with patch.object(package, 'ROOT', root):
                 package.rewrite_bundle_documentation(directory, 'v0.0.0-test')
             self.assertIn(package.SOURCE_URL + '/blob/v0.0.0-test/docs/provider.md#setup', document.read_text())
+            self.assertIn('guide](' + package.SOURCE_URL + '/blob/v0.0.0-test/docs/provider.md)', document.read_text())
             self.assertIn('[Local](local.md)', document.read_text())
             self.assertIn('[Example](not-a-file.md)', document.read_text())
 
@@ -60,7 +62,7 @@ class ReleaseTests(unittest.TestCase):
                         continue
                     text = tar.extractfile(prefix + name).read().decode()
                     text = re.sub(r'```.*?```', '', text, flags=re.S)
-                    for match in re.finditer(r'(?<!!)\[[^\]\n]*\]\(([^)\n]+)\)', text):
+                    for match in re.finditer(r'(?<!!)\[[^\]]*\]\(([^)\n]+)\)', text):
                         target = match.group(1).strip().split(' "', 1)[0].strip('<>')
                         parsed = urlsplit(target)
                         if not target or target.startswith(('#', '/')) or parsed.scheme or parsed.netloc:

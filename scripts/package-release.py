@@ -85,7 +85,8 @@ def rewrite_bundle_documentation(directory, version):
 
         chunks = re.split(r'(```.*?```)', document.read_text(), flags=re.S)
         for index in range(0, len(chunks), 2):
-            chunks[index] = re.sub(r'(?<!!)(\[[^\]\n]*\]\()([^\n)]+)(\))', replace, chunks[index])
+            # Link text may wrap onto the next line; the target never does.
+            chunks[index] = re.sub(r'(?<!!)(\[[^\]]*\]\()([^\n)]+)(\))', replace, chunks[index])
         document.write_text(''.join(chunks))
 
 
