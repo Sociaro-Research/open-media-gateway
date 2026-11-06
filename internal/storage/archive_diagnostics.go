@@ -37,6 +37,8 @@ func PublicArchiveError(err error) string {
 		message = "result storage endpoint was blocked by outbound policy; ask an operator to review the exact trusted endpoint allowlist"
 	case errors.Is(err, ErrEndpointDNS):
 		message = "result storage hostname could not be resolved; ask an operator to verify DNS and connectivity from Gateway and worker"
+	case errors.Is(err, ErrEndpointHTTPSRequired):
+		message = "result storage requires HTTPS for authenticated requests; ask an operator to configure HTTPS or review an exact trusted storage host exception"
 	case errors.As(err, &safe):
 		message = safe.Error()
 	case errors.As(err, &source):

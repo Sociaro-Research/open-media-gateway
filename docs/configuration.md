@@ -325,15 +325,21 @@ routes. Use the S3 API endpoint rather than the MinIO browser console, retain th
 service's signing region, and enable path-style addressing where required.
 Custom services accept explicit `http://`; use HTTPS where available. Public
 secret-bearing connections still require HTTPS. An unallowlisted HTTP hostname
-can fail this HTTPS requirement before DNS is checked; that failure retains the
-generic diagnostic. Exceptions also affect other
+can fail this HTTPS requirement before DNS is checked. A rejected authenticated
+HTTP request remains blocked; the diagnostic does not change outbound policy.
+Exceptions also affect other
 provider/storage/media traffic to the same host, so choose only trusted operator
 controlled destinations. See [SECURITY.md](../SECURITY.md#known-preview-limitations).
 
 Test connection returns sanitized HTTP 400 diagnostics: `storage_endpoint_blocked`
 means the private-address policy rejected the endpoint;
-`storage_endpoint_dns_failed` means its hostname could not be resolved. Check DNS
-and routing from both Gateway and worker before investigating credentials. Other
+`storage_endpoint_dns_failed` means its hostname could not be resolved;
+`storage_endpoint_https_required` means authenticated HTTP was rejected before DNS
+or dialing. Configure an HTTPS S3 endpoint, or ask the operator to review an exact
+trusted-host exception for an intentionally HTTP-only internal service. An
+exception does not establish DNS or connectivity. For DNS or private-address
+failures, check policy, DNS and routing from both Gateway and worker before
+investigating credentials. Other
 service/authentication/network failures retain the generic `storage_check_failed`
 response; credentials, signed URLs, raw transport details and response bodies are
 never included in these diagnostics.

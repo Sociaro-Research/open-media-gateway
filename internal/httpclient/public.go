@@ -20,6 +20,9 @@ var ErrOutboundDestination = errors.New("outbound destination must use a permitt
 var ErrOutboundPrivateDestination = fmt.Errorf("%w: private or special-use destination blocked", ErrOutboundDestination)
 var ErrOutboundDNS = fmt.Errorf("%w: endpoint hostname could not be resolved", ErrOutboundDestination)
 
+// Keep HTTPS policy distinct from URL/address classification for existing callers.
+var ErrOutboundHTTPSRequired = errors.New("authenticated outbound requests require HTTPS")
+
 type publicTransport struct {
 	base    *http.Transport
 	private map[string]bool
@@ -125,7 +128,7 @@ func (t *publicTransport) RoundTrip(request *http.Request) (*http.Response, erro
 		return nil, ErrOutboundDestination
 	}
 	if u.Scheme != "https" && !t.private[strings.ToLower(strings.TrimSuffix(u.Hostname(), "."))] && carriesOutboundSecrets(request) {
-		return nil, errors.New("authenticated outbound requests require HTTPS")
+		return nil, ErrOutboundHTTPSRequired
 	}
 	return t.base.RoundTrip(request)
 }

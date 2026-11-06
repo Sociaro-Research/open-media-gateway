@@ -32,6 +32,7 @@ func TestPublicArchiveErrorKeepsOnlySafeCauses(t *testing.T) {
 		{"S3 unknown", safeS3Error("upload", &smithy.GenericAPIError{Code: "private-code", Message: "private-provider-body"}), "endpoint, region, bucket"},
 		{"private endpoint", fmt.Errorf("private-network: %w", ErrPrivateEndpoint), "allowlist"},
 		{"DNS", fmt.Errorf("private-network: %w", ErrEndpointDNS), "DNS and connectivity"},
+		{"HTTPS", fmt.Errorf("private-network: %w", ErrEndpointHTTPSRequired), "configure HTTPS or review an exact trusted storage host exception"},
 		{"download", sourceOpenError{message: "download provider result failed", cause: errors.New("private-signed-url")}, "provider download availability"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

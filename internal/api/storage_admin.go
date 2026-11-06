@@ -73,6 +73,8 @@ func (s *Server) storageSettingsRequest(w http.ResponseWriter, r *http.Request, 
 				writeError(w, http.StatusBadRequest, "storage_endpoint_blocked", "Connection check blocked by outbound private-address policy. Ask the operator to allow only the exact trusted storage hostname or IP with OUTBOUND_ALLOW_PRIVATE_HOSTS. Verify DNS and network reachability from Gateway and worker.")
 			} else if errors.Is(err, storage.ErrEndpointDNS) {
 				writeError(w, http.StatusBadRequest, "storage_endpoint_dns_failed", "Storage endpoint hostname could not be resolved. Check DNS from Gateway and worker; Docker service names must resolve in both runtime environments. Verify network reachability as well.")
+			} else if errors.Is(err, storage.ErrEndpointHTTPSRequired) {
+				writeError(w, http.StatusBadRequest, "storage_endpoint_https_required", "Authenticated storage requests require HTTPS. Configure an HTTPS S3 endpoint. For an intentionally trusted HTTP-only service, ask the operator to review an exact hostname or IP exception in OUTBOUND_ALLOW_PRIVATE_HOSTS for Gateway and worker. This exception does not configure DNS or network reachability.")
 			} else {
 				writeError(w, http.StatusBadRequest, "storage_check_failed", "Connection check failed. Verify endpoint, region, bucket, credentials and object read/write/delete permissions.")
 			}

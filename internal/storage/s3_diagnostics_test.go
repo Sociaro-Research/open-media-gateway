@@ -18,6 +18,7 @@ func TestSafeS3ErrorPreservesOnlyClassifiedOutboundCauses(t *testing.T) {
 	}{
 		{"policy", httpclient.ErrOutboundPrivateDestination, ErrPrivateEndpoint},
 		{"DNS", httpclient.ErrOutboundDNS, ErrEndpointDNS},
+		{"HTTPS", httpclient.ErrOutboundHTTPSRequired, ErrEndpointHTTPSRequired},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			// Model the SDK operation wrapper and untrusted transport diagnostics.
@@ -60,5 +61,9 @@ func TestSafeS3ErrorKeepsServiceAndFallbackBehavior(t *testing.T) {
 	got := safeS3Error("write check", &net.DNSError{Name: "fixture-secret", Err: "raw transport detail"})
 	if got.Error() != "S3 write check failed; check endpoint, region, bucket and network connectivity" {
 		t.Fatal("raw DNS fallback changed", got)
+	}
+	got = safeS3Error("write check", errors.New("authenticated outbound requests require HTTPS: fixture-secret"))
+	if errors.Is(got, ErrEndpointHTTPSRequired) || got.Error() != "S3 write check failed; check endpoint, region, bucket and network connectivity" {
+		t.Fatal("untyped transport text was trusted", got)
 	}
 }

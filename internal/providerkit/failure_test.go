@@ -84,6 +84,16 @@ func TestTransportFailureKeepsSafeDestinationClassifications(t *testing.T) {
 		}
 	}
 }
+
+func TestHTTPSPolicySentinelPreservesProviderTransportBehavior(t *testing.T) {
+	p := fixtureFailurePolicy()
+	legacy := p.TransportFailure(FailureSubmit, errors.New("authenticated outbound requests require HTTPS"))
+	current := p.TransportFailure(FailureSubmit, fmt.Errorf("private-url private-token: %w", httpclient.ErrOutboundHTTPSRequired))
+	var failure *Failure
+	if !errors.As(current, &failure) || failure.Kind() != FailureTransport || current.Error() != legacy.Error() {
+		t.Fatal("new storage diagnosis changed provider transport behavior", current)
+	}
+}
 func TestFailurePolicyOwnsRegisteredCodesAndTerminalGuidance(t *testing.T) {
 	codes := map[string]FailureKind{"KnownInput": FailureInput}
 	p := NewFailurePolicy("Fixture provider", codes)

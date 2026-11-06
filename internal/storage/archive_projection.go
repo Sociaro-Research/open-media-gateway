@@ -25,6 +25,7 @@ func init() {
 		"result archival failed; ask an operator to check result storage, provider download availability and worker health",
 		"result storage endpoint was blocked by outbound policy; ask an operator to review the exact trusted endpoint allowlist",
 		"result storage hostname could not be resolved; ask an operator to verify DNS and connectivity from Gateway and worker",
+		"result storage requires HTTPS for authenticated requests; ask an operator to configure HTTPS or review an exact trusted storage host exception",
 		"result storage is full; ask an operator to free space or expand the configured storage",
 		"result storage permission denied; ask an operator to check worker storage ownership and write permissions",
 		"trusted artifact stream storage is unavailable; ask an operator to check trusted-stream support in the selected storage backend",
@@ -43,6 +44,7 @@ func init() {
 	for _, operation := range []string{"upload", "open", "read", "store template media"} {
 		table["S3 "+operation+" failed: storage endpoint blocked by outbound private-address policy"] = PublicArchiveError(ErrPrivateEndpoint)
 		table["S3 "+operation+" failed: storage endpoint hostname could not be resolved"] = PublicArchiveError(ErrEndpointDNS)
+		table["S3 "+operation+" failed: storage endpoint requires HTTPS for authenticated requests"] = PublicArchiveError(ErrEndpointHTTPSRequired)
 		for _, message := range []string{"S3 " + operation + " denied; check credentials and bucket permissions", "S3 " + operation + " failed; check endpoint, region, bucket and network connectivity"} {
 			table[message] = message + archiveRecoveryAction
 			table[table[message]] = table[message]

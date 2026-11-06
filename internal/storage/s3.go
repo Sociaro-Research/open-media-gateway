@@ -40,6 +40,7 @@ var ErrInvalidConfig = errors.New("invalid storage configuration")
 // Safe domain causes; never wrap an SDK/transport error that may contain secrets.
 var ErrPrivateEndpoint = errors.New("storage endpoint blocked by outbound private-address policy")
 var ErrEndpointDNS = errors.New("storage endpoint hostname could not be resolved")
+var ErrEndpointHTTPSRequired = errors.New("storage endpoint requires HTTPS for authenticated requests")
 
 func (c *S3Config) normalize() error {
 	c.Endpoint = strings.TrimRight(strings.TrimSpace(c.Endpoint), "/")
@@ -351,6 +352,9 @@ func safeS3Error(operation string, err error) error {
 	}
 	if errors.Is(err, httpclient.ErrOutboundDNS) {
 		return archiveDiagnostic{message: fmt.Sprintf("S3 %s failed: %s", operation, ErrEndpointDNS), cause: ErrEndpointDNS}
+	}
+	if errors.Is(err, httpclient.ErrOutboundHTTPSRequired) {
+		return archiveDiagnostic{message: fmt.Sprintf("S3 %s failed: %s", operation, ErrEndpointHTTPSRequired), cause: ErrEndpointHTTPSRequired}
 	}
 	// SDK errors can contain endpoint URLs, access key IDs and remote response text.
 	return archiveDiagnostic{message: fmt.Sprintf("S3 %s failed; check endpoint, region, bucket and network connectivity", operation)}

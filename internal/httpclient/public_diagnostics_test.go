@@ -79,7 +79,31 @@ func TestPublicClientHTTPSGuardPrecedesDNSDiagnostics(t *testing.T) {
 	request, _ := http.NewRequest("GET", "http://storage.example", nil)
 	request.Header.Set("Authorization", "synthetic-credential")
 	_, err := client.Do(request)
-	if err == nil || !strings.Contains(err.Error(), "HTTPS") || lookedUp || errors.Is(err, ErrOutboundDNS) || errors.Is(err, ErrOutboundPrivateDestination) {
+	if !errors.Is(err, ErrOutboundHTTPSRequired) || !strings.Contains(err.Error(), "HTTPS") || lookedUp || errors.Is(err, ErrOutboundDNS) || errors.Is(err, ErrOutboundPrivateDestination) || errors.Is(err, ErrOutboundDestination) {
 		t.Fatalf("HTTPS enforcement changed: %v lookup=%t", err, lookedUp)
+	}
+}
+
+func TestPublicClientHTTPSGuardReturnsStablePolicyCause(t *testing.T) {
+	client := newPublic(time.Second, nil, func(context.Context, string, string) ([]netip.Addr, error) {
+		t.Fatal("HTTPS policy rejection reached DNS")
+		return nil, nil
+	}, func(context.Context, string, string) (net.Conn, error) {
+		t.Fatal("HTTPS policy rejection reached dial")
+		return nil, nil
+	})
+	causes := make([]error, 0, 2)
+	for range 2 {
+		request, _ := http.NewRequest("GET", "http://storage.example", nil)
+		request.Header.Set("Authorization", "synthetic-credential")
+		_, err := client.Do(request)
+		var wrapped *url.Error
+		if !errors.As(err, &wrapped) || wrapped.Err == nil {
+			t.Fatal("missing wrapped policy rejection")
+		}
+		causes = append(causes, wrapped.Err)
+	}
+	if !errors.Is(causes[0], causes[1]) {
+		t.Fatal("HTTPS rejection has no stable cause for safe downstream classification")
 	}
 }
