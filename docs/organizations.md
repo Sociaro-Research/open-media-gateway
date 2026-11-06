@@ -118,6 +118,8 @@ curl "$GATEWAY_URL/v1/api-keys" -H "Authorization: Bearer $MANAGEMENT_KEY" \
 
 Invitation acceptance also requires `organizations:manage` for API keys. Preview requires only authentication. All membership mutations require `organizations:manage` when using API keys, plus an appropriate organization role. Invites are previewed with `POST /v1/invitations/preview` and accepted with `POST /v1/invitations/accept`, both carrying `{"token":"..."}`. Organization reports use the existing `from`, `to`, `api_key_id`, `limit`, and `offset` filters on `GET /v1/organizations/{org}/reports`.
 
+Invitation preview and acceptance enforce an organization-bound key's company ceiling against the invitation's organization, including when its owner is already a member of another company. The existing global exception requires both `system:manage` and a current Administrator role. First-owner invitations remain unavailable to API keys.
+
 ## Client managers
 
 A client manager is a separate sales account role. System administrators assign or remove it in **Administration → Users**, then select the manager in an organization's **Settings → Client manager** form. A user must sign in once before a role can be assigned. Each organization has at most one client manager; a manager can be assigned to multiple organizations. The Settings field accepts the user's email (case-insensitive, surrounding whitespace ignored) or internal user ID. It does not assign a sales role. Client manager, Lead client manager and Regional client manager accounts are eligible; an ordinary user or Administrator is not eligible merely because the account exists.

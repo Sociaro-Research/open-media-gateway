@@ -39,3 +39,16 @@ func CompanyBoundary(ctx context.Context) string {
 	v, _ := ctx.Value(companyBoundaryKey{}).(string)
 	return v
 }
+
+// WithDirectKeyCompanyBoundary carries the direct credential's effective ceiling
+// after the live global-access decision. It grants no membership or delegated
+// mutation authority and is separate from the delegated CompanyBoundary.
+type directKeyCompanyBoundaryKey struct{}
+
+func WithDirectKeyCompanyBoundary(ctx context.Context, company string) context.Context {
+	return context.WithValue(ctx, directKeyCompanyBoundaryKey{}, company)
+}
+func DirectKeyCompanyBoundary(ctx context.Context) string {
+	v, _ := ctx.Value(directKeyCompanyBoundaryKey{}).(string)
+	return v
+}

@@ -541,6 +541,9 @@ func (r *SystemRepository) OrganizationInvitation(ctx context.Context, actor, to
 	if bound := identity.CompanyBoundary(ctx); bound != "" && (invitationCompany != bound || firstOwner) {
 		return i, org.ErrForbidden
 	}
+	if bound := identity.DirectKeyCompanyBoundary(ctx); bound != "" && invitationCompany != "" && invitationCompany != bound {
+		return i, org.ErrForbidden
+	}
 	if firstOwner {
 		return r.firstOwnerInvitation(ctx, actor, token, accept)
 	}

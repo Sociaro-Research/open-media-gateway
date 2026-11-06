@@ -660,6 +660,9 @@ func (s *Server) authenticate(next http.Handler) http.Handler {
 					}
 					ctx = context.WithValue(ctx, globalOrganizationKey{}, global)
 				}
+				if identity.CompanyBoundary(ctx) == "" {
+					ctx = identity.WithDirectKeyCompanyBoundary(ctx, credentialOrganization(ctx))
+				}
 				next.ServeHTTP(w, r.WithContext(ctx))
 				return
 			}
