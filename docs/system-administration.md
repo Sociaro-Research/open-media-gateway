@@ -399,9 +399,9 @@ for exact defaults, inheritance, response codes and scheduler behavior.
 System administrators configure Stripe under **Settings → Payment providers**.
 Organization administrators use **Top up balance** in their organization. Each
 connection chooses whether the service or the organization pays the actual
-processing fee; the choice is fixed on each new payment. See [organization
-funding](payments.md) for webhook setup, test/live isolation, refunds, reconciliation
-and the separate trusted integration API.
+processing fee; the choice is fixed on each new payment. See
+[organization funding](payments.md) for webhook setup, test/live isolation, refunds,
+reconciliation and the separate trusted integration API.
 
 ## Public legal documents
 
