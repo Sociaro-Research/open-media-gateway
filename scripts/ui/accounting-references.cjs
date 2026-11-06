@@ -2,7 +2,7 @@ const {generationFixtureResponse}=require('./generation-page-fixture.cjs');
 const {useFixtureKey}=require('./fixture-key.cjs');
 const {evidencePath} = require('./evidence.cjs');
 // Exercise account reports and model-specific media selection without paid calls.
-const {chromium}=require('playwright');
+const {[process.env.UI_BROWSER_ENGINE||'chromium']:browserType}=require('playwright');
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const root=process.env.UI_SOURCE_DIR||path.resolve(__dirname,'../../web/public/ui');
 const syntheticPNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=','base64');
@@ -12,7 +12,7 @@ const wav=Buffer.alloc(1644);wav.write('RIFF');wav.writeUInt32LE(wav.length-8,4)
 const server=http.createServer((req,res)=>{if(req.url==='/references/test/v1'){res.setHeader('Content-Type','video/mp4');return res.end(clip);}if(req.url==='/references/test/a1'){res.setHeader('Content-Type','audio/wav');return res.end(wav);}if(/^\/references\/test\/i[12]$/.test(req.url)){res.setHeader('Content-Type','image/png');return res.end(syntheticPNG);}const file=path.join(root,req.url==='/'?'index.html':path.basename(req.url.split('?')[0]));if(!fs.existsSync(file))return res.writeHead(404).end();res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html');res.end(fs.readFileSync(file));});
 (async()=>{
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
- const browser=await chromium.launch({headless:true,...(process.env.UI_BROWSER_PATH?{executablePath:process.env.UI_BROWSER_PATH}:{})});
+ const browser=await browserType.launch({headless:true,...(process.env.UI_BROWSER_PATH?{executablePath:process.env.UI_BROWSER_PATH}:{})});
  const page=await browser.newPage({viewport:{width:1440,height:1100}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
  const profile=(id,label,i,v,a)=>({id,label,min_images:0,max_images:i,min_videos:0,max_videos:v,min_audios:0,max_audios:a});
  const modes=[{...profile('first_last_frames','First and last frames',2,0,0),min_images:2,image_roles:['First frame','Last frame']},profile('references','References',9,3,3)];
@@ -70,7 +70,24 @@ const server=http.createServer((req,res)=>{if(req.url==='/references/test/v1'){r
  assert.equal(posts.length,2);assert.equal(Object.keys(posts[1].options.reference_voices).length,1);assert.ok(Object.values(posts[1].options.reference_voices)[0].endsWith('/a1'));
  await page.locator('#workspaceOpen').click();await page.locator('.organization-tabs').getByRole('tab',{name:'Billing',exact:true}).click();await page.locator('.report-table tbody tr').first().waitFor();
  await page.getByRole('button',{name:'Columns',exact:true}).click();for(const name of ['Estimated cost','Cost','Confirmed cost']){const toggle=page.getByRole('dialog',{name:'Columns',exact:true}).getByRole('switch',{name,exact:true});await toggle.check();await page.waitForFunction(()=>!document.querySelector('#reportColumns').disabled);}await page.keyboard.press('Escape');
- assert.deepEqual(await page.locator('.report-table thead th:not(.report-columns-cell)').allTextContents(),['Date','User / API key','Model','Status','Tokens','Estimated cost','Cost','Confirmed cost','Settlement']);assert.deepEqual((await page.locator('.report-table tbody tr').first().locator('td').allTextContents()).slice(5,8),['$0.03','$0.039','$0.04']);assert.match(await page.locator('.report-table').innerText(),/Covered by package/);assert.deepEqual((await page.locator('.report-table tbody tr').nth(1).locator('td').allTextContents()).slice(5,8),['$0.05','$0.00','Not yet known']);assert.equal(await page.locator('.report-value').first().evaluate(el=>getComputedStyle(el).whiteSpace),'nowrap');
+ // Column controls retain hidden cells so editable tables can preserve drafts.
+ // Check displayed accounting fields by stable IDs, independently of DOM order.
+ assert.deepEqual(await page.locator('.report-table thead th:not(.report-columns-cell):visible').allTextContents(),['Date','User / API key','Model','Status','Tokens','Estimated cost','Cost','Confirmed cost','Settlement']);
+ const hiddenColumns=['generation_id','provider','profit_status','profit','customer_charge'];
+ assert.deepEqual(await page.locator('.report-table thead th[hidden]').evaluateAll(cells=>cells.map(cell=>cell.dataset.column)),hiddenColumns);
+ const reportRows=page.locator('.report-table tbody tr');
+ for(const id of hiddenColumns){
+  const cells=page.locator(`.report-table [data-column="${id}"]`);
+  assert.equal(await cells.count(),3,'hidden column retains its header and both data cells: '+id);
+  assert.equal(await page.locator(`.report-table [data-column="${id}"]:visible`).count(),0,'unselected column is not displayed: '+id);
+  assert.ok(await cells.evaluateAll(nodes=>nodes.every(cell=>cell.hidden&&getComputedStyle(cell).display==='none')),'retained cells are explicitly hidden: '+id);
+ }
+ for(const [row,expected] of [[0,['$0.03','$0.039','$0.04']],[1,['$0.05','$0.00','Not yet known']]]){
+  const costs=[];for(const id of ['estimated_cost','cost','confirmed_cost'])costs.push(await reportRows.nth(row).locator(`td[data-column="${id}"]:visible`).innerText());
+  assert.deepEqual(costs,expected);
+ }
+ assert.match(await reportRows.first().locator('td[data-column="settlement"]:visible').innerText(),/Covered by package/);
+ assert.equal(await page.locator('.report-value:visible').first().evaluate(el=>getComputedStyle(el).whiteSpace),'nowrap');
  // Identical fixture rows must not let the old table satisfy the post-filter wait.
  const previousReportRow=await page.locator('.report-table tbody tr').first().elementHandle();
  await page.locator('#reportFrom').fill('2026-08-01');await page.locator('#reportTo').fill('2026-08-31');await page.locator('#reportKey').selectOption('11111111-1111-4111-8111-111111111111',{force:true});const filtered=page.waitForResponse(r=>new URL(r.url()).pathname.endsWith('/reports')&&new URL(r.url()).searchParams.get('api_key_id')==='11111111-1111-4111-8111-111111111111');await page.getByRole('button',{name:'Apply'}).click();await (await filtered).finished();await page.waitForFunction(row=>!row.isConnected,previousReportRow);await previousReportRow.dispose();await page.locator('.report-table tbody tr').first().waitFor();
