@@ -5768,7 +5768,12 @@ paths:
         file bytes with the returned headers directly to that URL, without Gateway
         credentials, then call the completion endpoint within 30 minutes. The SHA-256
         must be the lowercase hexadecimal hash of the entire file. S3 verifies it.
-        Maximum sizes are 30 MiB for images, 200 MiB for video and 50 MiB for audio.
+        Default maximum sizes are 30 MiB for images, 200 MiB for video and 50 MiB for audio.
+        When validation selects a current visible reviewed native model and a
+        video-capable reference workflow, the server may authorize a larger video,
+        up to 300000000 decimal bytes. Manual model metadata, reference_voice and
+        arbitrary client targets do not raise this limit; stricter current model
+        limits still apply.
         A duplicate returns mode=existing and reference. Local storage returns mode=local;
         only in this mode use POST /v1/references with multipart/form-data.
         Browser transfers require bucket CORS for the frontend origin and PUT/GET/HEAD; saving the storage connection configures missing access automatically when the key has CORS management rights. B2 targets use payload-signed Authorization and x-amz-date headers; send all target headers. CORS must explicitly allow Authorization for B2.
@@ -5782,7 +5787,11 @@ paths:
               properties:
                 name: {type: string}
                 content_type: {type: string, example: image/png}
-                size_bytes: {type: integer, minimum: 1, maximum: 209715200}
+                size_bytes:
+                  type: integer
+                  minimum: 1
+                  maximum: 300000000
+                  description: Absolute upper bound, not a universal allowance. Media type and current authorized validation target determine the effective limit described above.
                 sha256: {type: string, pattern: '^[0-9a-f]{64}$'}
                 validation: {$ref: '#/components/schemas/ReferenceValidationTarget'}
       responses:
@@ -5808,6 +5817,9 @@ paths:
           "$ref": "#/components/responses/Unauthorized"
         '403':
           "$ref": "#/components/responses/Forbidden"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+          description: A reference selected in validation.reference_ids is unavailable, or a deduplicated reference becomes unavailable before preparation commits. Returns not_found in the standard JSON error envelope.
         '503':
           "$ref": "#/components/responses/ServiceUnavailable"
   "/v1/references/uploads/{id}/complete":
@@ -10560,7 +10572,11 @@ components:
         id: {type: string, format: uuid}
         name: {type: string}
         content_type: {type: string, enum: [image/png, image/jpeg, image/webp, image/gif, video/mp4, video/quicktime, video/webm, audio/mpeg, audio/wave, audio/wav, audio/x-wav, audio/ogg, audio/flac]}
-        size_bytes: {type: integer, minimum: 1, maximum: 209715200}
+        size_bytes:
+          type: integer
+          minimum: 1
+          maximum: 300000000
+          description: Actual stored byte size; authorized extended videos can exceed the ordinary 200 MiB limit. Current model limits still apply when preparing or validating inputs.
         created_at: {type: string, format: date-time}
         sha256: {type: string, pattern: "^[0-9a-f]{64}$", description: SHA-256 of file bytes; optional for older images until indexed.}
         duplicate: {type: boolean, description: True when upload reused an existing file.}
