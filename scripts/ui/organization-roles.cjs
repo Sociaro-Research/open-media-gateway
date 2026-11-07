@@ -2,8 +2,26 @@ const {generationFixtureResponse}=require('./generation-page-fixture.cjs');
 const {evidencePath} = require('./evidence.cjs');
 // Organization console fixtures: no provider calls or production data.
 const {chromium,webkit}=require('playwright'),http=require('node:http'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const engine=process.env.UI_BROWSER_ENGINE||'chromium',events=[],activeGates=new Set();
+let phase='bootstrap',acceptanceRefresh=null,acceptanceReports=null;
+const record=(event,data={})=>{events.push({at:new Date().toISOString(),phase,event,...data});if(events.length>256)events.shift();};
+const mark=name=>{phase=name;record('phase');};
+function responseGate(name){
+ let entered,release;const seen=new Promise(resolve=>entered=resolve),response=new Promise(resolve=>release=resolve);
+ const gate={seen,response,enter(){record('response held',{name});entered();},release(){activeGates.delete(gate);record('response released',{name});release();}};
+ activeGates.add(gate);return gate;
+}
+async function waitForGate(gate){
+ let timer;try{await Promise.race([gate.seen,new Promise((_,reject)=>timer=setTimeout(()=>reject(Error('Expected response gate was not reached')),10000))]);}finally{clearTimeout(timer);}
+}
+function writeDiagnostics(){
+ const file=process.env.GATEWAY_PERF_OUTPUT?path.join(process.env.GATEWAY_PERF_OUTPUT,'organization-roles-'+engine+'.json'):evidencePath('/tmp/gateway-organization-roles-'+engine+'.json');
+ fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,JSON.stringify({engine,node:process.version,playwright:require('playwright/package.json').version,platform:process.platform,events},null,2));
+}
 const root=process.env.UI_SOURCE_DIR||path.resolve(__dirname,'../../web/public/ui'),modern=fs.existsSync(path.join(root,'table-ui.js'));const server=http.createServer((req,res)=>{let file=path.join(root,path.basename(req.url.split('?')[0]));if(!path.extname(file))file=path.join(root,'index.html');if(!fs.existsSync(file))return res.writeHead(404).end();res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html');res.end(fs.readFileSync(file));});
-(async()=>{await new Promise(r=>server.listen(0,'127.0.0.1',r));const browser=await (process.env.UI_BROWSER_ENGINE==='webkit'?webkit:chromium).launch({headless:true,executablePath:process.env.UI_BROWSER_PATH}),page=await browser.newPage({viewport:{width:1440,height:1080},hasTouch:true}),errors=[],writes=[];page.on('pageerror',e=>{if(!e.message.includes('ResizeObserver loop completed with undelivered notifications'))errors.push(e.message)});page.setDefaultTimeout(10000);let storageFixture={driver:'gateway'};let clientManagerFixture=false,assignedManager='',admin=true,role='supermanager',balance=100,accepted=false,invitationRows=[],failInvitation=false,previewRole='member',firstOwnerPreview=false;
+(async()=>{await new Promise(r=>server.listen(0,'127.0.0.1',r));const browser=await (process.env.UI_BROWSER_ENGINE==='webkit'?webkit:chromium).launch({headless:true,executablePath:process.env.UI_BROWSER_PATH}),page=await browser.newPage({viewport:{width:1440,height:1080},hasTouch:true}),errors=[],writes=[];page.on('pageerror',e=>{record('pageerror',{message:e.message,stack:e.stack});if(!e.message.includes('ResizeObserver loop completed with undelivered notifications'))errors.push(e.message)});
+ const tracked=new WeakMap();page.on('request',request=>{const url=new URL(request.url());if(request.isNavigationRequest()||url.pathname.endsWith('/reports')){const entry={path:url.pathname+url.search,startedIn:phase,navigation:request.isNavigationRequest()};tracked.set(request,entry);record('request',entry);}});
+ page.on('requestfinished',request=>{if(tracked.has(request))record('request finished',tracked.get(request));});page.on('requestfailed',request=>{if(tracked.has(request))record('request failed',{...tracked.get(request),failure:request.failure()?.errorText});});page.setDefaultTimeout(10000);let storageFixture={driver:'gateway'};let clientManagerFixture=false,assignedManager='',admin=true,role='supermanager',balance=100,accepted=false,invitationRows=[],failInvitation=false,previewRole='member',firstOwnerPreview=false;
 const oid='22222222-2222-4222-8222-222222222222',uid='11111111-1111-4111-8111-111111111111';const organization=()=>({id:oid,name:'Example team',role,balance_usd:balance,available_usd:balance,credit_limit_usd:0,default_weekly_limit_usd:0,weekly_limit_usd:20,weekly_committed_usd:5,storage_bytes:2048,client_manager_email:assignedManager});
  const generationID='55555555-5555-4555-8555-555555555555',reportReads=[];
  const generation=()=>({id:generationID,actor_id:uid,user_id:uid,created_at:Math.floor(Date.now()/1000),status:'completed',media_type:'image',model:'mock/mock-image-v1',prompt:role==='admin'?undefined:'Retained prompt',content_access:role!=='admin',can_delete:['supermanager','developer','member'].includes(role),cost:{customer_expected_usd:0}});
@@ -14,7 +32,10 @@ await page.route('**/auth/company-connection',route=>route.fulfill({status:404,j
 await page.route('**/v1/**',async route=>{const req=route.request(),p=new URL(req.url()).pathname,method=req.method(),data=req.postData()?req.postDataJSON():null,json=value=>route.fulfill({json:generationFixtureResponse(route.request(),value)});if(method!=='GET')writes.push({p,method,data});
 if(p==='/v1/info')return json({auth_mode:'google',provider:'mock',console:{generation_ui:true,personal_providers:true,shared_resources:true,version:1}});
 if(p==='/v1/me')return json({id:uid,name:'Organization tester',email:'tester@example.test',is_system_admin:admin,is_client_manager:clientManagerFixture,session_id:'fixture'});
-if(p==='/v1/organizations')return json(method==='POST'?organization():{data:[organization()]});
+if(p==='/v1/organizations'){
+ if(accepted&&acceptanceRefresh){const gate=acceptanceRefresh;acceptanceRefresh=null;gate.enter();await gate.response;}
+ return json(method==='POST'?organization():{data:[organization()]});
+}
 if(p==='/v1/organizations/'+oid)return method==='PUT'?route.fulfill({status:204}):json(organization());
 if(p.endsWith('/storage/check'))return json({status:'ok'});
 if(p.endsWith('/storage')){if(method==='PUT'){storageFixture={...data,secret_access_key:'',credentials_configured:true};return json(storageFixture)}return json({settings:storageFixture,can_manage:true,gateway_allowance_bytes:10000000000});}
@@ -35,7 +56,7 @@ if(p==='/v1/organizations/'+oid+'/reports/'+generationID){
  reportReads.push(p);const content=role!=='admin';
  return json({report:reportRow(),generation:generation(),content_access:content,request_logging:'full',...(content?{request:{prompt:'Retained prompt',options:{}},links:{}}:{})});
 }
-if(p.endsWith('/reports')){reportReads.push(p);return json({data:[reportRow()],has_more:false});}
+if(p.endsWith('/reports')){reportReads.push(p);if(accepted&&acceptanceReports){const gate=acceptanceReports;acceptanceReports=null;gate.enter();await gate.response;}return json({data:[reportRow()],has_more:false});}
 
 if(p==='/v1/api-keys')return method==='POST'?json({id:'key',secret:'fixture-key',...data}):json({data:[]});
 if(p==='/v1/api-keys/usage')return json({month:'2026-09',data:[]});
@@ -105,15 +126,31 @@ try{const base='http://127.0.0.1:'+server.address().port;
  assert.deepEqual(await page.locator('#newKeyUser option').evaluateAll(options=>options.map(o=>o.value)),[uid,'33333333-3333-4333-8333-333333333333']);
  await page.locator('#newKeyUser').selectOption('33333333-3333-4333-8333-333333333333',{force:true});await page.locator('#newKeyName').fill('Member working key');await page.getByRole('button',{name:'Create',exact:true}).click();await page.getByRole('heading',{name:'Save your key now',exact:true}).waitFor();
  assert.ok(writes.some(w=>w.p==='/v1/api-keys'&&w.data.user_id==='33333333-3333-4333-8333-333333333333'));await capture('assigned-member-key');
- role='admin';await page.goto(base+'/organizations');await page.getByRole('tab',{name:'Requests',exact:true}).click();await page.getByRole('button',{name:'Details',exact:true}).click();
+ mark('manager accounting');role='admin';await page.goto(base+'/organizations');await page.getByRole('tab',{name:'Requests',exact:true}).click();await page.getByRole('button',{name:'Details',exact:true}).click();
  const restricted=page.getByRole('dialog',{name:'Request details',exact:true});await restricted.getByText('Your role can view accounting and status, but not prompts, input materials or generated content.',{exact:true}).waitFor();
  assert.equal(await page.getByText('Retained prompt',{exact:true}).count(),0);assert.equal(await restricted.locator('.detail-text,.detail-media-card').count(),0);assert.equal(await restricted.getByRole('button',{name:'Delete files',exact:true}).count(),0);assert.equal(await page.locator('#reportColumns option[value=profit],#reportColumns option[value=profit_status]').count(),0);assert.ok(reportReads.includes('/v1/organizations/'+oid+'/reports/'+generationID));await page.keyboard.press('Escape');
 
- role='content_officer';await page.goto(base+'/organizations');await page.getByRole('button',{name:'Details',exact:true}).click();await page.getByText('Retained prompt',{exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Delete files',exact:true}).count(),0);assert.equal(await page.getByRole('tab',{name:'Management',exact:true}).count(),0);assert.equal(await page.getByRole('tab',{name:'API keys',exact:true}).count(),0);await capture('content-officer-journal');
- role='member';const beforeMemberReports=reportReads.length;await page.goto(base+'/organizations');await page.getByRole('button',{name:'Details',exact:true}).waitFor();assert.equal(await page.getByRole('tab',{name:'API keys',exact:true}).count(),0);assert.equal(await page.getByRole('tab',{name:'Members',exact:true}).count(),0);assert.equal(await page.locator('#reportUser').count(),0);assert.equal(await page.locator('.report-table tbody tr').count(),1);assert.ok(reportReads.slice(beforeMemberReports).length>0);assert.ok(reportReads.slice(beforeMemberReports).every(p=>p==='/v1/organizations/'+oid+'/reports'));
- previewRole='supermanager';await page.goto(base+'/organizations#invite='+('s'.repeat(43)));await page.getByText('You will join with the Supermanager role. Your other organizations are unchanged.',{exact:true}).waitFor();assert.equal(await page.getByText('You will become the first Supermanager and can manage company members and API keys.',{exact:true}).count(),0);
+ mark('content officer journal');role='content_officer';await page.goto(base+'/organizations');await page.getByRole('button',{name:'Details',exact:true}).click();await page.getByText('Retained prompt',{exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Delete files',exact:true}).count(),0);assert.equal(await page.getByRole('tab',{name:'Management',exact:true}).count(),0);assert.equal(await page.getByRole('tab',{name:'API keys',exact:true}).count(),0);await capture('content-officer-journal');
+ mark('member journal');role='member';const beforeMemberReports=reportReads.length;await page.goto(base+'/organizations');await page.getByRole('button',{name:'Details',exact:true}).waitFor();assert.equal(await page.getByRole('tab',{name:'API keys',exact:true}).count(),0);assert.equal(await page.getByRole('tab',{name:'Members',exact:true}).count(),0);assert.equal(await page.locator('#reportUser').count(),0);assert.equal(await page.locator('.report-table tbody tr').count(),1);assert.ok(reportReads.slice(beforeMemberReports).length>0);assert.ok(reportReads.slice(beforeMemberReports).every(p=>p==='/v1/organizations/'+oid+'/reports'));
+ mark('ordinary invitation preview');previewRole='supermanager';await page.goto(base+'/organizations#invite='+('s'.repeat(43)));await page.getByText('You will join with the Supermanager role. Your other organizations are unchanged.',{exact:true}).waitFor();assert.equal(await page.getByText('You will become the first Supermanager and can manage company members and API keys.',{exact:true}).count(),0);
+ // Marker removal precedes Workspace.refresh and the asynchronous company view.
+ // Hold both responses to prove readiness cannot settle at either intermediate state.
+ mark('ordinary invitation acceptance');const refreshGate=responseGate('accepted workspace'),reportsGate=responseGate('accepted reports');acceptanceRefresh=refreshGate;acceptanceReports=reportsGate;
  await page.getByRole('button',{name:'Accept invitation',exact:true}).click();await page.waitForFunction(()=>!sessionStorage.getItem('gateway-pending-invite'));assert.deepEqual(Object.keys(writes.filter(w=>w.p==='/v1/invitations/accept').at(-1).data),['token']);
- firstOwnerPreview=true;await page.goto(base+'/organizations?owner=1#invite='+('o'.repeat(43)));await page.getByText('You will become the first Supermanager and can manage company members and API keys.',{exact:true}).waitFor();
+ await waitForGate(refreshGate);
+ let companyReady=false;
+ const ready=page.waitForFunction(({oid,generationID})=>{
+  const host=document.querySelector('#organizationsContent'),content=host?.querySelector('.requests-content'),row=content?.querySelector('tbody tr'),table=content?.querySelector('.report-table');
+  return !sessionStorage.getItem('gateway-pending-invite')&&!host?.querySelector('.organization-invitation')&&Workspace.current()?.id===oid&&host?.querySelector('h1')?.textContent==='Example team'&&row?.getAttribute('aria-label')==='Open request '+generationID&&content.querySelector('[role=status]')?.textContent===''&&table?.getClientRects().length>0&&!table.closest('.docs-table-wrap').hidden;
+ },{oid,generationID});ready.then(()=>companyReady=true,()=>{});
+ const frame=()=>page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+ await frame();assert.equal(companyReady,false,'acceptance must wait for workspace refresh');assert.equal(await page.locator('.report-table tbody tr').count(),0);await capture('acceptance-refresh-pending');
+ refreshGate.release();await waitForGate(reportsGate);await frame();assert.equal(companyReady,false,'acceptance must wait for its report response');assert.equal(await page.locator('.report-table tbody tr').count(),0);await page.getByText('Loading requests…',{exact:true}).waitFor();await capture('acceptance-reports-pending');
+ reportsGate.release();await ready;await page.getByRole('row',{name:'Open request '+generationID,exact:true}).waitFor();
+ assert.equal(await page.evaluate(()=>Workspace.current().role),'member','the preview must not grant a different role locally');
+ assert.equal(writes.filter(w=>w.p==='/v1/invitations/accept').length,1);await capture('acceptance-company-ready');record('company ready',{organization:oid,generation:generationID});
+
+ mark('first owner preview');firstOwnerPreview=true;await page.goto(base+'/organizations?owner=1#invite='+('o'.repeat(43)));await page.getByText('You will become the first Supermanager and can manage company members and API keys.',{exact:true}).waitFor();
  console.log('PASS: invitation role picker, keyboard creation, failure/retry, history, role restrictions, recipient role display and first-owner distinction in '+(process.env.UI_BROWSER_ENGINE||'chromium'));
  assert.deepEqual(errors,[]);console.log('PASS: role permissions hover/touch/keyboard at 1440/390/320 px; delegated recipient selection; Manager redaction; Content Officer read-only journal; Member controls');
-}catch(e){console.error(errors);await page.screenshot({path:evidencePath('/tmp/gateway-role-ui-failure.png')});throw e}finally{await browser.close();server.close()}})().catch(e=>{console.error(e);process.exitCode=1;server.close()});
+}catch(e){console.error(errors);await page.screenshot({path:evidencePath('/tmp/gateway-role-ui-failure.png')});throw e}finally{for(const gate of activeGates)gate.release();try{writeDiagnostics()}finally{try{await browser.close()}finally{server.close()}}}})().catch(e=>{console.error(e);process.exitCode=1;server.close()});
