@@ -376,10 +376,16 @@ makes their download routes unavailable, while retaining history and costs.
 
 ## Single generation contract
 
-All generation routes use the same parser and response schema. There is no
-compatibility header or alternate status/date representation. The console uses
-this same API. Historical jobs remain readable; their download URLs are derived
-from their IDs so old stored paths do not escape into responses.
+The ordinary media creation routes described above share a parser and return the
+same Generation job representation, subject to their route-specific request
+rules. The generic estimate route uses that parser but returns a cost estimate,
+not a job. Template generation uses its own request contract before common
+admission; other specialized extensions retain their documented contracts.
+
+There is no compatibility-header switch or alternate status/date representation.
+The console calls these same APIs, including the separate extension routes.
+Historical jobs remain readable; their download URLs are derived from their IDs
+so old stored paths do not escape into responses.
 
 Preview access, last-frame downloads and result deletion use
 `GET /v1/generations/{id}/media-access`, `GET /v1/generations/{id}/last-frame`

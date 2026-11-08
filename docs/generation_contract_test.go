@@ -38,6 +38,50 @@ func object(t *testing.T, value any) map[string]any {
 	return result
 }
 
+func TestSingleGenerationGuideSeparatesCreationEstimatesAndTemplates(t *testing.T) {
+	guide, err := os.ReadFile("openai-api.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	parts := strings.SplitN(string(guide), "## Single generation contract\n", 2)
+	if len(parts) != 2 {
+		t.Fatal("single generation contract section missing")
+	}
+	section := strings.SplitN(parts[1], "\n## Reference contracts checked", 2)[0]
+	for _, distinction := range []string{"ordinary media creation", "route-specific", "cost estimate", "Template"} {
+		if !strings.Contains(section, distinction) {
+			t.Errorf("contract summary must distinguish %q", distinction)
+		}
+	}
+	paths := object(t, generationSpecification(t)["paths"])
+	responseSchema := func(path, code string) map[string]any {
+		op := object(t, object(t, paths[path])["post"])
+		response := object(t, object(t, op["responses"])[code])
+		return object(t, object(t, object(t, response["content"])["application/json"])["schema"])
+	}
+	for _, path := range []string{"/v1/generations", "/v1/videos", "/v1/images/generations", "/v1/images/edits", "/v1/audio/speech", "/v1/audio/generations"} {
+		if responseSchema(path, "202")["$ref"] != "#/components/schemas/Generation" {
+			t.Error(path, "must return the shared generation job representation")
+		}
+	}
+	estimate := responseSchema("/v1/generations/estimate", "200")
+	properties := object(t, estimate["properties"])
+	if estimate["$ref"] == "#/components/schemas/Generation" || properties["cost"] == nil || properties["can_generate"] == nil {
+		t.Error("estimate must return cost/budget information rather than a generation job")
+	}
+	template := object(t, object(t, paths["/v1/templates/{template}/generations"])["post"])
+	body := object(t, template["requestBody"])
+	schema := object(t, object(t, object(t, body["content"])["application/json"])["schema"])
+	separate := schema["$ref"] == "#/components/schemas/TemplateGenerationRequest"
+	branches, _ := schema["allOf"].([]any)
+	for _, branch := range branches {
+		separate = separate || object(t, branch)["$ref"] == "#/components/schemas/TemplateGenerationRequest"
+	}
+	if !separate {
+		t.Error("template generation has its own request contract before common admission")
+	}
+}
+
 type documentedCountService struct {
 	maximum int
 	created int
