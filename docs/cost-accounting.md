@@ -84,9 +84,15 @@ after package coverage is a separate administrator-only report field.
 
 Configure Billing Access Key ID and Billing Access Key Secret in **Providers**,
 with read access to billing details. Generation API keys alone cannot read bills.
-The worker imports current and previous month snapshots every five minutes using
-Alibaba `DescribeInstanceBill` and BytePlus `ListBillDetail`. All pages must succeed.
-Billing status is available in **API keys** and `GET /v1/api-keys/billing`.
+The worker starts a sync pass at startup, then waits five minutes after each pass.
+For supported providers, it selects UTC task months with saved cost records from
+the start of the previous month onward, plus older tasks awaiting billing
+verification for profit. It uses Alibaba `DescribeInstanceBill` and BytePlus
+`ListBillDetail`; all required pages must succeed before a snapshot is imported.
+Billing sync status is available through `GET /v1/api-keys/billing`, within the
+current owner's scope. Effective System Administrator access is required;
+administrator API keys must include both `keys:manage` and
+`system:manage`.
 
 Provider records are stored separately for audit. BytePlus responses are decoded
 from `Result`. The worker discovers products from the monthly summary, then fetches
