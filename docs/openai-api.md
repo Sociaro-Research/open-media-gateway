@@ -268,7 +268,10 @@ accept signed reference-library URLs through `options.video_urls` or
 
 ## Lifecycle
 
-Creation returns HTTP 202 and a `Location` header matching `status_url`:
+Accepted creation returns HTTP 202 and a root-relative `Location` header matching
+`status_url`. A matching idempotent replay returns the original generation with
+its current status, which may already be terminal; 202 does not mean a new job
+was queued or that rendering succeeded. A newly queued video looks like this:
 
 ```json
 {
@@ -286,20 +289,37 @@ Creation returns HTTP 202 and a `Location` header matching `status_url`:
 }
 ```
 
-Poll until `completed` or `failed`. Intermediate statuses are `queued` and
-`in_progress`. On failure, `error` contains `code` and `message`. `created_at` and
-`updated_at` are Unix seconds. `completed_at` is the stored result archival time
-when known; it is not invented from a later billing update. No synthetic progress
-percentage is reported. Existing `options`, `cost`, `usage`, reference and storage
-metadata remain extensions. Storage timestamps inside extensions use ISO dates.
+Poll `status_url` until `completed` or `failed`. Stored `running` maps to
+`in_progress` and `succeeded` maps to `completed`; `queued` and `failed` keep their
+names. Video status/content links use `/v1/videos/{id}`; other media use
+`/v1/generations/{id}`, independently of the creation route.
 
-`content_url` is present from admission but returns 404 until media is available;
-it also returns 404 after result deletion. Authenticate downloads with the same
-key. Signed previews, last-frame downloads, result deletion and webhooks
-remain available through the documented extension endpoints. Webhook `data` is
-the same generation object as the HTTP response. Event types are
+For content-authorized views, `error` is null when no stored failure message is
+available; otherwise it contains exactly `code: generation_failed` and a sanitized
+`message`, not the raw provider response. `created_at` and `updated_at` are Unix
+seconds. `completed_at` is Unix seconds from the recorded `stored_at`, only for a
+completed generation; it remains null when that archival time is unknown and
+never falls back to a later update or billing time. Result deletion does not erase
+the recorded completion time. No synthetic progress percentage is reported.
+Existing `options`, `cost`, `usage`, reference and storage metadata remain
+extensions. Storage timestamps inside extensions use ISO dates.
+
+For viewers with content access, `content_url` is included from admission, even
+before an archive is readable. Pending/failed, deleted or missing stored results
+return 404. Authenticate downloads with the same authorized key; a returned link
+does not grant additional access. Metadata-only views omit content links, errors
+and `completed_at`. Signed previews, last-frame downloads, result deletion and
+webhooks remain available through the documented extension endpoints and their
+existing permissions.
+
+Webhook `data` is a saved lifecycle snapshot using the same base Generation
+format. It does not include HTTP-only viewer permission flags, and content,
+logging and financial projection can differ from a particular caller's current
+HTTP response. Poll the status route for current state. Event types are
 `generation.queued`, `generation.in_progress`, `generation.completed`, and
-`generation.failed`; envelope `created_at` is also Unix seconds.
+`generation.failed`; envelope `created_at` is the event-record creation time in
+Unix seconds, distinct from generation timestamps and the delivery-attempt
+timestamp header.
 
 ### Archived results
 

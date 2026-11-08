@@ -1902,6 +1902,10 @@ paths:
         required: true
       responses:
         "202":
+          headers: &GenerationAdmissionHeaders
+            Location:
+              description: Root-relative generation status route, equal to status_url in the response. A matching idempotent replay can return an existing generation, including its terminal status.
+              schema: {type: string, format: uri-reference}
           content:
             application/json:
               schema:
@@ -1964,6 +1968,7 @@ paths:
         required: true
       responses:
         "202":
+          headers: *GenerationAdmissionHeaders
           content:
             application/json:
               schema:
@@ -2246,6 +2251,7 @@ paths:
         required: true
       responses:
         "202":
+          headers: *GenerationAdmissionHeaders
           content:
             application/json:
               schema:
@@ -2351,12 +2357,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Result not available
-        "409":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: Not ready
         "503":
           $ref: '#/components/responses/ServiceUnavailable'
       summary: Download generation content
@@ -2392,12 +2392,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Result not available
-        "409":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: Not ready
         "503":
           $ref: '#/components/responses/ServiceUnavailable'
       summary: Inspect generation content
@@ -2534,6 +2528,7 @@ paths:
         required: true
       responses:
         "202":
+          headers: *GenerationAdmissionHeaders
           content:
             application/json:
               schema:
@@ -2587,6 +2582,7 @@ paths:
         required: true
       responses:
         "202":
+          headers: *GenerationAdmissionHeaders
           content:
             application/json:
               schema:
@@ -2790,6 +2786,7 @@ paths:
         required: true
       responses:
         "202":
+          headers: *GenerationAdmissionHeaders
           content:
             application/json:
               schema:
@@ -2895,12 +2892,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Result not available
-        "409":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: Not ready
         "503":
           $ref: '#/components/responses/ServiceUnavailable'
       summary: Download generation content
@@ -2936,12 +2927,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
           description: Result not available
-        "409":
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-          description: Not ready
         "503":
           $ref: '#/components/responses/ServiceUnavailable'
       summary: Inspect generation content
@@ -10080,22 +10065,27 @@ components:
           type: array
           items: {type: string}
         completed_at:
-          description: Result archival time if recorded; null until known.
+          description: Recorded stored_at archival time in Unix seconds, only for completed generations; otherwise null. Never inferred from updated_at. Retained after result deletion, but omitted from content-restricted views.
+          format: int64
           type:
           - integer
           - "null"
         content_url:
           type: string
-          description: Authorized route for the first archived result. Available from admission but returns 404 until successful archival or after deletion. Use artifacts[].content_url for every archived output or format variant; scalar-result jobs can omit artifacts.
+          description: Authorized route for the first archived result, included from admission for viewers with content access and omitted from restricted views. Its presence does not prove availability; pending/failed, deleted or missing stored results return 404. Use artifacts[].content_url for every archived output or format variant; scalar-result jobs can omit artifacts.
         cost:
           $ref: '#/components/schemas/TaskCost'
         created_at:
           format: int64
           type: integer
         error:
+          description: Null when no stored failure message is available; otherwise a sanitized generation failure, not a raw provider response. Omitted from content-restricted views.
+          additionalProperties: false
+          required: [code, message]
           properties:
             code:
               type: string
+              const: generation_failed
             message:
               type: string
           type:
@@ -11968,6 +11958,7 @@ components:
           items:
             "$ref": "#/components/schemas/APIKey"
     WebhookEvent:
+      description: Saved lifecycle event snapshot using the base Generation representation and applicable logging/financial projection. HTTP-only viewer permissions and redaction can differ; data is not a fresh status response at delivery time.
       type: object
       required: [id, object, type, created_at, data]
       properties:
@@ -11976,7 +11967,7 @@ components:
         type:
           type: string
           enum: [generation.queued, generation.in_progress, generation.completed, generation.failed]
-        created_at: {type: integer, format: int64}
+        created_at: {type: integer, format: int64, description: 'Event-record creation time in Unix seconds, distinct from generation timestamps and the delivery-attempt timestamp header.'}
         data:
           $ref: '#/components/schemas/Generation'
 
