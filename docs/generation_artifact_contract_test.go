@@ -8,7 +8,46 @@ import (
 	"time"
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
+	"github.com/Sociaro-Research/open-media-gateway/internal/mediafile"
+	"github.com/Sociaro-Research/open-media-gateway/internal/references"
 )
+
+func TestSavedReferenceMIMEIncludesCanonicalOutputs(t *testing.T) {
+	schemas := object(t, object(t, generationSpecification(t)["components"])["schemas"])
+	property := object(t, object(t, object(t, schemas["ReferenceImage"])["properties"])["content_type"])
+	if property["type"] != "string" {
+		t.Fatal("saved reference MIME must remain a string")
+	}
+	allowed := map[string]bool{}
+	for _, value := range property["enum"].([]any) {
+		allowed[value.(string)] = true
+	}
+	checkStored := func(kind string) {
+		t.Helper()
+		raw, err := json.Marshal(references.Image{ContentType: kind})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var response map[string]any
+		if err := json.Unmarshal(raw, &response); err != nil {
+			t.Fatal(err)
+		}
+		if response["content_type"] != kind || !allowed[kind] {
+			t.Errorf("saved reference output %q is not represented by the schema", kind)
+		}
+	}
+	for _, input := range []string{"image/heic", "image/heif", "audio/aac", "audio/x-aac", "audio/mp4", "audio/m4a", "audio/x-m4a", "audio/wave", "audio/wav", "audio/x-wav"} {
+		checkStored(mediafile.CanonicalContentType(input))
+	}
+	// Listing old records returns stored metadata without rewriting aliases.
+	checkStored("audio/wav")
+	checkStored("audio/x-wav")
+	for _, inputOnly := range []string{"image/heif", "audio/x-aac", "audio/m4a", "audio/x-m4a"} {
+		if allowed[inputOnly] {
+			t.Errorf("input alias %q is not a separate canonical output", inputOnly)
+		}
+	}
+}
 
 func TestArtifactGuideDistinguishesPrimaryAndCompleteResults(t *testing.T) {
 	guide, err := os.ReadFile("openai-api.md")

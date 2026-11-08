@@ -10639,7 +10639,14 @@ components:
       properties:
         id: {type: string, format: uuid}
         name: {type: string}
-        content_type: {type: string, enum: [image/png, image/jpeg, image/webp, image/gif, video/mp4, video/quicktime, video/webm, audio/mpeg, audio/wave, audio/wav, audio/x-wav, audio/ogg, audio/flac]}
+        content_type:
+          type: string
+          enum: [image/png, image/jpeg, image/webp, image/gif, image/heic, video/mp4, video/quicktime, video/webm, audio/mpeg, audio/wave, audio/wav, audio/x-wav, audio/ogg, audio/flac, audio/aac, audio/mp4]
+          description: >-
+            Stored media MIME type. New inspected uploads use image/heic for
+            HEIC/HEIF, audio/aac for ADTS AAC, audio/mp4 for M4A, and audio/wave
+            for WAV. Existing saved metadata is returned unchanged; audio/wav
+            and audio/x-wav remain listed for saved-metadata compatibility.
         size_bytes:
           type: integer
           minimum: 1
