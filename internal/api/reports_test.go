@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
 	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
+	"github.com/Sociaro-Research/open-media-gateway/internal/system"
 	"strings"
 	"testing"
 	"time"
@@ -54,5 +55,43 @@ func TestReportGenerationIDFilter(t *testing.T) {
 	w := sendTest(s.handler(), "GET", "/v1/admin/reports?generation_id="+strings.ToUpper(id), "", "alice", "")
 	if w.Code != 200 || service.filter.GenerationID != id || service.owner != identity.PersonalOwnerID("alice") {
 		t.Fatal(w.Code, service.filter, service.owner)
+	}
+}
+
+func TestOrganizationReportsUseGenerationScopeAndLiveAccess(t *testing.T) {
+	s, _ := newPersonalTestServer()
+	f := &keyMembershipFixture{organizationFixture: &organizationFixture{systemFixture: &systemFixture{
+		settings: system.Defaults(), admins: map[string]bool{},
+	}}, role: "supermanager"}
+	f.settings.SharedResources = true
+	s.system = f
+	service := &reportTestService{accountService: s.service.(*accountService)}
+	s.service = service
+	_, generation := issueTestKey(t, s.handler(), "alice", `{"name":"Report reader","organization_id":"`+fixtureOrg+`","scopes":["generation"]}`)
+	h := s.handler()
+	path := "/v1/organizations/" + fixtureOrg + "/reports"
+	for _, tc := range []struct {
+		path, session, key string
+		status             int
+	}{
+		{path, "", "", 401},
+		{path, "alice", "", 200},
+		{path, "", generation, 200},
+		{"/v1/admin/reports", "", generation, 403},
+		{"/v1/organizations/" + fixtureOtherOrg + "/reports", "", generation, 403},
+	} {
+		w := sendTest(h, "GET", tc.path, "", tc.session, tc.key)
+		if w.Code != tc.status {
+			t.Fatalf("%+v: %d %s", tc, w.Code, w.Body)
+		}
+	}
+	if service.owner != fixtureOrg {
+		t.Fatal("organization report read another owner", service.owner)
+	}
+	f.role = "" // Both credentials must recheck current membership.
+	for _, auth := range []struct{ session, key string }{{"alice", ""}, {"", generation}} {
+		if w := sendTest(h, "GET", path, "", auth.session, auth.key); w.Code != 403 {
+			t.Fatal("lost organization access still read reports", w.Code, w.Body)
+		}
 	}
 }

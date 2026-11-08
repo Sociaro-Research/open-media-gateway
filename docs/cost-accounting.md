@@ -56,16 +56,29 @@ does not prove a refund, so its provisional charge remains until reconciliation.
 
 ## Account reports
 
-**Configuration → Reports** shows date, API key, model, status, generation cost,
-provider cash charge and settlement information. Filter by inclusive UTC dates
-and API key, including revoked keys. `GET /v1/organizations/{org}/reports` exposes the same
-paginated data and requires a Google session or `keys:manage`. Missing billing
-data is shown as unknown, never as a zero charge. Package coverage is reported
-only when confirmed; a bill does not necessarily identify a daily allowance.
+**Requests** lists requests within the viewer's authorized owner,
+organization and financial scope. An authenticated browser session can read
+personal reports at `GET /v1/admin/reports`; API keys need `keys:manage` there.
+`GET /v1/organizations/{org}/reports` accepts a browser session or an API key with
+`generation`, plus current organization access. An organization-bound key must
+match `{org}`. Signing in alone does not grant access to another organization's
+reports. Provider cash charges and settlement fields require effective System
+Administrator access; administrator API keys also need `system:manage`. Other
+viewers receive customer-priced amounts.
 
-The Generation journal shows only estimated cost, actual generation cost and
-elapsed time. Here "Actual cost" means provider-reported usage priced at its
-tariff (`tariff_usd`, falling back to `metered_usd`), before package coverage.
+Filter by inclusive `from`/`to` dates and `api_key_id`, including revoked keys.
+The API defaults to UTC and accepts an IANA `timezone`; the console sends the
+browser's timezone. JSON pages default to 50 rows, accept `limit` 1–100 and
+`offset` 0–100000, and return `has_more` and `next_offset`. Missing billing data
+is shown as unknown, distinct from a confirmed zero charge. Package coverage is
+reported only when confirmed; a bill does not necessarily identify a daily allowance.
+
+The Generation journal shows **Cost** for completed or failed jobs with a known
+tariff- or usage-based amount, otherwise **Estimated cost**, plus elapsed time.
+It prefers customer-priced amounts (`customer_tariff_usd`, then
+`customer_metered_usd`), falling back to `tariff_usd`, then `metered_usd`.
+Confirmed free or no-charge outcomes can show zero. Provider cash settlement
+after package coverage is a separate administrator-only report field.
 
 ## Provider billing integration
 
