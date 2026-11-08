@@ -1890,7 +1890,15 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenerationRequest'
+              allOf:
+              - $ref: '#/components/schemas/GenerationRequest'
+              - not:
+                  anyOf:
+                  - required: [input]
+                  - required: [voice]
+                  - required: [instructions]
+                  - required: [response_format]
+                  - required: [output_format]
         required: true
       responses:
         "202":
@@ -10823,8 +10831,9 @@ components:
           enum:
           - female
           - male
+          - ''
           - null
-          description: Vocal gender when supports_gender is true.
+          description: Vocal gender when supports_gender is true. Empty string or null acts as omission; music models with this capability default to female. A nonempty value is rejected for music models without this capability.
         format:
           type: [string, "null"]
           description: Output format from the model’s formats list.

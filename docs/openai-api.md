@@ -226,14 +226,43 @@ job response. Streaming and the standard top-level `speed` control are unsupport
 
 Music supports `POST /v1/audio/generations` or the generic route. Sound effects,
 mixed soundtracks and media post-production use `POST /v1/generations` with the
-exact public model ID. For example:
+exact public model ID. The music route selects `media_type=music`; it does not
+accept a model whose output type is `audio`. Generic generation and estimate
+routes infer the output type from the selected catalog model. For example:
 
 ```json
 {"model":"sonilo/text-to-music","prompt":"Warm instrumental piano","options":{"duration":30,"format":"wav"}}
 ```
 
+Use top-level `prompt` for text direction. Put `lyrics`, `language`, `gender`,
+`duration` and `format` inside `options`, subject to the selected model. The first
+three and `format` accept strings or null; `duration` accepts an integer or null,
+not a fractional number or numeric string. Optional null values act as omission.
+Do not use the speech fields `input`, `voice`, `instructions` or `response_format`,
+or the image field `output_format`, even as empty strings or null.
+
+Surrounding whitespace is trimmed from `prompt`. A nonblank `options.lyrics` can
+replace a missing, null or blank prompt only for `music` models advertising
+`supports_lyrics`, subject to native validation. It does not waive text requirements
+for `audio` models. Models with `prompt_optional` or `no_prompt` keep their separate
+requirements. Lyrics are not automatically trimmed or converted into a prompt.
+
+For music models with `supports_gender`, omitted, null or empty `gender` defaults
+to `female`; otherwise choose the exact `female` or `male` value. Nonempty gender
+is rejected for music models without this capability. An omitted, null or empty
+`format` selects the first advertised format when a list exists. Zero, null or
+omitted `duration` uses the model's declared default when it has a duration range;
+`duration_from_input` models reject a nonzero duration override. Model ranges,
+steps and native checks still apply. Whitespace is not trimmed from these options.
+
+These controls are not universal audio features. Sonilo rejects nonempty lyrics,
+language and gender; Alibaba Fun Music advertises lyrics, and `fun-music-v1` also
+advertises vocal gender. Use only the selected model's documented language and
+duration controls; a shared option field does not establish native support.
 Fractional effects use the model's declared number parameter rather than an
-integer duration field. Video-based Sonilo operations and narration mixing
+integer duration field: Sonilo text effects use `options.parameters.duration_seconds`,
+while Kling text-to-audio uses `options.parameters.duration` and rejects nonzero
+`options.duration` and nonempty `options.format`. Video-based Sonilo operations and narration mixing
 accept signed reference-library URLs through `options.video_urls` or
 `options.audio_urls`. See [Sonilo controls and tariffs](sonilo-provider.md).
 
