@@ -155,13 +155,26 @@ an advertised asset-reference capability and are separate from Gateway file IDs.
 `/v1/images/edits` also accepts multipart files named `image`, `image[]`, or both.
 Either field may repeat; there must be 1–16 files across both names together,
 subject to stricter model limits. Multipart edits require files and do not accept
-a scalar image URL together with them. `/v1/videos` accepts multipart forms with
-an optional `input_reference` image. Video forms containing only scalar fields
-require no reference storage or media signer and use the same model validation
-as JSON. Multipart file uploads require local storage. With S3,
+a scalar image URL together with them.
+
+For `/v1/videos` multipart, omit the reference when the selected model allows it,
+or send one scalar `input_reference` image URL. To upload an image, send exactly
+one file under `input_reference` or the file-only alias `input_reference[]`.
+Unlike image edits, these two video fields cannot coexist, and multiple files,
+repeated scalar references and scalar/file combinations are rejected. A scalar
+`input_reference` is plain text: JSON objects/arrays and library IDs are not
+resolved from that text. Use an `application/json` reference object/array for
+those forms. Model URL/reference capabilities still apply; merely parsing a
+string does not establish admission. Scalar-only video forms require no reference
+storage or media signer. Each scalar field is limited to 64 KiB; scalar-only
+parsing also caps the form at 1000 parts and an 11 MiB captured prefix including
+headers, within the overall multipart limit below.
+
+Multipart file uploads require local reference storage and a media signer. With S3,
 file uploads return `409 direct_upload_required` after inspecting part headers,
 without draining or spooling the file. Upload directly using
-`/v1/references/uploads`, then send the saved reference ID or URL. Total multipart size is
+`/v1/references/uploads`, then reference the saved image in a JSON request.
+Video forms can instead send its URL as scalar `input_reference`. Total multipart size is
 32 MiB; at most 16 edit images or one video reference. Each image still obeys the
 library's MIME/30 MiB limit and the model's capabilities. Scalar controls are form
 strings; `options` is JSON text. Uploaded files are stored in the reusable library,
