@@ -194,8 +194,33 @@ deleted. JSON bodies retain the existing 64 KiB limit; use uploads for large fil
 }
 ```
 
-Use models/voices/encodings actually returned by your account catalog. The response
-is a job object; download its audio when the status is `completed`.
+Send JSON to `POST /v1/audio/speech` with an exact public model ID whose media type
+is `speech`. The generic generation and estimate routes use the same Speech fields
+when that model is selected; `/v1/audio/generations` selects music instead.
+
+`input`, `voice`, `instructions` and `response_format` belong at the top level and
+must be strings when supplied; JSON null is rejected. `input` becomes the core
+prompt, and the other three map to the core voice, instructions and format options.
+Do not send `prompt`, `output_format` or `options.format`, even as empty strings or
+null. `options.voice` and `options.instructions` are also rejected. Surrounding
+whitespace is trimmed from `input` before the selected model's text requirements
+and Unicode code-point limits apply. Text is normally required; only model
+capabilities and native validation can permit omission or blank input.
+
+Use the selected model's advertised capabilities and native requirements. For
+preset voices, an omitted or whitespace-only `voice` selects the first advertised
+voice when supported; nonblank IDs must match exactly. Saved voice bindings have
+their own requirements and conflict with an explicit preset. An omitted or empty
+`response_format` selects the first advertised encoding when a format list exists.
+There is no universal `alloy` or `mp3` default. Models with fixed output formats may
+require omitting this field. Instruction support and limits also vary: for example,
+OpenAI `tts-1` models reject nonempty instructions, and Kling TTS rejects nonempty
+instructions and `response_format` and requires a matching voice/language choice.
+
+The response is HTTP 202 with a queued JSON job, never immediate audio bytes.
+Poll `status_url`; download `content_url` with the same API key when the status is
+`completed`. `response_format` controls the eventual audio encoding, not the JSON
+job response. Streaming and the standard top-level `speed` control are unsupported.
 
 ### Music and sound effects
 

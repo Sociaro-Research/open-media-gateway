@@ -1943,7 +1943,16 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenerationRequest'
+              allOf:
+              - $ref: '#/components/schemas/GenerationRequest'
+              - not:
+                  anyOf:
+                  - required: [prompt]
+                  - required: [output_format]
+                properties:
+                  options:
+                    not:
+                      required: [format]
         required: true
       responses:
         "202":
