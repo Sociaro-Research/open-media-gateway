@@ -5725,7 +5725,7 @@ paths:
       operationId: prepareTemplateEditing
       tags: [Templates]
       summary: Resolve an editable Playground snapshot
-      description: Requires generation scope. Fixed slots cannot be replaced; only declared variable slots accept owned reference IDs. Uses published settings and authorized model capabilities. Returns prompt, provider, model, media_type and normalized options with signed library URLs. Empty string reference positions and duplicates are preserved. No files are copied. Does not change the recipe, estimate, or create work.
+      description: Requires generation scope. Fixed slots cannot be replaced; only declared variable slots accept completed file IDs from the caller's library or authorized shared Template library files. Uses published settings and authorized model capabilities. Returns prompt, provider, model, media_type and normalized options with signed library URLs. Empty string reference positions and duplicates are preserved. No files are copied. Does not change the recipe, estimate, or create work.
       requestBody:
         required: true
         content:
@@ -5735,7 +5735,7 @@ paths:
         '200': {description: Editable snapshot; empty reference positions must be filled or removed before ordinary generation}
         '400': {description: Invalid or incompatible input}
         '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {description: Template or owned input unavailable}
+        '404': {description: Template or authorized input unavailable}
         '409': {description: Published revision changed}
   /v1/templates/{template}/validate-media:
     parameters:
@@ -5743,8 +5743,8 @@ paths:
     post:
       operationId: validateTemplateInputMedia
       tags: [Templates]
-      summary: Check partial owned inputs for a published recipe
-      description: Requires generation scope. Fixed slots cannot be replaced; only declared variable slots accept owned reference IDs. Uses published settings and authorized model capabilities. Does not change the recipe, estimate, or create work.
+      summary: Check partial authorized inputs for a published recipe
+      description: Requires generation scope. Fixed slots cannot be replaced; only declared variable slots accept completed file IDs from the caller's library or authorized shared Template library files. Uses published settings and authorized model capabilities. Does not change the recipe, estimate, or create work.
       requestBody:
         required: true
         content:
@@ -5754,7 +5754,7 @@ paths:
         '200': {description: Present references are valid}
         '400': {description: Invalid or incompatible input}
         '401': {$ref: '#/components/responses/Unauthorized'}
-        '404': {description: Template or owned input unavailable}
+        '404': {description: Template or authorized input unavailable}
         '409': {description: Published revision changed}
   "/v1/references/uploads":
     post:
@@ -7706,7 +7706,15 @@ paths:
               additionalProperties: false
               required: [public_id, enabled_by_default, version]
               properties:
-                public_id: {type: string, minLength: 1, maxLength: 200}
+                public_id:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
+                  description: >-
+                    Case-sensitive ASCII identifier. Start with a letter or digit;
+                    remaining characters may be letters, digits, dots, underscores,
+                    colons, slashes or hyphens. Consecutive slashes and a trailing
+                    slash are rejected.
                 enabled_by_default: {type: boolean}
                 version: {type: integer, minimum: 1}
       responses:
@@ -7756,7 +7764,7 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/OrganizationModelAccess'}
-        '403': {description: Administrator access required}
+        '403': {description: Administrator access or a sales browser session with effective models permission for this client is required.}
         '404': {description: Organization or model setting does not exist}
         '409': {description: Version changed; reload settings}
 
@@ -8593,7 +8601,11 @@ paths:
       responses:
         '200': {description: Existing generation cost estimate and budget response}
         '400': {description: "Invalid binding, actual file, model or unsupported override"}
-        '409': {description: Published revision changed; review again}
+        '401': {description: An explicit active generation bearer key is required}
+        '404': {description: Template or fixed media unavailable}
+        '409': {description: "Published revision, reviewed output resolution or provider configuration changed; review again"}
+        '422': {description: Verified pricing is unavailable (pricing_unavailable)}
+        '503': {description: Template operation or cost estimation unavailable}
   /v1/templates/{template}/generations:
     parameters:
     - {in: path, name: template, required: true, schema: {type: string, format: uuid}}
@@ -8620,7 +8632,17 @@ paths:
         '400': {description: "Invalid input, override, model or missing confirmation/idempotency key"}
         '401': {description: An explicit active generation bearer key is required}
         '402': {description: Existing generation budget exhausted}
-        '409': {description: "Revision, estimate or idempotency conflict"}
+        '404': {description: Template or fixed media unavailable}
+        '409': {description: "Revision, reviewed output resolution, provider configuration, estimate or idempotency conflict"}
+        '422': {description: Verified pricing is unavailable (pricing_unavailable)}
+        '503':
+          description: >-
+            Template operation unavailable, or generation acceptance could not be
+            confirmed. When acceptance is unconfirmed, check the Journal or the
+            original generation's status before creating another generation. Any
+            retry must preserve the original Idempotency-Key, endpoint and request
+            body in the same account and workspace. If verification keeps failing,
+            ask an operator to check admission and queue state before submitting again.
   /v1/system/templates:
     get:
       tags: [Templates]
@@ -8649,10 +8671,11 @@ paths:
               - {required: [content]}
               - {required: [draft]}
       responses:
+        '401': {description: Sign in or provide a valid Gateway API key}
         '201': {description: Created unpublished TemplateRecord in an available model's References workflow}
         '400': {description: "Missing or unsupported default model, output or reference workflow"}
         '200': {description: Existing current record recovered by the same create ID}
-        '403': {description: Administrator required; company roles do not grant publishing}
+        '403': {description: 'System Administrator required; API keys also require system:manage. Company roles do not grant template authoring.'}
   /v1/system/template-references:
     get:
       tags: [Templates]
@@ -8765,6 +8788,7 @@ paths:
                 content: {$ref: '#/components/schemas/TemplateDefinition'}
                 draft: {$ref: '#/components/schemas/TemplateDefinition'}
       responses:
+        '401': {description: Sign in or provide a valid Gateway API key}
         '200':
           description: Saved current content and visibility; no separate published definition
           content:
@@ -8772,7 +8796,7 @@ paths:
               schema: {$ref: '#/components/schemas/TemplateRecord'}
         '400': {description: "Conflicting aliases or invalid content; publish and published Save require valid slots, model, media and an explicit image/video cover. No content is changed on failure."}
         '404': {description: Template or selected shared media unavailable; previous current content remains unchanged}
-        '403': {description: Administrator required}
+        '403': {description: 'System Administrator required; API keys also require system:manage. Company roles do not grant template authoring.'}
         '409': {description: Concurrent edit; reload the current record and review local changes}
     delete:
       tags: [Templates]
@@ -8784,6 +8808,8 @@ paths:
           application/json:
             schema: {type: object, additionalProperties: false, required: [version], properties: {version: {type: integer, minimum: 1}}}
       responses:
+        '401': {description: Sign in or provide a valid Gateway API key}
+        '403': {description: 'System Administrator required; API keys also require system:manage. Company roles do not grant template authoring.'}
         '200': {description: Retained versioned record; new use is unavailable}
         '409': {description: Concurrent edit}
   /v1/system/templates/{template}/infer:
@@ -8799,6 +8825,8 @@ paths:
           application/json:
             schema: {$ref: '#/components/schemas/TemplateDefinition'}
       responses:
+        '401': {description: Sign in or provide a valid Gateway API key}
+        '403': {description: 'System Administrator required; API keys also require system:manage. Company roles do not grant template authoring.'}
         '200':
           description: Syntax and ordered slots for Administrator review; repeated mentions bind once. An optional warning reports excess slot counts without discarding inferred slots or preventing unpublished draft saving. Publication independently validates all limits.
           content:
@@ -9118,7 +9146,16 @@ components:
         media_type: {type: string, enum: [image, video]}
         provider: {type: string}
         model: {type: string}
-        prompt: {type: string, maxLength: 10000}
+        prompt:
+          type: string
+          description: >-
+            Raw stored prompt. Unpublished content may be incomplete.
+            Publish and published Save require nonblank text without
+            surrounding whitespace and enforce the selected model's effective
+            max_prompt_characters in Unicode code points, plus its prompt
+            policy, grammar and native-request checks. The entire authoring
+            JSON request is limited to 65,536 bytes; separate syntax byte
+            guards also apply.
         syntax: {type: string, enum: ['', numbered, picture, bracket, kling-id, ui-reference-v1]}
         reference_counts:
           type: object
@@ -9162,14 +9199,14 @@ components:
       additionalProperties: false
       required: [revision, provider, model, inputs]
       properties:
-        expected_resolution: {type: string, nullable: true, description: Optional reviewed effective output resolution. Empty string binds omission; mismatch returns 409 before estimate/admission. Omitted or null retains legacy behavior.}
+        expected_resolution: {type: [string, "null"], description: Optional reviewed effective output resolution. Empty string binds omission; mismatch returns 409 before estimate/admission. Omitted or null retains legacy behavior.}
         revision: {type: integer, minimum: 1, description: Current opaque generation token; a changed template requires reloading and reviewing input choices.}
         provider: {type: string}
         model: {type: string}
         inputs:
           type: object
           additionalProperties: {type: string, format: uuid}
-          description: Exactly the missing stable slot IDs mapped to the calling owner's completed library file IDs. Fixed slots and extra references are forbidden. External URLs and provider asset IDs are excluded.
+          description: Stable variable slot IDs mapped to completed file IDs from the calling owner's library or authorized shared Template library files. Supply every variable slot for estimate and generations; editing and validate-media accept partial bindings. Fixed slots and extra references are forbidden. External URLs and provider asset IDs are excluded.
         project_id: {type: string, format: uuid}
         max_expected_cost_usd: {type: number, minimum: 0}
     ReferenceMediaLimits:
