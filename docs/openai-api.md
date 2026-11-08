@@ -396,13 +396,14 @@ history and financial records.
 
 - [OpenAI image generation](https://developers.openai.com/api/reference/typescript/resources/images/methods/generate)
 - [OpenAI image edits](https://developers.openai.com/api/reference/typescript/resources/images/methods/edit)
-- [OpenAI video creation](https://developers.openai.com/api/reference/typescript/resources/videos/methods/create)
+- [OpenAI video creation (historical)](https://developers.openai.com/api/reference/typescript/resources/videos/methods/create)
 - [OpenAI speech](https://developers.openai.com/api/reference/cli/resources/audio/subresources/speech/methods/create)
 - [OpenAI models](https://developers.openai.com/api/reference/cli/resources/models/methods/retrieve)
 
-OpenAI video generation is itself asynchronous; synchronous image/speech behavior
-must not be generalized to all of OpenAI. These sources define naming, not a claim
-that the gateway supports every OpenAI feature.
+OpenAI's retired Videos API used asynchronous generation jobs. The linked
+video reference is historical: the API shut down on September 24, 2026. These
+sources define naming, not current API availability or a claim that the gateway
+supports every OpenAI feature.
 
 ## Model names and organization availability
 
