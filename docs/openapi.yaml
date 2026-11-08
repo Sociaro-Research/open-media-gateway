@@ -2467,16 +2467,26 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GenerationRequest'
+              allOf:
+              - $ref: '#/components/schemas/GenerationRequest'
+              - required: [image]
           multipart/form-data:
             schema:
               properties:
                 background:
                   type: string
                 image:
-                  format: binary
-                  type: string
+                  description: One file or repeated file parts named image. May coexist with image[]; the combined batch must contain 1–16 files, subject to model limits.
+                  oneOf:
+                  - {type: string, format: binary}
+                  - type: array
+                    minItems: 1
+                    maxItems: 16
+                    items: {type: string, format: binary}
                 image[]:
+                  description: Repeated image files; may coexist with image. The combined batch must contain 1–16 files, subject to model limits.
+                  minItems: 1
+                  maxItems: 16
                   items:
                     format: binary
                     type: string
@@ -2500,7 +2510,9 @@ paths:
                   type: string
               required:
               - model
-              - image
+              anyOf:
+              - required: [image]
+              - required: ["image[]"]
               type: object
         required: true
       responses:
@@ -10113,18 +10125,18 @@ components:
       - status_url
       type: object
     GenerationImageInput:
-      description: Image URL, an object containing exactly image_url or file_id (from
-        /v1/references), or a nonempty array. File IDs are checked against the authenticated
-        owner. Models advertising supports_asset_references also accept asset://ID
+      description: Nonempty image URL string, an object containing exactly one nonempty image_url or file_id string, or a nonempty single-level array mixing these forms in order. Null, empty strings and nested arrays are rejected. A plain string is a URL/asset value, not a library ID lookup. file_id resolves an accessible image from the caller's library or authorized shared Template library files and requires reference storage and a media signer. Model input capabilities and reference limits still apply. Models advertising supports_asset_references also accept asset://ID
         strings (or image_url values) for registered provider assets, mixed with URLs
         in the same ordered array. These IDs are not Gateway file_id values.
         Multipart file uploads are also supported for edits/videos.
       oneOf:
       - type: string
+        minLength: 1
       - additionalProperties: false
         properties:
           image_url:
             type: string
+            minLength: 1
         required:
         - image_url
         type: object
@@ -10132,22 +10144,26 @@ components:
         properties:
           file_id:
             type: string
+            minLength: 1
         required:
         - file_id
         type: object
       - items:
           oneOf:
           - type: string
+            minLength: 1
           - additionalProperties: false
             properties:
               file_id:
                 type: string
+                minLength: 1
             required: [file_id]
             type: object
           - additionalProperties: false
             properties:
               image_url:
                 type: string
+                minLength: 1
             required: [image_url]
             type: object
         minItems: 1

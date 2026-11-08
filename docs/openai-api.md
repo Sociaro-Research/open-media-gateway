@@ -140,15 +140,25 @@ of one. Omitting `n` selects one output. The saved response options may contain
 `output_count` for a larger count; the normalized single-output default is omitted.
 Ordinary generation requests reject `options.output_count`: send top-level `n`.
 
-For edits, add `image`: a URL, `{ "image_url": "https://…" }`,
-`{ "file_id": "REFERENCE_ID" }`, or an array. Reference IDs come from the existing
-`POST /v1/references/uploads` direct-upload library, and are checked against the requesting owner.
-`input_reference` accepts these same forms for video.
+JSON image edits require `image`: a nonempty URL string, an object containing
+exactly one `image_url` or `file_id` string, or a nonempty single-level array mixing
+these forms in order. Null, empty strings, nested arrays and extra object keys are
+rejected. A plain string is treated as a URL/asset value; use `{ "file_id":
+"REFERENCE_ID" }` for a library ID lookup. The file must be an accessible image in
+the caller's library or the authorized shared Template library; ID lookup requires
+reference storage and a media signer. References may come from direct uploads or
+local library uploads. Model capabilities and reference limits still apply.
+`input_reference` accepts these same JSON forms for video; omission remains
+subject to the selected model's requirements. Provider `asset://ID` values require
+an advertised asset-reference capability and are separate from Gateway file IDs.
 
-`/v1/images/edits` also accepts multipart `image` or `image[]` files;
-`/v1/videos` accepts multipart forms with an optional `input_reference` image.
-Text-only forms require no reference storage or media signer and use the same
-model validation as JSON. Multipart file uploads require local storage. With S3,
+`/v1/images/edits` also accepts multipart files named `image`, `image[]`, or both.
+Either field may repeat; there must be 1–16 files across both names together,
+subject to stricter model limits. Multipart edits require files and do not accept
+a scalar image URL together with them. `/v1/videos` accepts multipart forms with
+an optional `input_reference` image. Video forms containing only scalar fields
+require no reference storage or media signer and use the same model validation
+as JSON. Multipart file uploads require local storage. With S3,
 file uploads return `409 direct_upload_required` after inspecting part headers,
 without draining or spooling the file. Upload directly using
 `/v1/references/uploads`, then send the saved reference ID or URL. Total multipart size is

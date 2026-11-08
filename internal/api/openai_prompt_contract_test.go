@@ -51,8 +51,10 @@ func TestOpenAPIPromptRequirementsMatchJSONAndMultipartAdmission(t *testing.T) {
 	for _, path := range []string{"/v1/videos", "/v1/images/edits"} {
 		t.Run(path, func(t *testing.T) {
 			required := spec.Paths[path].Post.RequestBody.Content["multipart/form-data"].Schema.Required
-			if slices.Contains(required, "prompt") || !slices.Contains(required, "model") || path == "/v1/images/edits" && !slices.Contains(required, "image") {
-				t.Errorf("multipart schema must preserve model/image constraints without globally requiring prompt: %v", required)
+			// File alternatives are covered by TestImageInputSchemaMatchesEditRepresentations.
+			// image[] and mixed spellings are valid; image is not globally required.
+			if slices.Contains(required, "prompt") || !slices.Contains(required, "model") {
+				t.Errorf("multipart schema must preserve model without globally requiring prompt: %v", required)
 			}
 			for _, format := range []string{"json", "multipart"} {
 				for _, tc := range []struct {

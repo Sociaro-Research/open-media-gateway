@@ -35,7 +35,7 @@ func TestVideoMultipartAdmissionAndValidation(t *testing.T) {
 		name, format, storage, path, model, fileKey string
 		fields                                      [][2]string
 		files                                       int
-		nonImage, requireImage                      bool
+		nonImage, requireImage, mixedImageFields    bool
 		want                                        int
 		wantMessage                                 string
 	}{
@@ -50,6 +50,12 @@ func TestVideoMultipartAdmissionAndValidation(t *testing.T) {
 		{name: "multipart_reference_url", fields: [][2]string{{"input_reference", "https://example.test/reference.png"}}, want: 202},
 		{name: "multipart_reference_url_direct_storage", storage: "direct", fields: [][2]string{{"input_reference", "https://example.test/reference.png"}}, want: 202},
 		{name: "image_edit_reference", path: "/v1/images/edits", model: "mock/mock-image-v1", fileKey: "image[]", files: 1, want: 202},
+		{name: "image_edit_plain", path: "/v1/images/edits", model: "mock/mock-image-v1", fileKey: "image", files: 1, want: 202},
+		{name: "image_edit_repeated_plain", path: "/v1/images/edits", model: "mock/mock-image-v1", fileKey: "image", files: 2, want: 202},
+		{name: "image_edit_both_spellings", path: "/v1/images/edits", model: "mock/mock-image-v1", fileKey: "image", files: 2, mixedImageFields: true, want: 202},
+		{name: "image_edit_too_many_combined", path: "/v1/images/edits", model: "mock/mock-image-v1", fileKey: "image", files: 17, mixedImageFields: true, want: 400},
+		{name: "image_edit_scalar_only", path: "/v1/images/edits", model: "mock/mock-image-v1", fields: [][2]string{{"image", "https://example.test/reference.png"}}, want: 400},
+		{name: "image_edit_files_and_url", path: "/v1/images/edits", model: "mock/mock-image-v1", fileKey: "image", files: 1, fields: [][2]string{{"image", "https://example.test/reference.png"}}, want: 400},
 		{name: "image_edit_requires_image", path: "/v1/images/edits", model: "mock/mock-image-v1", want: 400, wantMessage: "send 1–16 images"},
 		{name: "unknown_model", model: "mock/unknown", want: 400, wantMessage: "model"},
 		{name: "unknown_field", fields: [][2]string{{"unknown", "value"}}, want: 400, wantMessage: "Unsupported JSON field"},
@@ -129,11 +135,17 @@ func TestVideoMultipartAdmissionAndValidation(t *testing.T) {
 					if key == "" {
 						key = "input_reference"
 					}
+					if tc.mixedImageFields && i > 0 {
+						key += "[]"
+					}
 					part, err := writer.CreateFormFile(key, "fixture.png")
 					if err != nil {
 						t.Fatal(err)
 					}
 					data := referencePNG(t)
+					if route == "/v1/images/edits" && tc.files > 1 {
+						data = resourceAPIPNG(t, uint8(i+1))
+					}
 					if tc.nonImage {
 						data = []byte("not an image")
 					}
