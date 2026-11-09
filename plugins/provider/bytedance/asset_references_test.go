@@ -75,7 +75,7 @@ func TestRegisteredAssetsReachBytePlusUnchanged(t *testing.T) {
 }
 
 func TestRegisteredAssetsRejectUnsupportedModelsAndModes(t *testing.T) {
-	adapter := &Adapter{}
+	adapter := &Adapter{clock: beforeSeedanceRetirement}
 	for _, tc := range []struct {
 		id      string
 		options core.MediaOptions

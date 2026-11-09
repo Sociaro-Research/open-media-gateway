@@ -19,10 +19,11 @@ func (a *Adapter) DiscoverModelIDs(ctx context.Context) ([]string, error) {
 	}
 	ids := []string{}
 	seen := map[string]bool{}
+	now := a.now()
 	for _, m := range response.Data {
 		if strings.Contains(m.ID, "seedance") || strings.Contains(m.ID, "seedream") {
 			id := modelcatalog.CanonicalID("bytedance", m.ID)
-			if !seen[id] {
+			if !seen[id] && !modelcatalog.IsInactive("bytedance", id, now) {
 				ids = append(ids, id)
 				seen[id] = true
 			}

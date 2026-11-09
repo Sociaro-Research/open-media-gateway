@@ -250,7 +250,7 @@ func parseAlibabaRetirements(body []byte) ([]Entry, string, error) {
 				if id == "" {
 					continue
 				}
-				entries = append(entries, Entry{ID: id, Metadata: &core.ModelMetadata{ShutdownDate: date[1], Facts: []core.ModelFact{{Label: "Lifecycle status", Value: "Retired by provider"}, {Label: "Provider replacement", Value: row[3] + "; replacement requires a new explicit model selection."}}}})
+				entries = append(entries, Entry{ID: id, Lifecycle: &Lifecycle{ShutdownDate: date[1]}, Metadata: &core.ModelMetadata{ShutdownDate: date[1], Facts: []core.ModelFact{{Label: "Lifecycle status", Value: "Retired by provider"}, {Label: "Provider replacement", Value: row[3] + "; replacement requires a new explicit model selection."}}}})
 			}
 			return
 		}

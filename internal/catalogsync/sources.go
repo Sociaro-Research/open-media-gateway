@@ -324,6 +324,11 @@ func Parse(source Source, body []byte) ([]Entry, string, error) {
 	if e != nil {
 		return nil, "", e
 	}
+	if source.Parser == "alibaba-releases" {
+		if entries, handled, err := alibabaReleaseCards(body); handled {
+			return entries, text, err
+		}
+	}
 	if source.Parser == "byteplus-pricing" {
 		if entries, handled := bytePlusMediaTables(text); handled {
 			if len(entries) == 0 {
@@ -465,19 +470,7 @@ func Parse(source Source, body []byte) ([]Entry, string, error) {
 	}
 	// Release tables may list the same ID several times, newest first.
 	if source.Parser == "alibaba-releases" || source.Parser == "byteplus-releases" {
-		index := map[string]int{}
-		var unique []Entry
-		for _, entry := range entries {
-			if i, ok := index[entry.ID]; ok {
-				if entry.Metadata.ReleaseDate < unique[i].Metadata.ReleaseDate {
-					unique[i] = entry
-				}
-			} else {
-				index[entry.ID] = len(unique)
-				unique = append(unique, entry)
-			}
-		}
-		entries = unique
+		entries = earliestReleases(entries)
 	}
 	return entries, text, nil
 }

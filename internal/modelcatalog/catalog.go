@@ -38,21 +38,24 @@ func Inactive(provider string, now time.Time) []core.MediaModel {
 // IsInactive requires an explicit lifecycle review, not an inferred date or
 // an account-specific discovery omission. Historical metadata stays available.
 func IsInactive(provider, id string, now time.Time) bool {
-	m := catalog[provider][id]
-	if m.ShutdownDate == "" || m.ShutdownDate > now.UTC().Format("2006-01-02") {
+	return inactiveMetadata(provider, id, catalog[provider][id], now)
+}
+
+func inactiveMetadata(provider, id string, m core.ModelMetadata, now time.Time) bool {
+	reviewed := false
+	for _, f := range m.Facts {
+		reviewed = reviewed || f.Label == "Lifecycle status" && f.Value == "Retired by provider"
+	}
+	if !reviewed {
 		return false
 	}
-	if provider == "bytedance" && id == "seedream-3-0-t2i-250415" {
-		return true
+	// A timestamp takes precedence; never fall back to midnight for a malformed instant.
+	if m.ShutdownAt != "" {
+		cutoff, err := time.Parse(time.RFC3339, m.ShutdownAt)
+		return err == nil && !now.Before(cutoff)
 	}
-	if provider == "alibaba" || provider == "openai" {
-		for _, f := range m.Facts {
-			if f.Label == "Lifecycle status" && f.Value == "Retired by provider" {
-				return true
-			}
-		}
-	}
-	return false
+	cutoff, err := time.Parse("2006-01-02", m.ShutdownDate)
+	return err == nil && !now.Before(cutoff)
 }
 
 // Enrich returns independent slices: no account metadata is ever written into
@@ -71,7 +74,8 @@ func Enrich(provider string, model core.MediaModel) core.MediaModel {
 	metadata.Sources = append([]core.ModelSource(nil), metadata.Sources...)
 	if live := model.Metadata; live != nil {
 		metadata.APICreated, metadata.OwnedBy = live.APICreated, live.OwnedBy
-		if live.ShutdownDate != "" {
+		// Reviewed exact cutoffs cannot be displaced by account discovery dates.
+		if live.ShutdownDate != "" && metadata.ShutdownAt == "" {
 			metadata.ShutdownDate = live.ShutdownDate
 		}
 		metadata.Facts = append(metadata.Facts, live.Facts...)

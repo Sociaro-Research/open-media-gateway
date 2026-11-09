@@ -8,10 +8,13 @@ import (
 
 func Definition() providerkit.Definition {
 	return providerkit.Definition{
-		CatalogSources: catalogSources(),
-		CatalogReviews: catalogDocumentReviews(),
-		CatalogAliases: tariffAliases(),
-		LegacyIdentity: true,
+		CatalogSources:          catalogSources(),
+		CatalogInterpret:        interpretLifecycle,
+		CatalogLifecycleSources: lifecycleSources(),
+		CatalogSourceAliases:    map[string]string{deprecationsURL: deprecationsURL + ".md"},
+		CatalogReviews:          catalogDocumentReviews(),
+		CatalogAliases:          tariffAliases(),
+		LegacyIdentity:          true,
 		Profiles: func() []core.MediaModel {
 			var result []core.MediaModel
 			for _, id := range modelIDs {

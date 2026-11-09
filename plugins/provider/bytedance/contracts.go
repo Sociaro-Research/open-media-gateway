@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
+	"github.com/Sociaro-Research/open-media-gateway/internal/modelcatalog"
 )
 
 func knownModel(id string) bool {
@@ -19,6 +20,11 @@ func knownModel(id string) bool {
 }
 
 func (a *Adapter) ValidateRequest(ctx context.Context, r core.MediaRequest) error {
+	// A manual call carries a serializer profile here. The connection boundary
+	// checks its actual outgoing ID before profile substitution.
+	if !core.IsManualCall(ctx) && modelcatalog.IsInactive("bytedance", r.Model, a.now()) {
+		return core.ErrModelUnavailable
+	}
 	if r.Model == "dreamina-seedance-2-5-260628" && (r.Options.ReferenceMode == "first_frame" || r.Options.ReferenceMode == "first_last_frames") && r.Options.Ratio != "" && r.Options.Ratio != "adaptive" {
 		return core.ErrOptionsInvalid
 	}

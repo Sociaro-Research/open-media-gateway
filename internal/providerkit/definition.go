@@ -61,8 +61,9 @@ type Field struct {
 	Env      string `json:"-"`
 }
 type Definition struct {
-	AssetLibrary   func(Credentials, *http.Client) (providerassets.Client, error)
-	CatalogSources []catalogsync.Source
+	AssetLibrary            func(Credentials, *http.Client) (providerassets.Client, error)
+	CatalogSources          []catalogsync.Source
+	CatalogLifecycleSources []catalogsync.Source
 	// Exact public source aliases preserve existing schedules while recording the actual fetched URL.
 	CatalogSourceAliases       map[string]string
 	CatalogInterpret           func(catalogsync.Source, string) ([]catalogsync.Entry, error)

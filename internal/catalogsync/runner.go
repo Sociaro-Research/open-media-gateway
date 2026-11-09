@@ -174,15 +174,19 @@ func (r *Runner) check(parent context.Context, schedule Schedule, settings Setti
 		}
 	}
 	observations = append(observations, apiObservation)
-	for _, source := range schedule.Sources {
+	sources := append([]Source(nil), schedule.Sources...)
+	if resolver, ok := r.Providers.(interface {
+		ResolveCatalogSource(context.Context, string, Source) Source
+	}); ok {
+		for i, source := range sources {
+			sources[i] = resolver.ResolveCatalogSource(ctx, schedule.Provider, source)
+		}
+	}
+	for _, source := range captureSources(sources, capture.LifecycleSources) {
 		if err := parent.Err(); err != nil {
 			return err
 		}
-		if resolver, ok := r.Providers.(interface {
-			ResolveCatalogSource(context.Context, string, Source) Source
-		}); ok {
-			source = resolver.ResolveCatalogSource(ctx, schedule.Provider, source)
-		}
+
 		call, cancel := context.WithTimeout(ctx, 30*time.Second)
 		ob := Fetch(call, r.Client, source)
 		if ob.Error == "" && source.Parser == "document" {

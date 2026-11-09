@@ -52,7 +52,7 @@ func TestOpenAIReviewedSpeechShutdownBackfillsExistingCatalogue(t *testing.T) {
 	_, _, capture := openaiCatalogFixture(t)
 	now := time.Date(2026, 10, 16, 12, 0, 0, 0, time.UTC)
 	state, _ := catalogsync.Reconcile(catalogsync.State{}, capture, nil, now, func(core.MediaModel, catalogsync.Rate) error { return nil })
-	ids := []string{"tts-1", "tts-1-hd", "gpt-4o-mini-tts-2025-03-20", "gpt-4o-mini-tts-2025-12-15"}
+	ids := []string{"tts-1", "tts-1-hd", "gpt-4o-mini-tts-2025-03-20", "gpt-4o-mini-tts-2025-12-15", "gpt-4o-mini-tts", "tts-1-1106", "tts-1-hd-1106"}
 	// Model the existing catalogue before this lifecycle review, without
 	// assuming that a live /models response includes shutdown_date.
 	for _, id := range ids {
@@ -84,11 +84,7 @@ func TestOpenAIReviewedSpeechShutdownBackfillsExistingCatalogue(t *testing.T) {
 	if len(run.Changes) != len(ids) || next.Version != state.Version+1 || len(run.OpenWarnings) != 0 {
 		t.Fatal("lifecycle backfill changed unrelated fields", run)
 	}
-	for _, id := range []string{"gpt-4o-mini-tts", "tts-1-1106", "tts-1-hd-1106"} {
-		if next.Models[id].Metadata.ShutdownDate != "" {
-			t.Fatal("inferred shutdown for an unlisted alias/snapshot", id)
-		}
-	}
+
 	_, repeat := catalogsync.Reconcile(next, capture, nil, now.Add(time.Hour), func(core.MediaModel, catalogsync.Rate) error { return nil })
 	if len(repeat.Changes) != 0 || repeat.EmailStatus != "not_needed" {
 		t.Fatal("reviewed shutdown backfill repeated", repeat)
@@ -135,14 +131,10 @@ func openaiReportReplay(t *testing.T, pricingFile string) {
 	}
 	now := time.Date(2026, 10, 24, 12, 0, 0, 0, time.UTC)
 	state, run := catalogsync.Reconcile(previous, capture, observations, now, check)
-	if len(run.ResolvedWarnings) != 20 || len(run.OpenWarnings) != 2 {
+	if len(run.ResolvedWarnings) != 20 || len(run.OpenWarnings) != 0 {
 		t.Fatalf("resolved %d/20, open %+v", len(run.ResolvedWarnings), run.OpenWarnings)
 	}
-	for _, warning := range run.OpenWarnings {
-		if (warning.Model != "gpt-image-1" && warning.Model != "gpt-audio-mini-2025-10-06") || !strings.Contains(warning.Reason, "deactivated model") {
-			t.Fatal("unrelated warning", warning)
-		}
-	}
+
 	for _, id := range []string{"sora-2", "sora-2-pro"} {
 		e := state.Models[id]
 		if !e.Inactive || e.Contract != nil || e.Metadata == nil || len(e.Metadata.Sources) == 0 {
@@ -158,7 +150,7 @@ func openaiReportReplay(t *testing.T, pricingFile string) {
 		}
 	}
 	_, repeat := catalogsync.Reconcile(state, capture, observations, now.Add(24*time.Hour), check)
-	if len(repeat.Changes) != 0 || len(repeat.NewWarnings) != 0 || len(repeat.OpenWarnings) != 2 || repeat.EmailStatus != "not_needed" {
+	if len(repeat.Changes) != 0 || len(repeat.NewWarnings) != 0 || len(repeat.OpenWarnings) != 0 || repeat.EmailStatus != "not_needed" {
 		t.Fatal("quiet repeat changed catalogue", repeat)
 	}
 	// A future snapshot must still require review, even if its base is known.
@@ -168,7 +160,7 @@ func openaiReportReplay(t *testing.T, pricingFile string) {
 	for _, w := range unknown.OpenWarnings {
 		foundUnknown = foundUnknown || w.Model == "gpt-image-2-2099-01-01"
 	}
-	if len(unknown.OpenWarnings) != 3 || !foundUnknown {
+	if len(unknown.OpenWarnings) != 1 || !foundUnknown {
 		t.Fatal("unknown snapshot inherited a contract", unknown)
 	}
 
@@ -185,7 +177,7 @@ func openaiReportReplay(t *testing.T, pricingFile string) {
 	}
 	capture.IDs = capture.IDs[:len(capture.IDs)-1]
 	updated, changed := catalogsync.Reconcile(state, capture, observations, now.Add(48*time.Hour), check)
-	if len(changed.OpenWarnings) != 2 || len(changed.Changes) == 0 {
+	if len(changed.OpenWarnings) != 0 || len(changed.Changes) == 0 {
 		t.Fatal(changed)
 	}
 	for _, model := range capture.Reviewed {

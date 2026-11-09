@@ -28,7 +28,7 @@ func TestReviewedDurationContractsAndNativeSerialization(t *testing.T) {
 				t.Fatalf("minimum = %d, want %d", model.MinDuration, wantMin)
 			}
 			calls := 0
-			adapter := &Adapter{apiKey: "test-key", baseURL: "http://byte.test", client: &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+			adapter := &Adapter{clock: beforeSeedanceRetirement, apiKey: "test-key", baseURL: "http://byte.test", client: &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 				calls++
 				var body map[string]any
 				if err := json.NewDecoder(r.Body).Decode(&body); err != nil {

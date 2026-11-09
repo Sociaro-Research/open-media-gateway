@@ -17,7 +17,7 @@ var priceTable = regexp.MustCompile(`(?s)<table>.*?</table>`)
 var h3Model = regexp.MustCompile(`MiniMax-[A-Za-z0-9._-]+`)
 var dollarAmount = regexp.MustCompile(`^\$([0-9]+(?:\.[0-9]+)?)$`)
 var legacyPrice = regexp.MustCompile(`\|\s*(MiniMax-Hailuo-(?:2\.3-Fast|2\.3|02))\s*\|\s*\\?\$([0-9]+(?:\.[0-9]+)?) per (512|768|1080)P, (6|10)s video\s*\|`)
-var imagePrice = regexp.MustCompile(`\|\s*image-01\s*\|\s*\\?\$([0-9]+(?:\.[0-9]+)?) per image\s*\|`)
+var imagePrice = regexp.MustCompile(`\|\s*(image-01(?:\s+image-01-live)?)\s*\|\s*\\?\$([0-9]+(?:\.[0-9]+)?) per image\s*\|`)
 var regenerationPrice = regexp.MustCompile(`\|\s*MiniMax-H3-Regeneration\s*\|\s*768P → 2K\s*\|\s*\\?\$([0-9]+(?:\.[0-9]+)?)\s*\|\s*\\?\$([0-9]+(?:\.[0-9]+)?)\s*\|\s*\\?\$([0-9]+(?:\.[0-9]+)?)\s*\|`)
 var contextPrice = regexp.MustCompile(`\|\s*MiniMax-H3-Context-IR\s*\|\s*\\?\$([0-9]+(?:\.[0-9]+)?)\s*\|\s*\\?\$([0-9]+(?:\.[0-9]+)?)\s*\|`)
 var regenerationPriceHeader = regexp.MustCompile(`\|\s*Model / API\s*\|\s*Spec\s*\|\s*Output Video\s+per second\s*\|\s*Input Video\s+per second\s*\|\s*Input Image\s+per image beyond free quota\s*\|\s*(?:\|[\s:\-]+\|[\s:\-]+\|[\s:\-]+\|[\s:\-]+\|[\s:\-]+\|\s*)?\|\s*MiniMax-H3-Regeneration\s*\|`)
@@ -106,11 +106,13 @@ func interpretPrices(source catalogsync.Source, text string) ([]catalogsync.Entr
 	if len(match) != 1 {
 		return nil, errors.New("MiniMax image-01 price is missing or ambiguous")
 	}
-	amount, e := money.Parse(match[0][1])
+	amount, e := money.Parse(match[0][2])
 	if e != nil || amount <= 0 {
 		return nil, errors.New("MiniMax image price is invalid")
 	}
-	entries["image-01"] = catalogsync.Entry{ID: "image-01", Rates: []catalogsync.Rate{{Region: "Global", Unit: "image", Per: 1, Price: amount, Source: source.URL}}}
+	for _, id := range strings.Fields(match[0][1]) {
+		entries[id] = catalogsync.Entry{ID: id, Rates: []catalogsync.Rate{{Region: "Global", Unit: "image", Per: 1, Price: amount, Source: source.URL}}}
+	}
 	legacySeen := map[string]bool{}
 	for _, row := range legacyPrice.FindAllStringSubmatch(text, -1) {
 		id := row[1]
@@ -184,8 +186,10 @@ func interpretPrices(source catalogsync.Source, text string) ([]catalogsync.Entr
 	}
 	entries[ContextIR] = contextEntry
 	out := []catalogsync.Entry{}
-	for _, id := range []string{"MiniMax-H3", "MiniMax-H3-Highspeed", "MiniMax-H3-Lite", "MiniMax-H3-Max", "image-01", "MiniMax-Hailuo-2.3", "MiniMax-Hailuo-2.3-Fast", "MiniMax-Hailuo-02", ContextIR, Regeneration, RegenerationVideo} {
-		out = append(out, entries[id])
+	for _, id := range []string{"MiniMax-H3", "MiniMax-H3-Highspeed", "MiniMax-H3-Lite", "MiniMax-H3-Max", "image-01", "image-01-live", "MiniMax-Hailuo-2.3", "MiniMax-Hailuo-2.3-Fast", "MiniMax-Hailuo-02", ContextIR, Regeneration, RegenerationVideo} {
+		if entry, ok := entries[id]; ok {
+			out = append(out, entry)
+		}
 	}
 	return out, nil
 }

@@ -127,6 +127,20 @@ type connectionAdapter struct {
 	core.MediaProvider
 	credentials Credentials
 	definition  providerkit.Definition
+	clock       func() time.Time
+}
+
+func (a *connectionAdapter) lifecycleNow() time.Time {
+	if a.clock != nil {
+		return a.clock()
+	}
+	return time.Now()
+}
+
+// A serializer profile is not the native
+// outgoing model identity and must remain usable by active manual models.
+func (a *connectionAdapter) retiredOutgoingModel(id string) bool {
+	return modelcatalog.IsInactive(a.definition.ID, id, a.lifecycleNow())
 }
 
 func (a *connectionAdapter) manual(id string) (providerkit.ManualModel, bool) {
@@ -248,7 +262,7 @@ func (a *connectionAdapter) ListModels(ctx context.Context) ([]core.MediaModel, 
 	}
 	eligible := result[:0]
 	for _, m := range result {
-		if !invalidManual[m.ID] {
+		if !invalidManual[m.ID] && !a.retiredOutgoingModel(m.ID) {
 			eligible = append(eligible, m)
 		}
 	}
@@ -321,6 +335,9 @@ func (a *connectionAdapter) CredentialStatus() providerkit.CredentialCheck {
 	return providerkit.CredentialCheck{}
 }
 func (a *connectionAdapter) ValidateRequest(ctx context.Context, r core.MediaRequest) error {
+	if a.retiredOutgoingModel(r.Model) {
+		return core.ErrModelUnavailable
+	}
 	preparation, err := a.nativePreparation(ctx, r.Model)
 	if err != nil {
 		return err
@@ -334,6 +351,9 @@ func (a *connectionAdapter) ValidateRequest(ctx context.Context, r core.MediaReq
 	return nil
 }
 func (a *connectionAdapter) Generate(ctx context.Context, r core.MediaRequest) (core.ProviderTask, error) {
+	if a.retiredOutgoingModel(r.Model) {
+		return core.ProviderTask{}, core.ErrModelUnavailable
+	}
 	preparation, err := a.nativePreparation(ctx, r.Model)
 	if err != nil {
 		return core.ProviderTask{}, err
@@ -378,6 +398,9 @@ func (a *connectionAdapter) PreferInlineImages() bool {
 func (a *connectionAdapter) IsFree() bool        { return a.definition.Free }
 func (a *connectionAdapter) FailureIsFree() bool { return a.definition.FailureNoCharge }
 func (a *connectionAdapter) Quote(ctx context.Context, m core.MediaModel, r core.MediaRequest) (core.TaskCost, string, error) {
+	if a.retiredOutgoingModel(r.Model) {
+		return core.TaskCost{}, "", core.ErrModelUnavailable
+	}
 	preparation, err := a.nativePreparation(ctx, r.Model)
 	if err != nil {
 		return core.TaskCost{}, "", err
@@ -430,4 +453,24 @@ func (a *connectionAdapter) nativePreparation(ctx context.Context, id string) (b
 		}
 	}
 	return false, nil
+}
+
+// HistoricalUsageModel does not invoke new-admission guards or Quote. Manual
+// descriptors keep their own saved pricing; they never inherit a native profile's tariff.
+func (a *connectionAdapter) HistoricalUsageModel(ctx context.Context, id string) (core.MediaModel, bool, error) {
+	history, ok := a.MediaProvider.(core.HistoricalUsageCatalog)
+	if !ok {
+		return core.MediaModel{}, false, nil
+	}
+	model, found, err := history.HistoricalUsageModel(ctx, id)
+	if err != nil || !found {
+		return model, found, err
+	}
+	if manual, ok := a.manual(id); ok {
+		model = manual.Model
+		model.Pricing.Known = manual.PriceUSD != nil
+	} else if len(a.connection().ExtraBody) > 0 || a.connection().Endpoints["generate"] != "" {
+		model.Pricing.Known = false
+	}
+	return model, true, nil
 }

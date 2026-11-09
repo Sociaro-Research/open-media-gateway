@@ -37,6 +37,9 @@ func (p *managedProvider) Quote(ctx context.Context, model core.MediaModel, requ
 	if err != nil {
 		return core.TaskCost{}, "", err
 	}
+	if catalogUnavailable(state, request.Model, time.Now()) {
+		return core.TaskCost{}, "", core.ErrModelUnavailable
+	}
 	if quoter, ok := adapter.(core.CostQuoter); ok {
 		cost, _, err := quoter.Quote(ctx, model, request)
 		cost, err = applyCatalogQuote(cost, err, model, request, state)

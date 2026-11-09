@@ -23,8 +23,11 @@ next checks and invalidates work using the old schedule configuration.
 Default source lists belong to each provider module in
 `plugins/provider/<id>/catalog_sources.go`. They are copied when a shared
 connection first receives a schedule. Existing administrator edits are preserved
-on startup and upgrades. New sources introduced by a code upgrade must be added
-to existing schedules deliberately. Newly initialized schedules use `03:00` and
+on startup and upgrades. New optional sources introduced by a code upgrade must
+be added to existing schedules deliberately. Module-registered official lifecycle
+sources are always checked in addition to saved sources, including on older
+schedules; this does not rewrite administrator settings. Exact source aliases
+record the actual official Markdown URL fetched. Newly initialized schedules use `03:00` and
 inherit the connection's enabled/non-archived state; set different times for
 providers to distribute their work. Free/mock providers have no schedule.
 Personal and administrator-defined manual model catalogues are not overwritten.
@@ -94,6 +97,15 @@ Automatic publication is limited to reviewed adapter contracts:
   supports their exact ID and request/response contract. Unknown IDs, capabilities,
   reference rules and availability removals require review. No prefix-based
   protocol or pricing inheritance is introduced.
+- Explicit availability and shutdown boundaries from registered official lifecycle
+  sources are published automatically for reviewed media IDs. OpenAI deprecation
+  tables, BytePlus deactivation batches and Alibaba retirement notices retain exact
+  model identities; replacement columns never select another model. Invalid dates,
+  conflicting sources, unknown contracts and unrecognized regional restrictions
+  produce warnings. Arbitrary manifests and metadata cannot create lifecycle controls.
+  Release dates/months, version dates and API creation timestamps remain informational.
+  Missing or failed sources preserve last-confirmed boundaries. Reactivation of an
+  unavailable model requires review.
 - Prices update only when currency, billing unit, region, selectors and usage
   metrics match an existing quantity estimator. Regional prices remain separate.
   Promotions, unreviewed video/audio reference tariffs, fixed surcharges, unknown metrics and
@@ -128,6 +140,12 @@ unknown versions still require an adapter contract. Seedream Flash uses its revi
 single-image API contract. Seedream 3.0, deactivated on 13 May 2026, is retained as
 an `inactive` historical entry without an executable contract and is excluded from
 the adapter's model picker. An API retaining its old ID does not reactivate it.
+Seedance 1.0 Lite T2V and I2V were also deactivated on 13 May 2026. Seedance 1.5 Pro
+stops new admission at `2026-11-11T09:00:00Z` (17:00 UTC+8), without automatic
+migration. Exact `shutdown_at` instants take precedence over `shutdown_date`;
+date-only boundaries retain UTC midnight semantics. Cached lists, manual outgoing
+IDs, validation, estimates and new submission enforce retirement. Polling, accepted
+receipts, historical usage descriptors and immutable task prices remain recoverable.
 
 Alibaba keeps exact regional and third-party IDs. Reviewed models documented in
 another region are distinct from models previously discovered by the configured
@@ -191,7 +209,11 @@ OpenAI model pages also monitor unparsed changes beyond their description.
 OpenAI exact snapshots share published parent tariffs only through the module's
 reviewed `CatalogAliases` map. Each snapshot retains its wire ID and quantity
 estimator; unknown snapshots remain blocked. Sora 2 aliases and snapshots are
-inactive historical entries following the provider's 2026-09-24 shutdown.
+inactive historical entries following the provider's 2026-09-24 shutdown. All
+reviewed future OpenAI shutdown dates take effect without another code upgrade,
+including the image, speech and audio aliases and exact snapshots in the catalogue.
+Published lifecycle windows are checked on every new admission and cached list read,
+so a daily synchronization need not occur at the boundary itself.
 Image Mini keeps its separate size/quality planning table when tariffs refresh;
 actual usage is still priced from returned tokens. Image 1.5 and ChatGPT Image
 include internal text/reasoning output in both the planning estimate and reported

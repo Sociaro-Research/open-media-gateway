@@ -15,7 +15,9 @@ import (
 	"github.com/Sociaro-Research/open-media-gateway/internal/catalogsync"
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
 	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
+	"github.com/Sociaro-Research/open-media-gateway/internal/modelcatalog"
 	"github.com/Sociaro-Research/open-media-gateway/internal/money"
+	"github.com/Sociaro-Research/open-media-gateway/plugins/provider/bytedance"
 )
 
 func bytePlusCatalogFixture(t *testing.T) (*Manager, context.Context, catalogsync.Capture) {
@@ -37,10 +39,30 @@ func bytePlusCatalogFixture(t *testing.T) (*Manager, context.Context, catalogsyn
 	if _, err := m.Update(ctx, "bytedance", ProviderUpdate{APIKey: pointer("fixture"), Enabled: pointer(true)}); err != nil {
 		t.Fatal(err)
 	}
+	// These offline source replays represent the October catalogue, not current
+	// model admission. Pin native/cache and connection guards to that snapshot.
+	historicalNow := bytePlusCatalogueFixtureTime
+	resolved, err := m.resolve(ctx, "bytedance", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	connection, ok := resolved.(*connectionAdapter)
+	if !ok {
+		t.Fatal("fixture did not resolve a connection adapter")
+	}
+	native, err := bytedance.New(connection.credentials.APIKey, connection.credentials.BaseURL, m.client, bytedance.WithClock(historicalNow))
+	if err != nil {
+		t.Fatal(err)
+	}
+	connection.MediaProvider = native
+	connection.clock = historicalNow
 	capture, err := m.CaptureCatalog(ctx, "bytedance")
 	if err != nil {
 		t.Fatal(err)
 	}
+	// CaptureCatalog uses the production wall clock for history; this fixture
+	// explicitly replays the same historical instant as the adapter above.
+	capture.Inactive = modelcatalog.Inactive("bytedance", historicalNow())
 	return m, ctx, capture
 }
 
@@ -82,7 +104,7 @@ func bytePlusReportReplay(t *testing.T, dir, extension string) {
 	if err != nil || json.Unmarshal(data, &previous.Warnings) != nil {
 		t.Fatal("original report fixture", err)
 	}
-	state, run := catalogsync.Reconcile(previous, capture, obs, time.Now(), func(model core.MediaModel, rate catalogsync.Rate) error {
+	state, run := catalogsync.Reconcile(previous, capture, obs, bytePlusCatalogueFixtureTime(), func(model core.MediaModel, rate catalogsync.Rate) error {
 		return m.CheckCatalogRate(ctx, "bytedance", model, rate)
 	})
 	for _, w := range run.OpenWarnings {
@@ -97,7 +119,7 @@ func bytePlusReportReplay(t *testing.T, dir, extension string) {
 	if !state.Models["seedream-3-0-t2i-250415"].Inactive || state.Models["seedream-3-0-t2i-250415"].Contract != nil {
 		t.Fatal("deactivated model became executable")
 	}
-	_, repeated := catalogsync.Reconcile(state, capture, obs, time.Now(), func(model core.MediaModel, rate catalogsync.Rate) error {
+	_, repeated := catalogsync.Reconcile(state, capture, obs, bytePlusCatalogueFixtureTime(), func(model core.MediaModel, rate catalogsync.Rate) error {
 		return m.CheckCatalogRate(ctx, "bytedance", model, rate)
 	})
 	if len(repeated.Changes) != 0 || len(repeated.NewWarnings) != 0 || len(repeated.OpenWarnings) != 0 {
@@ -111,7 +133,7 @@ func TestBytePlusCatalogAudioAndReferenceImageTariffs(t *testing.T) {
 	for _, model := range capture.Models {
 		byID[model.ID] = model
 	}
-	if len(capture.Models) != 15 {
+	if len(capture.Models) != 13 {
 		t.Fatal("duplicate aliases or deactivated model leaked into executable catalogue", len(capture.Models))
 	}
 	pro := byID["dola-seedream-5-0-pro-260628"]
@@ -119,7 +141,7 @@ func TestBytePlusCatalogAudioAndReferenceImageTariffs(t *testing.T) {
 	request.Options.Resolution = "1.5K"
 	request.Options.ImageURLs = []string{"https://example.test/1.png", "https://example.test/2.png", "https://example.test/3.png"}
 	d, _ := m.findSpec("bytedance")
-	before, err := d.Quote("https://ark.ap-southeast.bytepluses.com", pro, request, time.Now())
+	before, err := d.Quote("https://ark.ap-southeast.bytepluses.com", pro, request, bytePlusCatalogueFixtureTime())
 	if err != nil || before.ExpectedUSD != 51_000 {
 		t.Fatal(before, err)
 	}
@@ -138,7 +160,7 @@ func TestBytePlusCatalogAudioAndReferenceImageTariffs(t *testing.T) {
 	for _, on := range []bool{false, true} {
 		request, _ = referenceRequest(video)
 		request.Options.GenerateAudio = &on
-		before, err = d.Quote("https://ark.ap-southeast.bytepluses.com", video, request, time.Now())
+		before, err = d.Quote("https://ark.ap-southeast.bytepluses.com", video, request, bytePlusCatalogueFixtureTime())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -173,7 +195,7 @@ func TestBytePlusVideoReferenceSelectorAndFrozenReserve(t *testing.T) {
 			request.Options.VideoURL = "https://example.test/ref.mp4"
 			request.Options.AudioURL = "https://example.test/ref.wav"
 		}
-		base, err := d.Quote("https://ark.ap-southeast.bytepluses.com", model, request, time.Now())
+		base, err := d.Quote("https://ark.ap-southeast.bytepluses.com", model, request, bytePlusCatalogueFixtureTime())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -280,4 +302,10 @@ func TestBytePlusRedesignedSavedReportReplay(t *testing.T) {
 		t.Fatal("repeat is not quiet", repeat)
 	}
 	t.Logf("saved run replay: %d pricing warnings resolved, %d independent models-source warning retained; all confirmed prices unchanged; repeat quiet", len(run.ResolvedWarnings), len(run.OpenWarnings))
+}
+
+// Offline source and tariff fixtures must not change their meaning when the
+// current wall clock passes a reviewed model retirement.
+func bytePlusCatalogueFixtureTime() time.Time {
+	return time.Date(2026, 10, 24, 12, 0, 0, 0, time.UTC)
 }

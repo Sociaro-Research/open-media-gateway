@@ -1,6 +1,9 @@
 package core
 
-import "encoding/json"
+import (
+	"context"
+	"encoding/json"
+)
 
 // ModelMetadata separates published release dates, version dates and API object
 // creation times. They must never be silently presented as the same date.
@@ -15,9 +18,11 @@ type ModelMetadata struct {
 	APICreated   int64                      `json:"api_created,omitempty"`
 	OwnedBy      string                     `json:"owned_by,omitempty"`
 	ShutdownDate string                     `json:"shutdown_date,omitempty"`
-	CheckedAt    string                     `json:"checked_at,omitempty"`
-	Facts        []ModelFact                `json:"facts,omitempty"`
-	Sources      []ModelSource              `json:"sources,omitempty"`
+	// ShutdownAt is an exact reviewed retirement instant, independent of date-only metadata.
+	ShutdownAt string        `json:"shutdown_at,omitempty"`
+	CheckedAt  string        `json:"checked_at,omitempty"`
+	Facts      []ModelFact   `json:"facts,omitempty"`
+	Sources    []ModelSource `json:"sources,omitempty"`
 }
 
 type ModelFact struct {
@@ -47,4 +52,11 @@ type OperationalFact struct {
 	Source    ModelSource     `json:"source"`
 	Snapshot  string          `json:"snapshot"`
 	CheckedAt string          `json:"checked_at"`
+}
+
+// HistoricalUsageCatalog supplies a pure reviewed descriptor solely for legacy
+// accepted-task usage that has no accepted tariff snapshot. It must not discover,
+// quote, admit, resubmit or choose a replacement model.
+type HistoricalUsageCatalog interface {
+	HistoricalUsageModel(context.Context, string) (MediaModel, bool, error)
 }

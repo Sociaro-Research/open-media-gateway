@@ -104,3 +104,32 @@ func TestOfficialPricesThroughActualCatalogueIngestion(t *testing.T) {
 		t.Fatalf("normalized source price replay failed: entries=%d err=%v", len(entries), e)
 	}
 }
+
+func TestCombinedImageModelPriceKeepsExplicitCandidateWithoutEstimatorInheritance(t *testing.T) {
+	body, err := os.ReadFile("testdata/pricing.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated := strings.Replace(string(body), "| image-01 |", "| image-01 image-01-live |", 1)
+	if updated == string(body) {
+		t.Fatal("fixture mutation did not apply")
+	}
+	entries, err := interpretPrices(catalogsync.Source{URL: priceSource + ".md"}, updated)
+	if err != nil || len(entries) != 12 {
+		t.Fatal(entries, err)
+	}
+	a := fixture(t, nil)
+	for _, e := range entries {
+		if e.ID != "image-01" && e.ID != "image-01-live" {
+			continue
+		}
+		if len(e.Rates) != 1 || e.Rates[0].Price != 3500 {
+			t.Fatal(e)
+		}
+		model, _ := modelFor(e.ID)
+		_, err := reviewedRateFixture(a, model, e.Rates[0])
+		if (err == nil) != (e.ID == "image-01") {
+			t.Fatal("unreviewed estimator inherited a rate", e.ID, err)
+		}
+	}
+}

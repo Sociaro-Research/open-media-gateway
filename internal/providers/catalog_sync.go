@@ -63,16 +63,17 @@ func (m *Manager) EnsureCatalogSchedules(ctx context.Context) error {
 }
 func (m *Manager) CaptureCatalog(ctx context.Context, id string) (catalogsync.Capture, error) {
 	ctx = catalogContext(ctx)
+	d, _ := m.findSpec(id)
+	capture := catalogsync.Capture{LifecycleSources: d.CatalogLifecycleSources, DocumentReviews: d.CatalogReviews}
 	adapter, err := m.resolve(ctx, id, true)
 	if err != nil {
-		return catalogsync.Capture{}, err
+		return capture, err
 	}
 	models, err := listAdapterModels(ctx, adapter)
 	if err != nil {
-		return catalogsync.Capture{}, err
+		return capture, err
 	}
-	d, _ := m.findSpec(id)
-	capture := catalogsync.Capture{Models: models, Inactive: modelcatalog.Inactive(d.ID, time.Now()), IDs: []string{}}
+	capture.Models, capture.Inactive, capture.IDs = models, modelcatalog.Inactive(d.ID, time.Now()), []string{}
 	capture.DocumentReviews = d.CatalogReviews
 	capture.VerificationSources = d.CatalogVerificationSources
 	if reviewed, ok := adapter.(interface {
@@ -285,6 +286,12 @@ func applyCatalogModel(model core.MediaModel, state catalogsync.State) core.Medi
 	if model.Metadata != nil {
 		metadata.APICreated = model.Metadata.APICreated
 		metadata.OwnedBy = model.Metadata.OwnedBy
+		// A saved catalogue may predate the exact reviewed retirement. Retain
+		// the native descriptor's reviewed cutoff until synchronization adopts it.
+		if entry.Lifecycle == nil && model.Metadata.ShutdownAt != "" {
+			metadata.ShutdownAt = model.Metadata.ShutdownAt
+			metadata.ShutdownDate = model.Metadata.ShutdownDate
+		}
 	}
 	if fact, ok := metadata.Operational["reference_prompt_recommendation"]; ok {
 		var hint core.ReferencePromptRecommendation

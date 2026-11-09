@@ -18,6 +18,9 @@ func TestOfficialCatalogueSources(t *testing.T) {
 	client := httpclient.NewPublic(30 * time.Second)
 	for _, d := range All() {
 		for _, source := range d.CatalogSources {
+			if alias := d.CatalogSourceAliases[source.URL]; alias != "" {
+				source.URL = alias
+			}
 			t.Run(d.ID+"/"+source.ID, func(t *testing.T) {
 				t.Parallel()
 				ctx, cancel := context.WithTimeout(context.Background(), 35*time.Second)
@@ -25,6 +28,15 @@ func TestOfficialCatalogueSources(t *testing.T) {
 				ob := catalogsync.Fetch(ctx, client, source)
 				if ob.Error != "" {
 					t.Fatal(ob.Error)
+				}
+				if source.Parser == "document" && d.CatalogInterpret != nil {
+					entries, err := d.CatalogInterpret(source, ob.Text)
+					if err != nil {
+						t.Fatal("official document interpretation:", err)
+					}
+					if entries != nil {
+						ob.Entries = entries
+					}
 				}
 				t.Logf("%d normalized records; snapshot %s", len(ob.Entries), ob.Hash)
 			})

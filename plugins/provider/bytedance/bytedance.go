@@ -31,6 +31,7 @@ type Adapter struct {
 	modelsMu     sync.Mutex
 	models       []core.MediaModel
 	modelsAt     time.Time
+	clock        func() time.Time
 }
 
 type Option func(*Adapter)
@@ -68,10 +69,10 @@ func (a *Adapter) CheckCredentials(ctx context.Context) error {
 
 func (a *Adapter) ListModels(ctx context.Context) ([]core.MediaModel, error) {
 	a.modelsMu.Lock()
-	if len(a.models) > 0 && time.Since(a.modelsAt) < 10*time.Minute {
+	if len(a.models) > 0 && a.now().Sub(a.modelsAt) < 10*time.Minute {
 		models := cloneModels(a.models)
 		a.modelsMu.Unlock()
-		return models, nil
+		return activeModels(models, a.now()), nil
 	}
 	a.modelsMu.Unlock()
 
@@ -100,9 +101,9 @@ func (a *Adapter) ListModels(ctx context.Context) ([]core.MediaModel, error) {
 	slices.SortFunc(models, func(a, b core.MediaModel) int { return strings.Compare(a.ID, b.ID) })
 	a.modelsMu.Lock()
 	a.models = cloneModels(models)
-	a.modelsAt = time.Now()
+	a.modelsAt = a.now()
 	a.modelsMu.Unlock()
-	return models, nil
+	return activeModels(models, a.now()), nil
 }
 
 func (a *Adapter) Generate(ctx context.Context, request core.MediaRequest) (core.ProviderTask, error) {

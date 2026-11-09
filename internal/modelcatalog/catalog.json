@@ -130,7 +130,7 @@
       "release_date": "2026-04-21"
     },
     "gpt-image-1.5": {
-      "checked_at": "2026-09-13",
+      "checked_at": "2026-11-10",
       "facts": [
         {
           "label": "Provider: Input modalities",
@@ -147,6 +147,10 @@
         {
           "label": "Provider: Supported features",
           "value": "inpainting"
+        },
+        {
+          "label": "Lifecycle status",
+          "value": "Retired by provider"
         }
       ],
       "sources": [
@@ -178,7 +182,7 @@
       "release_date": "2025-12-16"
     },
     "gpt-image-1-mini": {
-      "checked_at": "2026-09-13",
+      "checked_at": "2026-11-10",
       "facts": [
         {
           "label": "Provider: Input modalities",
@@ -191,6 +195,10 @@
         {
           "label": "Provider: Supported endpoints",
           "value": "batch, image_edit, image_generation"
+        },
+        {
+          "label": "Lifecycle status",
+          "value": "Retired by provider"
         }
       ],
       "sources": [
@@ -221,7 +229,7 @@
       "release_date": "2025-10-06"
     },
     "gpt-image-1": {
-      "checked_at": "2026-10-24",
+      "checked_at": "2026-11-10",
       "facts": [
         {
           "label": "Provider: Input modalities",
@@ -272,7 +280,7 @@
       "release_date": "2025-04-23"
     },
     "chatgpt-image-latest": {
-      "checked_at": "2026-09-13",
+      "checked_at": "2026-11-10",
       "facts": [
         {
           "label": "Provider: Input modalities",
@@ -289,6 +297,10 @@
         {
           "label": "Provider: Supported features",
           "value": "inpainting"
+        },
+        {
+          "label": "Lifecycle status",
+          "value": "Retired by provider"
         }
       ],
       "sources": [
@@ -319,7 +331,7 @@
       "release_date": "2025-12-16"
     },
     "gpt-4o-mini-tts": {
-      "checked_at": "2026-09-13",
+      "checked_at": "2026-11-10",
       "facts": [
         {
           "label": "Provider: Input modalities",
@@ -332,6 +344,10 @@
         {
           "label": "Provider: Supported endpoints",
           "value": "speech_generation"
+        },
+        {
+          "label": "Lifecycle status",
+          "value": "Retired by provider"
         }
       ],
       "sources": [
@@ -346,15 +362,20 @@
         {
           "title": "Release announcement",
           "url": "https://openai.com/index/introducing-our-next-generation-audio-models/"
+        },
+        {
+          "title": "OpenAI deprecations",
+          "url": "https://developers.openai.com/api/docs/deprecations"
         }
       ],
       "description": "Text-to-speech model powered by GPT-4o Mini",
       "snapshot": "gpt-4o-mini-tts-2025-12-15",
       "version_date": "2025-12-15",
-      "release_date": "2025-03-20"
+      "release_date": "2025-03-20",
+      "shutdown_date": "2027-01-06"
     },
     "tts-1": {
-      "checked_at": "2026-09-13",
+      "checked_at": "2026-11-10",
       "facts": [
         {
           "label": "Provider: Input modalities",
@@ -367,6 +388,10 @@
         {
           "label": "Provider: Supported endpoints",
           "value": "speech_generation"
+        },
+        {
+          "label": "Lifecycle status",
+          "value": "Retired by provider"
         }
       ],
       "sources": [
@@ -393,7 +418,7 @@
       "shutdown_date": "2027-01-06"
     },
     "tts-1-hd": {
-      "checked_at": "2026-09-13",
+      "checked_at": "2026-11-10",
       "facts": [
         {
           "label": "Provider: Input modalities",
@@ -406,6 +431,10 @@
         {
           "label": "Provider: Supported endpoints",
           "value": "speech_generation"
+        },
+        {
+          "label": "Lifecycle status",
+          "value": "Retired by provider"
         }
       ],
       "sources": [
@@ -482,7 +511,7 @@
       "release_date": "2026-02-23"
     },
     "gpt-audio": {
-      "checked_at": "2026-09-13",
+      "checked_at": "2026-11-10",
       "facts": [
         {
           "label": "Provider: Context window",
@@ -511,6 +540,10 @@
         {
           "label": "Provider: Supported features",
           "value": "streaming, function_calling"
+        },
+        {
+          "label": "Lifecycle status",
+          "value": "Retired by provider"
         }
       ],
       "sources": [
@@ -533,7 +566,7 @@
       "shutdown_date": "2027-01-20"
     },
     "gpt-audio-mini": {
-      "checked_at": "2026-09-13",
+      "checked_at": "2026-11-10",
       "facts": [
         {
           "label": "Provider: Context window",
@@ -562,6 +595,10 @@
         {
           "label": "Provider: Supported features",
           "value": "function_calling, prompt_caching"
+        },
+        {
+          "label": "Lifecycle status",
+          "value": "Retired by provider"
         }
       ],
       "sources": [
@@ -718,7 +755,7 @@
       "release_date": "2026-09-08"
     },
     "gpt-image-1.5-2025-12-16": {
-      "checked_at": "2026-10-12",
+      "checked_at": "2026-11-10",
       "facts": [
         {
           "label": "Provider: Input modalities",
@@ -735,6 +772,10 @@
         {
           "label": "Provider: Supported features",
           "value": "inpainting"
+        },
+        {
+          "label": "Lifecycle status",
+          "value": "Retired by provider"
         }
       ],
       "sources": [
@@ -766,7 +807,7 @@
       "release_date": "2025-12-16"
     },
     "gpt-4o-mini-tts-2025-03-20": {
-      "checked_at": "2026-10-12",
+      "checked_at": "2026-11-10",
       "facts": [
         {
           "label": "Provider: Input modalities",
@@ -779,6 +820,10 @@
         {
           "label": "Provider: Supported endpoints",
           "value": "speech_generation"
+        },
+        {
+          "label": "Lifecycle status",
+          "value": "Retired by provider"
         }
       ],
       "sources": [
@@ -806,7 +851,7 @@
       "shutdown_date": "2027-01-06"
     },
     "gpt-4o-mini-tts-2025-12-15": {
-      "checked_at": "2026-10-12",
+      "checked_at": "2026-11-10",
       "facts": [
         {
           "label": "Provider: Input modalities",
@@ -819,6 +864,10 @@
         {
           "label": "Provider: Supported endpoints",
           "value": "speech_generation"
+        },
+        {
+          "label": "Lifecycle status",
+          "value": "Retired by provider"
         }
       ],
       "sources": [
@@ -846,7 +895,7 @@
       "shutdown_date": "2027-01-06"
     },
     "gpt-audio-2025-08-28": {
-      "checked_at": "2026-10-12",
+      "checked_at": "2026-11-10",
       "facts": [
         {
           "label": "Provider: Context window",
@@ -875,6 +924,10 @@
         {
           "label": "Provider: Supported features",
           "value": "streaming, function_calling"
+        },
+        {
+          "label": "Lifecycle status",
+          "value": "Retired by provider"
         }
       ],
       "sources": [
@@ -898,7 +951,7 @@
       "release_date": "2025-08-28"
     },
     "gpt-audio-mini-2025-10-06": {
-      "checked_at": "2026-10-24",
+      "checked_at": "2026-11-10",
       "facts": [
         {
           "label": "Provider: Context window",
@@ -958,7 +1011,7 @@
       "release_date": "2025-10-06"
     },
     "gpt-audio-mini-2025-12-15": {
-      "checked_at": "2026-10-12",
+      "checked_at": "2026-11-10",
       "facts": [
         {
           "label": "Provider: Context window",
@@ -987,6 +1040,10 @@
         {
           "label": "Provider: Supported features",
           "value": "function_calling, prompt_caching"
+        },
+        {
+          "label": "Lifecycle status",
+          "value": "Retired by provider"
         }
       ],
       "sources": [
@@ -1014,7 +1071,7 @@
       "release_date": "2025-12-15"
     },
     "tts-1-1106": {
-      "checked_at": "2026-10-12",
+      "checked_at": "2026-11-10",
       "facts": [
         {
           "label": "Provider: Input modalities",
@@ -1027,6 +1084,10 @@
         {
           "label": "Provider: Supported endpoints",
           "value": "speech_generation"
+        },
+        {
+          "label": "Lifecycle status",
+          "value": "Retired by provider"
         }
       ],
       "sources": [
@@ -1041,15 +1102,20 @@
         {
           "title": "Release announcement",
           "url": "https://openai.com/index/new-models-and-developer-products-announced-at-devday/"
+        },
+        {
+          "title": "OpenAI deprecations",
+          "url": "https://developers.openai.com/api/docs/deprecations"
         }
       ],
       "description": "Text-to-speech model optimized for speed",
       "snapshot": "tts-1-1106",
       "release_date": "2023-11-06",
-      "version_date": "2023-11-06"
+      "version_date": "2023-11-06",
+      "shutdown_date": "2027-01-06"
     },
     "tts-1-hd-1106": {
-      "checked_at": "2026-10-12",
+      "checked_at": "2026-11-10",
       "facts": [
         {
           "label": "Provider: Input modalities",
@@ -1062,6 +1128,10 @@
         {
           "label": "Provider: Supported endpoints",
           "value": "speech_generation"
+        },
+        {
+          "label": "Lifecycle status",
+          "value": "Retired by provider"
         }
       ],
       "sources": [
@@ -1076,15 +1146,20 @@
         {
           "title": "Release announcement",
           "url": "https://openai.com/index/new-models-and-developer-products-announced-at-devday/"
+        },
+        {
+          "title": "OpenAI deprecations",
+          "url": "https://developers.openai.com/api/docs/deprecations"
         }
       ],
       "description": "Text-to-speech model optimized for quality",
       "snapshot": "tts-1-hd-1106",
       "release_date": "2023-11-06",
-      "version_date": "2023-11-06"
+      "version_date": "2023-11-06",
+      "shutdown_date": "2027-01-06"
     },
     "sora-2": {
-      "checked_at": "2026-10-12",
+      "checked_at": "2026-11-10",
       "description": "Retired OpenAI video generation model. The Videos API and Sora 2 models were shut down on September 24, 2026.",
       "shutdown_date": "2026-09-24",
       "facts": [
@@ -1097,11 +1172,15 @@
         {
           "title": "OpenAI Sora 2 retirement notice",
           "url": "https://developers.openai.com/api/docs/deprecations#2026-03-24-sora-2-video-generation-models-and-videos-api"
+        },
+        {
+          "title": "OpenAI deprecations",
+          "url": "https://developers.openai.com/api/docs/deprecations"
         }
       ]
     },
     "sora-2-pro": {
-      "checked_at": "2026-10-12",
+      "checked_at": "2026-11-10",
       "description": "Retired OpenAI video generation model. The Videos API and Sora 2 models were shut down on September 24, 2026.",
       "shutdown_date": "2026-09-24",
       "facts": [
@@ -1114,11 +1193,15 @@
         {
           "title": "OpenAI Sora 2 retirement notice",
           "url": "https://developers.openai.com/api/docs/deprecations#2026-03-24-sora-2-video-generation-models-and-videos-api"
+        },
+        {
+          "title": "OpenAI deprecations",
+          "url": "https://developers.openai.com/api/docs/deprecations"
         }
       ]
     },
     "sora-2-2025-10-06": {
-      "checked_at": "2026-10-12",
+      "checked_at": "2026-11-10",
       "description": "Retired OpenAI video generation model. The Videos API and Sora 2 models were shut down on September 24, 2026.",
       "shutdown_date": "2026-09-24",
       "facts": [
@@ -1131,11 +1214,15 @@
         {
           "title": "OpenAI Sora 2 retirement notice",
           "url": "https://developers.openai.com/api/docs/deprecations#2026-03-24-sora-2-video-generation-models-and-videos-api"
+        },
+        {
+          "title": "OpenAI deprecations",
+          "url": "https://developers.openai.com/api/docs/deprecations"
         }
       ]
     },
     "sora-2-2025-12-08": {
-      "checked_at": "2026-10-12",
+      "checked_at": "2026-11-10",
       "description": "Retired OpenAI video generation model. The Videos API and Sora 2 models were shut down on September 24, 2026.",
       "shutdown_date": "2026-09-24",
       "facts": [
@@ -1148,11 +1235,15 @@
         {
           "title": "OpenAI Sora 2 retirement notice",
           "url": "https://developers.openai.com/api/docs/deprecations#2026-03-24-sora-2-video-generation-models-and-videos-api"
+        },
+        {
+          "title": "OpenAI deprecations",
+          "url": "https://developers.openai.com/api/docs/deprecations"
         }
       ]
     },
     "sora-2-pro-2025-10-06": {
-      "checked_at": "2026-10-12",
+      "checked_at": "2026-11-10",
       "description": "Retired OpenAI video generation model. The Videos API and Sora 2 models were shut down on September 24, 2026.",
       "shutdown_date": "2026-09-24",
       "facts": [
@@ -1165,6 +1256,10 @@
         {
           "title": "OpenAI Sora 2 retirement notice",
           "url": "https://developers.openai.com/api/docs/deprecations#2026-03-24-sora-2-video-generation-models-and-videos-api"
+        },
+        {
+          "title": "OpenAI deprecations",
+          "url": "https://developers.openai.com/api/docs/deprecations"
         }
       ]
     }
@@ -5965,7 +6060,7 @@
       "description": "Video generation from text and supported references."
     },
     "seedance-1-5-pro-251215": {
-      "checked_at": "2026-10-12",
+      "checked_at": "2026-11-08",
       "facts": [
         {
           "label": "Published standard tariff (USD / million tokens)",
@@ -5994,6 +6089,14 @@
         {
           "label": "Release notes",
           "value": "High-fidelity audio–visual synchronization with cinematic-level motion and emotional expression. Supports first-and-last-frame generation. For usage instructions, see Create a video generation task."
+        },
+        {
+          "label": "Lifecycle status",
+          "value": "Retired by provider"
+        },
+        {
+          "label": "Retirement cutoff",
+          "value": "2026-11-11T09:00:00Z (17:00 UTC+8). No automatic migration."
         }
       ],
       "sources": [
@@ -6012,11 +6115,17 @@
         {
           "title": "BytePlus release history",
           "url": "https://docs.byteplus.com/en/docs/modelark/2172655"
+        },
+        {
+          "title": "BytePlus model deprecations",
+          "url": "https://ai.byteplus.com/ark/region:ap-southeast-1/docs/model-deprecation-notice"
         }
       ],
       "version_date": "2025-12-15",
       "description": "Video generation from text and supported references.",
-      "release_date": "2025-12"
+      "release_date": "2025-12",
+      "shutdown_date": "2026-11-11",
+      "shutdown_at": "2026-11-11T09:00:00Z"
     },
     "seedance-1-0-pro-250528": {
       "checked_at": "2026-10-12",
@@ -6297,7 +6406,7 @@
       "description": "Image generation and editing with reference images."
     },
     "seedance-1-0-lite-t2v-250428": {
-      "checked_at": "2026-09-13",
+      "checked_at": "2026-11-10",
       "facts": [
         {
           "label": "Pricing audit",
@@ -6306,6 +6415,10 @@
         {
           "label": "Release notes",
           "value": "Seedance 1.0 is the latest video generation model from ByteDance's large model team. The Seedance 1.0 lite model, a smaller parameter version, delivers excellent video generation quality while significantly increasing generation speed, making it a cost-effective choice balancing performance and efficiency."
+        },
+        {
+          "label": "Lifecycle status",
+          "value": "Retired by provider"
         }
       ],
       "sources": [
@@ -6316,14 +6429,19 @@
         {
           "title": "BytePlus release history",
           "url": "https://docs.byteplus.com/en/docs/modelark/2172655"
+        },
+        {
+          "title": "BytePlus model deprecations",
+          "url": "https://ai.byteplus.com/ark/region:ap-southeast-1/docs/model-deprecation-notice"
         }
       ],
       "description": "Legacy model ID; current public pricing is not confirmed.",
       "version_date": "2025-04-28",
-      "release_date": "2025-06"
+      "release_date": "2025-06",
+      "shutdown_date": "2026-05-13"
     },
     "seedance-1-0-lite-i2v-250428": {
-      "checked_at": "2026-09-13",
+      "checked_at": "2026-11-10",
       "facts": [
         {
           "label": "Pricing audit",
@@ -6332,6 +6450,10 @@
         {
           "label": "Release notes",
           "value": "Seedance 1.0 is the latest video generation model from ByteDance's large model team. The Seedance 1.0 lite model, a smaller parameter version, delivers excellent video generation quality while significantly increasing generation speed, making it a cost-effective choice balancing performance and efficiency."
+        },
+        {
+          "label": "Lifecycle status",
+          "value": "Retired by provider"
         }
       ],
       "sources": [
@@ -6342,11 +6464,16 @@
         {
           "title": "BytePlus release history",
           "url": "https://docs.byteplus.com/en/docs/modelark/2172655"
+        },
+        {
+          "title": "BytePlus model deprecations",
+          "url": "https://ai.byteplus.com/ark/region:ap-southeast-1/docs/model-deprecation-notice"
         }
       ],
       "description": "Legacy model ID; current public pricing is not confirmed.",
       "version_date": "2025-04-28",
-      "release_date": "2025-06"
+      "release_date": "2025-06",
+      "shutdown_date": "2026-05-13"
     },
     "seedream-5-0-260128": {
       "checked_at": "2026-10-12",
@@ -6433,6 +6560,10 @@
         {
           "label": "Model availability",
           "value": "Deactivated; cannot be used for generation."
+        },
+        {
+          "label": "Lifecycle status",
+          "value": "Retired by provider"
         }
       ],
       "sources": [

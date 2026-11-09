@@ -21,8 +21,8 @@ func TestReviewedOpenAIRetirementsUseExactIDAndDate(t *testing.T) {
 			t.Errorf("unrelated active model retired: %s", id)
 		}
 	}
-	// A date without an explicit retirement review must never retire a model.
-	if IsInactive("openai", "gpt-image-1.5", time.Date(2027, 1, 1, 0, 0, 0, 0, time.UTC)) {
-		t.Fatal("unreviewed future shutdown became a retirement")
+	// The official future shutdown takes effect without another code upgrade.
+	if !IsInactive("openai", "gpt-image-1.5", time.Date(2026, 12, 1, 0, 0, 0, 0, time.UTC)) {
+		t.Fatal("reviewed future shutdown did not become a retirement")
 	}
 }

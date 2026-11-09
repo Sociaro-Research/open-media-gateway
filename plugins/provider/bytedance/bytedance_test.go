@@ -134,7 +134,7 @@ func TestListModelsIncludesEveryMediaGenerationModel(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"dreamina-seedance-2-0-mini-260615", "seedance-1-0-lite-i2v-250428", "seedance-1-0-pro-fast-251015", "seedream-5-0-260128"}
+	want := []string{"dreamina-seedance-2-0-mini-260615", "seedance-1-0-pro-fast-251015", "seedream-5-0-260128"}
 	if len(models) != len(want) {
 		t.Fatalf("got %#v, want %#v", models, want)
 	}
@@ -163,7 +163,7 @@ func TestImageToVideoPassesImageContent(t *testing.T) {
 		}
 		return jsonResponse(http.StatusOK, `{"id":"provider-i2v"}`), nil
 	})}
-	adapter := &Adapter{apiKey: "test-key", baseURL: "http://byte.test", client: client}
+	adapter := &Adapter{clock: beforeLiteRetirement, apiKey: "test-key", baseURL: "http://byte.test", client: client}
 	_, err := adapter.Generate(context.Background(), core.MediaRequest{
 		Model: "seedance-1-0-lite-i2v-250428", Prompt: "animate",
 		Options: core.MediaOptions{ImageURLs: []string{"https://example.com/frame.png"}},
@@ -297,7 +297,7 @@ func TestVideoReferenceRolesAndStructuredCamera(t *testing.T) {
 				o.VideoURL = "https://example.com/v.mp4"
 				o.AudioURL = "https://example.com/a.mp3"
 			}
-			a := &Adapter{baseURL: "https://byte.test", client: &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+			a := &Adapter{clock: beforeSeedanceRetirement, baseURL: "https://byte.test", client: &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 				var body struct {
 					Content []struct {
 						Role string `json:"role"`
@@ -449,7 +449,7 @@ func TestReferenceModesBecomeNativeRoles(t *testing.T) {
 				}
 				return jsonResponse(200, `{"id":"task"}`), nil
 			})}
-			a := &Adapter{apiKey: "test", baseURL: "https://provider.test", client: client}
+			a := &Adapter{clock: beforeLiteRetirement, apiKey: "test", baseURL: "https://provider.test", client: client}
 			_, err := a.Generate(context.Background(), core.MediaRequest{Model: tc.model, Prompt: "test", Options: core.MediaOptions{ReferenceMode: tc.mode, ImageURLs: tc.images, VideoURLs: tc.videos, AudioURLs: tc.audios}})
 			if err != nil {
 				t.Fatal(err)

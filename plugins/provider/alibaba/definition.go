@@ -11,6 +11,7 @@ import (
 func Definition() providerkit.Definition {
 	return providerkit.Definition{
 		CatalogSources:             catalogSources(),
+		CatalogLifecycleSources:    lifecycleSources(),
 		CatalogInterpret:           interpretVideoAPI,
 		CatalogVerificationSources: videoVerificationSources(),
 		CatalogRegions:             map[string]string{"Singapore": "https://dashscope-intl.aliyuncs.com/api/v1", "Beijing": "https://dashscope.aliyuncs.com/api/v1"},

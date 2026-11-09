@@ -770,11 +770,15 @@ func (p *managedProvider) ListModels(ctx context.Context) ([]core.MediaModel, er
 		cost, err := baseQuote(model, request)
 		return applyCatalogQuote(cost, err, model, request, state)
 	}
-	for i := range models {
-		models[i] = p.modelReference(models[i], quote)
-		models[i] = applyCatalogModel(models[i], state)
+	available := models[:0]
+	for _, model := range models {
+		if catalogUnavailable(state, model.ID, time.Now()) {
+			continue
+		}
+		model = p.modelReference(model, quote)
+		available = append(available, applyCatalogModel(model, state))
 	}
-	return models, nil
+	return available, nil
 }
 
 func (p *managedProvider) Generate(ctx context.Context, request core.MediaRequest) (core.ProviderTask, error) {
@@ -790,6 +794,9 @@ func (p *managedProvider) Generate(ctx context.Context, request core.MediaReques
 		return core.ProviderTask{}, err
 	}
 	ctx = p.connectionScope(ctx, adapter, expected)
+	if err := p.catalogAdmission(ctx, request.Model); err != nil {
+		return core.ProviderTask{}, err
+	}
 	// Reset any earlier request proof, then bind only the selected operation from
 	// this resolved connection's pure reviewed catalog. Never discover remotely.
 	ctx = references.WithResourceSourceModel(ctx, request.Model, core.MediaModel{})
@@ -853,6 +860,9 @@ func (p *managedProvider) ValidateRequest(ctx context.Context, request core.Medi
 		return err
 	}
 	ctx = p.connectionScope(ctx, adapter, expected)
+	if err := p.catalogAdmission(ctx, request.Model); err != nil {
+		return err
+	}
 	if validator, ok := adapter.(core.RequestValidator); ok {
 		return validator.ValidateRequest(ctx, request)
 	}

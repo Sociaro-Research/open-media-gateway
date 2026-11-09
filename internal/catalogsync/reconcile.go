@@ -58,6 +58,24 @@ func ValidDate(d string) bool {
 	return e == nil
 }
 
+// Only adapter-reviewed metadata may supply an executable retirement instant.
+// Fetched observations remain evidence and cannot create this control.
+func reviewedShutdownInstant(m *core.ModelMetadata) bool {
+	if m == nil || m.ShutdownAt == "" {
+		return false
+	}
+	cutoff, err := time.Parse(time.RFC3339, m.ShutdownAt)
+	if err != nil || m.ShutdownDate != cutoff.UTC().Format("2006-01-02") {
+		return false
+	}
+	for _, fact := range m.Facts {
+		if fact.Label == "Lifecycle status" && fact.Value == "Retired by provider" {
+			return true
+		}
+	}
+	return false
+}
+
 // Reconcile re-evaluates every pending candidate, including unchanged evidence.
 // A code upgrade can therefore resolve warnings without an upstream edit.
 func Reconcile(previous State, native Capture, observations []Observation, now time.Time, checkRate func(core.MediaModel, Rate) error) (State, Run) {
@@ -135,7 +153,7 @@ func Reconcile(previous State, native Capture, observations []Observation, now t
 		}
 	}
 	known := map[string]core.MediaModel{}
-	checkedSources := map[string]bool{"_operational": true}
+	checkedSources := map[string]bool{"_operational": true, "_lifecycle": true}
 	operationalCandidates := collectOperationalCandidates(previous, observations)
 	apiFailed := false
 	// Resolve field conflicts before mutating the catalogue, preventing an
@@ -202,6 +220,7 @@ func Reconcile(previous State, native Capture, observations []Observation, now t
 			}
 		}
 	}
+	lifecycles := lifecycleCandidates(previous, native, observations, now, warn)
 	inactive := map[string]bool{}
 	apiIDs := map[string]bool{}
 	for _, id := range native.IDs {
@@ -224,10 +243,16 @@ func Reconcile(previous State, native Capture, observations []Observation, now t
 	}
 	for _, m := range native.Inactive {
 		inactive[m.ID] = true
+		if reviewedMetadata[m.ID] == nil {
+			reviewedMetadata[m.ID] = m.Metadata
+		}
 	}
 	for _, m := range append(models, native.Inactive...) {
 		if m.Manual {
 			continue
+		}
+		if lifecycle := lifecycles[m.ID]; lifecycle != nil {
+			inactive[m.ID] = inactive[m.ID] || lifecycle.Unavailable(now)
 		}
 		known[m.ID] = m
 		if _, ok := next.Models[m.ID]; !ok {
@@ -278,11 +303,42 @@ func Reconcile(previous State, native Capture, observations []Observation, now t
 		// Explicit reviewed retirements may correct an inherited date; other
 		// baseline dates only fill gaps, preserving current structured evidence.
 		entry := next.Models[m.ID]
-		if metadata := reviewedMetadata[m.ID]; metadata != nil && len(metadata.ShutdownDate) == 10 && ValidDate(metadata.ShutdownDate) && values[m.ID+"/shutdown_date"].value == "" && (entry.Metadata == nil || entry.Metadata.ShutdownDate == "" || inactive[m.ID]) {
+		if lifecycle := lifecycles[m.ID]; lifecycle != nil {
+			change(m.ID, "lifecycle", lifecycle.Source, entry.Lifecycle, lifecycle)
+			entry.Lifecycle = lifecycle
+			if entry.Metadata == nil {
+				entry.Metadata = &core.ModelMetadata{}
+			}
+			change(m.ID, "shutdown_date", lifecycle.Source, entry.Metadata.ShutdownDate, lifecycle.ShutdownDate)
+			change(m.ID, "shutdown_at", lifecycle.Source, entry.Metadata.ShutdownAt, lifecycle.ShutdownAt)
+			entry.Metadata.ShutdownDate, entry.Metadata.ShutdownAt = lifecycle.ShutdownDate, lifecycle.ShutdownAt
+			next.Models[m.ID] = entry
+		}
+		if metadata := reviewedMetadata[m.ID]; entry.Lifecycle == nil && metadata != nil && len(metadata.ShutdownDate) == 10 && ValidDate(metadata.ShutdownDate) && values[m.ID+"/shutdown_date"].value == "" && (entry.Metadata == nil || entry.Metadata.ShutdownDate == "" || inactive[m.ID]) {
 			if entry.Metadata == nil {
 				entry.Metadata = &core.ModelMetadata{}
 			}
 			change(m.ID, "shutdown_date", "adapter", entry.Metadata.ShutdownDate, metadata.ShutdownDate)
+			entry.Metadata.ShutdownDate = metadata.ShutdownDate
+			for _, source := range metadata.Sources {
+				found := false
+				for _, old := range entry.Metadata.Sources {
+					found = found || old.URL == source.URL
+				}
+				if !found {
+					entry.Metadata.Sources = append(entry.Metadata.Sources, source)
+				}
+			}
+			next.Models[m.ID] = entry
+		}
+
+		if metadata := reviewedMetadata[m.ID]; entry.Lifecycle == nil && reviewedShutdownInstant(metadata) {
+			if entry.Metadata == nil {
+				entry.Metadata = &core.ModelMetadata{}
+			}
+			change(m.ID, "shutdown_at", "adapter", entry.Metadata.ShutdownAt, metadata.ShutdownAt)
+			change(m.ID, "shutdown_date", "adapter", entry.Metadata.ShutdownDate, metadata.ShutdownDate)
+			entry.Metadata.ShutdownAt = metadata.ShutdownAt
 			entry.Metadata.ShutdownDate = metadata.ShutdownDate
 			for _, source := range metadata.Sources {
 				found := false
@@ -383,6 +439,10 @@ func Reconcile(previous State, native Capture, observations []Observation, now t
 	// silently resolve an outstanding model/protocol warning.
 	for i, ob := range observations {
 		old := next.Observations[ob.Source.ID]
+		lifecycleDocument := false
+		for _, source := range native.LifecycleSources {
+			lifecycleDocument = lifecycleDocument || source.URL == ob.Source.URL && source.Parser == ob.Source.Parser && ob.Error == "" && len(ob.Entries) > 0
+		}
 		// Never accept review metadata supplied by a source or an older run.
 		ob.Review = nil
 		review, reviewed := native.DocumentReviews[ob.Source.URL]
@@ -401,9 +461,9 @@ func Reconcile(previous State, native Capture, observations []Observation, now t
 				ob.Hash = old.Hash
 			}
 		}
-		if !reviewed && ob.Error == "" && old.Hash != "" && old.Hash != ob.Hash && (len(ob.Entries) == 0 || ob.Source.Parser == "openai-model" || ob.Source.Parser == "document") && ob.Source.ID != "_api" {
+		if !reviewed && !lifecycleDocument && ob.Error == "" && old.Hash != "" && old.Hash != ob.Hash && (len(ob.Entries) == 0 || ob.Source.Parser == "openai-model" || ob.Source.Parser == "document") && ob.Source.ID != "_api" {
 			warn("", ob.Source.ID, "Documentation changed without a supported structured interpretation", map[string]string{"url": ob.Source.URL, "previous_hash": old.Hash, "hash": ob.Hash})
-		} else if !reviewed && (ob.Error != "" || len(ob.Entries) == 0 || ob.Source.Parser == "openai-model" || ob.Source.Parser == "document") {
+		} else if !reviewed && !lifecycleDocument && (ob.Error != "" || len(ob.Entries) == 0 || ob.Source.Parser == "openai-model" || ob.Source.Parser == "document") {
 			// A failed fetch cannot review an earlier document change. Retain
 			// its original evidence through failures and quiet recovery days.
 			for _, w := range oldWarnings {
@@ -502,6 +562,12 @@ func Reconcile(previous State, native Capture, observations []Observation, now t
 			}
 			if entry.Metadata != nil {
 				m := entry.Metadata
+				if m.ShutdownAt != "" && entry.Lifecycle == nil && !reviewedShutdownInstant(reviewedMetadata[entry.ID]) {
+					warn(entry.ID, ob.Source.ID, "Published shutdown instant requires lifecycle interpretation", m.ShutdownAt)
+				}
+				if m.ShutdownDate != "" && entry.Lifecycle == nil && !inactive[entry.ID] && (reviewedMetadata[entry.ID] == nil || reviewedMetadata[entry.ID].ShutdownDate != m.ShutdownDate) {
+					warn(entry.ID, ob.Source.ID, "Published shutdown date requires lifecycle interpretation", m.ShutdownDate)
+				}
 				if !ValidDate(m.ReleaseDate) || !ValidDate(m.VersionDate) || !ValidDate(m.ShutdownDate) {
 					warn(entry.ID, ob.Source.ID, "Invalid model date", m)
 					continue
@@ -517,6 +583,13 @@ func Reconcile(previous State, native Capture, observations []Observation, now t
 					{"description", &current.Metadata.Description, m.Description}, {"release_date", &current.Metadata.ReleaseDate, m.ReleaseDate}, {"version_date", &current.Metadata.VersionDate, m.VersionDate}, {"shutdown_date", &current.Metadata.ShutdownDate, m.ShutdownDate}, {"snapshot", &current.Metadata.Snapshot, m.Snapshot},
 				} {
 					if field.value != "" {
+						if field.name == "shutdown_date" && entry.Lifecycle != nil {
+							continue
+						}
+						if reviewed := reviewedMetadata[entry.ID]; field.name == "shutdown_date" && reviewedShutdownInstant(reviewed) && field.value != reviewed.ShutdownDate {
+							warn(entry.ID, ob.Source.ID, "Published shutdown date differs from reviewed retirement instant", field.value)
+							continue
+						}
 						chosen := values[entry.ID+"/"+field.name]
 						if chosen.conflict {
 							warn(entry.ID, ob.Source.ID, "Official sources disagree on "+field.name, field.value)
@@ -568,7 +641,8 @@ func Reconcile(previous State, native Capture, observations []Observation, now t
 			}
 			for _, rate := range entry.Rates {
 				if current.Inactive {
-					warn(entry.ID, ob.Source.ID, "Tariff belongs to a deactivated model; automatic activation is prohibited", map[string]any{"rate": rate})
+					// Historical prices do not request activation. Retirement is an
+					// applied change; retain accepted tariffs without a false warning.
 					continue
 				}
 				chosen := tariffs[entry.ID+"/"+rateKey(rate)]

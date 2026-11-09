@@ -154,7 +154,7 @@ func (a *Adapter) CheckCredentials(ctx context.Context) error {
 func (a *Adapter) ListModels(ctx context.Context) ([]core.MediaModel, error) {
 	a.mu.Lock()
 	if a.models != nil && time.Since(a.modelsAt) < 10*time.Minute {
-		result := cloneModels(a.models)
+		result := activeModels(cloneModels(a.models), time.Now())
 		a.mu.Unlock()
 		return result, nil
 	}
@@ -289,4 +289,14 @@ func (a *Adapter) ValidateRequest(ctx context.Context, r core.MediaRequest) erro
 		}
 	}
 	return nil
+}
+
+func activeModels(models []core.MediaModel, now time.Time) []core.MediaModel {
+	result := models[:0]
+	for _, model := range models {
+		if !modelcatalog.IsInactive("openai", model.ID, now) {
+			result = append(result, model)
+		}
+	}
+	return result
 }

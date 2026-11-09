@@ -142,6 +142,7 @@ type ImageInputTariff struct {
 	Price money.USD `json:"price"`
 }
 type Entry struct {
+	Lifecycle         *Lifecycle                 `json:"lifecycle,omitempty"`
 	OperationalFields map[string]json.RawMessage `json:"operational_fields,omitempty"`
 	ID                string                     `json:"id"`
 	Inactive          bool                       `json:"inactive,omitempty"`
@@ -214,6 +215,9 @@ type Run struct {
 	EmailStatus      string        `json:"email_status"`
 }
 type Capture struct {
+	// Only module-registered official sources may publish lifecycle controls.
+	// The runner also fetches these when a saved schedule predates the module.
+	LifecycleSources    []Source
 	VerificationSources map[string][]Source // Exact supported model IDs -> authoritative operational sources.
 	Models              []core.MediaModel
 	DocumentReviews     map[string]DocumentReview // Exact source URL -> reviewed content hash.

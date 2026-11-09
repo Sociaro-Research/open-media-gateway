@@ -13,9 +13,13 @@ func Definition() providerkit.Definition {
 	return providerkit.Definition{
 		AssetLibrary:               newAssetLibrary,
 		CatalogSources:             catalogSources(),
-		CatalogInterpret:           interpretVideoAPI,
+		CatalogInterpret:           interpretCatalog,
+		CatalogLifecycleSources:    lifecycleSources(),
+		CatalogSourceAliases:       map[string]string{deprecationsURL: deprecationsURL + ".md"},
 		CatalogVerificationSources: map[string][]catalogsync.Source{"dreamina-seedance-2-5-260628": {videoAPISource}},
 		LegacyIdentity:             true,
+		// Profiles are retained serializers, including for pinned historical jobs;
+		// executable lists and new admission enforce the reviewed lifecycle separately.
 		Profiles: func() []core.MediaModel {
 			var result []core.MediaModel
 			for _, id := range []string{"seedream-4-0-250828", "seedream-4-5-251128", "seedance-1-0-pro-fast-251015", "seedance-1-5-pro-251215", "dreamina-seedance-2-0-260128", "dreamina-seedance-2-5-260628"} {

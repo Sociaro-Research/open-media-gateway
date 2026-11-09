@@ -10209,7 +10209,7 @@ components:
           - "null"
         content_url:
           type: string
-          description: Authorized route for the first archived media result, included from admission for viewers with content access and omitted from restricted views. Resource preparation jobs instead return an empty string. A nonempty value does not prove availability; pending/failed, deleted or missing stored results return 404. Use artifacts[].content_url for every archived output or format variant; scalar-result jobs can omit artifacts.
+          description: Authorized route for the first archived result, included from admission for viewers with content access and omitted from restricted views. Resource preparation jobs instead return an empty string. A nonempty value does not prove availability; pending/failed, deleted or missing stored results return 404. Use artifacts[].content_url for every archived output or format variant; scalar-result jobs can omit artifacts.
         cost:
           $ref: '#/components/schemas/TaskCost'
         created_at:
@@ -11667,6 +11667,7 @@ components:
         api_created: {type: integer, format: int64, description: Unix timestamp returned by the provider model API.}
         owned_by: {type: string}
         shutdown_date: {type: string}
+        shutdown_at: {type: string, format: date-time, description: Exact reviewed retirement instant. Takes precedence over the UTC date-only boundary.}
         checked_at: {type: string, format: date}
         facts:
           type: array
@@ -12169,6 +12170,17 @@ components:
       type: object
     CatalogEntry:
       properties:
+        lifecycle:
+          type: object
+          readOnly: true
+          description: Explicit admission boundaries interpreted from a module-registered official lifecycle source. Release dates do not create availability controls. Accepted jobs retain their original identities and pricing.
+          properties:
+            available_date: {type: string, format: date, description: Inclusive UTC availability date.}
+            available_at: {type: string, format: date-time, description: Inclusive exact availability instant; takes precedence over available_date.}
+            shutdown_date: {type: string, format: date, description: Exclusive UTC availability boundary.}
+            shutdown_at: {type: string, format: date-time, description: Exclusive exact availability boundary; takes precedence over shutdown_date.}
+            source: {type: string, format: uri}
+            snapshot: {type: string, description: SHA-256 of the interpreted official document.}
         operational_fields:
           type: object
           description: Typed public operational evidence from a provider-owned interpreter. Informational evidence cannot activate models or change native admission.

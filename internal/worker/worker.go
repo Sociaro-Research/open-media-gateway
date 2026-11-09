@@ -227,33 +227,42 @@ func (w *Worker) storeUsage(ctx context.Context, provider core.MediaProvider, ta
 		}
 	}
 	if task.Cost == nil && usage.EstimatedCost == nil {
-		if catalog, ok := provider.(core.ModelCatalog); ok {
-			if models, err := catalog.ListModels(ctx); err == nil {
-				for _, model := range models {
-					if model.ID != task.Model || !model.Pricing.Known {
-						continue
-					}
-					tokens := usageMetric(usage.Metrics, "total_tokens")
-					if tokens == 0 {
-						tokens = usageMetric(usage.Metrics, "completion_tokens")
-					}
-					rate := model.Pricing.USDPerMillionByResolution[task.Options.Resolution]
-					if rate == 0 {
-						rate = model.Pricing.USDPerMillionTokens
-					}
-					if task.Options.GenerateAudio != nil && *task.Options.GenerateAudio && model.Pricing.USDPerMillionAudioTokens > 0 {
-						rate = model.Pricing.USDPerMillionAudioTokens
-					}
-					if tokens > 0 && rate > 0 {
-						cost := tokens * rate / 1_000_000
-						usage.EstimatedCost = &cost
-						usage.Currency = "USD"
-						usage.CostStatus = "estimated"
-						usage.CostSource = "provider usage × public model tariff"
-					}
-					break
+		var models []core.MediaModel
+		if history, ok := provider.(core.HistoricalUsageCatalog); ok {
+			if model, found, err := history.HistoricalUsageModel(ctx, task.Model); err == nil && found {
+				models = []core.MediaModel{model}
+			}
+		}
+		if len(models) == 0 {
+			if catalog, ok := provider.(core.ModelCatalog); ok {
+				if listed, err := catalog.ListModels(ctx); err == nil {
+					models = listed
 				}
 			}
+		}
+		for _, model := range models {
+			if model.ID != task.Model || !model.Pricing.Known {
+				continue
+			}
+			tokens := usageMetric(usage.Metrics, "total_tokens")
+			if tokens == 0 {
+				tokens = usageMetric(usage.Metrics, "completion_tokens")
+			}
+			rate := model.Pricing.USDPerMillionByResolution[task.Options.Resolution]
+			if rate == 0 {
+				rate = model.Pricing.USDPerMillionTokens
+			}
+			if task.Options.GenerateAudio != nil && *task.Options.GenerateAudio && model.Pricing.USDPerMillionAudioTokens > 0 {
+				rate = model.Pricing.USDPerMillionAudioTokens
+			}
+			if tokens > 0 && rate > 0 {
+				cost := tokens * rate / 1_000_000
+				usage.EstimatedCost = &cost
+				usage.Currency = "USD"
+				usage.CostStatus = "estimated"
+				usage.CostSource = "provider usage × public model tariff"
+			}
+			break
 		}
 	}
 	return w.repo.SetProviderUsage(ctx, task.ID, *usage)
