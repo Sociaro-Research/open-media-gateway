@@ -4,7 +4,7 @@ root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 python3 "$root/scripts/check-ui-updates.py"
 output=${1:-"$root/dist/gateway-ui.tar.gz"}
 mkdir -p "$(dirname -- "$output")"
-staging=$(mktemp -d)
+staging=$(mktemp -d "${TMPDIR:-/tmp}/gateway-ui.XXXXXXXX")
 trap 'rm -rf "$staging"' EXIT HUP INT TERM
 cp -R "$root/web/public/." "$staging/"
 cp "$root/web/Caddyfile" "$staging/Caddyfile"
