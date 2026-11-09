@@ -7327,44 +7327,83 @@ paths:
       tags: [Media]
       operationId: get_v1_generations_id_artifacts_artifact_content
       summary: Download one archived generation artifact
-      description: Requires generation ownership. Only completely archived results are available. Supports Range and conditional requests. Provider URLs and authenticated source handles are never returned.
+      description: Requires authorized generation content access. Only completed, non-deleted archived results are available. Gateway-served bytes use the selected artifact's MIME type and support Range and conditional requests. When an isolated direct-storage URL is available, the Gateway instead returns 307 and storage handles subsequent byte delivery. Provider URLs and authenticated source handles are never returned.
       x-required-scope: generation
       responses:
         '200':
-          description: Archived artifact bytes
+          description: Archived artifact bytes with the selected media Content-Type.
+          headers:
+            ETag: {description: Selected artifact checksum validator when recorded., schema: {type: string}}
           content:
-            application/octet-stream:
+            "*/*":
               schema: {type: string, format: binary}
         '206':
-          description: Requested byte range
+          description: Gateway-served byte-range representation; multiple ranges can use multipart/byteranges.
+          headers:
+            Content-Range: {description: Present for a single byte range; multipart responses describe each range in its part., schema: {type: string}}
+          content:
+            "*/*":
+              schema: {type: string, format: binary}
+        '304':
+          description: Gateway-served representation is not modified under the supplied condition; no response body.
         '307':
           description: Redirect to isolated storage; do not forward Gateway credentials.
+          headers:
+            Location: {schema: {type: string, format: uri}}
+            Cache-Control: {schema: {type: string, const: "private, no-store"}}
+            Referrer-Policy: {schema: {type: string, const: no-referrer}}
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
           "$ref": "#/components/responses/Forbidden"
         '404':
           "$ref": "#/components/responses/NotFound"
+        '412':
+          description: Gateway-served media precondition failed, for example If-Match; no response body.
+        '416':
+          description: Invalid or unsatisfiable Range for Gateway-served bytes. Returns a plain-text error, not the Gateway JSON error envelope.
+          headers:
+            Content-Range: {description: bytes */size for a nonoverlapping range when the object size is known; not guaranteed for every invalid Range., schema: {type: string}}
+          content:
+            text/plain:
+              schema: {type: string}
         '503':
           "$ref": "#/components/responses/ServiceUnavailable"
     head:
       tags: [Media]
       operationId: head_v1_generations_id_artifacts_artifact_content
       summary: Read archived artifact headers
+      description: Uses the same selected artifact, authorization, conditional and Range processing as GET. All responses, including errors and redirects, have no response body. Local representation headers do not describe the separate storage response after a 307 redirect.
       x-required-scope: generation
       responses:
         '200':
           description: Archived artifact metadata without a response body
+        '206':
+          description: Gateway-served byte-range metadata without a response body.
+          headers:
+            Content-Range: {description: Present for a single byte range; omitted for multipart ranges., schema: {type: string}}
+        '304':
+          description: Gateway-served representation is not modified under the supplied condition; no response body.
         '307':
           description: Redirect to isolated storage; do not forward Gateway credentials.
+          headers:
+            Location: {schema: {type: string, format: uri}}
+            Cache-Control: {schema: {type: string, const: "private, no-store"}}
+            Referrer-Policy: {schema: {type: string, const: no-referrer}}
         '401':
-          "$ref": "#/components/responses/Unauthorized"
+          description: Gateway authentication required; no response body.
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          description: Generation content access denied; no response body.
         '404':
-          "$ref": "#/components/responses/NotFound"
+          description: Task or selected archived artifact unavailable, including incomplete or deleted results; no response body.
+        '412':
+          description: Gateway-served media precondition failed, for example If-Match; no response body.
+        '416':
+          description: Invalid or unsatisfiable Range for Gateway-served bytes; no response body.
+          headers:
+            Content-Range: {description: bytes */size for a nonoverlapping range when the object size is known; not guaranteed for every invalid Range., schema: {type: string}}
         '503':
-          "$ref": "#/components/responses/ServiceUnavailable"
+          description: Task or archived object could not be read, or the direct-storage origin is unsafe; no response body.
   "/v1/provider-resource-presets":
     get:
       tags: [References]
