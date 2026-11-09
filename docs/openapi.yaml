@@ -7489,6 +7489,15 @@ paths:
       tags: [References]
       operationId: listProviderResources
       summary: List owner-bound provider resources
+      description: >-
+        Pages scoped local bindings for the provider, ordered by updated_at
+        descending then id ascending. limit and offset apply before the optional
+        exact-string kind filter; an unmatched kind returns no entries. Omitted or
+        empty limit and offset use 50 and 0. An empty or short filtered data array
+        does not prove exhaustion: the response has no total, cursor or has_more
+        field. Bindings can be retained across lifecycle or connection changes;
+        inspect usable and unavailable_reason rather than assuming every binding
+        is currently usable.
       x-required-scope: generation
       parameters:
       - {name: provider, in: query, required: true, schema: {type: string}}
@@ -7507,6 +7516,15 @@ paths:
                   data: {type: array, items: {$ref: '#/components/schemas/ProviderResource'}}
                   limit: {type: integer}
                   offset: {type: integer}
+        '400':
+          description: >-
+            Missing or empty provider, or malformed or out-of-range nonempty
+            limit/offset. These handler checks return invalid_request with
+            error.param naming provider, limit or offset; authentication and
+            resource-service availability are checked first.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorResponse'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '503': {$ref: '#/components/responses/ServiceUnavailable'}
