@@ -7209,6 +7209,24 @@ paths:
           description: Signed out; empty response body
         '403':
           "$ref": "#/components/responses/Forbidden"
+        '503':
+          description: Session revocation could not be confirmed (logout_unavailable). The session cookie is not cleared, and successful sign-out is not confirmed. Retry sign-out; this response does not establish whether the session remains valid.
+          headers:
+            Cache-Control:
+              description: Prevents caching of the sign-out failure response.
+              schema: {type: string, const: no-store}
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error]
+                properties:
+                  error:
+                    type: object
+                    required: [code, message]
+                    properties:
+                      code: {type: string, const: logout_unavailable}
+                      message: {type: string}
       operationId: post_auth_logout
   "/v1/admin/storage":
     get:
