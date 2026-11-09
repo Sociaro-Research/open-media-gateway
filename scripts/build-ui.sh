@@ -10,5 +10,7 @@ cp -R "$root/web/public/." "$staging/"
 cp "$root/web/Caddyfile" "$staging/Caddyfile"
 cp "$root/LICENSE" "$staging/LICENSE"
 cp "$root/NOTICE" "$staging/NOTICE"
-tar -czf "$output" -C "$staging" .
+# Disable macOS tar's generated AppleDouble streams, not application dotfiles.
+# Other tar implementations ignore this environment variable.
+COPYFILE_DISABLE=1 tar -czf "$output" -C "$staging" .
 printf 'UI artifact: %s\n' "$output"
