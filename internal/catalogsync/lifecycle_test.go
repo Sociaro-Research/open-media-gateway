@@ -178,3 +178,26 @@ func TestLifecycleConflictIsOrderIndependentAndMissingRecordWarns(t *testing.T) 
 		t.Fatal("official source move was not adopted", moved, run)
 	}
 }
+
+func TestUninterpretedDateCannotDisplaceConfirmedLifecycleMetadata(t *testing.T) {
+	source := Source{ID: "notice", URL: "https://official.example.test/notice", Parser: "document"}
+	other := Source{ID: "manifest", URL: "https://example.test/evidence", Parser: "manifest-v1"}
+	capture := Capture{Models: []core.MediaModel{{ID: "m", MediaType: "image"}}, LifecycleSources: []Source{source}}
+	observations := []Observation{{Source: source, Hash: "official", Entries: []Entry{{ID: "m", Lifecycle: &Lifecycle{ShutdownDate: "2026-12-01"}}}}, {Source: other, Hash: "conflict", Entries: []Entry{{ID: "m", Metadata: &core.ModelMetadata{ShutdownDate: "2027-01-01"}}}}}
+	now := time.Date(2026, 11, 10, 0, 0, 0, 0, time.UTC)
+	state, run := Reconcile(State{}, capture, observations, now, nil)
+	if state.Models["m"].Metadata.ShutdownDate != "2026-12-01" || len(run.OpenWarnings) == 0 {
+		t.Fatal("unreviewed metadata displaced confirmed lifecycle", state, run)
+	}
+	found := false
+	for _, s := range state.Models["m"].Metadata.Sources {
+		found = found || s.URL == source.URL
+	}
+	if !found {
+		t.Fatal("official provenance missing from public metadata")
+	}
+	_, repeat := Reconcile(state, capture, observations, now, nil)
+	if len(repeat.Changes) != 0 {
+		t.Fatal("conflicting metadata oscillated", repeat.Changes)
+	}
+}

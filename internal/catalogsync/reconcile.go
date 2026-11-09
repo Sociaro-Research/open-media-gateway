@@ -312,6 +312,13 @@ func Reconcile(previous State, native Capture, observations []Observation, now t
 			change(m.ID, "shutdown_date", lifecycle.Source, entry.Metadata.ShutdownDate, lifecycle.ShutdownDate)
 			change(m.ID, "shutdown_at", lifecycle.Source, entry.Metadata.ShutdownAt, lifecycle.ShutdownAt)
 			entry.Metadata.ShutdownDate, entry.Metadata.ShutdownAt = lifecycle.ShutdownDate, lifecycle.ShutdownAt
+			found := false
+			for _, source := range entry.Metadata.Sources {
+				found = found || source.URL == lifecycle.Source
+			}
+			if !found {
+				entry.Metadata.Sources = append(entry.Metadata.Sources, core.ModelSource{Title: "Official lifecycle notice", URL: lifecycle.Source})
+			}
 			next.Models[m.ID] = entry
 		}
 		if metadata := reviewedMetadata[m.ID]; entry.Lifecycle == nil && metadata != nil && len(metadata.ShutdownDate) == 10 && ValidDate(metadata.ShutdownDate) && values[m.ID+"/shutdown_date"].value == "" && (entry.Metadata == nil || entry.Metadata.ShutdownDate == "" || inactive[m.ID]) {
@@ -583,7 +590,10 @@ func Reconcile(previous State, native Capture, observations []Observation, now t
 					{"description", &current.Metadata.Description, m.Description}, {"release_date", &current.Metadata.ReleaseDate, m.ReleaseDate}, {"version_date", &current.Metadata.VersionDate, m.VersionDate}, {"shutdown_date", &current.Metadata.ShutdownDate, m.ShutdownDate}, {"snapshot", &current.Metadata.Snapshot, m.Snapshot},
 				} {
 					if field.value != "" {
-						if field.name == "shutdown_date" && entry.Lifecycle != nil {
+						if field.name == "shutdown_date" && current.Lifecycle != nil {
+							if field.value != current.Lifecycle.ShutdownDate {
+								warn(entry.ID, ob.Source.ID, "Published shutdown date differs from confirmed lifecycle", field.value)
+							}
 							continue
 						}
 						if reviewed := reviewedMetadata[entry.ID]; field.name == "shutdown_date" && reviewedShutdownInstant(reviewed) && field.value != reviewed.ShutdownDate {
