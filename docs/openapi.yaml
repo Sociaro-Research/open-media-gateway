@@ -7398,6 +7398,11 @@ paths:
         '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
+        '404':
+          description: Provider resource not found (not_found). The resolved provider connection scope is invalid or changes during catalogue lookup.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorResponse'}
         '503': {$ref: '#/components/responses/ServiceUnavailable'}
   "/v1/provider-resource-presets/import":
     post:
