@@ -6953,13 +6953,13 @@ paths:
       - sessionAuth: []
       tags:
       - API keys
-      summary: Create a personal API key
+      summary: Create a personal or organization API key
       description: 'Create the first key using your browser session. Thereafter a key
         with keys:manage may create keys with a subset of its own permissions. Body
         limit: 4 KiB. The secret is shown once. This operation is not idempotent;
         after an ambiguous timeout, inspect the key list and revoke an unused key
         before issuing a replacement. The deployment service key cannot manage personal
-        keys.'
+        keys. Organization keys act as their recipient; selected scopes do not elevate the recipient''s current organization role.'
       requestBody:
         required: true
         content:
