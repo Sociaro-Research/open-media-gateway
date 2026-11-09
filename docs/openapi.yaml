@@ -7543,7 +7543,18 @@ paths:
             schema: {$ref: '#/components/schemas/ProviderResourceCreate'}
       responses:
         '202':
-          description: Resource creation admitted; poll the returned generation status URL.
+          description: >-
+            New generation accepted, or the current original generation returned
+            by an idempotent retry; status need not be queued. Poll status_url.
+            Resource preparations have object generation and an empty content_url;
+            resources are exposed only after successful, non-deleted terminal capture.
+            Receipt recovery precedes mutable model, source and pricing checks,
+            but retains current authentication, role/workspace, system and rate-limit gates.
+          headers:
+            Location:
+              description: Status route emitted by accepted-intent recovery; not guaranteed on fresh admission. Use body.status_url regardless.
+              schema: {type: string, format: uri-reference}
+            Cache-Control: {schema: {type: string, const: no-store}}
           content:
             application/json:
               schema: {$ref: '#/components/schemas/Generation'}
@@ -7560,9 +7571,28 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/ErrorResponse'}
-        '409': {description: Idempotency conflict or estimate increased; no new work admitted.}
+        '409': {description: "Idempotency conflict, provider configuration changed (provider_changed), or estimate increased; no new generation accepted by this attempt."}
+        '429':
+          description: Request quota exceeded (rate_limit_exceeded). Limits run before receipt recovery, so accepted-job retries can also be rejected; this response does not establish whether an earlier attempt was accepted.
+          headers:
+            Retry-After: {description: Seconds until retry; rounded up to at least one second., schema: {type: integer, minimum: 1}}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorResponse'}
         '422': {description: A verified tariff or capped total is unavailable; no provider submission.}
-        '503': {$ref: '#/components/responses/ServiceUnavailable'}
+        '503':
+          description: >-
+            Service, admission or receipt verification unavailable, including
+            limits_unavailable before receipt recovery. A 503 alone does not
+            establish whether an earlier attempt committed. If acceptance is
+            unconfirmed, check the Journal or original generation status before
+            creating another generation. Retry the same operation with its original
+            Idempotency-Key, endpoint and request body in the same account and workspace.
+            If no key was sent or verification keeps failing, ask an operator to
+            check admission and queue state before submitting again.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorResponse'}
   "/v1/provider-resources/estimate":
     post:
       tags: [References]
@@ -10172,7 +10202,7 @@ components:
           - "null"
         content_url:
           type: string
-          description: Authorized route for the first archived result, included from admission for viewers with content access and omitted from restricted views. Its presence does not prove availability; pending/failed, deleted or missing stored results return 404. Use artifacts[].content_url for every archived output or format variant; scalar-result jobs can omit artifacts.
+          description: Authorized route for the first archived media result, included from admission for viewers with content access and omitted from restricted views. Resource preparation jobs instead return an empty string. A nonempty value does not prove availability; pending/failed, deleted or missing stored results return 404. Use artifacts[].content_url for every archived output or format variant; scalar-result jobs can omit artifacts.
         cost:
           $ref: '#/components/schemas/TaskCost'
         created_at:
@@ -10196,7 +10226,10 @@ components:
         id:
           type: string
         media_type:
-          $ref: '#/components/schemas/MediaType'
+          description: Generated media type, or resource for a generation-scoped input preparation.
+          anyOf:
+          - $ref: '#/components/schemas/MediaType'
+          - {type: string, const: resource}
         model:
           type: string
         object:
@@ -11410,7 +11443,7 @@ components:
               'x': {type: number, minimum: 0, maximum: 1}
               'y': {type: number, minimum: 0, maximum: 1}
     ProviderResourceCreate:
-      description: Preparation input validation preserves trusted local field constraints in the existing error envelope. error.param names a request field or zero-based reference_ids item; rejected names, tags, source identifiers and private provider diagnostics are not echoed. The JSON body is limited to 8,192 bytes. Supply at least one uploaded reference or a generated_task_id; the selected preparation's source and model constraints still apply.
+      description: Preparation input validation preserves trusted local field constraints in the existing error envelope. error.param names a request field or zero-based reference_ids item; rejected names, tags, source identifiers and private provider diagnostics are not echoed. New-admission JSON decoding is limited to 8,192 bytes. Keyed JSON receipt recovery can occur before that decoder and reads at most 65,536 bytes. Supply at least one uploaded reference or a generated_task_id for new admission; the selected preparation's source and model constraints still apply.
       type: object
       additionalProperties: false
       required: [provider, workflow_model, kind, name]
