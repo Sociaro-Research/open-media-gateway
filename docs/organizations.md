@@ -78,6 +78,17 @@ For shared-provider generation, available funds equal credits plus Credit Limit 
 
 ## Invitations and access
 
+The Administrator's **Assign an existing user** form adds an account only when it
+is not an active company member. It sends `add_only: true` with the selected role
+to `PUT /v1/organizations/{org}/members/{user}`. An active member, resolved by user
+ID or case-insensitive email, receives HTTP 409 `already_member`; their role,
+individual weekly limit and membership remain unchanged. The check and assignment
+share the organization transaction lock, so stale lists and concurrent Assign
+requests cannot overwrite the winner. Removed memberships may still be restored
+with the existing default-limit behavior. To intentionally change an active
+member's role or limit, use that member's row controls; the ordinary PUT without
+`add_only` retains its existing role checks and last-Supermanager protection.
+
 Create a seven-day, single-use invitation in the organization’s Members tab. Choose **Invitation role** before selecting **Create invitation**. Administrators and Supermanagers may choose any organization role; Managers may choose Developer or Member. The role is fixed when the invitation is created and appears in its history and recipient preview. Omitted roles, including existing ordinary invitations, default to Member. The secret is shown once and stored only as a hash. The browser link carries it in the URL fragment, keeping it out of HTTP request paths. After Google sign-in the recipient previews the organization and explicitly accepts or declines. Preview and decline do not consume the link. Acceptance is atomic, assigns the invitation's saved role, and takes the organization's default weekly limit. The accept request cannot override that role. First-owner onboarding invitations remain recipient-bound and assign Supermanager; they are a separate flow. Role grants are recorded in the organization audit log. Opening or accepting an invitation as an existing active member returns `already_member: true` without consuming the invitation or changing membership, role, or limits. The console opens the organization directly, even when that invitation has since expired, been revoked, or been used. Used invitations cannot restore removed members or admit another user. Rejoining does not clear prior weekly spending or reactivate revoked API keys.
 
 Supermanagers and Content Officers can inspect retained organization content. Managers can inspect metadata and organization statistics. Developers and Members can read and delete only their own organization inputs and result files, and see only their own financial records. Their organization-wide balances, credit histories and provider settlement fields are hidden. Organization webhooks also carry consumption costs without provider settlement details. Removing a member revokes their organization keys immediately for new requests. Files, historical expenses and accepted tasks stay with the organization. API keys inherit only the actor's actual membership role in each organization unless the credential also has `system:manage` and its owner is currently a system administrator. A personal key with `organizations:manage` alone cannot use its owner's system role to read or modify unrelated organizations, promote its membership role, or make system-only changes. Organization-bound keys remain restricted to their organization unless both system permission and the current system role allow global access. Browser sessions retain account-role authorization.

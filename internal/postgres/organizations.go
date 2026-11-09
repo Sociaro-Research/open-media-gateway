@@ -279,6 +279,14 @@ func (r *SystemRepository) OrganizationMembers(ctx context.Context, actor, id st
 	return out, rows.Err()
 }
 func (r *SystemRepository) SetOrganizationMember(ctx context.Context, actor, id, target, role string, limit *money.USD, limitProvided, remove bool) error {
+	return r.setOrganizationMember(ctx, actor, id, target, role, limit, limitProvided, remove, false)
+}
+
+func (r *SystemRepository) AssignOrganizationMember(ctx context.Context, actor, id, target, role string, limit *money.USD, limitProvided bool) error {
+	return r.setOrganizationMember(ctx, actor, id, target, role, limit, limitProvided, false, true)
+}
+
+func (r *SystemRepository) setOrganizationMember(ctx context.Context, actor, id, target, role string, limit *money.USD, limitProvided, remove, addOnly bool) error {
 	if !org.ValidRole(role) {
 		return org.ErrInvalid
 	}
@@ -303,6 +311,9 @@ func (r *SystemRepository) SetOrganizationMember(ctx context.Context, actor, id,
 	if e != nil {
 		return e
 	}
+	if addOnly && access != "system_admin" {
+		return org.ErrForbidden
+	}
 	var uid string
 	if e = tx.QueryRowContext(ctx, `SELECT id FROM users WHERE (id::text=$1 OR lower(email)=lower($1)) AND NOT is_client_manager ORDER BY id LIMIT 1 FOR UPDATE`, target).Scan(&uid); e != nil {
 		return org.ErrNotFound
@@ -319,6 +330,11 @@ func (r *SystemRepository) SetOrganizationMember(ctx context.Context, actor, id,
 	}
 	if !org.MutateMember(access, previous, role) && !(access == org.Manager && previous == org.Manager && role == org.Manager && !remove) {
 		return org.ErrForbidden
+	}
+	// The organization lock serializes assignments with role changes and removals.
+	// Check the active membership here, never against a previously loaded UI list.
+	if addOnly && previous != "" {
+		return org.ErrAlreadyMember
 	}
 	// Resolve omitted limits under the organization lock: inherit for new or
 	// restored members, and preserve an active member's individual limit.

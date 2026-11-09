@@ -1,7 +1,7 @@
 // Focused checks reuse the organization console fixture and real UI components.
 const assert=require('node:assert/strict'),fs=require('node:fs');
 const {evidencePath}=require('./evidence.cjs');
-module.exports=async function(page,{writes,oid,account}){
+module.exports=async function(page,{writes,oid,uid,account}){
  const baseline=process.env.UI_BASELINE==='1',measurements=[];
  const assignment=()=>page.locator('.organization-form').filter({has:page.getByRole('heading',{name:'Assign an existing user',exact:true})});
  const invite=()=>page.locator('.member-invitations form');
@@ -64,17 +64,38 @@ module.exports=async function(page,{writes,oid,account}){
  await assignment().getByRole('status').filter({hasText:'Role assignment denied for testing'}).waitFor();
  assert.equal(await email().inputValue(),' existing@example.test ');assert.equal(await role().inputValue(),'developer');await snapshot('assignment-error');
  fail=false;
+ // Existing active membership, including a Supermanager, is not a role edit.
+ // The server diagnostic preserves this form and never reloads away its draft.
+ for(const target of ['TESTER@EXAMPLE.TEST',uid]){
+  for(const selected of ['supermanager','member']){
+   await role().selectOption(selected,{force:true});await email().fill(target);
+   await assignment().getByRole('button',{name:'Assign',exact:true}).click();
+   await assignment().getByRole('status').filter({hasText:'This user is already a member of this company.'}).waitFor();
+   assert.equal(await email().inputValue(),target);assert.equal(await role().inputValue(),selected);
+   assert.deepEqual(writes.at(-1).data,{role:selected,add_only:true});
+   const existing=page.locator('.organization-page tbody tr').filter({hasText:'tester@example.test'});
+   assert.equal(await existing.locator('.member-role-editor select').inputValue(),'supermanager');
+   assert.equal(await existing.locator('.member-limit-form input').inputValue(),'20');
+  }
+ }
+ await snapshot('assignment-already-member');
  for(const selected of ['developer','member','content_officer','admin','supermanager']){
-  await role().selectOption(selected,{force:true});await email().fill(' existing@example.test ');
+  await role().selectOption(selected,{force:true});await email().fill(' '+selected+'@example.test ');
   const ready=new Promise(resolve=>entered=resolve),old=await assignment().elementHandle();
   const request=page.waitForRequest(r=>r.method()==='PUT'&&new URL(r.url()).pathname.includes('/members/'));
   await assignment().getByRole('button',{name:'Assign',exact:true}).click();await ready;
-  const sent=await request;assert.equal(new URL(sent.url()).pathname,'/v1/organizations/'+oid+'/members/existing%40example.test');assert.deepEqual(sent.postDataJSON(),{role:selected});
+  const sent=await request;assert.equal(new URL(sent.url()).pathname,'/v1/organizations/'+oid+'/members/'+selected+'%40example.test');assert.deepEqual(sent.postDataJSON(),{role:selected,add_only:true});
   assert.equal(await assignment().getByRole('button',{name:'Assign',exact:true}).isDisabled(),true);
   const count=requests;await assignment().evaluate(f=>f.dispatchEvent(new Event('submit',{cancelable:true})));assert.equal(requests,count);
   release();entered=null;await page.waitForFunction(n=>!n.isConnected,old);await old.dispose();await email().waitFor();assert.equal(await role().inputValue(),'member');assert.equal(requests,count);
  }
  await page.unroute('**/v1/organizations/'+oid+'/members/*');
+ const assigned=page.locator('.organization-page tbody tr').filter({hasText:'developer@example.test'});
+ await assigned.locator('.member-role-editor select').selectOption('member',{force:true});
+ const applied=page.waitForResponse(r=>r.request().method()==='PUT'&&new URL(r.url()).pathname.includes('/members/'));
+ await assigned.getByRole('button',{name:'Apply',exact:true}).click();
+ await applied;await assigned.getByRole('button',{name:'Apply',exact:true}).waitFor({state:'hidden'});
+ assert.equal(writes.at(-1).data.add_only,undefined);assert.deepEqual(writes.at(-1).data,{role:'member',weekly_limit_usd:0});
  await invite().locator('select').selectOption('content_officer',{force:true});
  await invite().getByRole('button',{name:'Create invitation',exact:true}).focus();
  await page.keyboard.press('Enter');await page.getByLabel('One-time invitation link',{exact:true}).waitFor();
@@ -88,5 +109,5 @@ module.exports=async function(page,{writes,oid,account}){
   assert.equal(await assignment().count(),0);assert.deepEqual(await invite().locator('select option').evaluateAll(nodes=>nodes.map(n=>n.value)),choices);
  }
  fs.writeFileSync(evidencePath('/tmp/member-roles/geometry.json'),JSON.stringify(measurements,null,2));
- console.log('PASS: selected roles, safe default, trimmed email, failure/retry, pending guard, invitations, restricted roles, keyboard, both themes and 1440/390/320 layouts');
+ console.log('PASS: add-only assignment, active-member rejection, preserved role/limit/draft, intentional role Apply, selected roles, safe default, trimmed email, failure/retry, pending guard, invitations, restricted roles, keyboard, both themes and 1440/390/320 layouts');
 };

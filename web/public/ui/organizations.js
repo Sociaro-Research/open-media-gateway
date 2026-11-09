@@ -167,7 +167,7 @@
    return [memberIdentity(m),choices.length?roleForm:memberRoleLabel(m.role),money(m.weekly_committed_usd),money(m.total_consumed_usd??0),edit];
  }));
  if(systemAdministrator){
-  let user,role;const add=form(body,'Assign an existing user',async()=>{await api(base+'/members/'+encodeURIComponent(user.value.trim()),{method:'PUT',body:JSON.stringify({role:role.value})});await reload()});
+  let user,role;const add=form(body,'Assign an existing user',async()=>{await api(base+'/members/'+encodeURIComponent(user.value.trim()),{method:'PUT',body:JSON.stringify({role:role.value,add_only:true})});await reload()});
   add.classList.add('organization-settings-grid');user=field(add,'Email or user ID','text','',true);
   const label=el('label','Role','organization-field');role=el('select');role.setAttribute('aria-label','Role');
   for(const value of OrganizationRoles.assign('system_admin','member')){const option=el('option',memberRoleLabel(value));option.value=value;role.append(option)}role.value='member';

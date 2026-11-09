@@ -54,6 +54,8 @@ func orgError(w http.ResponseWriter, e error) {
 		writeError(w, 400, "invalid_request", org.ErrInvalid.Error())
 	case errors.Is(e, org.ErrInvitationUnavailable):
 		writeError(w, 409, "invitation_unavailable", e.Error())
+	case errors.Is(e, org.ErrAlreadyMember):
+		writeError(w, 409, "already_member", org.ErrAlreadyMember.Error())
 	case errors.Is(e, org.ErrConflict):
 		writeError(w, 409, "conflict", e.Error())
 	default:
@@ -255,6 +257,7 @@ func (s *Server) organizations(w http.ResponseWriter, r *http.Request) {
 		var input struct {
 			Role        string          `json:"role"`
 			WeeklyLimit json.RawMessage `json:"weekly_limit_usd"`
+			AddOnly     json.RawMessage `json:"add_only"`
 		}
 		if r.Method == "DELETE" {
 			input.Role = "member"
@@ -262,13 +265,35 @@ func (s *Server) organizations(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "DELETE" && !decodeSystem(w, r, &input) {
 			return
 		}
+		addOnly := false
+		if len(input.AddOnly) != 0 {
+			var value *bool
+			if json.Unmarshal(input.AddOnly, &value) != nil || value == nil {
+				writeError(w, 400, "invalid_request", "add_only must be a boolean")
+				return
+			}
+			addOnly = *value
+		}
 		var weekly *money.USD
 		limitProvided := len(input.WeeklyLimit) != 0
 		if limitProvided && json.Unmarshal(input.WeeklyLimit, &weekly) != nil {
 			writeError(w, 400, "invalid_request", "weekly_limit_usd must be a number or null for unlimited")
 			return
 		}
-		e = repo.SetOrganizationMember(r.Context(), actor, id, r.PathValue("user"), input.Role, weekly, limitProvided, r.Method == "DELETE")
+		if addOnly {
+			if !systemAdmin {
+				orgError(w, org.ErrForbidden)
+				return
+			}
+			assigner, ok := repo.(org.MemberAssigner)
+			if !ok {
+				writeError(w, 503, "unavailable", "member assignment is unavailable")
+				return
+			}
+			e = assigner.AssignOrganizationMember(r.Context(), actor, id, r.PathValue("user"), input.Role, weekly, limitProvided)
+		} else {
+			e = repo.SetOrganizationMember(r.Context(), actor, id, r.PathValue("user"), input.Role, weekly, limitProvided, r.Method == "DELETE")
+		}
 	case strings.HasSuffix(path, "/balance-history"):
 		history, ok := repo.(payments.HistoryRepository)
 		if !ok {

@@ -3353,14 +3353,14 @@ paths:
           "bearerAuth": []
         -
           "sessionAuth": []
-      "description": "Organization role checks apply. Key mutations require organizations:manage; system-only operations additionally require system:manage. Amounts are USD."
+      "description": "Organization role checks apply. Key mutations require organizations:manage; system-only operations additionally require system:manage. Amounts are USD. Administrator assignment uses add_only=true to add or restore a non-active member; an already-active member is rejected atomically without changing their role or limit. Omit add_only for intentional member-row updates."
       "responses":
         "204":
           "description": "Success"
         "403":
           "description": "Insufficient role, membership or scope"
         "409":
-          "description": "Last supermanager, used invitation or conflicting payment ID"
+          "description": "already_member when add_only is true and the user is active; otherwise existing last-Supermanager protection applies"
       "parameters":
         -
           "in": "path"
@@ -3382,10 +3382,17 @@ paths:
               "type": "object"
               "additionalProperties": false
               "properties":
+                "add_only":
+                  "type": "boolean"
+                  "default": false
+                  "description": "Administrator-only assignment intent. True rejects an already-active member by ID or case-insensitive email with 409 already_member. Removed members retain the existing restoration behavior. False or omitted preserves intentional role/limit updates."
                 "role":
                   "enum":
                     - "member"
+                    - "developer"
+                    - "content_officer"
                     - "admin"
+                    - "supermanager"
                 "weekly_limit_usd":
                   "description": "Omit to inherit the organization default for a new or restored member, or keep an active member's current limit. Null means unlimited; zero blocks generation."
                   "type":
