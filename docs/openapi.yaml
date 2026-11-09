@@ -7420,6 +7420,8 @@ paths:
       responses:
         '200':
           description: Official preset descriptors with opaque short-lived import tickets.
+          headers:
+            Cache-Control: {schema: {type: string, const: no-store}}
           content:
             application/json:
               schema:
@@ -7432,7 +7434,13 @@ paths:
                   kind: {type: string, enum: [element, voice]}
                   page: {type: integer}
                   size: {type: integer}
-                  has_more: {type: boolean}
+                  has_more:
+                    type: boolean
+                    description: >-
+                      The provider's has_more flag, returned unchanged after the
+                      Gateway filters that page to the selected consumer's accepted
+                      subtypes. An empty data array alone does not mean the catalogue
+                      is exhausted.
                   data: {type: array, items: {$ref: '#/components/schemas/OfficialResourcePreset'}}
         '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
@@ -7465,6 +7473,8 @@ paths:
       responses:
         '200':
           description: Imported owner-local read-only binding; repeated import reuses its identity.
+          headers:
+            Cache-Control: {schema: {type: string, const: no-store}}
           content:
             application/json:
               schema: {$ref: '#/components/schemas/ProviderResource'}
