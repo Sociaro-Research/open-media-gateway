@@ -7549,7 +7549,17 @@ paths:
               schema: {$ref: '#/components/schemas/Generation'}
         '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
+        '402':
+          description: Available generation budget is exhausted (budget_exceeded).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorResponse'}
         '403': {$ref: '#/components/responses/Forbidden'}
+        '404':
+          description: A required reference, generated source or bound voice is unavailable to the caller (not_found).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ErrorResponse'}
         '409': {description: Idempotency conflict or estimate increased; no new work admitted.}
         '422': {description: A verified tariff or capped total is unavailable; no provider submission.}
         '503': {$ref: '#/components/responses/ServiceUnavailable'}
@@ -11400,23 +11410,30 @@ components:
               'x': {type: number, minimum: 0, maximum: 1}
               'y': {type: number, minimum: 0, maximum: 1}
     ProviderResourceCreate:
-      description: Preparation input validation preserves trusted local field constraints in the existing error envelope. error.param names a request field or zero-based reference_ids item; rejected names, tags, source identifiers and private provider diagnostics are not echoed.
+      description: Preparation input validation preserves trusted local field constraints in the existing error envelope. error.param names a request field or zero-based reference_ids item; rejected names, tags, source identifiers and private provider diagnostics are not echoed. The JSON body is limited to 8,192 bytes. Supply at least one uploaded reference or a generated_task_id; the selected preparation's source and model constraints still apply.
       type: object
       additionalProperties: false
       required: [provider, workflow_model, kind, name]
+      anyOf:
+      - required: [reference_ids]
+        properties:
+          reference_ids: {minItems: 1}
+      - required: [generated_task_id]
+        properties:
+          generated_task_id: {minLength: 1}
       properties:
         workflow_model: {type: string, description: Required currently authorized media consumer on this connection; preparation is not a standalone model.}
         provider: {type: string, description: Authorized concrete provider connection ID.}
         model: {type: string, description: Optional native input-preparation operation returned for the authorized media consumer.}
         kind: {type: string}
         subtype: {type: string}
-        name: {type: string}
-        description: {type: string}
-        reference_ids: {type: array, maxItems: 64, items: {type: string, format: uuid}}
+        name: {type: string, description: Nonblank name with at most 256 UTF-8 bytes; the selected preparation may impose a lower Unicode code point limit.}
+        description: {type: string, description: "At most 4096 UTF-8 bytes; the selected preparation may require nonblank text, reject nonempty text or impose a lower Unicode code point limit."}
+        reference_ids: {type: array, maxItems: 64, uniqueItems: true, items: {type: string, format: uuid}}
         generated_task_id: {type: string, format: uuid, description: An eligible completed owned generation; never a native provider ID.}
         generated_artifact_id: {type: string, maxLength: 128, pattern: "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$", description: Local archived audio artifact selector. Required when multiple eligible audio outputs exist; never an upstream audio ID or URL.}
         bound_voice_binding_id: {type: string, format: uuid}
-        tags: {type: array, maxItems: 32, items: {type: string}}
+        tags: {type: array, maxItems: 32, description: The selected preparation may impose a lower tag count limit., items: {type: string, description: At most 128 UTF-8 bytes per tag.}}
         max_expected_usd: {type: number, minimum: 0, description: Unknown totals cannot satisfy an explicit cap.}
     OfficialResourcePreset:
       type: object
