@@ -12,13 +12,6 @@ import (
 )
 
 func encoded(v any) json.RawMessage { b, _ := json.Marshal(v); return b }
-func sameJSON(a, b json.RawMessage) bool {
-	var x, y any
-	if json.Unmarshal(a, &x) != nil || json.Unmarshal(b, &y) != nil {
-		return reflect.DeepEqual(a, b)
-	}
-	return reflect.DeepEqual(x, y)
-}
 func contract(m core.MediaModel) core.MediaModel {
 	// Derived local UI capability is not new external catalogue evidence.
 	m.MaxPromptCharacters = 0
@@ -85,7 +78,7 @@ func Reconcile(previous State, native Capture, observations []Observation, now t
 	// Detach nested tariff components too: callers may reuse or refresh their
 	// observations after publication without changing a returned version.
 	var detached []Observation
-	_ = json.Unmarshal(encoded(observations), &detached)
+	_ = decodeJSON(encoded(observations), &detached)
 	observations = detached
 	for i, ob := range observations {
 		if ob.Error != "" {
@@ -148,7 +141,11 @@ func Reconcile(previous State, native Capture, observations []Observation, now t
 		warnings[key] = w
 	}
 	change := func(model, field, source string, before, after any) {
-		if !reflect.DeepEqual(before, after) {
+		equal := reflect.DeepEqual(before, after)
+		if field == "contract" {
+			equal = sameContract(before, after)
+		}
+		if !equal {
 			run.Changes = append(run.Changes, Change{Model: model, Field: field, Source: source, Before: encoded(before), After: encoded(after)})
 		}
 	}
@@ -263,7 +260,7 @@ func Reconcile(previous State, native Capture, observations []Observation, now t
 			}
 			// Provider adapters may cache their descriptors. Never mutate them.
 			var detached Entry
-			_ = json.Unmarshal(encoded(entry), &detached)
+			_ = decodeJSON(encoded(entry), &detached)
 			entry = detached
 			next.Models[m.ID] = entry
 			change(m.ID, "model", "adapter", nil, entry)
@@ -564,7 +561,7 @@ func Reconcile(previous State, native Capture, observations []Observation, now t
 					}
 				}
 			}
-			if entry.Contract != nil && !reflect.DeepEqual(contract(*entry.Contract), contract(model)) {
+			if entry.Contract != nil && !sameContract(contract(*entry.Contract), contract(model)) {
 				warn(entry.ID, ob.Source.ID, "Capabilities or reference requirements differ from the adapter contract", entry.Contract)
 			}
 			if entry.Metadata != nil {

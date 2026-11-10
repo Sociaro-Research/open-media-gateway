@@ -349,7 +349,7 @@ func contractEvidence(m core.MediaModel, previous State, observations []Observat
 			return false
 		}
 		for _, e := range ob.Entries {
-			if e.ID == m.ID && e.Contract != nil && sameJSON(encoded(comparable(*e.Contract)), encoded(comparable(m))) {
+			if e.ID == m.ID && e.Contract != nil && sameContract(comparable(*e.Contract), comparable(m)) {
 				return true
 			}
 		}

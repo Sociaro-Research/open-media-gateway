@@ -270,6 +270,7 @@ func Parse(source Source, body []byte) ([]Entry, string, error) {
 			Models []Entry `json:"models"`
 		}
 		d := json.NewDecoder(bytes.NewReader(body))
+		d.UseNumber()
 		d.DisallowUnknownFields()
 		if e := d.Decode(&payload); e != nil || payload.Models == nil || len(payload.Models) > 10000 {
 			return nil, "", errors.New("Invalid catalogue manifest")
