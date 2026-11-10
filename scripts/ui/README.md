@@ -126,6 +126,10 @@ identical URLs in distinct ordered slots), Auto duration/aspect-ratio omission,
 ordered text-list parameters, Unicode prompt budgets, unknown/zero/known prices,
 Template Save/reopen and Advanced editing. It measures shared field spacing and
 role-picker legibility in both themes at 1440/390/320px.
+Set `UI_PROMPT_WHITESPACE_ONLY=1` for the reviewed prompt preservation regression:
+estimate and keyboard confirmation retain separators, limits count retained spaces,
+and ordinary/manual models retain trimming. It submits no generation. Repeat in
+Chromium/WebKit; `UI_BASELINE=1` captures matching prior-layout screenshots.
 
 `generation-artifacts.cjs` renders every archived output/format variant through
 authorized media-access links, including scalar last-frame compatibility,

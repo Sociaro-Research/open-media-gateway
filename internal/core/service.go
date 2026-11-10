@@ -198,6 +198,9 @@ func (s *TaskService) prepare(ctx context.Context, input CreateMediaInput, idemp
 	if !found {
 		return Task{}, ErrModelUnavailable
 	}
+	if !descriptor.Manual && descriptor.PromptPolicy != nil && descriptor.PromptPolicy.PreserveWhitespace {
+		prompt = input.Prompt
+	}
 	if err := ValidatePromptPolicy(descriptor, prompt); err != nil {
 		return Task{}, err
 	}
@@ -211,7 +214,7 @@ func (s *TaskService) prepare(ctx context.Context, input CreateMediaInput, idemp
 	if descriptor.MediaType != "" && mediaType != descriptor.MediaType {
 		return Task{}, ErrModelUnavailable
 	}
-	if prompt == "" && !descriptor.NoPrompt && !descriptor.PromptOptional && !(mediaType == "music" && descriptor.SupportsLyrics && strings.TrimSpace(input.Options.Lyrics) != "") {
+	if strings.TrimSpace(prompt) == "" && !descriptor.NoPrompt && !descriptor.PromptOptional && !(mediaType == "music" && descriptor.SupportsLyrics && strings.TrimSpace(input.Options.Lyrics) != "") {
 		return Task{}, ErrPromptRequired
 	}
 	if descriptor.NoPrompt && prompt != "" {

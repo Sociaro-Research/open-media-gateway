@@ -28,9 +28,11 @@ func promptLengthError(length, limit int) error {
 // budgets describe Gateway's enforced classification, not an undocumented vendor
 // tokenizer, UTF-16 rule or linguistic definition of English characters.
 type PromptPolicy struct {
-	MaxCharacters  int `json:"max_characters"`
-	ASCIIBudget    int `json:"ascii_budget,omitempty"`
-	NonASCIIBudget int `json:"non_ascii_budget,omitempty"`
+	// PreserveWhitespace retains reviewed native binding separators verbatim.
+	PreserveWhitespace bool `json:"preserve_whitespace,omitempty"`
+	MaxCharacters      int  `json:"max_characters"`
+	ASCIIBudget        int  `json:"ascii_budget,omitempty"`
+	NonASCIIBudget     int  `json:"non_ascii_budget,omitempty"`
 }
 
 // MaxReviewedPromptCharacters is a parser safety bound, not the ordinary or

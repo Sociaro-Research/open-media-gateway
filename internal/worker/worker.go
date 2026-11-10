@@ -157,7 +157,8 @@ func (w *Worker) process(ctx context.Context, id string) error {
 	}
 	taskCtx, cancel := context.WithDeadline(ctx, deadline)
 	defer cancel()
-	result, err := provider.GetTask(taskCtx, providerTaskID)
+	pollContext := core.WithProviderPollRequest(taskCtx, core.MediaRequest{TaskID: task.ID, Model: task.Model, Options: task.Options.ProviderOptions()})
+	result, err := provider.GetTask(pollContext, providerTaskID)
 	if err != nil {
 		if ctx.Err() != nil {
 			return ctx.Err()

@@ -19,13 +19,23 @@ func Definition() providerkit.Definition {
 		Profiles:                   func() []core.MediaModel { return mediaModels(true) },
 		Region:                     providerRegion,
 		ID:                         "alibaba", Name: "Alibaba Cloud Model Studio", Description: "Images, video, speech and music through the native DashScope API.", DefaultModel: "wan2.7-t2v", ModelEnv: "DASHSCOPE_MODEL",
-		Fields:     []providerkit.Field{{Key: "api_key", Label: "API key", Secret: true, Required: true, Env: "DASHSCOPE_API_KEY"}, {Key: "base_url", Label: "API endpoint", Default: "https://dashscope-intl.aliyuncs.com/api/v1", Env: "DASHSCOPE_BASE_URL"}, {Key: "music_api_key", Label: "Music API key", Secret: true, Env: "DASHSCOPE_MUSIC_API_KEY"}, {Key: "music_base_url", Label: "Music endpoint", Env: "DASHSCOPE_MUSIC_BASE_URL"}, {Key: "billing_access_key_id", Label: "Billing AccessKey ID", Secret: true, Group: "billing", Env: "ALIBABA_BILLING_ACCESS_KEY_ID"}, {Key: "billing_access_key_secret", Label: "Billing AccessKey Secret", Secret: true, Group: "billing", Env: "ALIBABA_BILLING_ACCESS_KEY_SECRET"}},
-		RuntimeEnv: map[string]string{}, RuntimeDefaults: providerkit.Settings{},
+		Fields: []providerkit.Field{{Key: "api_key", Label: "API key", Secret: true, Required: true, Env: "DASHSCOPE_API_KEY"}, {Key: "base_url", Label: "API endpoint", Default: "https://dashscope-intl.aliyuncs.com/api/v1", Env: "DASHSCOPE_BASE_URL"}, {Key: "music_api_key", Label: "Music API key", Secret: true, Env: "DASHSCOPE_MUSIC_API_KEY"}, {Key: "music_base_url", Label: "Music endpoint", Env: "DASHSCOPE_MUSIC_BASE_URL"}, {Key: "billing_access_key_id", Label: "Billing AccessKey ID", Secret: true, Group: "billing", Env: "ALIBABA_BILLING_ACCESS_KEY_ID"}, {Key: "billing_access_key_secret", Label: "Billing AccessKey Secret", Secret: true, Group: "billing", Env: "ALIBABA_BILLING_ACCESS_KEY_SECRET"}},
+		// An operator may attest prior account review only after separately verifying
+		// activation/terms and this workspace. This setting never activates a service.
+		RuntimeEnv: map[string]string{pixverseAccountReviewSetting: "DASHSCOPE_PIXVERSE_REVIEWED_CONNECTION"}, RuntimeDefaults: providerkit.Settings{},
 		Quote: quotePublic, Bills: fetchBills, NormalizeBill: normalizeBill,
 		BillingHelp: "Add a separate Alibaba RAM AccessKey with AliyunBSSReadOnlyAccess.",
 		Aliases:     []string{"dashscope"}, FailureNoCharge: true,
 		Factory: func(c providerkit.Credentials, s providerkit.Settings, client *http.Client) (core.MediaProvider, error) {
-			return New(c.APIKey, c.BaseURL, c.MusicAPIKey, c.MusicBaseURL, client)
+			adapter, err := New(c.APIKey, c.BaseURL, c.MusicAPIKey, c.MusicBaseURL, client)
+			if err != nil {
+				return nil, err
+			}
+			reviewed := c
+			reviewed.BaseURL = adapter.baseURL
+			attestation := s[pixverseAccountReviewSetting]
+			adapter.pixverseAccountReviewed = attestation != "" && attestation == Definition().Identity(reviewed)
+			return adapter, nil
 		},
 	}
 }

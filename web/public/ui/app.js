@@ -1126,7 +1126,7 @@ let quoteTimer;
 function estimateRequest() {
  const provider=selectedProvider(), model=selectedModel();
  if(!provider || !model) return null;
- return {prompt:model.no_prompt ? '' : elements.prompt.value.trim(), provider:provider.id, model:model.id, media_type:model.media_type, options:requestOptions(model),...(playgroundResources?.creation()?{resource_create:playgroundResources.creation()}:{}),...(playgroundResources?.action()?{session_action:playgroundResources.action()}:{})};
+ return {prompt:FormUI.promptValue(elements.prompt.value,model), provider:provider.id, model:model.id, media_type:model.media_type, options:requestOptions(model),...(playgroundResources?.creation()?{resource_create:playgroundResources.creation()}:{}),...(playgroundResources?.action()?{session_action:playgroundResources.action()}:{})};
 }
 function sessionPath(request){return '/v1/provider-resources/'+encodeURIComponent(request.session_action.binding_id)+'/actions/'+encodeURIComponent(request.session_action.action);}
 function generationRequest(request) {
@@ -1569,9 +1569,9 @@ elements.form.addEventListener('submit', async event => {
   if (window.PromptReferences && !window.PromptReferences.validate()) return;
   const provider = selectedProvider();
   const model = selectedModel();
-  const prompt = model?.no_prompt ? '' : elements.prompt.value.trim();
+  const prompt = FormUI.promptValue(elements.prompt.value,model);
   const lyricsOnly = model?.media_type === 'music' && model.supports_lyrics && elements.lyrics.value.trim();
-  if ((!prompt && !lyricsOnly && !model?.prompt_optional && !model?.no_prompt) || !provider || !model) {
+  if ((!prompt.trim() && !lyricsOnly && !model?.prompt_optional && !model?.no_prompt) || !provider || !model) {
     setMessage('Enter a prompt and select a model.', 'error'); return;
   }
   const request={prompt, provider: provider.id, model: model.id, media_type: model.media_type, options: requestOptions(model),...(playgroundResources?.creation()?{resource_create:playgroundResources.creation()}:{}),...(playgroundResources?.action()?{session_action:playgroundResources.action()}:{})};

@@ -249,11 +249,12 @@
   document.addEventListener('reset',event=>{event.target.querySelectorAll('.password-field input').forEach(hidePassword);setTimeout(refresh,0);},true);
   window.addEventListener('resize',schedule);document.fonts?.ready.then(schedule);
   const promptHints=new WeakMap();
+  function promptValue(value,model){const text=String(value||'');return model?.no_prompt?'':!model?.manual&&model?.prompt_policy?.preserve_whitespace?text:text.trim();}
   function promptState(value,model){
     const policy=!model?.manual?model?.prompt_policy:null,reviewed=Number.isSafeInteger(policy?.max_characters)&&policy.max_characters>0;
     const count=Array.from(String(value||'')).length,declared=Number.isSafeInteger(model?.max_prompt_characters)&&model.max_prompt_characters>0?model.max_prompt_characters:null,known=declared?reviewed?Math.min(policy.max_characters,declared):declared:reviewed?policy.max_characters:null;
     const number=n=>n.toLocaleString('en-US'),label=model?.no_prompt?'Prompt':known?count?'Prompt ('+number(count)+' / '+number(known)+' characters)':'Prompt ('+number(known)+' characters max)':count?'Prompt ('+number(count)+' characters)':'Prompt';
-    const characters=Array.from(String(value||'').trim()),maximum=known||10000,ascii=characters.filter(c=>c.codePointAt(0)<128).length,other=characters.length-ascii;
+    const characters=Array.from(promptValue(value,model)),maximum=known||10000,ascii=characters.filter(c=>c.codePointAt(0)<128).length,other=characters.length-ascii;
     let error=!model?.no_prompt&&characters.length>maximum?'Prompt must not exceed '+number(maximum)+' characters.':'';
     const weighted=reviewed&&Number.isSafeInteger(policy.ascii_budget)&&Number.isSafeInteger(policy.non_ascii_budget)&&policy.ascii_budget>0&&policy.non_ascii_budget>0;
     if(!error&&!model?.no_prompt&&weighted&&ascii*policy.non_ascii_budget+other*policy.ascii_budget>policy.ascii_budget*policy.non_ascii_budget)error='The mixed ASCII/non-ASCII prompt exceeds this model’s Gateway budget.';
@@ -268,6 +269,6 @@
     return state;
   }
   function setLabel(control,text){enhance(control);const label=control.closest('.floating-field')?.querySelector('.floating-label');if(label&&label.textContent!==text)label.textContent=text;}
-  window.FormUI={sectionHeading,dialogHeading,disclosure,message,valid,watch,commit,snapshot,saved,update,refresh,setLabel,setText,promptState,updatePrompt,copyButton,placeAction,credentials:{setup:setupCredential,render:renderCredential,replacement:credentialReplacement,updateValue:credentialUpdate},passwords:{hide:hidePassword}};
+  window.FormUI={sectionHeading,dialogHeading,disclosure,message,valid,watch,commit,snapshot,saved,update,refresh,setLabel,setText,promptValue,promptState,updatePrompt,copyButton,placeAction,credentials:{setup:setupCredential,render:renderCredential,replacement:credentialReplacement,updateValue:credentialUpdate},passwords:{hide:hidePassword}};
   new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['disabled']});refresh();
 })();

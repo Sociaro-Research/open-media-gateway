@@ -34,6 +34,7 @@ media across providers.
 
 Included adapters: [OpenAI](docs/openai-provider.md),
 [BytePlus ModelArk and Alibaba Cloud Model Studio](docs/configuration.md#provider-bootstrap),
+including [guarded native PixVerse V6](docs/alibaba-pixverse.md),
 [Agnes AI](docs/agnes-provider.md), [Sonilo](docs/sonilo-provider.md), and
 [direct Kling AI](docs/kling-provider.md),
 [direct MiniMax image/video](docs/minimax-provider.md), plus `mock`.

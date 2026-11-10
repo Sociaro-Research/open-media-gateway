@@ -46,10 +46,13 @@ Count Unicode code points, not UTF-8 bytes, UTF-16 code units or visible graphem
 clusters. For example, `😀` is one code point and `e` followed by a combining acute
 accent is two. A JavaScript counter can use `Array.from(prompt).length`.
 
-Create, estimate and validation share Gateway admission, which trims surrounding
-whitespace before counting and passes that trimmed prompt to native validation.
-Consequently a raw JSON Schema `maxLength` cannot exactly describe admission:
-outer whitespace does not consume the character budget. JSON generation bodies
+Create, estimate and validation share Gateway admission, which normally trims
+surrounding whitespace before counting and passes that trimmed prompt to native
+validation. A reviewed native `prompt_policy.preserve_whitespace` instead retains
+the original text, including named-reference separators, and counts every retained
+code point. Manual models keep their existing trimming behavior.
+Playground estimates, confirmation and field validation use this same policy.
+Consequently a raw JSON Schema `maxLength` cannot exactly describe every admission policy. JSON generation bodies
 are limited to 64 KiB total, and multipart scalar fields to 64 KiB each, so a
 Unicode prompt within its character budget may still exceed a transport limit.
 Multipart generation forms also retain their 32 MiB total limit.

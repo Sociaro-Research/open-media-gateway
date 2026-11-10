@@ -32,15 +32,16 @@ const (
 // Video and legacy image jobs use the asynchronous task API. Synchronous-only
 // image models, HTTP TTS and Fun-Music return immediate results.
 type Adapter struct {
-	apiKey       string
-	baseURL      string
-	musicAPIKey  string
-	musicBaseURL string
-	musicEnabled bool
-	client       *http.Client
-	modelsMu     sync.Mutex
-	models       []core.MediaModel
-	modelsAt     time.Time
+	apiKey                  string
+	baseURL                 string
+	musicAPIKey             string
+	musicBaseURL            string
+	musicEnabled            bool
+	pixverseAccountReviewed bool // Opt-in attestation; never inferred from a public listing.
+	client                  *http.Client
+	modelsMu                sync.Mutex
+	models                  []core.MediaModel
+	modelsAt                time.Time
 }
 
 func New(apiKey, baseURL, musicAPIKey, musicBaseURL string, client *http.Client) (*Adapter, error) {
@@ -95,7 +96,7 @@ func (a *Adapter) ListModels(ctx context.Context) ([]core.MediaModel, error) {
 	if len(a.models) > 0 && time.Since(a.modelsAt) < 10*time.Minute {
 		models := cloneModels(a.models)
 		a.modelsMu.Unlock()
-		return models, nil
+		return a.pixverseVisibleModels(models), nil
 	}
 	a.modelsMu.Unlock()
 
@@ -103,6 +104,7 @@ func (a *Adapter) ListModels(ctx context.Context) ([]core.MediaModel, error) {
 	if remote, err := a.listRemoteModels(ctx); err == nil && len(remote) > 0 {
 		models = mergeModels(remote, musicModels(a.musicEnabled))
 	}
+	models = a.pixverseVisibleModels(models)
 	slices.SortStableFunc(models, func(a, b core.MediaModel) int {
 		if a.MediaType != b.MediaType {
 			return strings.Compare(a.MediaType, b.MediaType)
@@ -172,6 +174,12 @@ func (a *Adapter) listRemoteModels(ctx context.Context) ([]core.MediaModel, erro
 }
 
 func (a *Adapter) Generate(ctx context.Context, request core.MediaRequest) (core.ProviderTask, error) {
+	if isPixverseModel(request.Model) {
+		if modelcatalog.IsInactive("alibaba", request.Model, time.Now()) {
+			return core.ProviderTask{}, core.ErrModelUnavailable
+		}
+		return a.generatePixverse(ctx, request)
+	}
 	model, ok := a.model(ctx, request.Model)
 	if !ok {
 		return core.ProviderTask{}, fmt.Errorf("unsupported DashScope media model %q", request.Model)
@@ -281,6 +289,9 @@ func (a *Adapter) createImmediate(ctx context.Context, baseURL, apiKey, path str
 }
 
 func (a *Adapter) GetTask(ctx context.Context, providerTaskID string) (core.ProviderResult, error) {
+	if request, ok := core.ProviderPollRequestFromContext(ctx); ok && isPixverseModel(request.Model) {
+		return a.getPixverseTask(ctx, providerTaskID, request)
+	}
 	var response dashResponse
 	if err := a.do(ctx, a.baseURL, a.apiKey, http.MethodGet, "/tasks/"+url.PathEscape(providerTaskID), nil, false, &response); err != nil {
 		return core.ProviderResult{}, err
@@ -843,6 +854,7 @@ func mediaModels(includeMusic bool) []core.MediaModel {
 		result = append(result, musicModels(true)...)
 	}
 	result = append(result, additionalMediaModels()...)
+	result = append(result, pixverseModels()...)
 	for index := range result {
 		configureInputCapabilities(&result[index])
 		applyModelContract(&result[index])
@@ -876,6 +888,9 @@ func musicModels(enabled bool) []core.MediaModel {
 }
 
 func configureInputCapabilities(model *core.MediaModel) {
+	if isPixverseModel(model.ID) {
+		return
+	} // Exact PixVerse contracts were constructed independently.
 	lower := strings.ToLower(model.ID)
 	if strings.HasPrefix(lower, "wan3.0-") {
 		model.SupportsImageInput, model.SupportsVideoInput, model.SupportsAudioInput = true, true, true

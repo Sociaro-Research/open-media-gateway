@@ -31,11 +31,19 @@ var reviewedTariffs = func() map[string][]catalogsync.Rate {
 }()
 
 func (a *Adapter) Quote(_ context.Context, model core.MediaModel, request core.MediaRequest) (core.TaskCost, string, error) {
+	if isPixverseModel(request.Model) {
+		if err := a.validatePixverseConnection(); err != nil {
+			return core.TaskCost{}, "", err
+		}
+	}
 	cost, err := quotePublic(a.baseURL, model, request, time.Now().UTC())
 	return cost, "", err
 }
 
 func quotePublic(endpoint string, model core.MediaModel, request core.MediaRequest, now time.Time) (core.TaskCost, error) {
+	if isPixverseModel(request.Model) {
+		return quotePixversePublic(endpoint, model, request, now)
+	}
 	id, o := request.Model, request.Options
 	if _, ok := describeDashModel(id, id); !ok {
 		return core.TaskCost{}, core.ErrPricingUnavailable

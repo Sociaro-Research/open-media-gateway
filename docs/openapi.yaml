@@ -10366,7 +10366,7 @@ components:
           description: Image output encoding supported by the model, e.g. png/jpeg/webp.
           type: string
         prompt:
-          description: Text direction for image/video/music/audio routes; speech uses input and rejects prompt. Surrounding whitespace is trimmed before checking requirements and counting Unicode code points. Normally nonblank; omission, null or blank text is admitted for prompt_optional or no_prompt models, or music with supports_lyrics and nonblank options.lyrics, subject to selected-model and effective-mode native validation. no_prompt rejects remaining nonblank text. Use max_prompt_characters and any reviewed prompt_policy; ordinary models use a 10000 ceiling or a lower native bound, manual models retain 10000, and only explicit reviewed native policies may extend it up to 40000. Transport byte limits apply separately; a raw-string maxLength cannot express trim-before-count.
+          description: Text direction for image/video/music/audio routes; speech uses input and rejects prompt. Surrounding whitespace is normally trimmed before checking requirements and counting Unicode code points; a reviewed native prompt_policy.preserve_whitespace retains it verbatim and counts retained separators. Normally nonblank; omission, null or blank text is admitted for prompt_optional or no_prompt models, or music with supports_lyrics and nonblank options.lyrics, subject to selected-model and effective-mode native validation. no_prompt rejects remaining nonblank text. Use max_prompt_characters and any reviewed prompt_policy; ordinary models use a 10000 ceiling or a lower native bound, manual models retain 10000, and only explicit reviewed native policies may extend it up to 40000. Transport byte limits apply separately; a raw-string maxLength cannot express trim-before-count.
           type: [string, "null"]
         quality:
           type: string
@@ -11101,7 +11101,19 @@ components:
           minimum: 1
           maximum: 40000
           readOnly: true
-          description: Effective known gateway/adapter prompt input ceiling in Unicode code points, not bytes, UTF-16 units, grapheme clusters or a documented vendor maximum. Ordinary models use the 10000 ceiling or a lower native bound; an explicit reviewed native prompt_policy may set a ceiling up to 40000 and an additional mixed ASCII/non-ASCII budget. Manual models bypass native policies and retain 10000. Omitted for no_prompt models; absence on older servers is unknown metadata. Admission trims surrounding whitespace before counting. Template publication separately checks the raw prompt and its own constraints. See prompt-limits.md.
+          description: Effective known gateway/adapter prompt input ceiling in Unicode code points, not bytes, UTF-16 units, grapheme clusters or a documented vendor maximum. Ordinary models use the 10000 ceiling or a lower native bound; an explicit reviewed native prompt_policy may set a ceiling up to 40000 and an additional mixed ASCII/non-ASCII budget. Manual models bypass native policies and retain 10000. Omitted for no_prompt models; absence on older servers is unknown metadata. Admission normally trims surrounding whitespace before counting; a reviewed native prompt_policy.preserve_whitespace counts and retains the original text. Template publication separately checks the raw prompt and its own constraints. See prompt-limits.md.
+        prompt_policy:
+          type: object
+          readOnly: true
+          description: Reviewed native admission policy. Manual models retain their existing Gateway policy.
+          required: [max_characters]
+          properties:
+            max_characters: {type: integer, minimum: 1, maximum: 40000}
+            ascii_budget: {type: integer, minimum: 0}
+            non_ascii_budget: {type: integer, minimum: 0}
+            preserve_whitespace:
+              type: boolean
+              description: Preserve the original prompt including named-reference separators; retained code points count toward the effective limit.
         prompt_optional:
           type: boolean
           description: Gateway admits an empty prompt after surrounding-whitespace trimming, for example when direction comes from reference media. Selected-model and effective-mode native validation still applies.

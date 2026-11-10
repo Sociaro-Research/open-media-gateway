@@ -27,6 +27,9 @@ func animatePayload(r core.MediaRequest) any {
 }
 
 func applyModelContract(m *core.MediaModel) {
+	if isPixverseModel(m.ID) {
+		return
+	} // Do not overwrite exact contracts with suffix heuristics.
 	defer func() {
 		m.ReferenceModes = referenceModes(*m)
 		if strings.HasPrefix(m.ID, "wan3.0-") || strings.HasPrefix(m.ID, "wan2.7-") && strings.Contains(m.ID, "r2v") {
@@ -208,6 +211,13 @@ func applyReferenceFileContract(m *core.MediaModel) {
 }
 
 func (a *Adapter) ValidateRequest(ctx context.Context, r core.MediaRequest) error {
+	if isPixverseModel(r.Model) {
+		if err := a.validatePixverseConnection(); err != nil {
+			return err
+		}
+		_, err := pixversePayload(r)
+		return err
+	}
 	if isQwen31(r.Model) {
 		return qwen31Validate(a.baseURL, r)
 	}
