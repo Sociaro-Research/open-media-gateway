@@ -316,6 +316,10 @@ func (r *SystemRepository) setOrganizationMember(ctx context.Context, actor, id,
 	}
 	var uid string
 	if e = tx.QueryRowContext(ctx, `SELECT id FROM users WHERE (id::text=$1 OR lower(email)=lower($1)) AND NOT is_client_manager ORDER BY id LIMIT 1 FOR UPDATE`, target).Scan(&uid); e != nil {
+		if addOnly && errors.Is(e, sql.ErrNoRows) {
+			// Only administrators reach this point, so it does not reveal accounts to company managers.
+			return org.ErrUnknownUser
+		}
 		return org.ErrNotFound
 	}
 	var previous string
@@ -352,7 +356,7 @@ func (r *SystemRepository) setOrganizationMember(ctx context.Context, actor, id,
 			return e
 		}
 		if count <= 1 {
-			return org.ErrConflict
+			return org.ErrLastSupermanager
 		}
 	}
 	if remove {

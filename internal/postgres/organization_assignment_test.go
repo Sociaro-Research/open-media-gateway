@@ -235,7 +235,7 @@ func TestOrganizationAssignmentControls(t *testing.T) {
 	t.Run("last-supermanager", func(t *testing.T) {
 		ctx, repo, model := assignmentFixture(t, true)
 		model.role = org.Supermanager
-		if err := repo.SetOrganizationMember(ctx, "admin", "company", "target-id", org.MemberRole, nil, false, false); !errors.Is(err, org.ErrConflict) || model.writes != 0 || model.role != org.Supermanager {
+		if err := repo.SetOrganizationMember(ctx, "admin", "company", "target-id", org.MemberRole, nil, false, false); !errors.Is(err, org.ErrLastSupermanager) || !errors.Is(err, org.ErrConflict) || model.writes != 0 || model.role != org.Supermanager {
 			t.Fatal("last Supermanager guard changed", err)
 		}
 	})

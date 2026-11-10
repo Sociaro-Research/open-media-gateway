@@ -69,6 +69,9 @@ func TestPostgresOrganizationAssignment(t *testing.T) {
 		}
 	}
 	initial := money.USD(17_000_000)
+	if err = repo.AssignOrganizationMember(ctx, admin.ID, company.ID, "nobody-"+target.Email, org.Developer, &initial, true); !errors.Is(err, org.ErrUnknownUser) || !errors.Is(err, org.ErrNotFound) {
+		t.Fatal("unknown email must say no account uses it", err)
+	}
 	if err = repo.AssignOrganizationMember(ctx, admin.ID, company.ID, target.Email, org.Developer, &initial, true); err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +94,7 @@ func TestPostgresOrganizationAssignment(t *testing.T) {
 	if err = repo.SetOrganizationMember(ctx, admin.ID, company.ID, admin.ID, org.MemberRole, nil, false, false); err != nil {
 		t.Fatal(err)
 	}
-	if err = repo.SetOrganizationMember(ctx, admin.ID, company.ID, target.ID, org.MemberRole, nil, false, false); !errors.Is(err, org.ErrConflict) {
+	if err = repo.SetOrganizationMember(ctx, admin.ID, company.ID, target.ID, org.MemberRole, nil, false, false); !errors.Is(err, org.ErrLastSupermanager) || !errors.Is(err, org.ErrConflict) {
 		t.Fatal("last Supermanager guard changed", err)
 	}
 	if err = repo.SetOrganizationMember(ctx, admin.ID, company.ID, admin.ID, org.Supermanager, nil, false, false); err != nil {
