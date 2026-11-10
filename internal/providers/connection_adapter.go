@@ -26,8 +26,17 @@ type manualRequest struct {
 	body  map[string]any
 }
 type connectionTransport struct {
-	base        http.RoundTripper
-	credentials Credentials
+	base          http.RoundTripper
+	credentials   Credentials
+	mediaRedirect func(*http.Request, []*http.Request) error
+}
+
+// Public media downloads retain the host's outbound transport without the API
+// origin restriction, endpoint rewrites or configured authentication headers.
+func (t *connectionTransport) PublicMediaTransport() http.RoundTripper { return t.base }
+
+func (t *connectionTransport) PublicMediaRedirectPolicy() func(*http.Request, []*http.Request) error {
+	return t.mediaRedirect
 }
 
 func (t *connectionTransport) RoundTrip(original *http.Request) (*http.Response, error) {

@@ -283,7 +283,7 @@ func configurationClient(client *http.Client, c Credentials) *http.Client {
 	if base == nil {
 		base = http.DefaultTransport
 	}
-	copy.Transport = &connectionTransport{base: base, credentials: c}
+	copy.Transport = &connectionTransport{base: base, credentials: c, mediaRedirect: client.CheckRedirect}
 	copy.CheckRedirect = func(*http.Request, []*http.Request) error {
 		return errors.New("provider API redirects are not supported; configure the final endpoint")
 	}

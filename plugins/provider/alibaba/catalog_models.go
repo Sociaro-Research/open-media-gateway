@@ -120,6 +120,7 @@ func additionalMediaModels() []core.MediaModel {
 	}
 	m = videoModel("wan2.7-r2v", "Wan 2.7 Reference-to-Video", 2, 10, []string{"720p", "1080p"}, true)
 	result = append(result, m)
+	result = append(result, qwen31Models()...)
 	return result
 }
 

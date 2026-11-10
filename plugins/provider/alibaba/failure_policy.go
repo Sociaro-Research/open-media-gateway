@@ -5,6 +5,7 @@ import "github.com/Sociaro-Research/open-media-gateway/internal/providerkit"
 // Exact reviewed native codes only; unknown codes and provider prose remain private.
 // https://help.aliyun.com/en/model-studio/error-code
 var failurePolicy = providerkit.NewFailurePolicy("Alibaba Model Studio", map[string]providerkit.FailureKind{
+	"CLIENT_ERROR":               providerkit.FailureInput,
 	"InvalidParameter":           providerkit.FailureInput,
 	"invalid_parameter_error":    providerkit.FailureInput,
 	"InvalidApiKey":              providerkit.FailureCredentials,

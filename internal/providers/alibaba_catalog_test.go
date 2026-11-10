@@ -96,8 +96,8 @@ func TestAlibabaProductionConnectionFollowup(t *testing.T) {
 		t.Fatal(err)
 	}
 	m, ctx, capture := alibabaCatalogFixture(t)
-	// The live check also discovered this exact new ID after the API fixture
-	// was captured. It stays unreviewed rather than inheriting a 3.0 contract.
+	// The live check also discovered this exact ID after the API fixture was
+	// captured. Its native contract is reviewed separately from source adoption.
 	capture.IDs = append(capture.IDs, "qwen-audio-3.1-tts-flash")
 	var obs []catalogsync.Observation
 	for _, id := range []string{"_api", "releases", "pricing", "image-capabilities", "retirements"} {
@@ -161,8 +161,15 @@ func alibabaReportReplay(t *testing.T, dir string, downloaded bool) {
 		if w.Model != "qwen-audio-3.1-tts-next" && w.Model != "qwen-audio-3.1-tts-flash" && w.Model != "qwen-tts-flash" {
 			t.Fatalf("unexpected unresolved warning: %+v", w)
 		}
-		if w.Reason != "Model requires an adapter contract before it can be enabled" || !strings.Contains(strings.ToLower(string(w.Evidence)), "token") {
-			t.Fatalf("unsupported token pricing was not preserved as evidence: %+v", w)
+		want := "Model requires an adapter contract before it can be enabled"
+		if w.Model == "qwen-audio-3.1-tts-next" || w.Model == "qwen-audio-3.1-tts-flash" {
+			want = "Published tariff needs a structured pricing rule"
+			if state.Models[w.Model].Contract == nil {
+				t.Fatal("reviewed Qwen file contract missing", w.Model)
+			}
+		}
+		if w.Reason != want || !strings.Contains(strings.ToLower(string(w.Evidence)), "token") {
+			t.Fatalf("unadopted token pricing was not preserved as evidence: %+v", w)
 		}
 	}
 	if len(run.ResolvedWarnings) != 207 {

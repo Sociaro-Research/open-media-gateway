@@ -1,6 +1,7 @@
 package alibaba
 
 import (
+	"context"
 	_ "embed"
 	"encoding/json"
 	"fmt"
@@ -29,10 +30,18 @@ var reviewedTariffs = func() map[string][]catalogsync.Rate {
 	return rates
 }()
 
+func (a *Adapter) Quote(_ context.Context, model core.MediaModel, request core.MediaRequest) (core.TaskCost, string, error) {
+	cost, err := quotePublic(a.baseURL, model, request, time.Now().UTC())
+	return cost, "", err
+}
+
 func quotePublic(endpoint string, model core.MediaModel, request core.MediaRequest, now time.Time) (core.TaskCost, error) {
 	id, o := request.Model, request.Options
 	if _, ok := describeDashModel(id, id); !ok {
 		return core.TaskCost{}, core.ErrPricingUnavailable
+	}
+	if isQwen31(id) {
+		return qwen31Quote(endpoint, model, request, now)
 	}
 	parsed, err := url.Parse(endpoint)
 	if err != nil {

@@ -208,6 +208,9 @@ func (a *Adapter) Generate(ctx context.Context, request core.MediaRequest) (core
 		}
 		return a.createAsync(ctx, path, payload)
 	case "speech":
+		if isQwen31(request.Model) {
+			return a.generateQwen31(ctx, request)
+		}
 		if isBatchSpeech(request.Model) {
 			return a.createImmediate(ctx, a.baseURL, a.apiKey, "/services/audio/tts/SpeechSynthesizer", map[string]any{"model": request.Model, "input": map[string]any{"text": request.Prompt, "voice": request.Options.Voice, "format": "wav", "sample_rate": 24000}})
 		}

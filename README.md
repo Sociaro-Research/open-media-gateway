@@ -37,6 +37,8 @@ Included adapters: [OpenAI](docs/openai-provider.md),
 [Agnes AI](docs/agnes-provider.md), [Sonilo](docs/sonilo-provider.md), and
 [direct Kling AI](docs/kling-provider.md),
 [direct MiniMax image/video](docs/minimax-provider.md), plus `mock`.
+Alibaba's [Qwen Audio 3.1 file contracts](docs/alibaba-qwen-audio.md) describe
+the supported speech subset and workspace requirements.
 Media types and controls depend on the selected provider and model. Administrators
 can upload or remove [PNG provider logos](docs/provider-modules.md#provider-logos)
 from provider settings; logos follow the active light/dark display mode.

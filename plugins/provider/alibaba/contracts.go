@@ -208,6 +208,9 @@ func applyReferenceFileContract(m *core.MediaModel) {
 }
 
 func (a *Adapter) ValidateRequest(ctx context.Context, r core.MediaRequest) error {
+	if isQwen31(r.Model) {
+		return qwen31Validate(a.baseURL, r)
+	}
 	if core.IsManualCall(ctx) {
 		return nil
 	}
