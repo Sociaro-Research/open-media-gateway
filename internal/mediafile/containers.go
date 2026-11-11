@@ -26,6 +26,7 @@ func ogg(data []byte, info *Info) error {
 	var rate uint64
 	var skip uint16
 	found := false
+	ended := false
 	for pos := 0; pos < len(data); {
 		if len(data)-pos < 27 || string(data[pos:pos+4]) != "OggS" || data[pos+4] != 0 {
 			return ErrInvalid
@@ -44,6 +45,11 @@ func ogg(data []byte, info *Info) error {
 		}
 		body := data[head : head+size]
 		s := binary.LittleEndian.Uint32(data[pos+14 : pos+18])
+		// This metadata-only inspector cannot safely total chained links or
+		// interpret multiplexed streams. Never report just the first link.
+		if found && (ended || s != serial || data[pos+5]&2 != 0) {
+			return ErrInvalid
+		}
 		if !found {
 			switch {
 			case len(body) >= 19 && bytes.HasPrefix(body, []byte("OpusHead")):
@@ -59,6 +65,7 @@ func ogg(data []byte, info *Info) error {
 			serial = s
 			found = true
 		}
+		ended = data[pos+5]&4 != 0
 		if s == serial {
 			g := binary.LittleEndian.Uint64(data[pos+6 : pos+14])
 			if g != math.MaxUint64 {
