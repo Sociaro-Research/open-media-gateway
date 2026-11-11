@@ -70,7 +70,31 @@ func TestPostgresOrganizationAssignment(t *testing.T) {
 	}
 	initial := money.USD(17_000_000)
 	if err = repo.AssignOrganizationMember(ctx, admin.ID, company.ID, "nobody-"+target.Email, org.Developer, &initial, true); !errors.Is(err, org.ErrUnknownUser) || !errors.Is(err, org.ErrNotFound) {
-		t.Fatal("unknown email must say no account uses it", err)
+		t.Fatal("unknown email must say the user is not found or unavailable", err)
+	}
+	// An existing client-manager account stays excluded and gets the same message by email and by ID.
+	manager, err := auth.UpsertGoogleUser(ctx, uuid.NewString(), uuid.NewString()+"@example.test", "Assignment client manager", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		cleanup, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if _, err := db.ExecContext(cleanup, `DELETE FROM users WHERE id=$1`, manager.ID); err != nil {
+			t.Error(err)
+		}
+	})
+	if _, err = db.ExecContext(ctx, `UPDATE users SET is_client_manager=TRUE WHERE id=$1`, manager.ID); err != nil {
+		t.Fatal(err)
+	}
+	for _, lookup := range []string{manager.Email, manager.ID} {
+		if err = repo.AssignOrganizationMember(ctx, admin.ID, company.ID, lookup, org.Developer, &initial, true); !errors.Is(err, org.ErrUnknownUser) || err.Error() != org.ErrUnknownUser.Error() {
+			t.Fatal("client manager must be unavailable", lookup, err)
+		}
+	}
+	var managerRows int
+	if err = db.QueryRowContext(ctx, `SELECT count(*) FROM organization_members WHERE user_id=$1`, manager.ID).Scan(&managerRows); err != nil || managerRows != 0 {
+		t.Fatal("client manager membership created", managerRows, err)
 	}
 	if err = repo.AssignOrganizationMember(ctx, admin.ID, company.ID, target.Email, org.Developer, &initial, true); err != nil {
 		t.Fatal(err)
