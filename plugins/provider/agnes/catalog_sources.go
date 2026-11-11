@@ -10,6 +10,8 @@ func catalogDocumentReviews() map[string]catalogsync.DocumentReview {
 
 func catalogSources() []catalogsync.Source {
 	return []catalogsync.Source{
+		{ID: "documentation-index", URL: "https://wiki.agnes-ai.com/llms.txt", Parser: "document"},
+		{ID: "video-2.0-retirement", URL: "https://wiki.agnes-ai.com/en/docs/agnes-video-v20.md", Parser: "document"},
 		{ID: "overview", URL: "https://www.agnes-ai.com/en/docs/overview", Parser: "document"},
 		{ID: "pricing", URL: "https://www.agnes-ai.com/en/docs/pricing", Parser: "document"},
 		{ID: "image-2.0", URL: "https://www.agnes-ai.com/en/docs/agnes-image-20-flash", Parser: "document"},

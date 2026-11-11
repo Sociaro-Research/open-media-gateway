@@ -253,9 +253,9 @@ func TestCheckoutReusesCompanyBilling(t *testing.T) {
 }
 
 func TestCheckoutBillingSummary(t *testing.T) {
-	b := &payments.Billing{BusinessName: "Sunday Games LTD", Address: payments.Address{Line1: "Company street 7", City: "Erimi", PostalCode: "4630", Country: "CY"}, TaxIDs: []payments.TaxID{{Type: "eu_vat", Value: "CY12345678X"}}}
+	b := &payments.Billing{BusinessName: "Example Company Ltd", Address: payments.Address{Line1: "Company street 7", City: "Example city", PostalCode: "1000", Country: "CY"}, TaxIDs: []payments.TaxID{{Type: "eu_vat", Value: "CY12345678X"}}}
 	got := checkoutBillingSummary(b)
-	want := "Billing to: Sunday Games LTD\nAddress: Company street 7, Erimi, 4630, CY\nTax ID: CY12345678X"
+	want := "Billing to: Example Company Ltd\nAddress: Company street 7, Example city, 1000, CY\nTax ID: CY12345678X"
 	if got != want {
 		t.Fatalf("summary=%q", got)
 	}

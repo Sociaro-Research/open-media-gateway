@@ -37,7 +37,7 @@ func TestEmailDeliveryAdministration(t *testing.T) {
 	h := s.handler()
 	_, generation := issueTestKey(t, h, "alice", `{"name":"Generation"}`)
 	_, adminKey := issueTestKey(t, h, "alice", `{"name":"System","scopes":["generation","system:manage"]}`)
-	body := `{"provider":"resend","from":"Sociaro <login@example.test>","api_key":"fixture-secret-key","version":1}`
+	body := `{"provider":"resend","from":"Central server <login@example.test>","api_key":"fixture-secret-key","version":1}`
 	for _, tc := range []struct {
 		session, key string
 		status       int

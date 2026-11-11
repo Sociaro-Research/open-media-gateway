@@ -6,7 +6,7 @@ import (
 )
 
 // Profile selection changes only the confirmed local resource policy. Skip is
-// deliberately a client-only action; Sociaro connection has its own lifecycle.
+// deliberately a client-only action; Central server connection has its own lifecycle.
 func (s *Server) setupProfile(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Profile       string `json:"profile"`
@@ -25,7 +25,7 @@ func (s *Server) setupProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if in.Profile != "personal" && in.Profile != "operator" {
-		writeError(w, 400, "invalid_profile", "choose personal or operator; connect Sociaro separately")
+		writeError(w, 400, "invalid_profile", "choose personal or operator; connect Central server separately")
 		return
 	}
 	current, err := s.system.Settings(r.Context())

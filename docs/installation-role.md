@@ -55,7 +55,7 @@ deny central hosting or enable it on an ordinary origin. Existing settings versi
 and active-job/drain safeguards still apply to explicit configuration writes.
 
 Ordinary installations offer two exclusive local modes and the unchanged remote connection entry: **For myself**, **Service for
-companies** and **Sociaro**. The Sociaro connection form defaults to the central
+companies** and **Central server**. The Central server connection form defaults to the central
 origin from server metadata. An existing saved connection retains its original
 origin instead of silently moving when a release changes the default.
 

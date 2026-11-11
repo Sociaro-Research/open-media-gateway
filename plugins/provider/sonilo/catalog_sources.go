@@ -8,6 +8,8 @@ func completeOpenAPISource() catalogsync.Source {
 
 func catalogSources() []catalogsync.Source {
 	return []catalogsync.Source{
+		// This feed describes operation/default changes, not vendor model dates.
+		{ID: "api-changelog", URL: "https://sonilo.com/docs/changelog", Parser: "document"},
 		{ID: "api", URL: "https://platform.sonilo.com/docs/api", Parser: "document"},
 		{ID: "openapi", URL: "https://sonilo.com/openapi.json", Parser: "document"},
 		completeOpenAPISource(),

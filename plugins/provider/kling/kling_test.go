@@ -49,7 +49,7 @@ func TestRequestsAndRestartSafePolling(t *testing.T) {
 			}
 			submissions, polls := 0, 0
 			f := transport(func(req *http.Request) (*http.Response, error) {
-				if req.URL.Host != "api-singapore.klingai.com" || req.Header.Get("Authorization") != "Bearer fixture-secret" || req.Header.Get("User-Agent") != "Sociaro-Media-Gateway/Kling" || req.Header.Get("Content-Type") != "application/json" {
+				if req.URL.Host != "api-singapore.klingai.com" || req.Header.Get("Authorization") != "Bearer fixture-secret" || req.Header.Get("User-Agent") != "Media-Gateway/Kling" || req.Header.Get("Content-Type") != "application/json" {
 					t.Fatal("incorrect destination or headers")
 				}
 				if req.Method == "POST" {

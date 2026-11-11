@@ -2,11 +2,12 @@
 const {chromium,webkit}=require('playwright'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const root=path.resolve(__dirname,'../../web/public'),out=path.resolve(process.env.UI_EVIDENCE_DIR||'.local/footer-layout'),engine=process.env.UI_BROWSER_ENGINE||'chromium';fs.mkdirSync(out,{recursive:true});
 let ui='https://console-staging.fixture.test',docs='https://docs-staging.fixture.test';const errors=[],external=[],geometry=[],footerGeometry=[];
-(async()=>{const browser=await({chromium,webkit}[engine]).launch({headless:true}),context=await browser.newContext({viewport:{width:1440,height:360}});
+(async()=>{const browser=await({chromium,webkit}[engine]).launch({headless:true,executablePath:process.env.UI_BROWSER_PATH}),context=await browser.newContext({viewport:{width:1440,height:360}});
  await context.addInitScript(()=>localStorage.setItem('gateway-theme','light'));
  await context.route('**/*',async route=>{const req=route.request(),u=new URL(req.url());if(![ui,docs].includes(u.origin)){external.push(u.origin);return route.abort();}
   const json=(body,status=200)=>route.fulfill({status,json:body,headers:{'Access-Control-Allow-Origin':docs}});
   if(u.pathname==='/site.json')return json({ui_url:ui,api_url:ui,docs_url:docs,branding:{name:'Footer fixture',version:1,dark:{accent:'#c7e888','accent-text':'#c7e888'},light:{accent:'#536b00','accent-text':'#536b00'}}});
+  if(u.pathname==='/auth/company-connection')return json({connected:false},404);
   if(u.pathname==='/auth/session')return route.fulfill({status:204,body:''});
   if(u.pathname==='/auth/methods')return json({email:true,email_delivery:true,google:false});
   if(u.pathname==='/v1/info')return json({auth_mode:'google',provider:'mock',console:{generation_ui:true,personal_providers:true,version:1}});
@@ -21,7 +22,7 @@ let ui='https://console-staging.fixture.test',docs='https://docs-staging.fixture
  });
  const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));page.setDefaultTimeout(10000);
  let nativeTab='Tab';await page.setContent('<input id=tabStart><a id=tabLink href=\"#native\">Native link</a><input id=tabEnd>');await page.locator('#tabStart').focus();await page.keyboard.press(nativeTab);if(!await page.locator('#tabLink').evaluate(n=>n===document.activeElement)){nativeTab='Alt+Tab';await page.locator('#tabStart').focus();await page.keyboard.press(nativeTab);assert.equal(await page.locator('#tabLink').evaluate(n=>n===document.activeElement),true,'Native full-control keyboard shortcut reaches an ordinary link');}
- try{await page.goto(ui+'/');await page.evaluate(()=>GatewaySite.ready);await page.locator('#generationView').waitFor({state:'visible'});
+ try{await page.goto(ui+'/');await page.evaluate(()=>GatewaySite.ready);await page.locator('#generationNav').click();await page.locator('#generationView').waitFor({state:'visible'});
   for(const theme of ['light','dark'])for(const width of [1440,390,320]){
    await page.evaluate(t=>GatewayTheme.apply(t),theme);await page.setViewportSize({width,height:360});await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
    const value=await page.evaluate(()=>{const f=document.querySelector('.site-footer').getBoundingClientRect(),content=document.querySelector('#generationView .layout').getBoundingClientRect();return {gap:f.top-content.bottom,expectedGap:parseFloat(getComputedStyle(document.querySelector('#configurationView')).paddingBottom),document:document.documentElement.scrollWidth,viewport:innerWidth};});geometry.push({theme,width,...value});
@@ -32,7 +33,7 @@ let ui='https://console-staging.fixture.test',docs='https://docs-staging.fixture
    [ui,docs]=pair;
    for(const surface of ['console','docs']){
     await page.goto(surface==='docs'?(docs===ui?docs+'/docs':docs+'/'):ui+'/');await page.evaluate(()=>GatewaySite.ready);if(surface==='docs'){await page.locator('#docsContent h1').waitFor();assert.equal(await page.getByText(/Could not load API reference/).count(),0);}const footer=page.getByRole('contentinfo');assert.equal(await footer.count(),1);
-    const copyright=footer.getByText('© 2026 Sociaro Baltic OÜ',{exact:true});assert.equal(await copyright.count(),1);assert.equal(await copyright.evaluate(n=>n.tagName==='SPAN'&&n.tabIndex===-1&&!n.closest('a,button')),true);
+    const copyright=footer.getByText('© '+new Date().getFullYear()+' [Your company name]',{exact:true});assert.equal(await copyright.count(),1);assert.equal(await copyright.evaluate(n=>n.tagName==='SPAN'&&n.tabIndex===-1&&!n.closest('a,button')),true);
     const terms=footer.getByRole('link',{name:'Terms of Use',exact:true}),privacy=footer.getByRole('link',{name:'Privacy Policy',exact:true});assert.equal(await terms.getAttribute('href'),ui+'/terms');assert.equal(await privacy.getAttribute('href'),ui+'/privacy');assert.equal(await footer.getByRole('link').count(),2);
     for(const theme of ['light','dark'])for(const width of [1440,390,320]){
      await page.evaluate(t=>GatewayTheme.apply(t),theme);await page.setViewportSize({width,height:700});await footer.scrollIntoViewIfNeeded();await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));await page.mouse.move(0,0);

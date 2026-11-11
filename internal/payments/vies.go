@@ -36,7 +36,7 @@ func (v *VIESVerifier) Verify(ctx context.Context, country, number string) (VATV
 	}
 	req.Header.Set("Content-Type", "text/xml; charset=utf-8")
 	req.Header.Set("SOAPAction", "")
-	req.Header.Set("User-Agent", "Sociaro-Gateway-VAT/1.0")
+	req.Header.Set("User-Agent", "Media-Gateway-VAT/1.0")
 	response, err := v.Client.Do(req)
 	if err != nil {
 		return VATVerification{}, ErrVATUnavailable

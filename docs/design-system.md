@@ -128,7 +128,7 @@ its desktop/mobile layout and keyboard navigation separately. The console's
 palette and content security policy remain unchanged outside this path; Grafana
 supplies its own nonce-based content security policy.
 
-The shared console/documentation footer shows noninteractive **© 2026 Sociaro Baltic OÜ**
+The shared console/documentation footer shows noninteractive **© [current year] [Your company name]**, using the independently configured Copyright holder from Public legal documents
 on the left and the legal links on the right, wrapping without overlap on narrow
 screens. Footer links never use underlines; hover/focus uses the configured
 primary foreground (`--accent-text`, falling back to `--accent`) and retains the
@@ -573,26 +573,26 @@ or key/workspace change closes it; polling and real load errors remain active.
 
 The setup guide uses a native dialog/fieldset/radios, shared FormUI heading,
 fields, switches and compact actions. Three scenario cards express onboarding
-intent while personal/shared policy remains independent. Sociaro opens a remote
+intent while personal/shared policy remains independent. Central server opens a remote
 workspace dialog with the shared ModelPicker and explicit estimate confirmation.
 Remote content, balance and history remain visibly labeled as remote; never
 reuse the local company balance or silently switch paid providers. Use the
 shared theme, modal scrollbars and 1440/390/320 px layout. There is no new design
 system exception.
 
-Installation connection starts with one **Connect to Sociaro** action after a
+Installation connection starts with one **Connect to central server** action after a
 brief name/address sharing disclosure. There are no editable destination or
 installation-name fields. Resume the saved request after reload; never create
 requests on page load or radio selection. The compact pending state shows the
-comparison code, Open Sociaro fallback, status and Cancel. Only a verified,
+comparison code, Open central server fallback, status and Cancel. Only a verified,
 redeemed and locally saved connection is labeled Connected.
 The connected company’s Management page contains the local-owner Disconnect
-action and explains that the company is hosted on Sociaro. Disconnect returns
+action and explains that the company is hosted on the central server. Disconnect returns
 to local operation without deleting the central company or files; keep the
 existing consequence confirmation. Do not place this control in the personal
 menu or conflate it with central installation-access revocation.
 
-On Sociaro, use the existing shared modal heading, account identity and compact
+On Central server, use the existing shared modal heading, account identity and compact
 actions: **Connect this installation?**, its name/address, comparison code and
 plain generation-only permission/balance/expiry disclosure. Explicit Connect
 replaces the consent checkbox, never the code comparison safeguard. The reported

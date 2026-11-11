@@ -79,7 +79,7 @@ def verify_cost(task, query=output):
 
 def main(sha):
     global ORIGIN
-    ua = 'Sociaro-Release-Verification/' + sha
+    ua = 'Media-Gateway-Release-Verification/' + sha
     container = output(COMPOSE + ['ps', '-q', 'gateway'])
     environment = json.loads(output(['docker', 'inspect', '--format', '{{json .Config.Env}}', container]))
     values = dict(item.split('=', 1) for item in environment if '=' in item)

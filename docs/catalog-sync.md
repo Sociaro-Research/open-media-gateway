@@ -32,6 +32,10 @@ inherit the connection's enabled/non-archived state; set different times for
 providers to distribute their work. Free/mock providers have no schedule.
 Personal and administrator-defined manual model catalogues are not overwritten.
 
+See [provider lifecycle source coverage](provider-lifecycle-sources.md) for the
+official model-list and retirement documents, their interpretation limits and
+version-aware adoption safeguards.
+
 The shared timezone catalogue is generated from Go's bundled IANA database by
 `go run scripts/catalog/build_timezones.go`. Regenerate it when updating timezone
 data, and advance its reference date/window when maintaining the catalogue. Groups

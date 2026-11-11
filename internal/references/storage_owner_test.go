@@ -63,7 +63,43 @@ func (s *physicalS3) RoundTrip(r *http.Request) (*http.Response, error) {
 		h.Set("Content-Length", "0")
 		return &http.Response{StatusCode: 200, Header: h, Body: io.NopCloser(bytes.NewReader(nil)), Request: r}, nil
 	}
-	return &http.Response{StatusCode: 200, Header: h, Body: io.NopCloser(bytes.NewReader(s.data)), ContentLength: int64(len(s.data)), Request: r}, nil
+	body := io.NopCloser(bytes.NewReader(s.data))
+	if r.Method == http.MethodHead {
+		body = http.NoBody
+	}
+	return &http.Response{StatusCode: 200, Header: h, Body: body, ContentLength: int64(len(s.data)), Request: r}, nil
+}
+
+func TestPhysicalS3HEADReturnsMetadataWithoutBody(t *testing.T) {
+	data := []byte{0, 0, 0, 8, 'f', 't', 'y', 'p'}
+	transport := &physicalS3{data: data}
+	for _, method := range []string{http.MethodHead, http.MethodGet} {
+		t.Run(method, func(t *testing.T) {
+			request, err := http.NewRequest(method, "https://storage.fixture.test/fixture/object", nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			response, err := transport.RoundTrip(request)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer response.Body.Close()
+			if response.StatusCode != http.StatusOK || response.ContentLength != int64(len(data)) || response.Header.Get("Content-Length") != strconv.Itoa(len(data)) || response.Header.Get("Content-Type") != "video/mp4" {
+				t.Fatal("HEAD and GET must retain the object's metadata", response)
+			}
+			got, err := io.ReadAll(response.Body)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if method == http.MethodHead {
+				if response.Body != http.NoBody || len(got) != 0 {
+					t.Fatal("HEAD must return http.NoBody, retaining the equivalent GET length", got)
+				}
+			} else if !bytes.Equal(got, data) {
+				t.Fatal("GET changed the binary object bytes", got)
+			}
+		})
+	}
 }
 func TestMigratedS3ReferenceUsesTrustedPhysicalOwner(t *testing.T) {
 	for _, owner := range []string{identity.SharedOwnerID, templates.LibraryOwnerID} {

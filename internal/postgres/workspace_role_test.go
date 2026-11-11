@@ -32,7 +32,7 @@ func TestWorkspaceHostingCanonicalRole(t *testing.T) {
 	}
 	cipher, _ := providerconfig.NewCipher(strings.Repeat("w", 32))
 	manager := wa.New(repo, cipher)
-	for _, origin := range []string{installation.DefaultCentralOrigin, "https://CONSOLE.SOCIARO.AI/", "https://console.sociaro.ai:443/", "https://console-staging.sociaro.ai", "https://console.sociaro.ai:8443", ""} {
+	for _, origin := range []string{installation.DefaultCentralOrigin, "https://CONSOLE.SOCIARO.AI/", "https://console.sociaro.ai:443/", "https://console-staging.fixture.test", "https://console.sociaro.ai:8443", ""} {
 		for _, legacy := range []bool{false, true} {
 			for _, shared := range []bool{false, true} {
 				t.Run(fmt.Sprintf("%s/legacy=%t/shared=%t", origin, legacy, shared), func(t *testing.T) {

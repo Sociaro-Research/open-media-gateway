@@ -189,7 +189,7 @@ func (a *Adapter) do(ctx context.Context, method, path string, payload any, gene
 	}
 	request.Header.Set("Authorization", "Bearer "+a.apiKey)
 	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("User-Agent", "Sociaro-Media-Gateway/OpenAI")
+	request.Header.Set("User-Agent", "Media-Gateway/OpenAI")
 	response, err := httpclient.Do(client, request)
 	if err != nil {
 		if ctx.Err() != nil {

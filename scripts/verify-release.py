@@ -105,7 +105,7 @@ def verify(version, images, https=False):
         base = f"https://localhost:{tls_port}" if https else f"http://localhost:{ui_port}"
 
         def request(path, body=None, expected=200, origin=None):
-            headers = {"User-Agent": "Sociaro-GHCR-Release-Verification"}
+            headers = {"User-Agent": "Media-Gateway-GHCR-Release-Verification"}
             if key:
                 headers["Authorization"] = "Bearer " + key
             if body is not None:
@@ -146,7 +146,7 @@ def verify(version, images, https=False):
                 opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cookies),
                     urllib.request.HTTPSHandler(context=ssl.create_default_context(cadata=ca)))
                 redirect = urllib.request.Request(f"http://localhost:{ui_port}/healthz", headers={
-                    "Host": "localhost", "User-Agent": "Sociaro-GHCR-Release-Verification"})
+                    "Host": "localhost", "User-Agent": "Media-Gateway-GHCR-Release-Verification"})
                 try:
                     urllib.request.build_opener(NoRedirect()).open(redirect, timeout=10)
                 except urllib.error.HTTPError as error:

@@ -66,7 +66,9 @@ type Repository interface {
 	Get(context.Context, string) (Record, error)
 	Reserve(context.Context, Record) (Record, bool, error)
 	Save(context.Context, Record) error
-	Pending(context.Context, int) ([]Record, error)
+	// Pending returns eligible bindings in ID order, strictly after afterID.
+	// An empty afterID starts a new background sweep.
+	Pending(ctx context.Context, limit int, afterID string) ([]Record, error)
 	BeginDelete(context.Context, string) (Record, error)
 	Detach(context.Context, string) error
 }

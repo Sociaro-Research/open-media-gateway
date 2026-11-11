@@ -12,7 +12,7 @@ const server=http.createServer((req,res)=>{const filename=path.basename(req.url.
  await page.route('**/v1/**',async route=>{const url=new URL(route.request().url()),p=url.pathname,json=value=>route.fulfill({json:value});
   if(p==='/v1/info')return json({auth_mode:'google',console:{generation_ui:true,personal_providers:false,shared_resources:true,version:1}});
   if(p==='/v1/me')return json({id:'33333333-3333-4333-8333-333333333333',email:'tester@example.test',name:'Tester',theme:displayTheme,is_system_admin:true,session_id:'fixture'});
-  if(p==='/v1/organizations')return json({data:[{id:org,name:'Sunday Games',role:'admin'}]});
+  if(p==='/v1/organizations')return json({data:[{id:org,name:'Example Company',role:'admin'}]});
   if(p==='/v1/system/settings')return json({generation_ui:true,shared_resources:true,version:1});
   if(p.endsWith('/limits'))return json({system:{values:{},version:1}});
   if(p.endsWith('/reports')){
@@ -22,7 +22,7 @@ const server=http.createServer((req,res)=>{const filename=path.basename(req.url.
     if(empty)return json({requests:0,successful:0,failed:0,spend_usd:0,priced_requests:0,tokens:0,token_requests:0,average_cost_usd:null,interval:url.searchParams.get('interval'),periods:[],public_models:[],provider_models:[],providers:[]});
     return json(summary(url.searchParams.get('interval')));
    }
-   return json({data:empty?[]:[{id:'task',created_at:'2026-09-16T12:00:00Z',provider:'bytedance',model:'vendor-original',public_model:'public/model-0',status:'succeeded',profit_status:'recognized',profit_usd:0.5,consumed_usd:5,api_key_name:'Test key',organization_name:'Sunday Games'}],has_more:!empty});
+   return json({data:empty?[]:[{id:'task',created_at:'2026-09-16T12:00:00Z',provider:'bytedance',model:'vendor-original',public_model:'public/model-0',status:'succeeded',profit_status:'recognized',profit_usd:0.5,consumed_usd:5,api_key_name:'Test key',organization_name:'Example Company'}],has_more:!empty});
   }
   return json({data:[]});
  });

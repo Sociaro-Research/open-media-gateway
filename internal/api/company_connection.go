@@ -125,7 +125,7 @@ func (s *Server) companyKeyProxy(w http.ResponseWriter, r *http.Request) {
 			remoteError(w, err)
 			return
 		}
-		writeError(w, http.StatusGone, "company_connection_revoked", "Sociaro access was revoked. This installation is no longer connected.")
+		writeError(w, http.StatusGone, "company_connection_revoked", "Central server access was revoked. This installation is no longer connected.")
 		return
 	}
 	// Do not follow upstream redirects or copy cookies. Browser transport also

@@ -31,7 +31,7 @@ func Fetch(ctx context.Context, client *http.Client, source Source) Observation 
 	ob := Observation{Source: source, Entries: []Entry{}, FailureStage: "retrieval"}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, source.URL, nil)
 	if err == nil {
-		req.Header.Set("User-Agent", "Sociaro-Gateway-CatalogSync/1.0")
+		req.Header.Set("User-Agent", "Media-Gateway-CatalogSync/1.0")
 		req.Header.Set("Accept", "text/html")
 		if source.Parser == "manifest-v1" {
 			req.Header.Set("Accept", "application/json")

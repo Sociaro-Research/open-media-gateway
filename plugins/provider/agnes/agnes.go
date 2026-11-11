@@ -259,7 +259,7 @@ func (a *Adapter) do(ctx context.Context, method, path string, payload any, gene
 	}
 	request.Header.Set("Authorization", "Bearer "+a.apiKey)
 	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("User-Agent", "Sociaro-Media-Gateway/Agnes")
+	request.Header.Set("User-Agent", "Media-Gateway/Agnes")
 	client := a.client
 	if generation {
 		copied := *client

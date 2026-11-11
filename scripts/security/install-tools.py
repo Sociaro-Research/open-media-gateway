@@ -43,7 +43,7 @@ def main():
     provenance = []
     for repo, version, filename, expected, binary in assets:
         url = f"https://github.com/{repo}/releases/download/{version}/{filename}"
-        request = urllib.request.Request(url, headers={"User-Agent": "Sociaro-Gateway-Security-Checks"})
+        request = urllib.request.Request(url, headers={"User-Agent": "Media-Gateway-Security-Checks"})
         with urllib.request.urlopen(request, timeout=60) as response:
             data = response.read()
         actual = hashlib.sha256(data).hexdigest()

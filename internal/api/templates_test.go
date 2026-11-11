@@ -55,6 +55,12 @@ func (m *templateMemory) Save(_ context.Context, v templates.Record, version int
 	v.Version = version + 1
 	v.Revision = old.Revision
 	v.Published = old.Published
+	if action == "remove" {
+		v.Draft, v.Published = old.Draft, nil
+		m.saves++
+		delete(m.items, v.ID)
+		return v, nil
+	}
 	if action == "publish" || action == "" && old.Published != nil {
 		d := v.Draft
 		v.Published = &d

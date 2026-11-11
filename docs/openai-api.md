@@ -187,7 +187,7 @@ deleted. JSON bodies retain the existing 64 KiB limit; use uploads for large fil
 ```json
 {
   "model": "openai/gpt-4o-mini-tts",
-  "input": "Welcome to Sociaro",
+  "input": "Welcome to central server",
   "voice": "alloy",
   "instructions": "Speak warmly",
   "response_format": "mp3"

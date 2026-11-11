@@ -52,7 +52,7 @@ func TestAllOperationPayloadsPollingAndRestart(t *testing.T) {
 			r.Options.Format = valueOr(first(modelFor(op.id).Formats), "")
 			var submissions, polls int
 			f := transport(func(req *http.Request) (*http.Response, error) {
-				if req.Header.Get("Authorization") != "Bearer fixture-secret" || req.Header.Get("User-Agent") != "Sociaro-Media-Gateway/Sonilo" {
+				if req.Header.Get("Authorization") != "Bearer fixture-secret" || req.Header.Get("User-Agent") != "Media-Gateway/Sonilo" {
 					t.Error("missing auth or descriptive agent")
 				}
 				if req.Method == "POST" {

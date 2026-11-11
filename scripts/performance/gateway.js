@@ -18,7 +18,7 @@ export const options={
  thresholds:{generation_errors:['rate==0'],dropped_iterations:['count==0']},
 };
 export default function(){
- const headers={Authorization:`Bearer ${key}`,'Content-Type':'application/json','User-Agent':'Sociaro-Gateway-Isolated-Performance/1.0','Idempotency-Key':`perf-${runID}-${__VU}-${__ITER}`};
+ const headers={Authorization:`Bearer ${key}`,'Content-Type':'application/json','User-Agent':'Media-Gateway-Isolated-Performance/1.0','Idempotency-Key':`perf-${runID}-${__VU}-${__ITER}`};
  const at=Date.now();const response=http.post(base+'/v1/generations',JSON.stringify({model,prompt:'Isolated free performance fixture'}),{headers,tags:{operation:'admission'}});
  admission.add(response.timings.duration);
  if(response.status===429){quota.add(1);errors.add(__ENV.GATEWAY_PERF_EXPECT_QUOTA!=='1');return;}

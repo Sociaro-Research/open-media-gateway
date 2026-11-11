@@ -25,7 +25,7 @@
    const connect=node('button','Connect to Sociaro','primary compact');connect.type='button';
    const message=node('p',undefined,'form-message');message.setAttribute('role','status');
    const available=()=>canConnect&&!service.hidden&&!root.hidden&&!document.querySelector('#providersView')?.hidden;
-   connect.onclick=async()=>{if(!available()||connect.disabled)return;const user=actor,navigation=consoleNavigation,load=providerLoadSequence,current=()=>available()&&actor===user&&consoleNavigation===navigation&&providerLoadSequence===load;connect.disabled=true;message.textContent='';try{await window.SetupSelector.open({selection:'sociaro',current});}catch(error){if(current())FormUI.message(message,error.message,'error');}finally{connect.disabled=false;}};
+   connect.onclick=async()=>{if(!available()||connect.disabled)return;const user=actor,navigation=consoleNavigation,load=providerLoadSequence,current=()=>available()&&actor===user&&consoleNavigation===navigation&&providerLoadSequence===load;connect.disabled=true;message.textContent='';try{await window.SetupSelector.open({selection:'central',current});}catch(error){if(current())FormUI.message(message,error.message,'error');}finally{connect.disabled=false;}};
    const contribution=card('contribute','Missing a provider?','Add it to our open-source project with a pull request.',link);
    const service=card('sociaro','Skip the provider setup','Connect to Sociaro for ready-to-use providers, exclusive models and pricing.',connect);service.append(message);
    root.append(contribution,service);

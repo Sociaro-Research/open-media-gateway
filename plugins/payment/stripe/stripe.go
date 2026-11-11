@@ -48,7 +48,7 @@ func (c *Client) request(ctx context.Context, credentials payments.Credentials, 
 	}
 	req.SetBasicAuth(credentials.SecretKey, "")
 	req.Header.Set("Stripe-Version", APIVersion)
-	req.Header.Set("User-Agent", "Sociaro-Gateway-Payments/1.0")
+	req.Header.Set("User-Agent", "Media-Gateway-Payments/1.0")
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	if key != "" {
 		req.Header.Set("Idempotency-Key", key)
@@ -171,7 +171,7 @@ func (c *Client) checkout(ctx context.Context, pr payments.Provider, credentials
 	if expires.Before(c.now().Add(31 * time.Minute)) {
 		return payments.Snapshot{}, payments.ErrCheckoutWindow
 	}
-	v := url.Values{"adaptive_pricing[enabled]": {"false"}, "mode": {"payment"}, "payment_method_types[0]": {"card"}, "client_reference_id": {p.ID}, "line_items[0][price_data][currency]": {"usd"}, "line_items[0][price_data][unit_amount]": {strconv.FormatInt(p.AmountCents, 10)}, "line_items[0][price_data][product_data][name]": {"Sociaro organization balance"}, "line_items[0][quantity]": {"1"}, "success_url": {successURL}, "cancel_url": {cancelURL}, "expires_at": {strconv.FormatInt(expires.Unix(), 10)}}
+	v := url.Values{"adaptive_pricing[enabled]": {"false"}, "mode": {"payment"}, "payment_method_types[0]": {"card"}, "client_reference_id": {p.ID}, "line_items[0][price_data][currency]": {"usd"}, "line_items[0][price_data][unit_amount]": {strconv.FormatInt(p.AmountCents, 10)}, "line_items[0][price_data][product_data][name]": {"Organization balance"}, "line_items[0][quantity]": {"1"}, "success_url": {successURL}, "cancel_url": {cancelURL}, "expires_at": {strconv.FormatInt(expires.Unix(), 10)}}
 	var billing *payments.Billing
 	if p.InvoiceMode == "local" {
 		if p.Billing == nil || p.VAT == nil {

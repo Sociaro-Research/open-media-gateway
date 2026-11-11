@@ -60,7 +60,7 @@ For recovery, a server operator can use `admin grant --user-id USER_UUID` or `ad
 ## Setup scenarios and remote workspaces
 
 After browser owner creation, the setup guide offers **For myself**, **Service
-for companies**, or **Sociaro**. Skip, Escape and closing the guide perform no
+for companies**, or **Central server**. Skip, Escape and closing the guide perform no
 settings write. Dismissal lasts for the browser session; **Settings → System →
 Change Mode** reopens it on ordinary installations. Existing installations keep
 their settings and do not open the guide automatically on upgrade.
@@ -73,7 +73,7 @@ service** action appears only when company-service setup is needed. It offers
 | --- | --- | --- |
 | For myself | true | false |
 | Service for companies | false | true |
-| Sociaro | unchanged | unchanged |
+| Central server | unchanged | unchanged |
 
 The two local modes are mutually exclusive, including for Administrators and
 existing keys. There is no personal-provider override in company mode. The
@@ -86,7 +86,7 @@ fail-closed. The read-only `mode_selection_required` settings field enables an
 explicit reviewed Apply for these rows even when the effective company option
 is already selected. A mode change retains version and active-work safeguards.
 An unrelated quota write requests explicit mode selection rather than changing
-legacy provider flags implicitly. Choosing Sociaro keeps local policy unchanged
+legacy provider flags implicitly. Choosing Central server keeps local policy unchanged
 and opens the existing remote authorization flow.
 Presets preserve `generation_ui` (UI visibility only), inline references,
 markups, storage limits, companies, credentials, credit, jobs and files. They do
@@ -104,22 +104,22 @@ another explicit save. It never repeats a conflicting write automatically.
 
 ### Connect an account and company
 
-In **Settings → System → Change Mode**, select **Sociaro**. The brief disclosure
+In **Settings → System → Change Mode**, select **Central server**. The brief disclosure
 explains that the installation's name and address will be shared. Activate
-**Connect to Sociaro** to start; choosing a radio or opening the dialog does not
+**Connect to central server** to start; choosing a radio or opening the dialog does not
 create a request or change local resource policy. This scenario also opens an
 existing connection. The header's current-company selector remains local.
 
-The backend fixes the destination to the canonical Sociaro origin and derives
+The backend fixes the destination to the canonical Central server origin and derives
 the display label/address from trusted public configuration (`UI_PUBLIC_URL`,
 with the existing `AUTH_PUBLIC_URL` fallback). No browser-supplied name, address,
 Host or Forwarded header selects the destination or installation identity. With
 no configured public address, the display fallback is `http://localhost` and
 “Local installation”. These values are display-only, not ownership proof.
 
-Sign in on Sociaro if necessary, using the existing Google or verified email
+Sign in on the central server if necessary, using the existing Google or verified email
 flow. The local portal never collects that password. A blocked popup leaves an
-**Open Sociaro** link. Sociaro shows the signed-in account, installation details
+**Open central server** link. Central server shows the signed-in account, installation details
 and **Check that this code matches the one in your installation**. Compare the
 code before explicitly choosing **Connect**; the supplied name/address is not
 verified ownership. Sign-in, inspection or closing the dialog grants nothing.
@@ -199,7 +199,7 @@ browser and its JavaScript, so use HTTPS outside loopback development. The fixed
 central proxy requires that owner's local session, the exact saved bearer key
 and `X-Company-Context`; writes also require the local Origin. Central APIs keep
 their existing scopes, membership and role checks. The key remains encrypted at
-rest locally. See [Frontend separation](frontend-separation.md#connect-the-existing-ui-to-sociaro)
+rest locally. See [Frontend separation](frontend-separation.md#connect-the-existing-ui-to-central-server)
 for the current interface, media transport and failure behavior.
 
 #### Legacy generation workspace

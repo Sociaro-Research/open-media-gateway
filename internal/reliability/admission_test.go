@@ -65,7 +65,7 @@ func TestReliabilityLostAdmissionResponseIsSafeToRetry(t *testing.T) {
 	}
 	request.Header.Set("Authorization", "Bearer "+s.key)
 	request.Header.Set("Idempotency-Key", "lost-response")
-	request.Header.Set("User-Agent", "Sociaro-Gateway-Isolated-Reliability/1.0")
+	request.Header.Set("User-Agent", "Media-Gateway-Isolated-Reliability/1.0")
 	response, err := client.Do(request)
 	if response != nil {
 		response.Body.Close()

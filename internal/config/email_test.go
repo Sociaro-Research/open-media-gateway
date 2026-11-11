@@ -24,7 +24,7 @@ func TestEmailAuthenticationConfiguration(t *testing.T) {
 	if _, err := Load(); err == nil {
 		t.Fatal("partial email sender accepted")
 	}
-	t.Setenv("EMAIL_FROM", "Sociaro <login@example.test>")
+	t.Setenv("EMAIL_FROM", "Central server <login@example.test>")
 	if _, err := Load(); err != nil {
 		t.Fatal("complete email-only configuration", err)
 	}

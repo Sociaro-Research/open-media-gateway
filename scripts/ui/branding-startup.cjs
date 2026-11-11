@@ -1,6 +1,6 @@
 const {evidencePath} = require('./evidence.cjs');
 // Static frontend regression: never paint/request a repository logo before settings arrive.
-const {chromium}=require('playwright');
+const {[process.env.UI_BROWSER_ENGINE||'chromium']:chromium}=require('playwright');
 const fs=require('node:fs'),http=require('node:http'),path=require('node:path'),assert=require('node:assert/strict');
 const root=path.resolve(__dirname,'../../web/public/ui');
 const files={'/system':'index.html','/login':'login.html','/docs':'documentation.html','/privacy':'privacy.html','/terms':'terms.html'};
@@ -41,12 +41,12 @@ const server=http.createServer((req,res)=>{
    const sources=await page.locator('.brand img').evaluateAll(nodes=>nodes.map(n=>n.getAttribute('src')));
    assert.ok(sources.every(u=>u==='/branding/assets/logo?v=12'));
    assert.ok((await page.title()).includes('Configured Brand'),url+' title='+await page.title()+' errors='+JSON.stringify(errors));
-   assert.ok(!requests.some(u=>/sociaro-(logo|symbol)/i.test(u)));
+   assert.ok(!requests.some(u=>/\/ui\/(?:logo|symbol)\.(?:png|svg)/i.test(u)));
    if(url==='/privacy'||url==='/terms'){
     await page.locator('[data-legal-default]').waitFor();
     assert.ok((await page.locator('[data-legal-default]').innerText()).includes('[CONTACT EMAIL]'),'Operator template contact placeholder must remain explicit');
-    assert.ok(!(await page.locator('[data-legal-default]').innerText()).includes('Sociaro'),'Operator legal template must not inherit vendor branding');
-    assert.equal(await page.locator('.site-footer-copyright').innerText(),'© 2026 Sociaro Baltic OÜ','Vendor copyright is independent of configured operator branding');
+    assert.ok((await page.locator('[data-legal-default]').innerText()).includes('[OPERATOR LEGAL NAME AND CONTACT ADDRESS]'),'Operator legal template must retain an explicit operator placeholder');
+    assert.equal(await page.locator('.site-footer-copyright').innerText(),'© '+new Date().getFullYear()+' [Your company name]','Unconfigured legal holder must use the neutral fallback, independently of Appearance');
    }
    await page.evaluate(()=>GatewayTheme.apply('light'));
    await page.waitForFunction(()=>document.querySelector('.brand img').naturalWidth>0&&!document.querySelector('.brand img').hidden);
@@ -64,6 +64,13 @@ const server=http.createServer((req,res)=>{
    assert.deepEqual(errors,[]);
    await page.close();
   }
+  // A late public configuration response cannot overwrite a newer editor value.
+  const delayed=await browser.newPage();let releaseFooter,footerRead;
+  const footerReadStarted=new Promise(resolve=>footerRead=resolve),footerGate=new Promise(resolve=>releaseFooter=resolve);
+  await delayed.route('**/site.json',async route=>{footerRead();await footerGate;await route.fulfill({json:site});});
+  await delayed.goto(base+'/login',{waitUntil:'domcontentloaded'});await footerReadStarted;
+  await delayed.evaluate(()=>GatewaySite.applyLegalFooter({copyright_holder:'Saved <operator> & company'}));releaseFooter();await delayed.evaluate(()=>GatewaySite.ready);
+  assert.equal(await delayed.locator('.site-footer-copyright').innerText(),'© '+new Date().getFullYear()+' Saved <operator> & company');await delayed.close();
   // Configuration failure keeps a fresh load unbranded.
   const page=await browser.newPage();
   await page.route('**/site.json',r=>r.fulfill({status:503,body:'unavailable'}));

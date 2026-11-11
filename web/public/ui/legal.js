@@ -2,6 +2,51 @@
  'use strict';
  const el=(tag,text,cls)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;};
  const titles={privacy:'Privacy Policy',terms:'Terms of Use'};
+ const invalidFooterLine=/[\p{Cc}\u2028\u2029]/u;
+ function footerValue(value){
+  if(!value||typeof value!=='object'||Array.isArray(value)||typeof value.copyright_holder!=='string'||!Number.isSafeInteger(value.version)||value.version<1||new TextEncoder().encode(value.copyright_holder).length>200||invalidFooterLine.test(value.copyright_holder))return null;
+  return {copyright_holder:value.copyright_holder,version:value.version};
+ }
+ function invalidFooterResponse(){const error=Error('Invalid footer settings response');error.code='invalid_footer_response';return error}
+ function mountFooter(parent,api,current){
+  const form=el('form',undefined,'member-limit-form profile-field legal-footer-settings'),input=el('input'),save=el('button','Save','secondary'),status=el('small');
+  input.type='text';input.setAttribute('aria-label','Copyright holder');input.maxLength=200;input.placeholder='[Your company name]';input.dataset.floatingLabel='always';input.autocomplete='organization';input.disabled=true;save.type='submit';save.hidden=true;status.role='status';form.append(input,save,status);parent.append(form);
+  let data,busy=false,watched=false,loading=true;const active=()=>current()&&form.isConnected,read=()=>input.value.trim();
+  const validate=()=>{
+   const bytes=new TextEncoder().encode(input.value).length;
+   input.setCustomValidity(bytes>200?'Copyright holder is '+bytes+' UTF-8 bytes; the limit is 200 bytes. Shorten the text before saving.':invalidFooterLine.test(input.value)?'Remove control characters and line separators; the copyright holder must be a single line.':'');FormUI.update(form);
+  };input.addEventListener('input',validate);
+  async function load(retain=false,uncertain=false){
+   let responseValid=false;loading=true;try{const next=footerValue(await api('/v1/system/legal/footer'));if(!active())return;if(!next)throw invalidFooterResponse();responseValid=true;data=next;loading=false;if(!retain)input.value=next.copyright_holder;input.disabled=false;save.disabled=false;
+    if(!watched){FormUI.watch(form,save,{read,valid:()=>!busy&&!loading&&FormUI.valid(form)});watched=true}else FormUI.commit(form,next.copyright_holder);
+    window.GatewaySite?.applyLegalFooter(next);
+    const checked=uncertain?(read()===next.copyright_holder?'Saved footer matches your draft. No further Save is needed.':'Saved footer settings were checked. Your draft is retained; choose Save only if you want to replace the current saved holder.'):'';
+    FormUI.message(status,uncertain?checked:retain?'This footer changed elsewhere. Your draft is retained. Review it before saving again.':'',uncertain&&read()===next.copyright_holder?'success':retain?'error':'');validate();FormUI.refresh();
+   }catch(e){
+    if(!active())return;loading=true;input.disabled=true;save.disabled=true;const draft=retain?' Your draft is retained.':'';
+    if(responseValid){FormUI.message(status,'The copyright holder loaded, but the editor could not initialize. Reload this page; if this continues, ask an Administrator to check the UI and server versions.'+draft,'error');return}
+    if(e.status===401){FormUI.message(status,'Sign in again, then reopen Public legal documents to load the copyright holder.'+draft,'error');return}
+    if(e.status===403){FormUI.message(status,'Administrator access is required. Ask an Administrator to restore access, then reopen Public legal documents.'+draft,'error');return}
+    if(e.status===429){FormUI.message(status,'The server is limiting requests. Wait, then reopen Public legal documents.'+draft,'error');return}
+    if(e.code==='invalid_footer_response'||e.status>=400&&e.status<500&&e.status!==408){FormUI.message(status,'Could not load the copyright holder. Ask an Administrator to check footer access, the server version and logs, then reload.'+draft,'error');return}
+    FormUI.message(status,'Could not load the copyright holder. Retrying automatically… If this continues, ask an Administrator to check the server logs.'+draft,'error');setTimeout(()=>{if(active())void load(retain,uncertain)},1500);
+   }
+  }
+  form.onsubmit=async event=>{event.preventDefault();if(busy||loading||!data||read()===data.copyright_holder||!form.reportValidity())return;busy=true;input.disabled=save.disabled=true;const submitted=read();let confirmed=false;FormUI.message(status,'');
+   try{const next=footerValue(await api('/v1/system/legal/footer',{method:'PUT',body:JSON.stringify({copyright_holder:submitted,version:data.version})}));if(!active())return;if(!next||next.copyright_holder!==submitted||next.version!==data.version+1)throw invalidFooterResponse();confirmed=true;data=next;input.value=next.copyright_holder;window.GatewaySite?.applyLegalFooter(next);FormUI.saved(form,next.copyright_holder)}
+   catch(e){if(active()){if(e.status===409)await load(true);else if(!confirmed&&(e.code==='invalid_footer_response'||!e.status||e.status===408||e.status>=500||e.status>=200&&e.status<300)){
+    loading=true;FormUI.message(status,'Save result could not be confirmed. The server may have accepted the change. Check saved settings before saving again; your draft is retained.','error');
+    const check=el('button','Check saved footer','secondary compact');check.type='button';check.onclick=()=>{if(!active()||busy)return;check.disabled=true;void load(true,true)};const actions=el('span',undefined,'form-actions compact');actions.append(el('span',status.textContent),check);status.replaceChildren(actions);
+   }else if(confirmed){loading=true;FormUI.message(status,'The footer was saved, but this view could not be updated. Reload this page before editing again.','error')}
+   else if(e.status===401)FormUI.message(status,'Sign in again before saving this footer. Your draft is retained.','error');
+   else if(e.status===403)FormUI.message(status,'Administrator access is required. Ask an Administrator to restore access before saving this draft.','error');
+   else if(e.status===429)FormUI.message(status,'The server is limiting requests. Wait before saving this draft again.','error');
+   else if(e.status===400)FormUI.message(status,e.message,'error');
+   else FormUI.message(status,'Could not save the copyright holder. Ask an Administrator to check the server version and configuration before saving again.','error')}}
+   finally{busy=false;if(active()){input.disabled=save.disabled=loading;FormUI.update(form)}}
+  };
+  void load();FormUI.refresh();
+ }
  async function publicDocument(){
   const original=document.querySelector('[data-legal-default]');if(!original)return;
   const kind=original.dataset.legalDefault,message=el('p','Loading document…'),custom=el('div',undefined,'legal-text');
@@ -14,7 +59,7 @@
   }await load();
  }
  window.LegalTextUI={mount(parent,api,current=()=>true){
-  const group=el('div',undefined,'settings-form-group'),documentActions=el('div',undefined,'form-actions compact');group.append(el('h3','Public legal documents'),documentActions);parent.append(group);
+  const group=el('div',undefined,'settings-form-group'),documentActions=el('div',undefined,'form-actions compact');group.append(el('h3','Public legal documents'));parent.append(group);mountFooter(group,api,current);group.append(documentActions);
   for(const [kind,title] of Object.entries(titles)){
    const open=el('button','Edit '+title,'secondary');open.type='button';documentActions.append(open);
    open.onclick=async()=>{

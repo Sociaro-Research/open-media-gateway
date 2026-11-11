@@ -135,15 +135,15 @@ func TestLegacyAPIOriginConfiguration(t *testing.T) {
 	for _, name := range []string{"GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET", "GOOGLE_OAUTH_REDIRECT_URL", "RESEND_API_KEY", "EMAIL_FROM", "SESSION_SIGNING_SECRET", "UI_PUBLIC_URL"} {
 		t.Setenv(name, "")
 	}
-	t.Setenv("AUTH_PUBLIC_URL", "https://console-staging.sociaro.ai")
+	t.Setenv("AUTH_PUBLIC_URL", "https://console-staging.fixture.test")
 	t.Setenv("LEGACY_API_ORIGIN", "")
 	cfg, err := Load()
 	if err != nil || cfg.LegacyAPIOrigin != "" {
 		t.Fatal("legacy host enabled by default", err)
 	}
-	t.Setenv("LEGACY_API_ORIGIN", "https://MEDIA-GATEWAY-DEV.SOCIARO.AI:443/")
+	t.Setenv("LEGACY_API_ORIGIN", "https://MEDIA-GATEWAY-DEV.fixture.test:443/")
 	cfg, err = Load()
-	if err != nil || cfg.LegacyAPIOrigin != "https://media-gateway-dev.sociaro.ai" || cfg.AuthPublicURL != "https://console-staging.sociaro.ai" || cfg.UIPublicURL != cfg.AuthPublicURL {
+	if err != nil || cfg.LegacyAPIOrigin != "https://media-gateway-dev.fixture.test" || cfg.AuthPublicURL != "https://console-staging.fixture.test" || cfg.UIPublicURL != cfg.AuthPublicURL {
 		t.Fatal("canonical settings changed", err)
 	}
 	for _, raw := range []string{"http://localhost", "https://old.example.test:8443", "https://old.example.test/path", "https://a.test,https://b.test"} {

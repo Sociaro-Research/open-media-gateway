@@ -58,7 +58,7 @@ func newAuthenticatedRequest(t *testing.T, s *testStack, method, path, body, key
 		t.Fatal(err)
 	}
 	r.Header.Set("Authorization", "Bearer "+key)
-	r.Header.Set("User-Agent", "Sociaro-Gateway-Isolated-Reliability/1.0")
+	r.Header.Set("User-Agent", "Media-Gateway-Isolated-Reliability/1.0")
 	return r
 }
 func newFaultProxy(t *testing.T, target string) *faultProxy {

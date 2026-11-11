@@ -56,6 +56,20 @@ Playground footer gap, copyright/legal layout, configured primary hover, no
 underlines, keyboard focus and console-host legal targets in both themes at
 1440/390/320px. It does not establish live authentication or Caddy serving policy.
 
+`node scripts/ui/legal-footer-state.cjs` exercises the shared footer editor with
+controlled asynchronous API outcomes: permanent authentication failures stop
+automatic reads, transient reads recover, Unicode line separators are rejected,
+failed conflict refresh retains the draft without automatic writes, and responses
+after navigation cannot update another view. Repeat with `UI_BROWSER_ENGINE=webkit`;
+malformed replies and unconfirmed writes require an explicit saved-state check
+before another Save. `UI_EVIDENCE_DIR` retains source hashes, per-case results and
+failure screenshots; `UI_FOOTER_VISUAL=1` captures permission and unconfirmed-save
+states in both themes at 1440/390/320px. These component screenshots supplement
+the real Settings composition and public-page visual review. The real
+`TestLegalDocumentsBrowserWorkflow`, enabled with `GATEWAY_LEGAL_BROWSER_NODE`,
+separately verifies persisted API/PostgreSQL behavior, held-read readiness,
+permissions, conflicts, isolated saves and responsive layout in both engines.
+
 For the focused integrated Playground native Upload gate, run
 `GATEWAY_NATIVE_CHOOSER_ONLY=1 node scripts/ui/references.cjs` and repeat with
 `UI_BROWSER_ENGINE=webkit`. It loads the real portal and checks click, Enter and
@@ -725,7 +739,7 @@ action can create a synthetic pending request. Both themes at 1440/390/320px use
 `UI_EVIDENCE_DIR`. No real server or provider is contacted.
 
 Run `node scripts/ui/workspace-authorization.cjs` and repeat with
-`UI_BROWSER_ENGINE=webkit` for the complete two-origin Sociaro journey. It loads
+`UI_BROWSER_ENGINE=webkit` for the complete two-origin central server journey. It loads
 the production sign-in/authorization modules with isolated synthetic endpoints:
 no start on render/radio selection, direct explicit start, popup and blocked-popup
 fallback, login/account switch, comparison code, explicit approval/denial,
@@ -760,6 +774,26 @@ actions and both themes at 1440/390/320 px. The localhost fixture blocks all
 external requests. Evidence goes to `.local/gw172/ui-<engine>` by default;
 `UI_EVIDENCE_DIR` overrides it. Run the affected Playground, response-context,
 reference-parser and storage fixtures alongside it.
+
+The same fixture covers reference-label Unicode code-point boundaries (including
+Cyrillic, mixed text and supplementary characters), publication/live-save field
+errors, incomplete unpublished saves and correction after a rejected request.
+Use `UI_SLOT_LABELS_ONLY=1` for this focused workflow, in both browser engines.
+It retains exact values and checks feedback association, focus, both themes and
+1440/390/320 px layouts; it never changes a live template.
+
+Run `node scripts/ui/template-delete.cjs` in Chromium and with
+`UI_BROWSER_ENGINE=webkit` for explicit Administrator template deletion. Its
+strict synthetic DELETE endpoint accepts only the target ID and saved version,
+removes the target from later lists and rejects unexpected mutations. It covers
+confirmation cancellation, safe titles, single-flight writes, invalid drafts,
+HTTP/network/unreadable outcomes, explicit conflict review, held editor reads and
+acknowledgements, unrelated drafts/runner inputs, refresh failure and
+navigation/profile/session/company/permission changes. It blocks external
+requests and writes evidence to `UI_EVIDENCE_DIR` (default
+`.local/template-delete/<engine>`). No live templates or physical files are
+removed. Focused API/PostgreSQL tests cover the existing authorization, version,
+saved-media validation and soft-removal contract separately.
 
 Run `node scripts/ui/project-journal-state.cjs` in Chromium and WebKit for
 metadata-only Journal updates with 30 synthetic company generations and actively

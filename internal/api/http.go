@@ -268,6 +268,8 @@ func (s *Server) handler() http.Handler {
 	s.registerPayments(mux)
 	mux.Handle("GET /v1/storage/usage", s.authenticate(http.HandlerFunc(s.storageUsage)))
 	if s.system != nil {
+		mux.Handle("GET /v1/system/legal/footer", s.authenticate(http.HandlerFunc(s.legalFooterSettings)))
+		mux.Handle("PUT /v1/system/legal/footer", s.authenticate(http.HandlerFunc(s.legalFooterSettings)))
 		mux.Handle("GET /v1/system/legal/{kind}", s.authenticate(http.HandlerFunc(s.legalSettings)))
 		mux.Handle("PUT /v1/system/legal/{kind}", s.authenticate(http.HandlerFunc(s.legalSettings)))
 		mux.Handle("GET /v1/system/branding", s.authenticate(http.HandlerFunc(s.brandingSettings)))

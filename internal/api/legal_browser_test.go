@@ -110,6 +110,10 @@ func TestLegalDocumentsBrowserWorkflow(t *testing.T) {
 		t.Fatalf("legal browser workflow: %v\n%s", err, output)
 	}
 	t.Log(strings.TrimSpace(string(output)))
+	footer, err := sys.LegalFooter(ctx)
+	if err != nil || footer.CopyrightHolder != "Persisted footer holder" || footer.Version < 5 {
+		t.Fatal("footer not persisted", footer, err)
+	}
 	privacy, err := sys.LegalDocument(ctx, "privacy")
 	if err != nil || privacy.Text != "" || privacy.Version < 4 {
 		t.Fatal("browser reset not persisted", privacy, err)

@@ -12,6 +12,7 @@ import (
 	"github.com/Sociaro-Research/open-media-gateway/docs"
 	"github.com/Sociaro-Research/open-media-gateway/internal/branding"
 	"github.com/Sociaro-Research/open-media-gateway/internal/installation"
+	"github.com/Sociaro-Research/open-media-gateway/internal/legal"
 )
 
 type storageBrowserOriginKey struct{}
@@ -131,7 +132,13 @@ func serveSiteConfiguration(w http.ResponseWriter, r *http.Request, apiURL, uiUR
 	}
 	settings.Assets = assets
 	meta := installation.FromContext(r.Context())
-	writeJSON(w, 200, map[string]any{"api_url": apiURL, "ui_url": uiURL, "docs_url": docsURL, "branding": settings, "installation_role": meta.Role, "central_origin": meta.CentralOrigin})
+	footer := legal.Footer{}
+	if store, ok := reader.(legal.FooterReader); ok {
+		if saved, err := store.LegalFooter(r.Context()); err == nil {
+			footer = saved
+		}
+	}
+	writeJSON(w, 200, map[string]any{"api_url": apiURL, "ui_url": uiURL, "docs_url": docsURL, "branding": settings, "legal": map[string]string{"copyright_holder": footer.DisplayHolder()}, "installation_role": meta.Role, "central_origin": meta.CentralOrigin})
 }
 func (s *Server) siteConfiguration(w http.ResponseWriter, r *http.Request) {
 	serveSiteConfiguration(w, r, "", "", "", s.brandingReader())

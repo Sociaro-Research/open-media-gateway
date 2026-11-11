@@ -2,9 +2,11 @@
 const { [process.env.UI_BROWSER_ENGINE||'chromium']:engine }=require('playwright');
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const root=path.resolve(__dirname,'../../web/public/ui'),out=process.env.UI_EVIDENCE_DIR||'/tmp/gateway-legal-documents';
+let footerSettings={copyright_holder:'',version:1};
 let saved={privacy:{text:'',version:1},terms:{text:'',version:1}},failure=0,delay=0,writes=0;
 const server=http.createServer(async(req,res)=>{
  const url=req.url.split('?')[0],json=(status,data)=>{res.writeHead(status,{'Content-Type':'application/json'});res.end(JSON.stringify(data))};
+ if(url==='/v1/system/legal/footer'){if(req.method==='PUT'){let raw='';for await(const c of req)raw+=c;const data=JSON.parse(raw);footerSettings={...data,version:footerSettings.version+1}}return json(200,footerSettings)}
  const match=url.match(/^\/(v1\/system\/)?legal\/(privacy|terms)$/);
  if(match){const admin=!!match[1],kind=match[2];if(failure)return json(failure,{error:{message:'Fixture failure'}});
   if(req.method==='PUT'){let raw='';for await(const c of req)raw+=c;writes++;await new Promise(r=>setTimeout(r,delay));const data=JSON.parse(raw);saved[kind]={text:data.text,version:saved[kind].version+1}}

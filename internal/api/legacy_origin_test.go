@@ -17,13 +17,13 @@ import (
 	"time"
 )
 
-const legacyOrigin = "https://media-gateway-dev.sociaro.ai"
-const stagingOrigin = "https://console-staging.sociaro.ai"
+const legacyOrigin = "https://media-gateway-dev.fixture.test"
+const stagingOrigin = "https://console-staging.fixture.test"
 
 func legacyPublicFixture(t *testing.T, next http.Handler) http.Handler {
 	t.Helper()
 	// Preserve exact host admission without rewriting browser/security context.
-	h, err := WithPublicAPIAndLegacyOrigin(next, stagingOrigin, stagingOrigin, "https://docs-staging.sociaro.ai", legacyOrigin)
+	h, err := WithPublicAPIAndLegacyOrigin(next, stagingOrigin, stagingOrigin, "https://docs-staging.fixture.test", legacyOrigin)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,8 +60,8 @@ func TestLegacyAPIOriginDisabledStrictAndSpoofedHosts(t *testing.T) {
 	if w.Code != 421 {
 		t.Fatal("default admitted legacy host", w.Code)
 	}
-	for _, invalid := range []string{"http://media-gateway-dev.sociaro.ai", "https://a.test:8443", "https://a.test:0", "https://a.test:65536", "https://a.test:", "https://a.test:abc", "https://a.test/path", "https://a.test?x=1", "https://a.test#fragment", "https://user:password@a.test", "https://*.sociaro.ai", "https://a.test,https://b.test", " https://a.test", "https://a.test ", stagingOrigin, "https://docs-staging.sociaro.ai"} {
-		if _, err := WithPublicAPIAndLegacyOrigin(next, stagingOrigin, stagingOrigin, "https://docs-staging.sociaro.ai", invalid); err == nil {
+	for _, invalid := range []string{"http://media-gateway-dev.fixture.test", "https://a.test:8443", "https://a.test:0", "https://a.test:65536", "https://a.test:", "https://a.test:abc", "https://a.test/path", "https://a.test?x=1", "https://a.test#fragment", "https://user:password@a.test", "https://*.fixture.test", "https://a.test,https://b.test", " https://a.test", "https://a.test ", stagingOrigin, "https://docs-staging.fixture.test"} {
+		if _, err := WithPublicAPIAndLegacyOrigin(next, stagingOrigin, stagingOrigin, "https://docs-staging.fixture.test", invalid); err == nil {
 			t.Errorf("invalid legacy origin accepted: %q", invalid)
 		}
 	}
@@ -69,17 +69,17 @@ func TestLegacyAPIOriginDisabledStrictAndSpoofedHosts(t *testing.T) {
 		t.Error("legacy host without canonical accepted")
 	}
 	h := legacyPublicFixture(t, next)
-	for _, host := range []string{"evil.test", "media-gateway-dev.sociaro.ai.evil.test", "xmedia-gateway-dev.sociaro.ai", "media-gateway-dev.sociaro.ai:8443"} {
+	for _, host := range []string{"evil.test", "media-gateway-dev.fixture.test.evil.test", "xmedia-gateway-dev.fixture.test", "media-gateway-dev.fixture.test:8443"} {
 		req := httptest.NewRequest("POST", "https://"+host+"/v1/fixture", nil)
-		req.Header.Set("X-Forwarded-Host", "console-staging.sociaro.ai")
-		req.Header.Set("Forwarded", "host=media-gateway-dev.sociaro.ai;proto=https")
+		req.Header.Set("X-Forwarded-Host", "console-staging.fixture.test")
+		req.Header.Set("Forwarded", "host=media-gateway-dev.fixture.test;proto=https")
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, req)
 		if w.Code != 421 {
 			t.Error("unknown/spoofed host admitted", host, w.Code)
 		}
 	}
-	normalized, err := WithPublicAPIAndLegacyOrigin(next, stagingOrigin, stagingOrigin, "", "https://MEDIA-GATEWAY-DEV.SOCIARO.AI:443/")
+	normalized, err := WithPublicAPIAndLegacyOrigin(next, stagingOrigin, stagingOrigin, "", "https://MEDIA-GATEWAY-DEV.fixture.test:443/")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,7 +97,7 @@ func TestLegacyAPIOriginCanonicalMetadataAndDocsIsolation(t *testing.T) {
 				t.Errorf("browser storage origin changed: %v", got)
 			}
 			w.WriteHeader(204)
-		}), canonical, canonical, "https://docs-staging.sociaro.ai", legacyOrigin)
+		}), canonical, canonical, "https://docs-staging.fixture.test", legacyOrigin)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -134,7 +134,7 @@ func TestLegacyAPIOriginCanonicalMetadataAndDocsIsolation(t *testing.T) {
 		for _, method := range []string{"GET", "POST", "HEAD"} {
 			for _, path := range []string{"/v1/info", "/auth/session", "/media/synthetic", "/references/synthetic"} {
 				w := httptest.NewRecorder()
-				h.ServeHTTP(w, httptest.NewRequest(method, "https://docs-staging.sociaro.ai"+path, nil))
+				h.ServeHTTP(w, httptest.NewRequest(method, "https://docs-staging.fixture.test"+path, nil))
 				if w.Code != 404 {
 					t.Fatal("docs acquired API access", method, path, w.Code)
 				}
@@ -224,7 +224,7 @@ func TestLegacyAPIOriginSignedMediaAndNonexpiringReferences(t *testing.T) {
 	h := legacyPublicFixture(t, next)
 	upload := referenceUploadRequest(t, data)
 	upload.URL.Scheme = "https"
-	upload.URL.Host = "console-staging.sociaro.ai"
+	upload.URL.Host = "console-staging.fixture.test"
 	upload.Host = upload.URL.Host
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, upload)
@@ -303,7 +303,7 @@ func TestLegacyAPIOriginDirectMediaRejectsBothApplicationHosts(t *testing.T) {
 	owner := identity.SystemOwnerID
 	referenceID := "22222222-2222-4222-8222-222222222222"
 	for _, origin := range []string{stagingOrigin, legacyOrigin} {
-		for _, destination := range []string{stagingOrigin + "/object.svg", legacyOrigin + "/object.svg", "https://CONSOLE-STAGING.SOCIARO.AI.:9443/object.svg", "https://MEDIA-GATEWAY-DEV.SOCIARO.AI:8443/object.svg", "https://separate-storage.example.test/object.svg"} {
+		for _, destination := range []string{stagingOrigin + "/object.svg", legacyOrigin + "/object.svg", "https://CONSOLE-STAGING.fixture.test.:9443/object.svg", "https://MEDIA-GATEWAY-DEV.fixture.test:8443/object.svg", "https://separate-storage.example.test/object.svg"} {
 			store := &directMedia{destination: destination}
 			task := core.Task{ID: id, OwnerID: owner, Status: core.TaskSucceeded, StorageKey: &key}
 			repo := &referenceMemory{items: map[string]references.Image{owner + "/" + referenceID: {ID: referenceID, StorageKey: key, ContentType: "image/svg+xml"}}}

@@ -60,7 +60,11 @@ func (s *Server) registerTemplateRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /template-media/{asset}", s.templateMedia)
 }
 func templateError(w http.ResponseWriter, err error) {
+	var label *templates.SlotLabelError
 	switch {
+	case errors.As(err, &label):
+		field := fmt.Sprintf("slots[%d].label", label.Index)
+		writeAPIError(w, 400, "invalid_template", label.Error(), &field)
 	case errors.Is(err, templates.ErrNotFound), errors.Is(err, storage.ErrObjectNotFound):
 		writeError(w, 404, "template_unavailable", "Template or fixed media is unavailable. Reload the gallery.")
 	case errors.Is(err, templates.ErrConflict):

@@ -32,7 +32,7 @@ no email provider and grants the initial Administrator role.
 
 In **Administration → Settings → Email delivery**, select **Resend**, enter
 an API key with sending access and a sender address (for example,
-`Sociaro <login@example.com>`), then save. The sender's domain must be verified in
+`Central server <login@example.com>`), then save. The sender's domain must be verified in
 Resend. The console offers only supported mail providers; currently that is Resend.
 The connection is separate from generation providers and is editable only by a
 system administrator, not an organization administrator.

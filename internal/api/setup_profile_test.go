@@ -95,7 +95,7 @@ func TestSetupProfilePreservesSettingsAndAuthorization(t *testing.T) {
 	if w := sendTest(h, "POST", "/v1/system/setup-profile", `{"profile":"operator","version":1}`, "bob", ""); w.Code != 403 {
 		t.Fatal("ordinary user changed policy", w.Code)
 	}
-	for _, profile := range []string{"skipped", "sociaro", "invalid"} {
+	for _, profile := range []string{"skipped", "central", "invalid"} {
 		w := sendTest(h, "POST", "/v1/system/setup-profile", `{"profile":"`+profile+`","version":1}`, "alice", "")
 		if w.Code != 400 || f.writes != 0 {
 			t.Fatal("unsupported profile mutated settings", w.Code)

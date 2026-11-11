@@ -6,6 +6,7 @@ func catalogSources() []catalogsync.Source {
 	return []catalogsync.Source{
 		videoAPISource,
 		{ID: "deprecations", URL: "https://ai.byteplus.com/ark/region:ap-southeast-1/docs/model-deprecation-notice", Parser: "document"},
+		{ID: "model-deprecations", URL: "https://docs.byteplus.com/en/docs/ModelArk/model-deprecation-notice", Parser: "document"},
 		{ID: "models", URL: "https://docs.byteplus.com/en/docs/modelark/1330310", Parser: "byteplus-models"},
 		{ID: "pricing", URL: "https://docs.byteplus.com/en/docs/modelark/1544106", Parser: "byteplus-pricing"},
 		{ID: "releases", URL: "https://docs.byteplus.com/en/docs/modelark/1159178", Parser: "byteplus-releases"},

@@ -70,7 +70,7 @@ func TestCentralCompaniesOnlyProfileAndMetadata(t *testing.T) {
 		code   string
 	}{
 		{`{"profile":"personal","version":1}`, 403, "central_companies_only"},
-		{`{"profile":"sociaro","version":1}`, 403, "central_companies_only"},
+		{`{"profile":"central","version":1}`, 403, "central_companies_only"},
 		{`{"profile":"operator","allow_personal":true,"version":1}`, 400, "invalid_profile"},
 	} {
 		w := call("POST", "/v1/system/setup-profile", tc.body)

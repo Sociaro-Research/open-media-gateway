@@ -26,7 +26,7 @@ import urllib.request
 import uuid
 
 
-MEDIA = (b'Sociaro disposable Compose recovery result\n' * 26000)[:1024 * 1024]
+MEDIA = (b'Central server disposable Compose recovery result\n' * 26000)[:1024 * 1024]
 MEDIA_HASH = hashlib.sha256(MEDIA).hexdigest()
 
 
@@ -198,7 +198,7 @@ class Campaign:
                                    "'lease',worker_lease_until,'error',error) FROM tasks WHERE id='" + task_id + "'"))
 
     def request(self, path, body=None, expected=200, base=None, token=True, host=None):
-        headers = {'User-Agent': 'Sociaro-Isolated-Compose-Recovery'}
+        headers = {'User-Agent': 'Media-Gateway-Isolated-Compose-Recovery'}
         if token and self.key:
             headers['Authorization'] = 'Bearer ' + self.key
         if host:

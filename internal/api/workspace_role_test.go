@@ -30,7 +30,7 @@ func TestWorkspaceHostingTrustedConfiguration(t *testing.T) {
 	db.Exec(`UPDATE system_settings SET customer_workspaces=TRUE,shared_resources=TRUE`)
 	cipher, _ := providerconfig.NewCipher(strings.Repeat("h", 32))
 	gateway := NewGateway(Dependencies{Service: &accountService{}, Health: healthStub{}, WorkspaceAuthorization: wa.New(repo, cipher)})
-	for _, origin := range []string{"", "https://console-staging.sociaro.ai", "https://console.sociaro.ai:8443", "https://CONSOLE.SOCIARO.AI:443/"} {
+	for _, origin := range []string{"", "https://console-staging.fixture.test", "https://console.sociaro.ai:8443", "https://CONSOLE.SOCIARO.AI:443/"} {
 		t.Run(origin, func(t *testing.T) {
 			h, err := WithPublicAPI(gateway, "", origin, "")
 			if err != nil {

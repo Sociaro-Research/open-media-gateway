@@ -58,7 +58,7 @@ func (s *Server) remoteAuthorization(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !in.Consent || in.Version < 0 {
-		writeError(w, 400, "consent_required", "Confirm sharing this installation’s name and address with Sociaro")
+		writeError(w, 400, "consent_required", "Confirm sharing this installation’s name and address with the central server")
 		return
 	}
 	central := installation.FromContext(r.Context()).CentralOrigin
@@ -69,11 +69,11 @@ func (s *Server) remoteAuthorization(w http.ResponseWriter, r *http.Request) {
 	if in.Origin != "" {
 		requested, e := installation.NormalizeOrigin(in.Origin)
 		if e != nil || requested != central {
-			writeError(w, 400, "invalid_destination", "Connect to the configured Sociaro service")
+			writeError(w, 400, "invalid_destination", "Connect to the configured Central server service")
 			return
 		}
 	}
-	// Only trusted public configuration supplies the label/address sent to Sociaro.
+	// Only trusted public configuration supplies the label/address sent to central server.
 	own, _ := r.Context().Value(storageBrowserOriginKey{}).(string)
 	label := "Local installation"
 	if own == "" {
@@ -98,7 +98,7 @@ func (s *Server) remoteAuthorization(w http.ResponseWriter, r *http.Request) {
 	if pending, e := s.remoteWorkspaceManager.Authorization(r.Context(), owner); e == nil {
 		prior, e := installation.NormalizeOrigin(pending.Origin)
 		if e != nil || prior != central {
-			writeError(w, 409, "remote_destination_changed", "Cancel the saved request before connecting to Sociaro")
+			writeError(w, 409, "remote_destination_changed", "Cancel the saved request before connecting to central server")
 			return
 		}
 		label, own = pending.Name, pending.ClientOrigin

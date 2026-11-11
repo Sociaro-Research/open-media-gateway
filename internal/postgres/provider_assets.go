@@ -130,8 +130,14 @@ func (r *ProviderAssetRepository) Save(ctx context.Context, a providerassets.Rec
 	}
 	return nil
 }
-func (r *ProviderAssetRepository) Pending(ctx context.Context, limit int) ([]providerassets.Record, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT `+assetColumns+` FROM provider_assets WHERE status IN ('Processing','Creating','Unknown') ORDER BY updated_at LIMIT $1`, limit)
+func (r *ProviderAssetRepository) Pending(ctx context.Context, limit int, afterID string) ([]providerassets.Record, error) {
+	query := `SELECT ` + assetColumns + ` FROM provider_assets WHERE status IN ('Processing','Creating','Unknown')`
+	args := []any{limit}
+	if afterID != "" {
+		query += ` AND id>$2::uuid`
+		args = append(args, afterID)
+	}
+	rows, err := r.db.QueryContext(ctx, query+` ORDER BY id LIMIT $1`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -189,9 +195,18 @@ func (r *ProviderAssetRepository) BeginDelete(ctx context.Context, id string) (p
 	if busy {
 		return a, providerassets.ErrConflict
 	}
-	_, err = tx.ExecContext(ctx, `UPDATE provider_assets SET status='Deleting',updated_at=now() WHERE id=$1`, id)
+	// Detach takes the same asset lock. Recheck its winning state in the
+	// transition itself, even when Get ran before that detach committed.
+	result, err := tx.ExecContext(ctx, `UPDATE provider_assets SET status='Deleting',updated_at=now() WHERE id=$1 AND status<>'Detached'`, id)
 	if err != nil {
 		return a, err
+	}
+	n, err := result.RowsAffected()
+	if err != nil {
+		return a, err
+	}
+	if n != 1 {
+		return a, providerassets.ErrConflict
 	}
 	a.Status = "Deleting"
 	return a, tx.Commit()

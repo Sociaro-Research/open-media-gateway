@@ -8,6 +8,6 @@ on run
         do shell script "/bin/test -f " & quoted form of (toolingPath & "release_ui.py")
         do shell script "/usr/bin/python3 " & quoted form of (toolingPath & "release_ui.py") & " --launch"
     on error errorMessage
-        display dialog "Could not open the checks and deployment window." & return & return & errorMessage with title "Sociaro" buttons {"Close"} default button "Close" with icon caution
+        display dialog "Could not open the checks and deployment window." & return & return & errorMessage with title "Media Gateway" buttons {"Close"} default button "Close" with icon caution
     end try
 end run

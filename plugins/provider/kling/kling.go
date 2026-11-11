@@ -325,7 +325,7 @@ func (a *Adapter) do(ctx context.Context, method, path string, payload any) (jso
 	}
 	req.Header.Set("Authorization", "Bearer "+a.apiKey)
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", "Sociaro-Media-Gateway/Kling")
+	req.Header.Set("User-Agent", "Media-Gateway/Kling")
 	response, err := httpclient.Do(a.client, req)
 	if err != nil {
 		if ctx.Err() != nil {

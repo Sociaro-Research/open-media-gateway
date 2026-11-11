@@ -115,7 +115,7 @@ func TestEmailRegistrationConfiguredBySystemAdministrator(t *testing.T) {
 	if err = db.QueryRow(`SELECT count(*) FROM email_auth_challenges`).Scan(&count); err != nil || count != 0 {
 		t.Fatal("unconfigured registration persisted", err)
 	}
-	in := auth.DeliveryUpdate{Provider: "resend", From: "Sociaro <login@example.test>", APIKey: "fixture-secret-key", Version: 1}
+	in := auth.DeliveryUpdate{Provider: "resend", From: "Central server <login@example.test>", APIKey: "fixture-secret-key", Version: 1}
 	if _, err = delivery.Update(ctx, ordinary.ID, in); !errors.Is(err, system.ErrForbidden) {
 		t.Fatal("ordinary user configured mail", err)
 	}

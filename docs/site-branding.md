@@ -10,7 +10,7 @@ themes with all shared palette colors for both modes, chart colors, full logo, c
 in matching Dark theme and Light theme columns, plus shared home screen and email
 images. Colors use six-digit hex values. Hover colors, background glows and table headers derive from
 these tokens. Third-party provider/Google marks and media previews keep their own
-colors. Fonts, layout and the substantive legal text remain code-managed.
+colors. Fonts remain code-managed. Public legal documents and the footer copyright holder have independent editors in **Payments → Public legal documents**.
 
 The preview is isolated from the active page. Its heading and right-aligned shared Dark/Light switch sit in one row inside
 the preview card. The switch changes only that card. Choose Dark or Light to check text,
@@ -105,6 +105,26 @@ empty rather than showing a placeholder brand. Theme changes use the same logic.
 There is no bundled logo, symbol, favicon, phone icon or email logo in either the
 frontend artifact or the core binary. Provider and sign-in service marks identify
 third parties and are not installation branding.
+
+## Legal footer
+
+**Administration → Settings → Payments → Public legal documents** includes a
+**Copyright holder** field with the shared inline Save, next to the Privacy Policy
+and Terms of Use editors. This changes the name after the copyright symbol and
+current year on every console, sign-in, documentation and public legal footer.
+The neutral fallback is **[Your company name]**. Clear and Save to restore it.
+The holder is independent of the seller invoice company, Appearance and both
+legal-document drafts; none of those saves overwrite it.
+
+The setting accepts single-line plain text up to 200 UTF-8 bytes without control
+characters. It is displayed as text, including literal angle brackets. Administrator
+session or authorized system-management access is required to read or save the
+editor setting. Updates use an independent version and reject stale writes.
+`GET/PUT /v1/system/legal/footer` reads/writes `copyright_holder` and `version`;
+public `/site.json` includes only `legal.copyright_holder`, with the neutral fallback.
+Migration `098_legal_footer.sql` adds the independent singleton. Existing configured
+values survive restarts and repeated migrations; no seller or appearance data is
+copied, rewritten or inferred. An upgrade does not seed an operator name.
 
 ## Images
 

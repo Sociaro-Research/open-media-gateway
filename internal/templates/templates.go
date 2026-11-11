@@ -25,6 +25,25 @@ var ErrNotFound = errors.New("template or media is unavailable")
 var ErrConflict = errors.New("template changed; reload and review before saving")
 var ErrInvalid = errors.New("invalid template")
 
+const MaxSlotLabelCharacters = 120
+
+// SlotLabelError identifies a publication-only label constraint without exposing
+// the submitted label. Unpublished drafts may retain incomplete labels.
+type SlotLabelError struct {
+	Index      int
+	Characters int
+	Missing    bool
+}
+
+func (e *SlotLabelError) Error() string {
+	field := fmt.Sprintf("slots[%d].label", e.Index)
+	if e.Missing {
+		return fmt.Sprintf("%s: %s is required for publication; enter a reference label", ErrInvalid, field)
+	}
+	return fmt.Sprintf("%s: %s has %d characters; use %d or fewer for publication", ErrInvalid, field, e.Characters, MaxSlotLabelCharacters)
+}
+func (e *SlotLabelError) Unwrap() error { return ErrInvalid }
+
 type Slot struct {
 	ID      string `json:"id"`
 	Type    string `json:"type"`
@@ -299,8 +318,16 @@ func (d Definition) Validate(model core.MediaModel) error {
 	}
 	for i, slot := range slots {
 		current := d.Slots[i]
-		if current.ID != slot.ID || current.Type != slot.Type || current.Index != slot.Index || current.Role != slot.Role || len(current.Label) > 120 || strings.TrimSpace(current.Label) == "" {
+		if current.ID != slot.ID || current.Type != slot.Type || current.Index != slot.Index || current.Role != slot.Role {
 			return fmt.Errorf("%w: duplicate, reordered or incorrectly bound slots", ErrInvalid)
+		}
+	}
+	// Validate every binding before labels so an earlier incomplete label cannot
+	// conceal a duplicate, reordered or incorrectly bound later slot.
+	for i, slot := range d.Slots {
+		characters := utf8.RuneCountInString(slot.Label)
+		if missing := strings.TrimSpace(slot.Label) == ""; missing || characters > MaxSlotLabelCharacters {
+			return &SlotLabelError{Index: i, Characters: characters, Missing: missing}
 		}
 	}
 	return d.Compatible(model)

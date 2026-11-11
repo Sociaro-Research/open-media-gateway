@@ -119,7 +119,7 @@ def failure_guidance(progress):
 
 
 def run_checks(native_only=False, extended_only=False):
-    with tempfile.TemporaryDirectory(prefix='sociaro-check-result-') as directory:
+    with tempfile.TemporaryDirectory(prefix='gateway-check-result-') as directory:
         result = Path(directory) / 'failure.json'
         try:
             run(sys.executable, str(TOOL_DIR / 'release_checks.py'), '--project', str(ROOT),

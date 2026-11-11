@@ -330,12 +330,17 @@ func (s *Service) Detach(ctx context.Context, p, id string) error {
 func (s *Service) Run(ctx context.Context) {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
+	var afterID string
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			rows, err := s.Repo.Pending(ctx, 24)
+			rows, err := s.Repo.Pending(ctx, 24, afterID)
+			if err == nil && len(rows) == 0 && afterID != "" {
+				afterID = ""
+				rows, err = s.Repo.Pending(ctx, 24, afterID)
+			}
 			if err != nil {
 				continue
 			}
@@ -343,6 +348,9 @@ func (s *Service) Run(ctx context.Context) {
 				if ctx.Err() != nil {
 					return
 				}
+				// Binding IDs do not move when a refresh updates the row. Advance
+				// even on errors, without saving stale state to rotate the queue.
+				afterID = r.ID
 				work, cancel := context.WithTimeout(ctx, 20*time.Second)
 				work = identity.WithResourceOwners(identity.WithOwnerID(work, r.Owner), r.ProviderOwner, r.ProviderOwner)
 				c, err := s.client(work, r.Provider)

@@ -42,7 +42,7 @@ const server=http.createServer((req,res)=>{if(req.method==='GET'&&new URL(req.ur
  try{
   await navigate(base+'/system');await page.getByRole('tab',{name:'Email delivery',exact:true}).click();await form.waitFor();await page.waitForFunction(()=>document.querySelector('.email-delivery-settings select')?.options.length===2);
   assert.equal(await save().isVisible(),false);assert.equal(await form.locator('input[name=key]').isVisible(),false);
-  await form.locator('select').selectOption('resend',{force:true});await form.locator('input[name=sender]').fill('Sociaro <login@example.test>');await form.locator('input[name=key]').fill('fixture-resend-key');
+  await form.locator('select').selectOption('resend',{force:true});await form.locator('input[name=sender]').fill('Central server <login@example.test>');await form.locator('input[name=key]').fill('fixture-resend-key');
   await save().click();await saved();assert.equal(posts.at(-1).api_key,'fixture-resend-key');assert.equal(posts.at(-1).provider,'resend');
   await credential(key());assert.equal(await form.getByLabel('API key',{exact:true}).count(),1);
   await form.getByRole('button',{name:'Saved',exact:true}).waitFor({state:'hidden'});

@@ -11,11 +11,11 @@
   flight=(async()=>{
    const response=await originalFetch('/auth/company-connection',{credentials:'same-origin',cache:'no-store'});
    if([401,403,404].includes(response.status))return null;
-   if(!response.ok)throw Error('Could not load the Sociaro connection. Try again.');
+   if(!response.ok)throw Error('Could not load the central server connection. Try again.');
    const data=await response.json();
    if(data.connected===false)return null;
    const record=data.connection,origin=new URL(record?.origin);
-   if(data.connected!==true||record?.access!=='company-api-v1'||!record.context||typeof data.key!=='string'||!data.key||origin.protocol!=='https:'||origin.origin!==record.origin)throw Error('Invalid Sociaro connection');
+   if(data.connected!==true||record?.access!=='company-api-v1'||!record.context||typeof data.key!=='string'||!data.key||origin.protocol!=='https:'||origin.origin!==record.origin)throw Error('Invalid Central server connection');
    connection=Object.freeze({record:Object.freeze(record),key:data.key,origin:origin.origin});return connection;
   })().finally(()=>{flight=null;});
   return flight;

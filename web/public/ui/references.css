@@ -136,7 +136,7 @@ textarea.reference-hover { cursor:pointer; }
 /* Keep requirements readable; wrap instead of squeezing a long title. */
 .media-picker-heading { display:flex; flex-wrap:wrap; align-items:flex-start; }
 .media-picker-heading > .media-picker-requirements { flex:0 0 50%; margin:0 0 0 auto; }
-.media-picker-heading > :first-child { width:max-content; max-width:100%; white-space:normal; }
+.media-picker-heading > :first-child { width:max-content; max-width:100%; white-space:normal; overflow-wrap:anywhere; }
 .media-picker-heading > :first-child,.media-picker-requirements { line-height:24px; }
 @media (max-width:600px) {
  .media-picker-heading > .media-picker-requirements { flex-basis:100%; text-align:left; }

@@ -70,7 +70,7 @@ class UpstreamSync(unittest.TestCase):
         self.assertEqual((self.root / 'new.txt').read_text(), 'new\n')
         self.assertEqual((self.root / 'remote.txt').read_text(), 'remote\n')
         self.assertEqual(self.git('rev-parse', 'HEAD'), self.remote)
-        self.assertTrue(self.git('for-each-ref', 'refs/sociaro-release/upstream/'))
+        self.assertTrue(self.git('for-each-ref', 'refs/gateway-release/upstream/'))
         self.assertFalse(self.git('stash', 'list'))
 
     def test_disjoint_edits_in_same_file_merge(self):
@@ -123,7 +123,7 @@ class UpstreamSync(unittest.TestCase):
             return original(args, **kwargs)
         with patch.object(sync.subprocess, 'run', run), self.assertRaisesRegex(RuntimeError, 'Work is preserved at'):
             sync.synchronize(self.root)
-        backup = self.git('for-each-ref', '--format=%(refname)', 'refs/sociaro-release/upstream/')
+        backup = self.git('for-each-ref', '--format=%(refname)', 'refs/gateway-release/upstream/')
         self.assertEqual(self.git('show', backup + ':app.txt'), 'release work')
         self.assertEqual(self.git('rev-parse', 'HEAD'), self.remote)
         self.assertEqual(len(self.git('stash', 'list').splitlines()), 1)

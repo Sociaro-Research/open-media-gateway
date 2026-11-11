@@ -26,7 +26,9 @@
   document.querySelectorAll('.topbar').forEach(bindHeader);
   // A single footer survives authentication, section changes and delayed site reads.
   const footer=document.createElement('footer');footer.className='site-footer';
-  const copyright=document.createElement('span');copyright.className='site-footer-copyright';copyright.textContent='© 2026 Sociaro Baltic OÜ';footer.append(copyright);
+  const copyright=document.createElement('span');copyright.className='site-footer-copyright';footer.append(copyright);let localFooter=false;
+  function applyLegalFooter(settings){copyright.textContent='© '+new Date().getFullYear()+' '+(typeof settings?.copyright_holder==='string'&&settings.copyright_holder.trim()?settings.copyright_holder:'[Your company name]');}
+  applyLegalFooter();
   const legal=document.createElement('nav');legal.setAttribute('aria-label','Legal');footer.append(legal);
   for(const [label,kind]of [['Terms of Use','terms'],['Privacy Policy','privacy']]){
     const link=document.createElement('a');link.textContent=label;link.setAttribute('aria-disabled','true');link.dataset.legalLink=kind;legal.append(link);
@@ -122,7 +124,7 @@
   const controller=new AbortController(),deadline=setTimeout(()=>controller.abort(),8000);
   const ready=fetch('/site.json',{credentials:'omit',signal:controller.signal}).then(async r=>{
     if(!r.ok)throw Error('Site configuration unavailable');
-    const site=await r.json();window.GatewayTheme?.configure(site,r.headers.get('X-Gateway-Theme-Cookie-Domain')||'');if(site.branding)apply(site.branding);
+    const site=await r.json();window.GatewayTheme?.configure(site,r.headers.get('X-Gateway-Theme-Cookie-Domain')||'');if(site.branding)apply(site.branding);if(!localFooter)applyLegalFooter(site.legal);
     const meta=document.querySelector('meta[name="gateway-url"]');if(meta)meta.content=site.api_url||location.origin;
     // Compatibility for old bookmarks only. New links already target the docs origin.
     if(site.docs_url&&['/docs','/docs/'].includes(location.pathname)&&new URL(site.docs_url).origin!==location.origin)location.replace(targetDocs(site));
@@ -137,5 +139,5 @@
     event.preventDefault();const intent=++linkNavigation;const target=link.hasAttribute('data-docs-link')?await docsURL():await consoleURL();if(target&&intent===linkNavigation)location.assign(target);
   });
   new MutationObserver(()=>{if(appearance)apply(appearance);if(siteConfiguration)updateLinks(siteConfiguration);}).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
-  window.GatewaySite={ready,docsURL,consoleURL,openDocs,apply,normalize,paletteColors,selectPreset,presets:()=>appearance?.presets||[],defaultPreset:()=>appearance?.default_preset||''};
+  window.GatewaySite={ready,docsURL,consoleURL,openDocs,apply,applyLegalFooter:settings=>{localFooter=true;applyLegalFooter(settings);},normalize,paletteColors,selectPreset,presets:()=>appearance?.presets||[],defaultPreset:()=>appearance?.default_preset||''};
 })();

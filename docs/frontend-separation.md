@@ -89,9 +89,9 @@ and cookie-only profile changes. It does not disable key-based management or
 background payment notifications. Email and payment providers retain their
 external delivery, verification and settlement requirements.
 
-## Connect the existing UI to Sociaro
+## Connect the existing UI to central server
 
-The Sociaro setup choice uses the existing central sign-in and explicit device-code
+The Central server setup choice uses the existing central sign-in and explicit device-code
 approval. It creates or recovers one dedicated company and obtains a normal
 company API key with `generation`, `organizations:manage` and `keys:manage`.
 New `company-api-v1` consent issues a revocable key without a fixed expiry. Existing

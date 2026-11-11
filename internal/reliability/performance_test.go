@@ -473,7 +473,7 @@ func verifyFullReports(s *testStack, expected int) (int, int64, error) {
 		return 0, 0, err
 	}
 	r.Header.Set("Authorization", "Bearer "+s.key)
-	r.Header.Set("User-Agent", "Sociaro-Gateway-Isolated-Reliability/1.0")
+	r.Header.Set("User-Agent", "Media-Gateway-Isolated-Reliability/1.0")
 	response, err := s.client.Do(r)
 	if err != nil {
 		return 0, 0, err

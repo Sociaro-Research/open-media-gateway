@@ -104,7 +104,7 @@ jobs:
           python3 -m unittest discover -s scripts/tests -p 'test_release*.py' -v
 
   profile-name:
-    name: Persisted profile name browser checks
+    name: Persisted profile and legal browser checks
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     services:
@@ -150,6 +150,21 @@ jobs:
         run: |
           go test -race -count=1 -v -run '^TestProfileNameBrowserReconciliation$' ./internal/api
           UI_BROWSER_ENGINE=webkit go test -race -count=1 -v -run '^TestProfileNameBrowserReconciliation$' ./internal/api
+
+      - name: Verify persisted legal settings in Chromium and WebKit
+        env:
+          GATEWAY_LEGAL_BROWSER_NODE: node
+        run: |
+          UI_EVIDENCE_DIR="$GITHUB_WORKSPACE/legal-browser/chromium" go test -race -count=1 -v -run '^TestLegalDocumentsBrowserWorkflow$' ./internal/api
+          UI_EVIDENCE_DIR="$GITHUB_WORKSPACE/legal-browser/webkit" UI_BROWSER_ENGINE=webkit go test -race -count=1 -v -run '^TestLegalDocumentsBrowserWorkflow$' ./internal/api
+
+      - name: Retain legal settings browser evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: legal-browser-workflow
+          path: legal-browser
+          if-no-files-found: ignore
 
       - name: Retain profile name evidence
         uses: actions/upload-artifact@v4
@@ -244,6 +259,8 @@ jobs:
           make build-ui
           UI_EVIDENCE_DIR=ui-performance-results/validation-layout/chromium node scripts/ui/validation-layout.cjs
           UI_EVIDENCE_DIR=ui-performance-results/validation-layout/webkit UI_BROWSER_ENGINE=webkit node scripts/ui/validation-layout.cjs
+          UI_EVIDENCE_DIR=ui-performance-results/legal-footer-state/chromium node scripts/ui/legal-footer-state.cjs
+          UI_EVIDENCE_DIR=ui-performance-results/legal-footer-state/webkit UI_BROWSER_ENGINE=webkit node scripts/ui/legal-footer-state.cjs
           node --test scripts/ui/auto-update-test.cjs
           node scripts/ui/generation-page-fixture.test.cjs
           node scripts/ui/automatic-update-dom.cjs

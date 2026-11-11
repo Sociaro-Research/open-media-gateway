@@ -858,8 +858,8 @@ paths:
         '200': {description: 'Pending id/origin/base_version/historical connection_revision/current_connection_revision/recovery_allowed/user_code/verification_uri/expiry, or pending false'}
     post:
       operationId: beginLocalInstallationAuthorization
-      summary: Connect this installation to Sociaro with explicit approval
-      description: Current local Administrator plus explicit metadata-transfer consent. Preserves the current dedicated connection and company until its renewed key is verified; active legacy connections require explicit legacy management. The backend retains a durable installation proof per normalized central origin and stores an encrypted device secret and makes checked outbound HTTPS calls only; no local management credential is forwarded. Retries resume the same pending request, retaining its original display metadata and proof. The destination is fixed server-side to the canonical Sociaro origin; request headers and browser fields cannot select another host. The display address comes from UI_PUBLIC_URL (AUTH_PUBLIC_URL fallback); missing configuration uses http://localhost. Names and addresses are display-only, not ownership verification.
+      summary: Connect this installation to central server with explicit approval
+      description: Current local Administrator plus explicit metadata-transfer consent. Preserves the current dedicated connection and company until its renewed key is verified; active legacy connections require explicit legacy management. The backend retains a durable installation proof per normalized central origin and stores an encrypted device secret and makes checked outbound HTTPS calls only; no local management credential is forwarded. Retries resume the same pending request, retaining its original display metadata and proof. The destination is fixed server-side to the canonical Central server origin; request headers and browser fields cannot select another host. The display address comes from UI_PUBLIC_URL (AUTH_PUBLIC_URL fallback); missing configuration uses http://localhost. Names and addresses are display-only, not ownership verification.
       requestBody:
         required: true
         content:
@@ -868,7 +868,7 @@ paths:
               type: object
               required: [version, consent]
               properties:
-                origin: {type: string, format: uri, deprecated: true, description: Optional legacy field; must equal the configured canonical Sociaro origin.}
+                origin: {type: string, format: uri, deprecated: true, description: Optional legacy field; must equal the configured canonical Central server origin.}
                 client_name: {type: string, deprecated: true, description: Ignored; trusted public configuration supplies the installation label.}
                 client_origin: {type: string, format: uri, deprecated: true, description: Ignored; trusted public configuration supplies the display address.}
                 version: {type: integer, minimum: 0}
@@ -1080,6 +1080,38 @@ paths:
                   text: {type: string}
         '404': {description: Unknown document}
         '503': {description: Document storage unavailable}
+  /v1/system/legal/footer:
+    get:
+      operationId: get_v1_system_legal_footer
+      summary: Read the installation footer copyright holder (Administrator only)
+      responses:
+        '200':
+          description: Stored holder and its independent concurrency token
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LegalFooter'}
+        '401': {description: Authentication required}
+        '403': {description: Administrator required}
+        '503': {description: Footer storage unavailable}
+    put:
+      operationId: put_v1_system_legal_footer
+      summary: Save or reset the installation footer copyright holder (Administrator only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/LegalFooter'}
+      responses:
+        '200':
+          description: Saved holder with incremented concurrency token
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LegalFooter'}
+        '400': {description: 'Invalid single-line text, version or request body'}
+        '401': {description: Authentication required}
+        '403': {description: Administrator required}
+        '409': {description: Footer changed since it was read}
+        '503': {description: Footer storage unavailable}
   /v1/system/legal/{kind}:
     parameters:
     - {in: path, name: kind, required: true, schema: {type: string, enum: [privacy, terms]}}
@@ -1121,7 +1153,7 @@ paths:
       description: Public metadata used by independently served frontends. installation_role is central or ordinary, derived only from the configured UI public origin (AUTH_PUBLIC_URL fallback). central_origin is the public release destination https://console.sociaro.ai. Request Host/forwarded headers do not assign role. Assets include MIME metadata; download image bytes from /branding/assets/{asset}.
       responses:
         '200':
-          description: API, UI and documentation origins, installation_role, central_origin and branding settings. Empty display origins use the current origin; missing trusted own identity never grants central role.
+          description: API, UI and documentation origins, installation_role, central_origin, branding settings and public legal copyright_holder (no legal version). The independent holder uses [Your company name] when unconfigured. Empty display origins use the current origin; missing trusted own identity never grants central role.
   "/auth/session":
     get:
       tags: [Account]
@@ -4308,7 +4340,7 @@ paths:
               required: [provider, from, version]
               properties:
                 provider: {type: string, enum: ['', resend]}
-                from: {type: string, maxLength: 320, example: 'Sociaro <login@example.com>'}
+                from: {type: string, maxLength: 320, example: 'Central server <login@example.com>'}
                 api_key: {type: string, maxLength: 512, writeOnly: true}
                 version: {type: integer, format: int64, minimum: 1}
       responses:
@@ -9403,6 +9435,13 @@ components:
         max_total_duration: {type: number}
         min_fps: {type: number}
         max_fps: {type: number}
+    LegalFooter:
+      type: object
+      additionalProperties: false
+      required: [copyright_holder, version]
+      properties:
+        copyright_holder: {type: string, maxLength: 200, description: 'Plain single-line UTF-8 text, at most 200 bytes without control characters. Trimmed on save. Empty text uses [Your company name]. Independent of billing, Appearance and legal documents.'}
+        version: {type: integer, minimum: 1, description: Independent optimistic concurrency token.}
     LegalDocument:
       type: object
       additionalProperties: false

@@ -295,7 +295,7 @@ func (a *Adapter) do(ctx context.Context, method, path string, body io.Reader, c
 	}
 	r.Header.Set("Authorization", "Bearer "+a.apiKey)
 	r.Header.Set("Accept", "application/json")
-	r.Header.Set("User-Agent", "Sociaro-Media-Gateway/Sonilo")
+	r.Header.Set("User-Agent", "Media-Gateway/Sonilo")
 	if contentType != "" {
 		r.Header.Set("Content-Type", contentType)
 	}

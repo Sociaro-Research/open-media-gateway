@@ -136,7 +136,7 @@ def isolated_services(environment):
     env.update(LANG='C', LC_ALL='C')
     # Explicitly replace inherited test endpoints, including accidental production values.
     env['PATH'] = str(tools) + os.pathsep + env.get('PATH', '')
-    with tempfile.TemporaryDirectory(prefix='sociaro-release-checks-') as folder:
+    with tempfile.TemporaryDirectory(prefix='gateway-release-checks-') as folder:
         folder = Path(folder)
         data = folder / 'postgres'
         pg_port, redis_port = available_port(), available_port()
@@ -229,7 +229,7 @@ def download_caddy(version, folder):
     name = 'caddy_%s_%s_%s.tar.gz' % (version, system, architecture)
     base = 'https://github.com/caddyserver/caddy/releases/download/v' + version + '/'
     def fetch(name):
-        request = urllib.request.Request(base + name, headers={'User-Agent': 'Sociaro-Release-UI-Runtime'})
+        request = urllib.request.Request(base + name, headers={'User-Agent': 'Media-Gateway-Release-UI-Runtime'})
         with urllib.request.urlopen(request, timeout=60) as response:
             return response.read()
     checksum_lines = fetch('caddy_%s_checksums.txt' % version).decode().splitlines()

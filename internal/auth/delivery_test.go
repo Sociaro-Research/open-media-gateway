@@ -68,7 +68,7 @@ func TestDynamicDeliveryAndSecretHandling(t *testing.T) {
 		t.Fatal("unconfigured delivery must hide email login while retaining existing links")
 	}
 	key := "fixture-private-resend-key"
-	settings, err := sender.Update(ctx, "admin", DeliveryUpdate{Provider: "resend", From: "Sociaro <login@example.test>", APIKey: key, Version: 1})
+	settings, err := sender.Update(ctx, "admin", DeliveryUpdate{Provider: "resend", From: "Central server <login@example.test>", APIKey: key, Version: 1})
 	if err != nil {
 		t.Fatal(err)
 	}

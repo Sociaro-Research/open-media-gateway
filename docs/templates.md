@@ -77,9 +77,24 @@ The Published switch is on for published templates and off for unpublished ones.
 Save pending edits before changing the switch. There is one current template, either published or unpublished. Save updates that content immediately; an unpublished Save keeps it unpublished. The switch only changes visibility. Every write requires the current optimistic-concurrency version; concurrent edits return a conflict and retain unsaved browser edits. Internal freshness tokens reject stale runner, estimate, media-validation and Advanced editing requests. They are not a user-facing version history. Already admitted jobs retain their immutable content and file snapshots.
 
 The administrator API accepts Save as `{version, content}` and visibility as `{version, action: "publish"}` or `{version, action: "unpublish"}`. Responses expose `content` and `is_published`; legacy `draft` and `published` aliases describe the same current content. If both request content aliases are supplied, they must agree. `is_published` is response-only. Migration 081 preserves legacy data without keeping a second editable source or deleting history.
-Unpublish prevents new template submissions. Removal is a soft operation through
-the API. Neither operation deletes original library files, durable copies or
-historical results. Physical cleanup requires a separate authorized operation.
+Unpublish prevents new template submissions. Administrators can select **Delete**
+in the editor, including for an incomplete unpublished draft. The confirmation
+identifies the saved title (or Untitled template), ID and version. Cancel, close
+and Escape retain unsaved fields. Confirming sends only the saved version to
+`DELETE /v1/system/templates/{id}`; it does not save or publish edits first.
+While deletion is pending, another mutation cannot be submitted from that editor.
+
+A conflict, rejected or unconfirmed deletion retains browser edits and requires
+**Review saved template** before another confirmation. Reviewing does not replace
+unsaved fields or automatically retry. **Use reviewed version for Delete** changes
+only the next deletion confirmation; Save still uses its original version check.
+A confirmed deletion remains successful if the subsequent gallery refresh fails.
+Removing a template clears only its selection and cached work; other drafts and
+selected runner inputs remain available.
+
+Removal is soft. Neither unpublishing nor removal deletes original library files,
+durable copies or historical results. Existing saved-media validation still
+applies to removal. Physical cleanup requires a separate authorized operation.
 
 ## Shared template assets
 
@@ -329,6 +344,12 @@ the disposable-service wrapper described in [testing](testing.md).
 ## Shared field and panel presentation
 
 Duration puts the selected model's actual bounds or discrete step in its label, without a detached duplicate caption. Prompt labels show the declared model limit and dynamic Unicode code-point count, formatted with thousands separators; unknown limits are not presented as known provider bounds. Validation remains authoritative.
+
+Reference-slot labels are required and limited to 120 Unicode code points when
+publishing or saving an already published template. The editor shows feedback
+beside Label; API failures retain `invalid_template` and identify `slots[i].label`
+in `error.param`. Labels are not normalized or truncated. Incomplete unpublished
+content, including blank or longer labels, can still be saved for later editing.
 
 Override Sound is a separate sibling panel after Output settings. Image URL and Advanced settings disclosures use the reference heading typography, a trailing dropdown chevron and the shared 16px expanded-content gap. Selection blocks show only internal Remove while selected; empty blocks show Upload and Choose from library where that scope supports it. Removing a fixed binding leaves its slot for the user and never deletes the library file.
 

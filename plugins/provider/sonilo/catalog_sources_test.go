@@ -12,6 +12,7 @@ import (
 func TestCompleteSpecificationPreservesExistingSources(t *testing.T) {
 	d := Definition()
 	want := map[string]catalogsync.Source{
+		"api-changelog":    {ID: "api-changelog", URL: "https://sonilo.com/docs/changelog", Parser: "document"},
 		"api":              {ID: "api", URL: "https://platform.sonilo.com/docs/api", Parser: "document"},
 		"openapi":          {ID: "openapi", URL: "https://sonilo.com/openapi.json", Parser: "document"},
 		"openapi-complete": {ID: "openapi-complete", URL: "https://platform.sonilo.com/openapi.json", Parser: "document"},

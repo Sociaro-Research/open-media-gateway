@@ -50,7 +50,7 @@ def synchronize(project):
         return True
 
     # Preview tracked work without changing the checkout, index or stash list.
-    preview = value('stash', 'create', 'Sociaro Release upstream preview')
+    preview = value('stash', 'create', 'Gateway Release upstream preview')
     if preview:
         merged = git('merge-tree', '--write-tree', upstream, preview, check=False)
         overlap = paths('diff', '--name-only', '-z', head, upstream) & paths('diff', '--name-only', '-z', head)
@@ -60,10 +60,10 @@ def synchronize(project):
 
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ') + '-' + uuid.uuid4().hex[:8]
     old_stash = git('rev-parse', '--verify', 'refs/stash', check=False).stdout.strip()
-    git('stash', 'push', '--include-untracked', '-m', 'Sociaro Release upstream backup ' + stamp)
+    git('stash', 'push', '--include-untracked', '-m', 'Gateway Release upstream backup ' + stamp)
     backup = value('rev-parse', 'refs/stash')
     require(backup.encode() != old_stash, 'Could not preserve release changes; synchronization stopped.')
-    backup_ref = 'refs/sociaro-release/upstream/' + stamp
+    backup_ref = 'refs/gateway-release/upstream/' + stamp
     git('update-ref', backup_ref, backup)
     print('UPSTREAM BACKUP: ' + backup_ref, flush=True)
     try:

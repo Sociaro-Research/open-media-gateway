@@ -207,7 +207,7 @@ func TestReliabilityReleaseWithActiveTasks(t *testing.T) {
 		}
 		r, _ := http.NewRequestWithContext(s.ctx, method, base+path, body)
 		r.Header.Set("Authorization", "Bearer "+s.key)
-		r.Header.Set("User-Agent", "Sociaro-Isolated-Release-Test")
+		r.Header.Set("User-Agent", "Media-Gateway-Isolated-Release-Test")
 		if input != nil {
 			r.Header.Set("Content-Type", "application/json")
 		}

@@ -42,7 +42,7 @@ func (r *EVMReader) rpc(ctx context.Context, network, method string, params any,
 		return ErrUnavailable
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", "Sociaro-Gateway-Stablecoins/1.0")
+	req.Header.Set("User-Agent", "Media-Gateway-Stablecoins/1.0")
 	resp, err := r.Client.Do(req)
 	if err != nil {
 		return ErrUnavailable

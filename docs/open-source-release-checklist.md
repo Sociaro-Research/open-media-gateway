@@ -9,7 +9,7 @@ while the repository is private before changing its visibility to public.
 - [ ] Confirm that employee and contractor agreements assign the necessary rights
   to the project owner.
 - [ ] Confirm the Apache License 2.0 choice; consult legal counsel if needed.
-- [ ] Check the right to use the `Sociaro` / `Media Gateway` name and logo.
+- [ ] Check the right to use every operator-supplied name and logo.
 - [ ] Exclude internal specifications, roadmaps, exported Google Docs/Slides and
   working research directories unless explicitly approved for publication.
 - [ ] Record the source and explicit redistribution permission for every added

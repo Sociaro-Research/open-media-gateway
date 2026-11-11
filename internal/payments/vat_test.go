@@ -161,7 +161,7 @@ func TestVATCentRoundingAndConfiguration(t *testing.T) {
 func TestVIESResponseValidation(t *testing.T) {
 	body := `<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><checkVatResponse xmlns="urn:ec.europa.eu:taxud:vies:services:checkVat:types"><countryCode>DE</countryCode><vatNumber>123456789</vatNumber><requestDate>2026-10-17</requestDate><valid>true</valid><name>Buyer GmbH</name></checkVatResponse></soap:Body></soap:Envelope>`
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != "POST" || !strings.HasPrefix(r.Header.Get("User-Agent"), "Sociaro") {
+		if r.Method != "POST" || !strings.HasPrefix(r.Header.Get("User-Agent"), "Media-Gateway") {
 			t.Error("unexpected validation request")
 		}
 		w.Header().Set("Content-Type", "text/xml")

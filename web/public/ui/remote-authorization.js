@@ -61,7 +61,7 @@
   async function reviewRecovery(){
    if(!attempt||busy)return;const savedAttempt={...attempt},value={id:attempt.id,version:connection.version,connection_revision:attempt.current_connection_revision,consent:true};
    try{value.operation_id=recoveryID(value,normalized(site.central_origin));}catch(e){FormUI.message(status,e.message,'error');return;}
-   const token=++phase;clearTimeout(timer);closeBlank();details.replaceChildren(node('p','The earlier request may still have remote access. Keep its cancellation details and continue with Sociaro.'));actions.replaceChildren();FormUI.message(status,'');
+   const token=++phase;clearTimeout(timer);closeBlank();details.replaceChildren(node('p','The earlier request may still have remote access. Keep its cancellation details and continue with the central server.'));actions.replaceChildren();FormUI.message(status,'');
    button('Back',false,()=>waiting(savedAttempt));button('Keep recovery and continue',true,()=>recover(value,token));
   }
   async function recover(value,token){
@@ -86,21 +86,21 @@
   function button(label,primary,action){const b=node('button',label,primary?'primary compact':'secondary');b.type='button';b.onclick=()=>{if(!busy&&active())void action();};actions.append(b);return b;}
   function verification(view){const destination=new URL(site.central_origin),url=new URL(view.verification_uri);if(!/^[A-Z2-7]{13}$/.test(view.user_code)||url.origin!==destination.origin||url.pathname!=='/'||url.search||url.username||url.password||url.hash!=='#workspace_authorize='+view.user_code)throw Error('The saved request has an unexpected destination. Cancel it before starting again.');return url.href;}
   function schedule(delay=10000){clearTimeout(timer);if(active()&&attempt)timer=setTimeout(poll,delay);}
-  function ready(message=''){phase++;attempt=null;details.replaceChildren(node('p','Your installation’s name and address will be shared with Sociaro.','field-explanation'));actions.replaceChildren();button(connection?.connected?'Reconnect':'Connect to Sociaro',true,start);FormUI.message(status,message);}
+  function ready(message=''){phase++;attempt=null;details.replaceChildren(node('p','Your installation’s name and address will be shared with the central server.','field-explanation'));actions.replaceChildren();button(connection?.connected?'Reconnect':'Connect to central server',true,start);FormUI.message(status,message);}
   async function cancel(){if(!attempt)return;const token=phase,id=attempt.id;lock(true);clearTimeout(timer);try{await api(endpoint,{method:'DELETE',body:JSON.stringify({id})});if(!owns(token))return;closeBlank();const state=await snapshot();if(!owns(token))return;await showSnapshot(state,state.pending.id?'':'Connection cancelled.');}catch(e){if(owns(token))try{const result=await reconcile(token);if(result===true)return;if(result==='absent'){closeBlank();ready('The request has ended. Your saved connection is unchanged.');return;}FormUI.message(status,e.message+' Your request is kept.','error');offerRecovery();}catch{if(owns(token)){FormUI.message(status,e.message+' The outcome is unknown. Check the request before starting another.','error');offerRecovery();}}}finally{if(active())lock(false);}}
   function waiting(view){
-   phase++;attempt=view;clearTimeout(timer);details.replaceChildren(node('p','Check this code in Sociaro: '+view.user_code));actions.replaceChildren();let uri;
+   phase++;attempt=view;clearTimeout(timer);details.replaceChildren(node('p','Check this code in the central server: '+view.user_code));actions.replaceChildren();let uri;
    try{uri=verification(view);}catch(e){FormUI.message(status,e.message,'error');button('Cancel request',true,cancel);offerRecovery();closeBlank();return;}
-   const link=node('a','Open Sociaro','primary compact');link.href=uri;link.target='_blank';link.rel='noopener noreferrer';actions.append(link);button('Check connection',false,poll);button('Cancel',false,cancel);
+   const link=node('a','Open central server','primary compact');link.href=uri;link.target='_blank';link.rel='noopener noreferrer';actions.append(link);button('Check connection',false,poll);button('Cancel',false,cancel);
    if(reserved){try{reserved.location.replace(uri);reserved=null;}catch{closeBlank();}}
-   FormUI.message(status,'Finish connecting in the Sociaro window. If it did not open, choose Open Sociaro.');if(Date.parse(view.expires_at)<=Date.now())offerRecovery();schedule(5000);
+   FormUI.message(status,'Finish connecting in the central server window. If it did not open, choose Open central server.');if(Date.parse(view.expires_at)<=Date.now())offerRecovery();schedule(5000);
   }
   async function recoverStart(error){
    try{const saved=await api(endpoint);if(!active())return;if(saved.id){waiting(saved);clearTimeout(timer);FormUI.message(status,error.message+' The same request is kept. Retry it or cancel before starting again.','error');button('Retry request',false,start);offerRecovery();return;}}catch{/* Never replace an uncertain request automatically. */}
    if(active()){closeBlank();details.replaceChildren();actions.replaceChildren();FormUI.message(status,error.message+' Check the saved request before trying again.','error');button('Check saved request',true,load);}
   }
   async function start(){
-   if(busy||!active())return;if(!reserved)reserved=reservePopup();lock(true);FormUI.message(status,'Connecting to Sociaro…');
+   if(busy||!active())return;if(!reserved)reserved=reservePopup();lock(true);FormUI.message(status,'Connecting to central server…');
    try{const view=await api(endpoint,{method:'POST',body:JSON.stringify({version:connection?.version||0,consent:true})});if(active())waiting(view);else closeBlank();}
    catch(e){if(active())await recoverStart(e);else closeBlank();}finally{lock(false);}
   }
@@ -109,7 +109,7 @@
    if(!Number.isFinite(Date.parse(attempt.expires_at))||Date.parse(attempt.expires_at)<=Date.now()){lock(true);try{if(await reconcile(token)===true)return;}catch{/* Do not discard the saved proof. */}finally{lock(false);}if(owns(token)){FormUI.message(status,'This connection request expired. Cancel it or recover the connection.','error');offerRecovery();}return;}
    lock(true);try{const saved=await api(endpoint+'/poll',{method:'POST',body:JSON.stringify({id})});if(!owns(token))return;
     await complete(saved,token);
-   }catch(e){if(!owns(token))return;if(e.status===428)FormUI.message(status,'Finish connecting in the Sociaro window.');else if(e.status===429)FormUI.message(status,'Sociaro asked us to wait. Checking again shortly.');else{
+   }catch(e){if(!owns(token))return;if(e.status===428)FormUI.message(status,'Finish connecting in the central server window.');else if(e.status===429)FormUI.message(status,'Central server asked us to wait. Checking again shortly.');else{
     if(![403,409,410].includes(e.status))try{const result=await reconcile(token);if(result===true)return;if(result==='absent'){FormUI.message(status,'The request has ended without a new saved connection. Reload to inspect your connection.','error');return;}}catch{/* Keep the original proof and retry only this request. */}
     FormUI.message(status,e.status===410?'This connection request was declined, cancelled or expired. Cancel it before starting again.':e.message,'error');offerRecovery();if([403,409,410].includes(e.status))return;
    }schedule();}finally{lock(false);}
@@ -117,7 +117,7 @@
   async function load(){
    if(busy||!active())return false;const token=++phase;lock(true);try{const state=await snapshot();if(!owns(token))return false;await showSnapshot(state);return true;}catch(e){if(owns(token)){FormUI.message(status,e.message,'error');actions.replaceChildren();button('Check saved request',true,load);}return false;}finally{if(active())lock(false);}
   }
-  try{site=await window.GatewaySite?.ready;if(!active()){closeBlank();return;}if(!site?.central_origin)throw Error('Sociaro connection details are unavailable. Reload this page.');if(site.installation_role==='central'){closeBlank();details.replaceChildren();FormUI.message(status,'This central server manages companies and cannot connect to another server.');return;}
+  try{site=await window.GatewaySite?.ready;if(!active()){closeBlank();return;}if(!site?.central_origin)throw Error('Central server connection details are unavailable. Reload this page.');if(site.installation_role==='central'){closeBlank();details.replaceChildren();FormUI.message(status,'This central server manages companies and cannot connect to another server.');return;}
    archiveView=await mountRecovery(section,active,{lock,value:null});const loaded=await load();if(options.start&&loaded&&active()&&!busy){if(attempt){const uri=verification(attempt);if(reserved){reserved.location.replace(uri);reserved=null;}}else await start();}
   }catch(e){closeBlank();if(active())FormUI.message(status,e.message,'error');}
  }

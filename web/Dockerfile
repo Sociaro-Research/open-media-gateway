@@ -22,7 +22,7 @@ LABEL org.opencontainers.image.title="Media Gateway UI" \
       org.opencontainers.image.source="https://github.com/Sociaro-Research/open-media-gateway" \
       org.opencontainers.image.url="https://github.com/Sociaro-Research/open-media-gateway" \
       org.opencontainers.image.documentation="https://github.com/Sociaro-Research/open-media-gateway#quick-start" \
-      org.opencontainers.image.vendor="Sociaro contributors" \
+      org.opencontainers.image.vendor="Media Gateway contributors" \
       org.opencontainers.image.version="unversioned-source" \
       org.opencontainers.image.licenses="Apache-2.0"
 RUN addgroup -S -g 10001 gateway-ui && adduser -S -u 10001 -G gateway-ui gateway-ui && \

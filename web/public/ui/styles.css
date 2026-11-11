@@ -1848,7 +1848,7 @@ input[type=color]:focus-visible { outline:none; box-shadow:none; border:2px soli
 .site-page > main,.site-page > .shell > main { flex:1; min-width:0; }
 .site-footer { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; column-gap:20px; row-gap:12px; flex-shrink:0; border-top:1px solid var(--line); padding:20px 0; color:var(--muted); }
 .site-page > .site-footer { width:min(var(--site-max-width,1280px),calc(100% - 2 * var(--site-gutter,20px))); margin-inline:auto; }
-.site-footer-copyright { font-size:var(--type-detail); line-height:1.5; }
+.site-footer-copyright { min-width:0; max-width:100%; overflow-wrap:anywhere; font-size:var(--type-detail); line-height:1.5; }
 .site-footer nav { display:flex; justify-content:flex-end; flex-wrap:wrap; gap:20px; margin-left:auto; }
 .site-footer a { display:inline-flex; align-items:center; min-height:44px; color:var(--muted); font-size:var(--type-detail); text-decoration:none; }
 .site-footer a:is(:hover,:focus-visible) { color:var(--accent-text,var(--accent)); }

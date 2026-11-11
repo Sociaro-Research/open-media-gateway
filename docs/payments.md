@@ -85,7 +85,7 @@ is created. Balance history combines manual credits, payment credits and correct
 single paginated table. Each ledger change appears once; pending, failed and
 zero-credit payment attempts remain visible without being counted as credits.
 The table shows gross payment, actual fee, the fee payer's organization name (or
-Sociaro), and the signed balance change. Technical IDs are omitted from the UI.
+Central server), and the signed balance change. Technical IDs are omitted from the UI.
 Dollar amounts use `$`; when Stripe settles in another currency, payment and fee
 also show the actual settlement amounts in parentheses. These are Stripe merchant
 settlement figures, not evidence of what the cardholder's bank debited. Existing
