@@ -14,7 +14,7 @@ RUN mkdir -p /out/rootfs/tmp && chmod 1777 /out/rootfs/tmp
 
 # The worker invokes FFmpeg as a separate process; the video codec is always copied.
 # Ship the tools and their runtime libraries through the distribution packages.
-FROM alpine:3.23
+FROM alpine:3.24
 RUN apk add --no-cache ca-certificates ffmpeg ffmpeg-doc
 
 LABEL org.opencontainers.image.title="Media Gateway" \
