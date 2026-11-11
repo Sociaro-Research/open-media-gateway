@@ -1,31 +1,37 @@
-Open Media Gateway 1.0.2 expands media workflows and completes a set of shared
-interface and recovery improvements. See the [changelog](https://github.com/Sociaro-Research/open-media-gateway/blob/v1.0.2/CHANGELOG.md).
+Media Gateway 1.0.3 improves template safety, saved console preferences, provider
+guidance and catalogue recovery. See the [changelog](https://github.com/Sociaro-Research/open-media-gateway/blob/v1.0.3/CHANGELOG.md).
 
-- Reuse the existing interface with a central company through explicit approval
-  and a permanent revocable company key, including published Support contacts.
-- Share Requests filters, columns and details across administration and company
-  views while preserving company isolation and role-based redaction.
-- Improve template authoring, media references, upload cancellation, image/video
-  framing, API-key controls, shared typography and accessible interactions.
-- Preserve accepted-result recovery, generation admission and active-reference
-  retention, with reviewed Kling and MiniMax media workflows.
+- Save table columns and width choices per signed-in profile.
+- Configure the footer copyright holder independently from legal documents;
+  retain existing saved branding and use neutral defaults for new installations.
+- Confirm template Delete against the saved version, preserve unrelated work and
+  count reference labels correctly without discarding incomplete drafts.
+- Reject repeated company-member assignment without changing its existing role.
+- Preserve detached provider assets during concurrent deletion and keep failed
+  asset lookups from monopolizing background polling.
+- Reject contradictory WAV timing and unsupported chained or multiplexed Ogg.
+- Add dismissible provider guidance and reviewed GPT Image 2.6, Qwen Audio 3.1
+  and guarded PixVerse V6 media workflows, alongside expanded lifecycle sources.
+- Update Go toolchains to 1.27.4, Caddy's x/net to 0.62.0 and Redis to 7.4.12 on
+  supported Alpine 3.22, with corresponding component notices.
 
-The company-key connection is supported; the separate full company-interface
-protocol remains gated. Existing generation-only approvals are not silently
-upgraded to company access. Live provider availability and paid calls depend on
-the operator's account and are not established by mock tests.
+Four image families (gateway/worker, UI, PostgreSQL and Redis) support Linux
+AMD64 and ARM64. The versioned workflow requires native builds, strict security
+scans and fresh HTTP/HTTPS source-free installation checks before publishing
+the final version manifests and downloads. The installation archive pins all
+four images by digest; SHA-256 checksums and CycloneDX inventories accompany it.
 
-Four image families (gateway/worker, UI, PostgreSQL and Redis) are built for Linux
-AMD64 and ARM64. Download the installation archive and its SHA-256 file, verify
-the checksum and follow the bundled README. Image references are pinned by digest;
-CycloneDX inventories for both architectures accompany the release.
+For an existing schema 96 installation, this release adds migrations 097 and 098
+for per-user table preferences and the independent versioned footer. Back up
+PostgreSQL, the complete Redis volume, media, configuration and active overrides;
+retain keys, Compose project and volumes, and drain workers with the bundled
+update procedure. Migration 081 is unchanged from v1.0.2 and must not be replayed
+on an installation that already applied it. Image rollback does not undo schema
+changes; use the documented compatibility and recovery procedure.
 
-For an existing installation, back up the database, media and configuration,
-retain the Compose project name, secrets and volumes, and drain workers using the
-bundled update procedure. This release includes migrations 071 through 096. An
-image rollback does not undo migrations; preserve post-upgrade writes and follow
-the documented compatibility and recovery procedure.
-
-Publishing this release does not deploy any running installation. The included
-mock provider is free; live provider credentials and charges are separate.
-The application is Apache-2.0; bundled components retain their own notices.
+Saved catalogue schedules and warnings remain operator decisions. Source changes
+do not establish pricing imports, paid generation or account entitlement;
+PixVerse keeps its reviewed Singapore-connection guard. Publishing this release
+does not deploy a running installation. The mock provider is free; live provider
+credentials and charges are separate. The application is Apache-2.0; bundled
+components retain their own notices.

@@ -5,6 +5,52 @@ All notable changes to Media Gateway will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/).
 
+## [v1.0.3] - 2026-11-11
+
+### Added
+
+- Save console table column and width preferences in the signed-in profile.
+- Add an independent Administrator footer copyright editor and neutral source
+  defaults while retaining saved branding and legal documents.
+- Confirm administrator template deletion against the saved version, preserving
+  unrelated drafts, references and stored media.
+- Add dismissible provider guidance and reviewed GPT Image 2.6, Qwen Audio 3.1
+  and guarded PixVerse V6 media adapter workflows.
+- Expand official model lifecycle sources while retaining unknown conditions,
+  warnings, source identity and accepted-task recovery.
+
+### Fixed
+
+- Count template reference labels as Unicode code points, identify field errors
+  and preserve incomplete unpublished drafts.
+- Reject duplicate company-member assignment without changing the existing role
+  or weekly limit; keep intentional member-row role updates.
+- Preserve account sign-in, scoped invitations and management audit events.
+- Keep numeric catalogue contracts stable across JSON persistence and isolate
+  source checks from individual provider failures.
+- Keep failing provider-asset lookups from monopolizing polling and prevent a
+  concurrent Delete from overriding a completed Detach.
+- Reject contradictory WAV timing and unsupported chained or multiplexed Ogg.
+- Improve field-specific API errors, media recovery guidance, table drafts,
+  responsive shared controls and source-free UI archives.
+
+### Security
+
+- Update Go build toolchains to 1.27.4 for GO-2026-6859 / CVE-2026-97054.
+- Build Caddy with golang.org/x/net v0.62.0 for CVE-2026-78661.
+- Update Redis to official 7.4.12-alpine3.22 with matching license provenance.
+
+### Upgrade notes
+
+- Schema 96 installations apply migrations 097 (table preferences) and 098 (legal
+  footer). Preserve backups, keys, Compose project and volumes; drain workers
+  before updating. Image rollback does not undo schema changes; retain full backups and follow
+  the documented recovery procedure.
+- Migration 081 is unchanged from v1.0.2. Do not replay it on an installation that
+  already applied it; follow the documented compatibility and recovery procedure.
+- Catalogue additions do not adopt saved schedules, confirm prices or clear
+  warnings. Adapter support does not establish paid generation or account access.
+
 ## [v1.0.2] - 2026-11-05
 
 ### Added
