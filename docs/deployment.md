@@ -205,7 +205,7 @@ your particular zone. Zone-specific authenticated origin pulls, a tunnel or a
 provider firewall remain additional account-dependent protections. Refresh the
 official IP ranges before changing the policy.
 
-The UI image rebuilds Caddy 2.11.7 on Go 1.27.3 with x/net 0.60.0, retaining
+The UI image rebuilds Caddy 2.11.7 on Go 1.27.3 with x/net 0.62.0, retaining
 the upstream command and standard modules. This incorporates the October 8 Go
 security fixes without changing Caddy's version or the separate TLS proxy.
 Database/cache image replacement remains a separate maintenance operation.
