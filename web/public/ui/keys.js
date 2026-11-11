@@ -58,6 +58,9 @@
       recipientField.append(recipientLabel,recipient);const creationFields=form.querySelector('.keys-fields');creationFields.classList.add('key-creation-fields-with-recipient');creationFields.prepend(recipientField);
       const orgScope=node('label');orgScope.innerHTML='<input type="checkbox" name="organizations"> Manage organization';form.querySelector('fieldset').append(orgScope);
       form.elements.providers.closest('label').remove();form.elements.storage.closest('label').remove();
+      // A key acts with its recipient's role, so offer only the scopes that role can use.
+      const syncScopes=()=>{const role=members.find(m=>m.id===recipient.value)?.role;for(const [name,usable] of [['keys',OrganizationRoles.issue(role,true)||OrganizationRoles.statistics(role)],['organizations',OrganizationRoles.statistics(role)]]){const box=form.elements[name];box.closest('label').hidden=!usable;if(!usable)box.checked=false;}};
+      recipient.addEventListener('change',syncScopes);form.addEventListener('reset',()=>setTimeout(syncScopes));syncScopes();
     }
     content.append(form);
     FormUI.watch(form,form.querySelector('button[type=submit]'),{valid:()=>!!form.elements.name.value.trim()});
