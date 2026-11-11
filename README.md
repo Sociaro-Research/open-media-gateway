@@ -1,126 +1,39 @@
 # Open Media Gateway
 
-**Generate AI images, video, speech, and music through one self-hosted workspace and API.**
+**One API. One key. AI media across providers.**
 
-Open Media Gateway connects your media provider accounts to a shared browser
-console and an asynchronous API. It is for developers building media features
-into applications and teams that want one place to generate, store, and manage
-media across providers.
+Generate images, video, speech, and music without integrating each provider separately.
+
+[Get started](#get-started) · [Providers](#supported-providers) · [API reference](docs/openai-api.md)
 
 ## Why use it?
 
-- **Integrate once.** Submit jobs through a common API, check their status, and
-  receive signed webhooks. Gateway handles provider requests, polling, and result
-  retrieval behind the scenes.
-- **Give your team a workspace.** Try models in the Playground, reuse reference
-  files, and share providers and generation history within organizations. Use the
-  Journal project selector to filter history and assign new submissions, or choose
-  All projects to include ungrouped generations. The adjacent **+** creates a shared
-  company project; **⋯** renames or deletes the selected project. Deletion clears tags and
-  preserves generations and files. A generation’s **⋯ → Project** submenu marks
-  its current project; choosing the marked project again removes its tag. Try again
-  keeps its current project. Company projects are shared across users and keys;
-  assignment does not depend on the generation author. Existing role/content
-  permissions still apply. Profile projects remain private. Projects require
-  a key for the matching workspace.
-- **Use administrator-prepared prompts.** The instance-wide [Templates gallery](docs/templates.md) shares published image/video covers and immutable prompts. Supply missing references, choose a compatible model and confirm the existing estimate with your Playground key. Optional Override Sound replaces generated video audio while preserving the compressed video stream.
-- **Keep Playground access across browsers.** Explicitly create an [account-managed Playground key](docs/playground-keys.md), encrypted for your selected workspace and shared with Templates. Ordinary generation API authentication and permissions still apply.
-- **Keep results in your storage.** Archive generated files locally or in
-  S3-compatible storage, with authenticated downloads and signed preview URLs.
-- **See usage and costs.** Review generation history, provider usage, and cost
-  estimates where pricing is available. Estimates are not guaranteed final charges.
-- **Start without paid credentials.** The included `mock` provider returns fixed
-  test media so you can try the console and API before connecting a paid account.
+- **Integrate once.** Submit jobs, track progress, and retrieve results through a consistent API.
 
-Included adapters: [OpenAI](docs/openai-provider.md),
-[BytePlus ModelArk and Alibaba Cloud Model Studio](docs/configuration.md#provider-bootstrap),
-including [guarded native PixVerse V6](docs/alibaba-pixverse.md),
-[Agnes AI](docs/agnes-provider.md), [Sonilo](docs/sonilo-provider.md), and
-[direct Kling AI](docs/kling-provider.md),
-[direct MiniMax image/video](docs/minimax-provider.md), plus `mock`.
-Alibaba's [Qwen Audio 3.1 file contracts](docs/alibaba-qwen-audio.md) describe
-the supported speech subset and workspace requirements.
-Media types and controls depend on the selected provider and model. Administrators
-can upload or remove [PNG provider logos](docs/provider-modules.md#provider-logos)
-from provider settings; logos follow the active light/dark display mode.
-The Playground highlights [supported prompt references](docs/prompt-reference-syntax.md)
-and previews their selected files without rewriting submitted text. Real generation
-uses your provider credentials and may incur charges. The API uses OpenAI-style
-endpoints with an [asynchronous job lifecycle](docs/openai-api.md); clients must
-poll or handle webhooks before downloading results.
+- **Keep your outputs.** Store generated media locally or in S3-compatible storage, ready to download and reuse.
 
-## Quick Start
+- **Understand spending.** See cost estimates before generation and track usage across providers.
 
-Run a new local installation with the **v1.0.2** release bundle. It contains
-configuration for Linux AMD64/ARM64 images; no source checkout, Go, Node, or image
-build is needed.
+- **Run it your way.** Self-host the gateway, connect your provider accounts, and manage team access.
 
-**Requirements:** Docker Engine or Docker Desktop running, **Compose 2.24.4+**,
-**Python 3.9+**, and a Linux/macOS/WSL shell. On Windows, use Docker Desktop with
-[Ubuntu in WSL 2](docs/windows-wsl.md) and run the
-commands in Ubuntu. No provider account or paid key is needed for `mock`.
+- **One balance for shared providers.** Fund generation from a common company balance, with an invoice for each top-up.
 
-### 1. Download and verify
+## Supported providers
 
-Download the [installation archive](https://github.com/Sociaro-Research/open-media-gateway/releases/download/v1.0.2/media-gateway-v1.0.2.tar.gz)
-and [SHA-256 file](https://github.com/Sociaro-Research/open-media-gateway/releases/download/v1.0.2/media-gateway-v1.0.2.tar.gz.sha256)
-into a new, empty directory. Then run there:
+[OpenAI](docs/openai-provider.md) · [BytePlus ModelArk](docs/configuration.md#provider-bootstrap) · [Alibaba Cloud Model Studio](docs/configuration.md#provider-bootstrap) · [Agnes AI](docs/agnes-provider.md) · [Kling AI](docs/kling-provider.md) · [MiniMax](docs/minimax-provider.md) · [Sonilo](docs/sonilo-provider.md)
 
-```sh
-sha256sum -c media-gateway-v1.0.2.tar.gz.sha256
-tar -xzf media-gateway-v1.0.2.tar.gz
-cd media-gateway-v1.0.2
-```
+## Add a provider
 
-On macOS, use `shasum -a 256 -c` instead of `sha256sum -c`. Stop if verification
-fails. For other versions, use matching assets from
-[GitHub Releases](https://github.com/Sociaro-Research/open-media-gateway/releases)
-and follow that bundle's README.
+Open Media Gateway is open source. Add an integration and submit a pull request. Our [provider integration guide](docs/provider-development.md) covers the requirements, tests, and submission checklist.
 
-### 2. Start and create your owner account
+## Get started
 
-```sh
-python3 initialize.py
-docker compose pull
-docker compose up -d --wait
-docker compose exec -T gateway /gateway admin setup-code
-```
+1. [Install the gateway](deploy/ghcr/README.md) on your infrastructure.
+2. [Connect your providers](docs/provider-connections.md) and choose your models.
+3. Create an API key and [make your first request](docs/api-quickstart.md).
 
-Open [http://localhost:8088](http://localhost:8088), enter the private setup code in
-**Create owner account**, and choose your name, email, and password. You are
-signed in as Administrator; email delivery and Google sign-in are optional.
-Google sign-in can later reuse that account when Google proves ownership of the
-same Gmail or Workspace address; see [account linking](docs/email-authentication.md#identity-and-verification).
+## Also included
 
-### 3. Try a free generation
+A browser Playground to try models, plus [templates](docs/templates.md) for reusable prompts.
 
-In **Playground**, select **Mock Image**, enter a prompt, and generate. The mock
-returns a fixed SVG, so it will not render your prompt or call a paid service.
-For an application integration, follow the [create, poll, and download example](docs/api-quickstart.md).
-
-Keep `.env` and Docker volumes: they contain credentials and data. Do not
-reinitialize an existing installation, change its encryption keys, or run
-`docker compose down -v` to restart it. Local ports bind to loopback; before
-public use, follow [server installation and updates](deploy/ghcr/README.md) and
-the [deployment guide](docs/deployment.md). Review and replace the included
-privacy and terms operator templates for your installation. Keep development configurations private.
-
-For private MinIO or another self-hosted S3 endpoint, an operator must explicitly
-set `OUTBOUND_ALLOW_PRIVATE_HOSTS` to the exact trusted hostname or IP. Both Gateway
-and worker must resolve and reach that endpoint; allowlisting does not create
-Docker DNS records or network routes. See [private storage setup](docs/configuration.md#private-minio-and-other-internal-s3-endpoints)
-and the [outbound security policy](SECURITY.md#known-preview-limitations).
-
-## Learn more
-
-- [Installation options, HTTPS, troubleshooting, and updates](deploy/ghcr/README.md)
-- [Provider, storage, and account configuration](docs/configuration.md)
-- [Installation roles and the central server](docs/installation-role.md)
-- [API integration and webhooks](docs/openai-api.md)
-- [Console table columns and viewport-width preferences](docs/table-preferences.md)
-- [Build from source and run checks](docs/development.md) · [Contribute](CONTRIBUTING.md)
-- [All documentation](docs/README.md) · [Security](SECURITY.md) · [Support](SUPPORT.md)
-
-Licensed under [Apache License 2.0](LICENSE). Bundled third-party components
-retain their own terms and notices. Provider names are trademarks of their
-respective owners; this project is independent and is not endorsed by them.
+Licensed under [Apache License 2.0](LICENSE). Bundled third-party components retain their own terms and notices. Provider names are trademarks of their respective owners; this project is independent and is not endorsed by them.
