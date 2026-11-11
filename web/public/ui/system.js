@@ -1,6 +1,6 @@
 (() => {
   const view=document.querySelector('#systemView'),content=document.querySelector('#systemContent');
-  let epoch=0,current='settings',selfID='',settingsTab='system';
+  let epoch=0,current='settings',selfID='',settingsTab='system',monitoringChecked=false;
  let embedded=null,originalParent=null;
  function restore(){if(embedded){originalParent.append(embedded);embedded.hidden=true;embedded=null;}sharedConfiguration=false;}
 
@@ -79,7 +79,8 @@
    }catch(error){FormUI.message(message,error.message,'error');}
   }
   async function activity(token){const status=title('Audit Log');FormUI.message(status,'');await window.AuditLog.mount(content,api,{current:()=>token===epoch});}
-  async function open(){window.SalesHierarchy?.close();GatewayLayout.clear(content);restore();content.replaceChildren();content.classList.remove('organizations-content');window.GatewayReports?.close();const token=++epoch;for(const node of view.querySelectorAll('[data-system-page]')){const active=node.dataset.systemPage===current;node.classList.toggle('active',active);if(active)node.setAttribute('aria-current','page');else node.removeAttribute('aria-current');}await ({settings,administrators,activity,sales:()=>SalesHierarchy.mount(content,api,()=>token===epoch),catalog:()=>window.CatalogSync.journal(content,api,()=>token===epoch),organizations:()=>window.GatewayOrganizations.open(content,true),sharedProviders:()=>embedPage('providers'),sharedStorage:()=>embedPage('storage'),usage:()=>embedPage('usage'),reports:()=>embedPage('reports')})[current](token);}
+  // Monitoring is an optional Compose profile. Without Grafana the UI proxy answers 502, so the action stays hidden.
+  async function open(){if(!monitoringChecked){monitoringChecked=true;fetch('/monitoring/api/health').then(r=>{view.querySelector('[data-system-page="monitoring"]').hidden=!r.ok}).catch(()=>{});}window.SalesHierarchy?.close();GatewayLayout.clear(content);restore();content.replaceChildren();content.classList.remove('organizations-content');window.GatewayReports?.close();const token=++epoch;for(const node of view.querySelectorAll('[data-system-page]')){const active=node.dataset.systemPage===current;node.classList.toggle('active',active);if(active)node.setAttribute('aria-current','page');else node.removeAttribute('aria-current');}await ({settings,administrators,activity,sales:()=>SalesHierarchy.mount(content,api,()=>token===epoch),catalog:()=>window.CatalogSync.journal(content,api,()=>token===epoch),organizations:()=>window.GatewayOrganizations.open(content,true),sharedProviders:()=>embedPage('providers'),sharedStorage:()=>embedPage('storage'),usage:()=>embedPage('usage'),reports:()=>embedPage('reports')})[current](token);}
   view.querySelectorAll('[data-system-page]').forEach(node=>node.addEventListener('click',()=>{if(node.dataset.systemPage==='monitoring'){location.assign('/monitoring/');return;}current=node.dataset.systemPage;open();}));
   window.GatewaySystem={open,identify(user){selfID=user.id;},close(){epoch++;window.SalesHierarchy?.close();GatewayLayout.clear(content);restore();document.querySelector('#providersView h1').textContent='Providers';document.querySelector('#storageView h1').textContent='Storage';content.replaceChildren();document.querySelectorAll('.system-dialog').forEach(d=>d.close());}};
 })();

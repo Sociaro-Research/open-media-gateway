@@ -120,7 +120,9 @@ tokens, editable in both palettes.
 
 The Administrator's Monitoring action reuses the existing sidebar button. It
 opens Grafana as a separate application at `/monitoring/`, using the same gateway
-session. Grafana retains its native dashboard grid, time picker, chart controls,
+session. The button appears only when `/monitoring/api/health` answers, so
+installations without the monitoring profile do not offer a dead link.
+Grafana retains its native dashboard grid, time picker, chart controls,
 themes and accessibility behavior: these controls belong to an independently
 maintained application and cannot use the console's DOM components. This is a
 functional exception, not a second implementation of console controls. Validate

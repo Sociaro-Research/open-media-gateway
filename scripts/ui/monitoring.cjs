@@ -5,7 +5,7 @@ const assert=require('node:assert/strict'),http=require('node:http'),fs=require(
 const root=path.resolve(__dirname,'../..'),tmp=fs.mkdtempSync(path.join(os.tmpdir(),'gateway-monitoring-ui-'));
 const listen=server=>new Promise(resolve=>server.listen(0,'127.0.0.1',()=>resolve(server.address().port)));
 const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
-let caddy,browser,revoked=false,unavailable=false,forwarded=[];
+let caddy,browser,revoked=false,unavailable=false,grafanaDown=false,forwarded=[];
 const api=http.createServer((req,res)=>{
  const p=new URL(req.url,'http://localhost').pathname;
  const json=data=>res.writeHead(200,{'Content-Type':'application/json'}).end(JSON.stringify(data));
@@ -25,6 +25,7 @@ const api=http.createServer((req,res)=>{
  res.writeHead(404).end();
 });
 const grafana=http.createServer((req,res)=>{
+ if(grafanaDown)return res.writeHead(502).end();
  forwarded.push(req.headers);
  res.writeHead(200,{'Content-Type':'text/html','Content-Security-Policy':"default-src 'self'; script-src 'nonce-fixture'; style-src 'self'"});
  res.end('<!doctype html><html><title>Gateway overview</title><h1>Gateway overview</h1><p>Service availability</p><a href="/system">Gateway administration</a></html>');
@@ -102,6 +103,7 @@ const grafana=http.createServer((req,res)=>{
   if(real)await delay(3000);
   await page.screenshot({path:path.join(screenshots,`monitoring-dashboard-${theme}-${width}.png`)});
  }
+ if(!real){grafanaDown=true;const health=page.waitForResponse(r=>r.url().endsWith('/monitoring/api/health'));await page.goto(base+'/system');await page.locator('#systemNav').click();assert.equal((await health).status(),502);assert.equal(await page.getByRole('button',{name:'Monitoring ↗',exact:true}).isVisible(),false,'Monitoring offered without Grafana');grafanaDown=false;}
  await page.goto(base+'/system');await page.locator('#systemNav').click();
  const action=page.getByRole('button',{name:'Monitoring ↗',exact:true});await action.waitFor();await action.focus();await page.keyboard.press('Enter');await page.waitForURL('**/monitoring/d/gateway-overview/gateway-overview');
  assert.deepEqual(errors.filter(message=>!message.includes('ResizeObserver')),[]);
