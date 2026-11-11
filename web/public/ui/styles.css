@@ -1917,3 +1917,14 @@ input[type=color]:focus-visible { outline:none; box-shadow:none; border:2px soli
 .table-preference-feedback { grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:12px;min-width:0; }
 .table-preference-feedback .table-preference-status { margin:0; }
 .table-preference-feedback .table-recover { min-height:44px; }
+
+/* Provider guidance uses the shared cards, actions and dismiss control. */
+.provider-promotions { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr)); gap:var(--space-4,16px); margin-bottom:var(--space-6,24px); }
+.provider-promotion { position:relative; display:flex; flex-direction:column; align-items:flex-start; gap:12px; padding:20px; min-width:0; }
+:is(#configurationView,#systemView) .provider-promotion h2 { margin:0; padding-right:36px; font-size:var(--type-section,20px); line-height:1.35; }
+.provider-promotion > .icon-close { position:absolute; top:8px; right:8px; }
+.provider-promotion p { margin:0; color:var(--muted); }
+.provider-promotion > :is(a,button:not(.icon-close)) { margin-top:auto; }
+.provider-promotion > a { display:inline-flex; align-items:center; min-height:44px; text-decoration:none; }
+.provider-promotion > a:hover { color:var(--accent-text,var(--accent)); }
+.provider-promotion > .form-message:empty { display:none; }

@@ -130,6 +130,7 @@ let consoleInitialized=false;
 let consolePolicy={generation_ui:true,personal_providers:true};
 window.applySystemAccess=function(settings,admin=systemAdministrator){
  consolePolicy={...consolePolicy,...settings};const central=consolePolicy.installation_role==='central';if(central){consolePolicy.shared_resources=true;consolePolicy.personal_providers=false;}else if(consolePolicy.shared_resources)consolePolicy.personal_providers=false;const personalConfiguration=!central&&!!consolePolicy.personal_providers;serviceInfo.console=consolePolicy;systemAdministrator=admin;
+ window.ProviderPromotions?.render({canConnect:admin&&consolePolicy.installation_role!=='central'&&!window.CompanyConnection?.active()});
  document.querySelector('#systemNav').hidden=!admin;
  window.GenerationKey.refreshPolicy();
  if(window.Workspace?.ready())Workspace.refresh().catch(()=>{});
@@ -952,7 +953,7 @@ async function authRequest(path) {
 
 function setAuthState(state) {
   authState = state;
-  if(state==='anonymous'||state==='error')ProviderLogos.clear();
+  if(state==='anonymous'||state==='error'){ProviderLogos.clear();window.ProviderPromotions?.identify(null);}
   const checking = state === 'checking', failed = state === 'error';
   document.querySelector('#authCheck').hidden = !checking && !failed;
   document.querySelector('#authCheckStatus').textContent = failed
@@ -1783,6 +1784,7 @@ async function initialize() {
     clientManagerRole = user.sales_role || (clientManager?'client_manager':'');
     window.GatewaySystem?.identify(user);
   }
+  window.ProviderPromotions?.identify(user || null);
   window.applySystemAccess(serviceInfo.console||{},!!user?.is_system_admin);
   setAuthState('authenticated');
   initializationPending = false;

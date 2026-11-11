@@ -11,7 +11,7 @@
  const scenario=s=>s.shared_resources?'operator':s.personal_providers?'personal':'';
  function dismissal(user=actor){return 'gateway-setup-dismissed-'+user.id+':'+(user.session_id||'session');}
  function dismissed(){try{return !!sessionStorage.getItem(dismissal());}catch{return false;}}
- async function open({current=()=>true,onboarding=false}={}){
+ async function open({current=()=>true,onboarding=false,selection}={}){
   if(!actor?.is_system_admin||busy||dialog?.open)return;
   const user=actor,ticket=++opening;let settings=await api('/v1/system/settings');
   if(ticket!==opening||actor!==user||!actor?.is_system_admin||busy||!current())return;
@@ -47,7 +47,7 @@
    finally{busy=false;modal.removeAttribute('aria-busy');update();}
   };
   function dismissAfterSave(){busy=false;dismiss();}
-  sync();modal.showModal();FormUI.refresh();(isCentral?(apply.disabled?close:apply):(choices.querySelector('input:checked')||choices.querySelector('input'))).focus();
+  sync();if(!isCentral&&selection==='sociaro'){for(const radio of choices.querySelectorAll('input'))radio.checked=radio.value===selection;update();}modal.showModal();FormUI.refresh();(isCentral?(apply.disabled?close:apply):(choices.querySelector('input:checked')||choices.querySelector('input'))).focus();
  }
  window.SetupSelector={
   async initialize(user){opening++;if(actor!==user)dialog?.close();actor=user;window.RemoteWorkspace?.setActor(user);if(!user?.is_system_admin)return;try{const settings=await api('/v1/system/settings');if(actor===user&&settings.setup_pending&&!dismissed())await open({onboarding:true});}catch(error){console.warn('Setup guide is available from Settings.');}},

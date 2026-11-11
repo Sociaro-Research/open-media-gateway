@@ -21,7 +21,7 @@
    catch(e){FormUI.message(status,e.message,'error')}finally{submit.disabled=false}
   };name.focus();
  }
- function setup(){const hero=document.querySelector('#providersView .providers-hero');let b=document.querySelector('#addProvider');if(!b){b=button('Add provider',create);b.id='addProvider';hero.append(b)}b.hidden=!systemAdministrator;}
+ function setup(){window.ProviderPromotions?.render({canConnect:systemAdministrator&&consolePolicy.installation_role!=='central'&&!window.CompanyConnection?.active()});const hero=document.querySelector('#providersView .providers-hero');let b=document.querySelector('#addProvider');if(!b){b=button('Add provider',create);b.id='addProvider';hero.append(b)}b.hidden=!systemAdministrator;}
  function render(provider){
   setup();const form=elements.providerForm;form.querySelector('.provider-connection-settings')?.remove();
   document.querySelector('#manualModelSettings')?.remove();document.querySelector('#archiveProvider')?.remove();

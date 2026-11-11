@@ -16,6 +16,13 @@ ignored `.local/` or `dist/`; record limits explicitly.
 
 ## Available fixtures
 
+`node scripts/ui/provider-promotions.cjs` checks the actual provider page's
+independently dismissible contribution and Sociaro cards using intercepted HTTPS
+fixtures. Repeat with `UI_BROWSER_ENGINE=webkit`; `UI_EVIDENCE_DIR` captures both
+themes at 1440/390/320px. It covers user-scoped persistence, unavailable storage,
+keyboard focus, central/non-admin visibility and interrupted mode selection.
+No server, live connection or generation is started.
+
 `node scripts/ui/validation-layout.cjs` checks the shared native validation state
 through offscreen layout changes, popup restoration, correction, focus changes,
 Escape and inactive views. Repeat with `UI_BROWSER_ENGINE=webkit` and retain
