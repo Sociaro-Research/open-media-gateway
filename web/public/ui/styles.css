@@ -1904,6 +1904,8 @@ input[type=color]:focus-visible { outline:none; box-shadow:none; border:2px soli
 
 /* Profile-owned table controls reuse the Requests borderless 44px action. */
 .table-controls-cell { width:104px!important;min-width:104px!important; }
+/* On phones a sticky 104px cell covers a third of the scrolled header, so the tools stay at the row end. */
+@media(max-width:760px) { .docs-table .table-controls-cell { position:static; } }
 .table-controls { display:flex;align-items:center;justify-content:flex-end;gap:0; }
 .table-controls button { flex-shrink:0; }
 .table-controls .table-recover { margin-inline-start:12px;font-size:12px;min-height:44px;white-space:normal; }
