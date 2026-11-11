@@ -582,7 +582,8 @@ button, input, textarea, select { font-family: inherit; }
 :is(#configurationView, #systemView) .docs-table-wrap { margin: 24px 0; }
 /* break-word, not anywhere: a column never shrinks below its longest word (email, date); the table wrapper scrolls instead. */
 :is(#configurationView, #systemView) .docs-table td { vertical-align: middle; overflow-wrap: break-word; }
-:is(#configurationView, #systemView) .docs-table .user-reference-text { overflow-wrap: break-word; }
+:is(#configurationView, #systemView) .docs-table .user-reference-text,
+:is(#configurationView, #systemView) .docs-table .user-reference-text > small { overflow-wrap: break-word; }
 .member-limit-form { margin: 0; width: 132px; min-width: 132px; max-width: 132px; }
 .member-role-editor { width: 264px; max-width: 264px; }
 .docs-table td:has(> .member-role-editor) { width: 264px; }
