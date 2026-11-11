@@ -25,14 +25,14 @@
     const month=node('input'); month.type='month'; month.id='keyUsageMonth';
     const now=new Date(),timezone=Intl.DateTimeFormat().resolvedOptions().timeZone;
     month.value=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`; month.min='2000-01';
-    let keys, usage=[], loadedMonth='', organizationMember=false,organizationRole='',members=[];
+    let keys, usage=[], loadedMonth='', organizationMember=false,organizationRole='',members=[],syncScopes=()=>{};
     async function loadKeys() {
       const selectedMonth=month.value;
       const [keyResult, usageResult, organizations]=await Promise.all([api('/v1/api-keys'+(organizationID?'?organization_id='+encodeURIComponent(organizationID):'')),api(`/v1/api-keys/usage?month=${encodeURIComponent(selectedMonth)}&timezone=${encodeURIComponent(timezone)}`+(organizationID?'&organization_id='+encodeURIComponent(organizationID):'')),organizationID?api('/v1/organizations'):Promise.resolve({data:[]})]);
       if(token!==pageToken || selectedMonth!==month.value) return;
       organizationRole=organizations.data.find(o=>o.id===organizationID)?.role||'';
       organizationMember=['supermanager','admin','developer','system_admin'].includes(organizationRole);
-      if(organizationID&&organizationMember)members=(await api('/v1/organizations/'+organizationID+'/members')).data;
+      if(organizationID&&organizationMember){members=(await api('/v1/organizations/'+organizationID+'/members')).data;syncScopes();}
       keys=keyResult.data.filter(inScope); usage=usageResult.data; loadedMonth=usageResult.month;
     }
     try { await loadKeys(); }
@@ -58,8 +58,8 @@
       recipientField.append(recipientLabel,recipient);const creationFields=form.querySelector('.keys-fields');creationFields.classList.add('key-creation-fields-with-recipient');creationFields.prepend(recipientField);
       const orgScope=node('label');orgScope.innerHTML='<input type="checkbox" name="organizations"> Manage organization';form.querySelector('fieldset').append(orgScope);
       form.elements.providers.closest('label').remove();form.elements.storage.closest('label').remove();
-      // A key acts with its recipient's role, so offer only the scopes that role can use.
-      const syncScopes=()=>{const role=members.find(m=>m.id===recipient.value)?.role;for(const [name,usable] of [['keys',OrganizationRoles.issue(role,true)||OrganizationRoles.statistics(role)],['organizations',OrganizationRoles.statistics(role)]]){const box=form.elements[name];box.closest('label').hidden=!usable;if(!usable)box.checked=false;}};
+      // A key acts with its recipient's role, so offer only the scopes that role can use. Members carry no system flag, so Manage system stays on the administrator's own key.
+      syncScopes=()=>{const role=members.find(m=>m.id===recipient.value)?.role;for(const [name,usable] of [['keys',OrganizationRoles.issue(role,true)||OrganizationRoles.statistics(role)],['organizations',OrganizationRoles.statistics(role)],['system',Workspace.isSelf(recipient.value)]]){const box=form.elements[name];if(!box)continue;box.closest('label').hidden=!usable;if(!usable)box.checked=false;}};
       recipient.addEventListener('change',syncScopes);form.addEventListener('reset',()=>setTimeout(syncScopes));syncScopes();
     }
     content.append(form);
