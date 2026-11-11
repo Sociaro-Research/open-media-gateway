@@ -1,14 +1,14 @@
 {
   "component": "Redis",
-  "version": "7.4.11",
+  "version": "7.4.12",
   "project_license": "Gateway code remains Apache-2.0; these third-party terms are separate",
   "upstream_source_archive": {
-    "url": "https://github.com/redis/redis/archive/refs/tags/7.4.11.tar.gz",
-    "sha256": "e973da69febfea096ab94690b44bf976482788a1b5e070df373b4f27697d57d4"
+    "url": "https://github.com/redis/redis/archive/refs/tags/7.4.12.tar.gz",
+    "sha256": "324ab63d55c607639b419f547b213c62ae39ff50e09870e450a11c272567b84f"
   },
   "upstream_container_recipe": {
-    "url": "https://github.com/redis/docker-library-redis/blob/74654c612ee06275377d483dc4e134e57b463e9e/alpine/Dockerfile",
-    "commit": "74654c612ee06275377d483dc4e134e57b463e9e"
+    "url": "https://github.com/redis/docker-library-redis/blob/346d38e447b5f2266de15081b60f952448c93594/alpine/Dockerfile",
+    "commit": "346d38e447b5f2266de15081b60f952448c93594"
   },
   "files": [
     {
@@ -70,7 +70,7 @@
     {
       "path": "SOURCE-NOTICES.txt",
       "bytes": 189769,
-      "sha256": "a2438392f773a5be782d9050aaf36037b3a0be4ea7b32f7c28412097106b86df",
+      "sha256": "5675eee43642b326bfade24c6928173907103207401f573ba876bc00a30b55bf",
       "preservation": "aggregate of verbatim source-comment blocks with added source-location delimiters"
     }
   ],
@@ -2713,5 +2713,13 @@
         ]
       }
     ]
+  },
+  "upstream_container_image": {
+    "reference": "redis:7.4.12-alpine3.22@sha256:acc6f0ac39f6fe3a39c57b3c943832f24f4eeff4e17f24960668e37d1e112a36",
+    "index_digest": "sha256:acc6f0ac39f6fe3a39c57b3c943832f24f4eeff4e17f24960668e37d1e112a36",
+    "platform_manifests": {
+      "linux/amd64": "sha256:e4ee3e03ce8f75471f40937a7c6b2b0e500390b6812fcdf5cb32c01295ded446",
+      "linux/arm64": "sha256:52d1ea8a654b10f06af3ecda4e9dbcd035c7868b5c49ee7975de917f81de13db"
+    }
   }
 }

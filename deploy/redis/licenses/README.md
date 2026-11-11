@@ -1,4 +1,4 @@
-# Redis 7.4.11 third-party notices
+# Redis 7.4.12 third-party notices
 
 Redis is a separate third-party runtime component. The Gateway's own code
 remains licensed under Apache License 2.0. The files here preserve Redis's
@@ -19,16 +19,20 @@ alternative or relicense Redis under the Gateway's license.
 - `provenance.json`: original source paths, byte offsets and SHA-256 hashes for
   the copied files and individual comment blocks.
 
-The source is the upstream Redis 7.4.11 archive:
-https://github.com/redis/redis/archive/refs/tags/7.4.11.tar.gz
+The source is the upstream Redis 7.4.12 archive:
+https://github.com/redis/redis/archive/refs/tags/7.4.12.tar.gz
 
 Its verified SHA-256 is
-`e973da69febfea096ab94690b44bf976482788a1b5e070df373b4f27697d57d4`.
+`324ab63d55c607639b419f547b213c62ae39ff50e09870e450a11c272567b84f`.
 The official container recipe recorded in `provenance.json` uses this same
 source checksum. No Redis source code was changed to prepare these notices.
 
 The release Redis image copies this directory to `/licenses/redis/`; the
 installation bundle copies the same explicit file set to `licenses/redis/`.
-The image build requires Redis 7.4.11 so a moving upstream image tag cannot
+The image build requires Redis 7.4.12 so a moving upstream image tag cannot
 silently receive notices for a different Redis version. Review the complete
 notice set and source provenance together when intentionally changing versions.
+
+The reviewed Docker Official Image is `redis:7.4.12-alpine3.22`, pinned to
+`sha256:acc6f0ac39f6fe3a39c57b3c943832f24f4eeff4e17f24960668e37d1e112a36`. Its platform manifests
+and exact container recipe are recorded in `provenance.json`.

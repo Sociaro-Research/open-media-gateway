@@ -1,4 +1,4 @@
-Redis 7.4.11 source copyright and license notices
+Redis 7.4.12 source copyright and license notices
 
 Each delimited source-comment block below is preserved verbatim.
 Identical blocks are included once; provenance.json records every source location.
