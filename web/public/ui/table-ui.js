@@ -17,6 +17,8 @@
   const {id,columns,legacy}=config,wrap=table.parentElement,header=table.tHead?.rows[0],originalMinWidth=table.style.minWidth;if(!header)return;
   const originalHeaders=[...header.cells];if(originalHeaders.length!==columns.length)return;
   const actions=columns.indexOf('actions'),dataColumns=columns.filter(c=>c!=='actions');
+  // The first column names the row (member, organization, key…), so it cannot be hidden. Requests keeps its released report_columns behavior.
+  const locked=legacy?'':dataColumns[0];
   const labels=new Map(columns.map((id,i)=>{const copy=originalHeaders[i].cloneNode(true);copy.querySelectorAll('button,svg,.sr-only,select').forEach(n=>n.remove());return [id,copy.textContent.trim()||id.replaceAll('_',' ')];}));
   const cell=actions>=0?originalHeaders[actions]:node('th');cell.classList.add('report-columns-cell','table-controls-cell');cell.dataset.tableUiOwned=actions>=0?'header':'aux';cell.scope='col';if(actions<0)header.append(cell);
   const controls=node('span','table-controls'),choose=node('button','secondary report-columns-button'),wideButton=node('button','secondary report-columns-button');
@@ -26,7 +28,7 @@
   // Backing selects stay outside business forms, including descendant-based
   // custom snapshots. Only the two type=button triggers live in the table.
   const select=node('select');select.multiple=true;select.hidden=true;select.dataset.tableColumns=id;select.dataset.plainControl='';select.setAttribute('aria-label',legacy?'Columns':'Columns for '+id.replaceAll('_',' '));if(legacy)select.id='reportColumns';document.body.append(select);
-  for(const column of dataColumns)select.append(new Option(labels.get(column),column));
+  for(const column of dataColumns){const option=new Option(labels.get(column),column);option.disabled=column===locked;select.append(option);}
   ControlPickers.enhance(select,{trigger:choose});
   const status=config.status||node('span','table-preference-status');status.setAttribute('role','status');const recover=node('button','secondary table-recover','Show hidden fields');recover.type='button';recover.hidden=true;const feedback=node('div','table-preference-feedback');feedback.dataset.tableUiOwned='aux';feedback.dataset.tableFeedback=id;feedback.append(recover);if(!config.status)feedback.append(status);wrap.after(feedback);
   let saved=[],visible=[],wide=false,busy=false,forced=new Set(),stamp=GatewayProfile.context();
@@ -34,7 +36,7 @@
   function preferences(){
    let pref=legacy?GatewayProfile.reportColumns():GatewayProfile.tableColumns(id);
    if(legacy&&pref?.includes('user'))pref=[...new Set(pref.map(c=>c==='user'?'api_key':c))];
-   saved=pref||[];visible=dataColumns.some(c=>saved.includes(c))?dataColumns.filter(c=>saved.includes(c)):defaults;
+   saved=pref||[];visible=dataColumns.some(c=>saved.includes(c))?dataColumns.filter(c=>c===locked||saved.includes(c)):defaults;
    wide=GatewayProfile.tableWide(id);stamp=GatewayProfile.context();
   }
   function message(text='',error=false){FormUI.message(status,text,error?'error':'');feedback.hidden=recover.hidden&&(!status.textContent||!!config.status);}
@@ -76,7 +78,7 @@
    finally{busy=false;if(table.isConnected){if(!GatewayProfile.sameContext(captured)){preferences();forced.clear();message();}apply();}}
   }
   select.onchange=()=>{
-   const next=[...select.selectedOptions].map(o=>o.value);
+   const next=[...select.options].filter(o=>o.selected||o.disabled).map(o=>o.value);
    if(!next.length){apply();message(legacy?'Keep at least one column visible.':'Keep at least one data column visible.',true);return;}
    visible=next;forced.clear();apply();
    const values=[...saved.filter(c=>!dataColumns.includes(c)),...next];
