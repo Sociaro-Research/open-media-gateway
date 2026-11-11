@@ -132,32 +132,9 @@ func Inspect(data []byte, kind string) (Info, error) {
 			return result, err
 		}
 	case kind == "audio/wave" || kind == "audio/wav" || kind == "audio/x-wav":
-		if len(data) < 12 || string(data[:4]) != "RIFF" || string(data[8:12]) != "WAVE" {
-			return result, ErrInvalid
+		if err := wav(data, &result); err != nil {
+			return result, err
 		}
-		var rate uint32
-		var size int
-		for pos := 12; pos+8 <= len(data); {
-			n := int(binary.LittleEndian.Uint32(data[pos+4 : pos+8]))
-			if n < 0 || n > len(data)-pos-8 {
-				return result, ErrInvalid
-			}
-			body := data[pos+8 : pos+8+n]
-			switch string(data[pos : pos+4]) {
-			case "fmt ":
-				if len(body) < 16 {
-					return result, ErrInvalid
-				}
-				rate = binary.LittleEndian.Uint32(body[8:12])
-			case "data":
-				size += n
-			}
-			pos += 8 + n + n%2
-		}
-		if rate == 0 || size == 0 {
-			return result, ErrInvalid
-		}
-		result.Duration = float64(size) / float64(rate)
 	case kind == "audio/mpeg":
 		duration, e := mp3(data)
 		if e != nil {
