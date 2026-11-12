@@ -332,6 +332,25 @@ function displayGeneration(task) {
  if(options.audio_urls?.length) options.audio_url=options.audio_urls[0];
  return {...task, model:task.provider_model || task.model.slice(task.provider.length+1), prompt:task.media_type==='speech'?task.input:task.prompt, options};
 }
+// An empty unfiltered Journal shows the first-run order; only the key step can already be done.
+function journalFirstSteps() {
+  const keyReady = !!window.GenerationKey.value();
+  const add = (parent, tag, text, className) => { const el = parent.appendChild(document.createElement(tag)); if (text) el.textContent = text; if (className) el.className = className; return el; };
+  const box = document.createElement('div'); box.className = 'empty-state journal-first-steps';
+  add(box, 'strong', 'Start your first generation');
+  const list = add(box, 'ol'); list.setAttribute('aria-label', 'First steps');
+  [['Connect a Gateway API key', keyReady ? 'Key connected.' : 'Paste a key or create a Playground key.', 'Enter a key', '#apiKey'],
+   ['Choose a model and write a prompt', 'Settings and references are optional.', 'Write a prompt', '#prompt'],
+   ['Press Generate', 'Check the price and confirm. The result appears here.']].forEach(([title, hint, action, target], index) => {
+    const done = index === 0 && keyReady, current = index === (keyReady ? 1 : 0);
+    const item = add(list, 'li', '', done ? 'done' : current ? 'current' : '');
+    const mark = add(item, 'span', done ? '' : String(index + 1), 'journal-step-mark'); mark.setAttribute('aria-hidden', 'true');
+    if (done) mark.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+    const text = add(item, 'span'); add(text, 'b', title); if (done) add(text, 'span', ' (done)', 'sr-only'); add(text, 'small', hint);
+    if (current) { const go = add(text, 'button', action, 'secondary'); go.type = 'button'; go.onclick = () => document.querySelector(target)?.focus(); }
+  });
+  return box;
+}
 function renderTasks(tasks) {
   const restoreProjectAssignment=window.GatewayProjects?.preserveAssignment();
   const focusedCard = document.activeElement?.closest('#taskList .task');
@@ -354,7 +373,8 @@ function renderTasks(tasks) {
   if (!tasks.length) {
     existing.forEach(disposeTaskCard);
     elements.taskList.innerHTML = '<div class="empty-state"><span>◎</span><strong>No tasks yet</strong><p>Your generations will appear here.</p></div>';
-    if(window.GatewayProjects?.filter()==='none') elements.taskList.querySelector('.empty-state p').textContent='Generations without a project will appear here.';
+    if(!window.GatewayProjects?.filter()) elements.taskList.replaceChildren(journalFirstSteps());
+    else if(window.GatewayProjects.filter()==='none') elements.taskList.querySelector('.empty-state p').textContent='Generations without a project will appear here.';
     else if(window.GatewayProjects?.selected()) elements.taskList.querySelector('.empty-state p').textContent='New generations in this project will appear here.';
     restoreProjectAssignment?.([]);
     restoreRemovedFocus();
@@ -811,7 +831,8 @@ function updateJournalPagination() {
   const footer = document.querySelector('#journalPagination'), count = document.querySelector('#journalCount');
   const status = document.querySelector('#journalLoadStatus'), button = document.querySelector('#journalLoadMore');
   const loading = taskListRequest && !taskListRequest.controller.signal.aborted;
-  footer.hidden = !window.GenerationKey.value();
+  // The empty state already says there is nothing to show, so no "Shown 0 of 0" strip.
+  footer.hidden = !window.GenerationKey.value() || (journalPage.total === 0 && !loading && !journalPage.error);
   count.textContent = journalPage.total === null ? '' : `Shown ${latestTasks.length} of ${journalPage.total}`;
   FormUI.message(status, loading && (!journalPage.ready || taskListRequest.more) ? 'Loading generations…' : journalPage.error, journalPage.error && !loading ? 'error' : '');
   const showButton = journalPage.hasMore || !!journalPage.error || !journalPage.ready;
@@ -1330,11 +1351,12 @@ window.addEventListener('gateway-key-change', () => {
   providerCatalog = []; latestTasks = []; taskCompletionUntil.clear(); renderedTasksFingerprint = ''; pendingSubmission = null;
   window.referencePicker?.reset();
   if(dialog.open&&!submitting)dialog.close();
-  elements.taskList.replaceChildren(); elements.model.replaceChildren(new Option('Enter an API key first', ''));
+  const ready = !!window.GenerationKey.value();
+  elements.taskList.replaceChildren(...(ready ? [] : [journalFirstSteps()])); elements.model.replaceChildren(new Option('Enter an API key first', ''));
   elements.model.disabled = true;
   clearTimeout(quoteTimer); ++quoteSequence;
   setActionEstimate('Key required'); elements.priceDetails.textContent = '';
-  const ready = !!window.GenerationKey.value(); elements.submit.disabled = !ready;
+  elements.submit.disabled = !ready;
   document.querySelector('#generationFields').hidden = !ready;
   document.querySelector('#generationSettings').hidden = true;if(playgroundSound)playgroundSound.root.hidden=true;
   elements.priceCard.hidden = !ready; elements.submit.hidden = !ready;
