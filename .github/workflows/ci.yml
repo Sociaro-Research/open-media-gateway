@@ -1,6 +1,9 @@
 name: CI
 
 on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
   workflow_dispatch:
   workflow_call:
     inputs:
@@ -14,7 +17,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -26,18 +29,24 @@ jobs:
       contents: read
       actions: read
     outputs:
-      reuse: ${{ steps.prior.outputs.reuse }}
+      reuse: ${{ github.event_name != 'pull_request' && steps.prior.outputs.reuse == 'true' }}
     steps:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - name: Test CI reuse guard offline
         run: python3 -m unittest discover -s scripts/tests -p 'test_ci_reuse.py' -v
+      - name: Test pull request permission boundaries
+        run: python3 -m unittest discover -s scripts/tests -p 'test_ci_pull_requests.py' -v
       - name: Test UI partition coverage offline
         run: |
           python3 -m unittest discover -s scripts/tests -p 'test_ci_ui_jobs.py' -v
           python3 scripts/ci/run-ui-job.py --validate-only
+      - name: Require full validation for pull requests
+        if: github.event_name == 'pull_request'
+        run: python3 scripts/ci/validate-prior-run.py --receipt prior-ci.json
       - name: Validate explicit prior run or require full CI
+        if: github.event_name != 'pull_request'
         id: prior
         env:
           GH_TOKEN: ${{ github.token }}
@@ -110,6 +119,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Set up Go
         uses: actions/setup-go@v7
@@ -179,6 +190,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Set up Go
         uses: actions/setup-go@v7
@@ -239,6 +252,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Validate Compose configuration
         run: docker compose --profile ui --profile monitoring config --quiet

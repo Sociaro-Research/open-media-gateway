@@ -17,7 +17,8 @@ WORKFLOW = '.github/workflows/ci.yml'
 MAX_AGE = dt.timedelta(hours=6)
 REQUIRED = {
     'Validate prior CI result': {'Test CI reuse guard offline',
-                                 'Validate explicit prior run or require full CI', 'Test UI partition coverage offline'},
+                                 'Validate explicit prior run or require full CI', 'Test UI partition coverage offline',
+                                 'Test pull request permission boundaries'},
     'Secret history and dependency security': {
         'Check out complete history', 'Install checksum-pinned scanners',
         'Scan complete Git history for secrets', 'Check all dependency versions for known vulnerabilities'},
@@ -43,6 +44,7 @@ REQUIRED = {
 # These are conditional only because a standalone full CI already runs govulncheck in make verify.
 OPTIONAL_STEPS = {'Set up Go for fresh vulnerability assessment',
                   'Assess Go vulnerabilities after CI reuse'}
+OPTIONAL_PRIOR_STEPS = {'Require full validation for pull requests'}
 
 
 class ReuseError(ValueError):
@@ -164,7 +166,8 @@ def validate(run_id, expected_sha, current_run_id, repository, workflow_bytes, r
             require(isinstance(step, dict) and isinstance(step.get('name'), str), 'Malformed job step')
             require(step['name'] not in seen, 'Duplicate job step')
             seen.add(step['name'])
-            optional = name == 'Secret history and dependency security' and step['name'] in OPTIONAL_STEPS
+            optional = (name == 'Secret history and dependency security' and step['name'] in OPTIONAL_STEPS
+                        or name == 'Validate prior CI result' and step['name'] in OPTIONAL_PRIOR_STEPS)
             require(step.get('status') == 'completed' and
                     (step.get('conclusion') == 'success' or optional and step.get('conclusion') == 'skipped'),
                     'Failed, skipped or incomplete acceptance step')
@@ -188,6 +191,7 @@ def main():
     try:
         receipt = {'reuse': False, 'reason': 'No prior run requested; full CI required'}
         if args.run_id:
+            require(os.environ.get('GITHUB_EVENT_NAME') != 'pull_request', 'Pull requests must run full validation, without prior-run reuse')
             token = os.environ.get('GH_TOKEN', '')
             require(bool(token), 'Missing GitHub API token')
             receipt = validate(args.run_id, os.environ.get('GITHUB_SHA', ''),
