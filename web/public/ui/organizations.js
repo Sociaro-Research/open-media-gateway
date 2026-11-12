@@ -187,7 +187,7 @@
   const now=Date.now();
   table('organization_invitations',history,['Role','Expires','Status','Accepted by',''],items.map(i=>{
    const expires=new Date(i.expires_at),state=i.accepted_by?'Accepted':i.revoked_at?'Revoked':expires.getTime()<=now?'Expired':'Pending';
-   return [memberRoleLabel(i.role||'member'),expires.toLocaleString(),state,i.accepted_by_email?UserUI.identity({id:i.accepted_by,email:i.accepted_by_email,picture:i.accepted_by_picture}):'—',state==='Pending'?button('Revoke',async()=>{try{await api(base+'/invitations/'+i.id,{method:'DELETE'});await loadInvitations()}catch(e){FormUI.message(status,e.message,'error')}},true):''];
+   return [memberRoleLabel(i.role||'member'),expires.toLocaleString(),el('span',state,'table-status '+({Accepted:'report-success',Pending:'report-warning'}[state]||'')),i.accepted_by_email?UserUI.identity({id:i.accepted_by,email:i.accepted_by_email,picture:i.accepted_by_picture}):'—',state==='Pending'?button('Revoke',async()=>{try{await api(base+'/invitations/'+i.id,{method:'DELETE'});await loadInvitations()}catch(e){FormUI.message(status,e.message,'error')}},true):''];
   }));
  }
  await loadInvitations();

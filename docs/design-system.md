@@ -208,6 +208,7 @@ validate the same 1440/390/320 px layouts and keyboard controls as email sign-in
 - Leave action-only column headings blank. Put optional actions (Manage, Remove, Revoke, receipt/invoice links) in `.table-row-actions`: reveal on row hover or keyboard focus; always show on touch devices. Reserve their space to prevent layout shifts.
 - Save is **not** a hover action: use `FormUI.watch`, hide it for unchanged rows, show it only for unsaved changes, and reset the baseline after success. Keep pending actions locked and preserve edits on failure.
 - Controls and buttons in a row share the 44px table height. Data-only and editable rows have no hover background unless they also have an explicit default action.
+- Status cells (Requests status, API key status, invitation status, Audit Log result) use the shared `.table-status` pill: a 12px label on a tint of its own color. The tone comes from the existing feedback classes: `report-success` for succeeded, active, accepted and success; `operation-error` for failed; `report-warning` for queued and running requests, pending invitations and keys disabled by system settings, matching the Journal's Running badge; no tone (muted) for revoked and expired. The tint is 10% of the label color, keeping the label at 4.5:1 or more in both themes. An active API key that expires within seven days shows **Expires soon:** with its date in `report-warning`. The label is always text, so color is never the only signal.
 
 ## 6. Usage and Requests
 

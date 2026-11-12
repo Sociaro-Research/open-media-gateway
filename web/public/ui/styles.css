@@ -690,8 +690,12 @@ table :is(.role-editor,.member-limit-form) button { min-height: 44px; }
 :is(#configurationView, #systemView) .docs-table th { font-size: 12px; font-weight: 500; }
 :is(#configurationView, #systemView) .docs-table td { color: var(--text); font-weight: 400; font-variant-numeric: tabular-nums; }
 :is(#configurationView, #systemView) .docs-table td :is(small,strong,code,time,span) { font: inherit; }
-:is(#configurationView, #systemView) .docs-table td :is(small,strong,code,time,span):not(.report-success):not(.report-warning):not(.operation-error) { color: inherit; }
-.docs-table .table-status { white-space:nowrap; }
+:is(#configurationView, #systemView) .docs-table td :is(small,strong,code,time,span):not(.report-success):not(.report-warning):not(.operation-error):not(.table-status) { color: inherit; }
+/* Table statuses share one tinted pill; the existing feedback class (report-success, operation-error, report-warning) sets its color. */
+.docs-table .table-status { display:inline-block; padding:2px 8px; border-radius:7px; background:color-mix(in srgb,currentColor 10%,transparent); line-height:20px; white-space:nowrap; }
+:where(.docs-table) .table-status { color:var(--muted); }
+:is(#configurationView, #systemView) .docs-table td .table-status { font-size:12px; font-weight:600; }
+.docs-table small.report-warning { color:var(--yellow); }
 :is(#configurationView, #systemView) .docs-table td small,
 :is(#configurationView, #systemView) .docs-table td > div > code { margin-top: 2px; }
 :is(#configurationView, #systemView) .docs-table td .floating-field > :is(input,select,textarea) { font: inherit; color: inherit; }

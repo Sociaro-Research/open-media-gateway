@@ -63,7 +63,7 @@
       {id:'api_key',label:'User / API key',base:true,value:item=>{const identity=node('div',undefined,'request-identity');identity.append(UserUI.identity({id:item.user_id,email:item.user_email,picture:item.user_picture}),node('small',item.api_key_name||(item.api_key_id?'*'+item.api_key_id.slice(-4):'—')));if(item.api_key_name&&item.api_key_id)identity.append(node('span','*'+item.api_key_id.slice(-4),'field-explanation'));return identity;}},
       {id:'model',label:'Model',base:true,value:item=>item.public_model||item.model},
       {id:'provider',label:'Provider',value:item=>item.provider},
-      {id:'status',label:'Status',base:true,value:item=>item.status},
+      {id:'status',label:'Status',base:true,value:item=>node('span',{queued:'Queued',running:'Running',succeeded:'Succeeded',failed:'Failed'}[item.status]||item.status||'—','table-status '+({succeeded:'report-success',failed:'operation-error',queued:'report-warning',running:'report-warning'}[item.status]||''))},
       {id:'profit_status',label:'Profit status',base:true,available:systemAdministrator||clientManager,value:item=>({generating:'Generating',awaiting_billing:'Awaiting billing verification',awaiting_cost:'Awaiting cost',recognized:'Profit calculated',not_tracked:'Before bonus tracking',not_applicable:'Not applicable'}[item.profit_status]||'—')},
       {id:'profit',label:'Profit',base:true,available:systemAdministrator||clientManager,value:item=>usd(item.profit_usd)},
       {id:'tokens',label:'Tokens',base:true,value:item=>tokens(item.usage)},
