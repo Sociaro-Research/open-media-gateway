@@ -3,6 +3,12 @@ name: CI
 on:
   workflow_dispatch:
   workflow_call:
+    inputs:
+      prior_ci_run_id:
+        description: 'Optional standalone CI run on main at this exact SHA, at most 6 hours old; validated before reuse. Empty runs full CI.'
+        required: false
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -12,7 +18,35 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  prior-ci:
+    name: Validate prior CI result
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      reuse: ${{ steps.prior.outputs.reuse }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Test CI reuse guard offline
+        run: python3 -m unittest discover -s scripts/tests -p 'test_ci_reuse.py' -v
+      - name: Validate explicit prior run or require full CI
+        id: prior
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PRIOR_CI_RUN_ID: ${{ inputs.prior_ci_run_id }}
+        run: python3 scripts/ci/validate-prior-run.py --run-id "$PRIOR_CI_RUN_ID" --receipt prior-ci.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prior-ci-validation
+          path: prior-ci.json
+          if-no-files-found: error
+
   security:
+    needs: prior-ci
     name: Secret history and dependency security
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -32,7 +66,20 @@ jobs:
       - name: Check all dependency versions for known vulnerabilities
         run: /tmp/gateway-security-tools/trivy fs --scanners vuln --severity HIGH,CRITICAL --exit-code 1 --skip-dirs .git .
 
+      - name: Set up Go for fresh vulnerability assessment
+        if: needs.prior-ci.outputs.reuse == 'true'
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - name: Assess Go vulnerabilities after CI reuse
+        if: needs.prior-ci.outputs.reuse == 'true'
+        run: make vulncheck
+
   go:
+    needs: prior-ci
+    if: needs.prior-ci.outputs.reuse != 'true'
     name: Go checks
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -104,6 +151,8 @@ jobs:
           python3 -m unittest discover -s scripts/tests -p 'test_release*.py' -v
 
   profile-name:
+    needs: prior-ci
+    if: needs.prior-ci.outputs.reuse != 'true'
     name: Persisted profile and legal browser checks
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -175,6 +224,8 @@ jobs:
           if-no-files-found: error
 
   container:
+    needs: prior-ci
+    if: needs.prior-ci.outputs.reuse != 'true'
     name: Container build
     runs-on: ubuntu-24.04
     timeout-minutes: 30
