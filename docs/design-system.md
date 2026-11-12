@@ -881,6 +881,21 @@ changes never save automatically. The Management Save submits only changed
 company/logging settings; a failed endpoint retains its draft without replaying
 already confirmed changes. This does not change who may update either setting.
 
+### Organization Get started checklist
+
+Supermanagers and Managers who are members of an organization see one Get started
+panel between the organization summary and its sections until every step is done
+or they dismiss it. The steps are Create an API key, Add credit, Send your first
+request and Invite your team; each is detected from existing reads (keys, balance or
+credit limit, one request record, members or open invitations) and rechecked when
+another section opens. A pending step shows one secondary action that opens the
+matching section (the Playground or Docs for the first request) and focuses its
+field. Done steps use the shared success color with a drawn check and a text label.
+The panel reuses the console panel (`.keys-form`) and the shared `.icon-close`
+dismiss control; dismissal and completion are remembered per user and organization
+in browser storage, so the panel never returns once finished. A failed read leaves
+the panel hidden. Client managers and Administrators who are not members do not see it.
+
 ## Unified media selection
 
 `ReferenceUpload` owns the shared picker heading, compact constraints, Upload,
