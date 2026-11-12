@@ -691,8 +691,9 @@ table :is(.role-editor,.member-limit-form) button { min-height: 44px; }
 :is(#configurationView, #systemView) .docs-table td { color: var(--text); font-weight: 400; font-variant-numeric: tabular-nums; }
 :is(#configurationView, #systemView) .docs-table td :is(small,strong,code,time,span) { font: inherit; }
 :is(#configurationView, #systemView) .docs-table td :is(small,strong,code,time,span):not(.report-success):not(.report-warning):not(.operation-error):not(.table-status) { color: inherit; }
-/* Table statuses share one tinted pill; the existing feedback class (report-success, operation-error, report-warning) sets its color. */
-.docs-table .table-status { display:inline-block; padding:2px 8px; border-radius:7px; background:color-mix(in srgb,currentColor 10%,transparent); line-height:20px; white-space:nowrap; }
+/* Table statuses share one tinted pill; the existing feedback class (report-success, operation-error, report-warning) sets its color.
+   The tint sits on an opaque panel so row hover/focus tints cannot drop the label below 4.5:1. */
+.docs-table .table-status { display:inline-block; padding:2px 8px; border-radius:7px; background:color-mix(in srgb,currentColor 10%,var(--panel)); line-height:20px; white-space:nowrap; }
 :where(.docs-table) .table-status { color:var(--muted); }
 :is(#configurationView, #systemView) .docs-table td .table-status { font-size:12px; font-weight:600; }
 .docs-table small.report-warning { color:var(--yellow); }

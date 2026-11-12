@@ -75,6 +75,16 @@ const server=http.createServer((req,res)=>{if(new URL(req.url,'http://fixture').
   await dialog().getByRole('heading',{name:'References',exact:true}).scrollIntoViewIfNeeded();await page.screenshot({path:evidencePath('/tmp/gateway-report-details-ui/media-mobile.png')});
   await page.setViewportSize({width:1440,height:1000});await dialog().getByRole('heading',{name:'References',exact:true}).scrollIntoViewIfNeeded();await page.screenshot({path:evidencePath('/tmp/gateway-report-details-ui/media-desktop.png')});
   await close();await page.setViewportSize({width:1440,height:1000});
+  // Light theme (last one above): the hovered row tint must keep every status pill tone (Queued/Running use report-warning) at 4.5:1 or more.
+  const statusRow=page.locator('#reportsContent tbody tr').first();await statusRow.hover();
+  const pillContrast=await statusRow.locator('.table-status').evaluate(pill=>{
+   if(getComputedStyle(pill.closest('tr')).backgroundColor==='rgba(0, 0, 0, 0)')throw new Error('row hover tint is not applied');
+   const c=document.createElement('canvas').getContext('2d',{willReadFrequently:true}),paint=colors=>{c.clearRect(0,0,1,1);for(const color of colors){c.fillStyle=color;c.fillRect(0,0,1,1);}return [...c.getImageData(0,0,1,1).data].slice(0,3);};
+   const lum=rgb=>rgb.map(v=>(v/=255)<=.03928?v/12.92:((v+.055)/1.055)**2.4).reduce((s,v,i)=>s+v*[.2126,.7152,.0722][i],0),original=pill.className;
+   const ratio=()=>{const layers=[];for(let n=pill;n;n=n.parentElement)layers.unshift(getComputedStyle(n).backgroundColor);const [a,b]=[lum(paint([...layers,getComputedStyle(pill).color])),lum(paint(layers))].sort((x,y)=>y-x);return +((a+.05)/(b+.05)).toFixed(2);};
+   const result=Object.fromEntries(['report-warning','report-success','operation-error',''].map(tone=>{pill.className='table-status '+tone;return [tone||'muted',ratio()];}));pill.className=original;return result;
+  });
+  await page.mouse.move(0,0);console.log('Hovered light row status pill contrast: '+JSON.stringify(pillContrast));for(const [tone,value] of Object.entries(pillContrast))assert.ok(value>=4.5,tone+' pill on a hovered light row is '+value+':1');
   await page.locator('#reportsContent tbody tr').first().focus();await page.keyboard.press('Enter');await ready();assert.equal(await dialog().getByRole('button',{name:'Close request details',exact:true}).evaluate(el=>el===document.activeElement),true);await page.keyboard.press('Tab');assert.equal(await page.evaluate(()=>document.activeElement.closest('dialog')!==null),true);await close();
   await page.keyboard.press('Space');await ready();await close();
   for(const next of ['video','audio','file','broken']){
