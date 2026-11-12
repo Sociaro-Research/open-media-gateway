@@ -737,6 +737,10 @@ reset dates and storage usage. Show creation/restoration actions only without an
 active key. Preserve transient loading/error feedback, keyboard focus after
 Forget and existing storage/generation enforcement outside this panel. Actions
 wrap within narrow panels using shared button styles; no design exception.
+When nothing is left of the weekly limit, its usage value uses the warning color.
+An estimate that cannot be admitted makes Generate read **Limit reached** instead
+of a price, and the form and Review show the same explanation: admission blocks
+free models too, and an organization manager can raise the limit or add credit.
 
 Override Sound uses the shared `ReferenceUpload` dropzone, keyboard file picker,
 progress/cancel/retry feedback and native audio preview in Playground and the
