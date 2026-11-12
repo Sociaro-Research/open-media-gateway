@@ -106,9 +106,9 @@
         if(result.data.length)hasHistory=true;
         if(!hasHistory){
           // A month/filter with no matches is different from an organization with no history.
-          const historyEndpoint=shared&&!scope?'/v1/system/reports?':endpoint;
+          // endpoint is the selected organization's route, or the system route for All organizations.
           const historyQuery=new URLSearchParams({from:'0001-01-01',to:'9999-12-30',limit:'1',timezone:Intl.DateTimeFormat().resolvedOptions().timeZone});
-          const history=await api(historyEndpoint+historyQuery);if(!currentMount()||current!==request)return;
+          const history=await api(endpoint+historyQuery);if(!currentMount()||current!==request)return;
           hasHistory=history.data.length>0;
         }
         form.hidden=false;tableWrap.hidden=!result.data.length;download.hidden=!result.data.length;

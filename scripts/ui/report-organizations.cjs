@@ -8,7 +8,7 @@ const server=http.createServer((req,res)=>{if(new URL(req.url,'http://fixture').
  await new Promise(r=>server.listen(0,'127.0.0.1',r));
  const browser=await browserType.launch({headless:true,executablePath:process.env.UI_BROWSER_PATH});
  const page=await browser.newPage({viewport:{width:1440,height:1050},timezoneId:'Asia/Nicosia'}),errors=[],requests=[];page.on('pageerror',e=>errors.push(e.message));page.setDefaultTimeout(10000);
- const ids=['11111111-1111-4111-8111-111111111111','22222222-2222-4222-8222-222222222222','33333333-3333-4333-8333-333333333333'];let role='system',delay=false,multiplePages=false,failSave=false;const saved={};
+ const ids=['11111111-1111-4111-8111-111111111111','22222222-2222-4222-8222-222222222222','33333333-3333-4333-8333-333333333333'];let role='system',delay=false,multiplePages=false,failSave=false,quiet=null;const saved={};
  const organizations=()=>ids.slice(role==='manager'?1:0,role==='manager'?2:role==='system'?3:2).map((id,i)=>({id,name:'Organization '+id[0],role:role==='manager'?'client_manager':'admin'}));
  await page.route('**/v1/**',async route=>{
   const url=new URL(route.request().url()),p=url.pathname,json=data=>route.fulfill({json:data});
@@ -22,6 +22,7 @@ const server=http.createServer((req,res)=>{if(new URL(req.url,'http://fixture').
    requests.push(url);if(url.searchParams.get('format')==='csv')return route.fulfill({contentType:'text/csv',body:'Date (UTC),Cost (USD)\r\n2026-09-09T00:00:00Z,0\r\n'});const selected=p==='/v1/system/reports'?null:p.split('/')[3];
    if(delay&&selected===ids[0])await new Promise(r=>setTimeout(r,350));
    const rows=(selected?[selected]:ids).map(id=>({id,organization_name:'Organization '+id[0],user_email:'member@example.test',api_key_id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaabcd',api_key_name:'Key '+id[0],model:'mock-image',provider:'mock',status:'succeeded',created_at:'2026-09-09T00:00:00Z',cost:{expected_usd:0,metered_usd:0,tariff_usd:0,actual_usd:0,actual_source:'free_mock'}}));
+   if(selected&&selected===quiet)return json({data:[],has_more:false});
    return json({data:url.searchParams.get('generation_id')?rows.filter(row=>row.id===url.searchParams.get('generation_id')):rows,has_more:multiplePages&&!Number(url.searchParams.get('offset'))});
   }
   if(p==='/v1/api-keys')return json({data:[]});
@@ -66,6 +67,9 @@ const server=http.createServer((req,res)=>{if(new URL(req.url,'http://fixture').
   assert.equal(await page.locator('.report-table tbody tr').count(),1);assert.match(await page.locator('.report-table tbody').innerText(),/Key 2/);assert.equal(requests.at(-1).pathname,'/v1/organizations/'+ids[1]+'/reports');assert.equal(await page.locator('#reportFrom').inputValue(),'2026-08-01');
   await page.getByLabel('User ID or email').fill('person@example.test');await page.getByRole('button',{name:'Apply',exact:true}).click();await ready();assert.equal(requests.at(-1).searchParams.get('user'),'person@example.test');assert.equal(requests.at(-1).searchParams.get('timezone'),'Asia/Nicosia');const downloading=page.waitForEvent('download');await page.getByRole('button',{name:'Download CSV',exact:true}).click();const download=await downloading;assert.equal(download.suggestedFilename(),'requests.csv');assert.equal(requests.at(-1).searchParams.get('user'),'person@example.test');
   await page.locator('#reportOrganization').selectOption('',{force:true});await ready();assert.equal(await page.locator('.report-table tbody tr').count(),3);
+  // A selected organization without requests gets the first-run state even when other organizations have requests.
+  quiet=ids[2];await page.locator('#reportOrganization').selectOption(ids[2],{force:true});await page.locator('.report-empty:visible').getByText('No requests yet.',{exact:true}).waitFor();assert.equal(requests.at(-1).pathname,'/v1/organizations/'+ids[2]+'/reports');assert.equal(await page.getByText('No requests match these filters.',{exact:true}).count(),0);
+  quiet=null;await page.locator('#reportOrganization').selectOption('',{force:true});await ready();
   delay=true;await page.locator('#reportOrganization').selectOption(ids[0],{force:true});await page.locator('#reportOrganization').selectOption(ids[1],{force:true});await ready();await page.waitForTimeout(450);assert.match(await page.locator('.report-table tbody').innerText(),/Key 2/);assert.doesNotMatch(await page.locator('.report-table tbody').innerText(),/Key 1/);delay=false;
   for(const nextRole of ['admin','manager']){
    role=nextRole;await page.reload();await showReports();await ready();const options=await page.locator('#reportOrganization option').evaluateAll(options=>options.map(o=>o.value));assert.deepEqual(options,organizations().map(o=>o.id));assert.equal(await page.locator('.report-table tbody tr').count(),1);assert.equal(await page.getByRole('dialog').count(),0);assert.equal(await page.locator('#reportColumns option[value=estimated_cost]').count(),0);assert.deepEqual(await visibleHeaders(),(role==='manager'?['Date','User / API key','Model','Status','Profit status','Profit','Tokens','Cost']:['Date','User / API key','Model','Status','Tokens','Cost']));
