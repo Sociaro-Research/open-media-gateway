@@ -33,6 +33,10 @@ jobs:
           persist-credentials: false
       - name: Test CI reuse guard offline
         run: python3 -m unittest discover -s scripts/tests -p 'test_ci_reuse.py' -v
+      - name: Test UI partition coverage offline
+        run: |
+          python3 -m unittest discover -s scripts/tests -p 'test_ci_ui_jobs.py' -v
+          python3 scripts/ci/run-ui-job.py --validate-only
       - name: Validate explicit prior run or require full CI
         id: prior
         env:
@@ -224,6 +228,9 @@ jobs:
           if-no-files-found: error
 
   container:
+    outputs:
+      ui_runtime_sha256: ${{ steps.runtime.outputs.sha256 }}
+      ui_image_id: ${{ steps.runtime.outputs.image_id }}
     needs: prior-ci
     if: needs.prior-ci.outputs.reuse != 'true'
     name: Container build
@@ -291,90 +298,32 @@ jobs:
       - name: Install isolated browser-test dependencies
         run: |
           npm install --prefix /tmp/gateway-ui-tests --no-save --package-lock=false playwright@1.62.1
-          /tmp/gateway-ui-tests/node_modules/.bin/playwright install --with-deps chromium chrome webkit
+          /tmp/gateway-ui-tests/node_modules/.bin/playwright install --with-deps chromium
 
-      - name: Prepare synthetic video fixtures
-        run: |
-          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
-            sudo apt-get update
-            sudo apt-get install --no-install-recommends -y ffmpeg
-          fi
-          python3 scripts/ui/template-video-fixtures.py .local/video-workflow/clips
-
-      - name: Verify independent UI and current workflows
-        env:
-          NODE_PATH: /tmp/gateway-ui-tests/node_modules
-          CADDY_BIN: /tmp/gateway-ui-caddy
-          GATEWAY_PERF_OUTPUT: ui-performance-results
+      - name: Package exact UI runtime for browser jobs
+        id: runtime
         run: |
           make build-ui
-          UI_EVIDENCE_DIR=ui-performance-results/validation-layout/chromium node scripts/ui/validation-layout.cjs
-          UI_EVIDENCE_DIR=ui-performance-results/validation-layout/webkit UI_BROWSER_ENGINE=webkit node scripts/ui/validation-layout.cjs
-          UI_EVIDENCE_DIR=ui-performance-results/legal-footer-state/chromium node scripts/ui/legal-footer-state.cjs
-          UI_EVIDENCE_DIR=ui-performance-results/legal-footer-state/webkit UI_BROWSER_ENGINE=webkit node scripts/ui/legal-footer-state.cjs
-          node --test scripts/ui/auto-update-test.cjs
-          node scripts/ui/generation-page-fixture.test.cjs
-          node scripts/ui/automatic-update-dom.cjs
-          UI_BROWSER_ENGINE=webkit node scripts/ui/automatic-update-dom.cjs
-          node scripts/ui/templates.cjs
-          UI_BROWSER_ENGINE=webkit node scripts/ui/templates.cjs
-          UI_SCREENSHOT_DIR=ui-performance-results/separation/chromium node scripts/ui/separation.cjs
-          UI_SCREENSHOT_DIR=ui-performance-results/separation/webkit UI_BROWSER_ENGINE=webkit node scripts/ui/separation.cjs
-          node scripts/ui/monitoring.cjs
-          node scripts/ui/origin-security.cjs
-          node scripts/ui/log-security.cjs
-          node scripts/ui/smoke.cjs --generations-only
-          node scripts/ui/performance.cjs
-          UI_BROWSER_ENGINE=webkit node scripts/ui/performance.cjs
-          node scripts/ui/branding.cjs
-          node scripts/ui/branding-startup.cjs
-          node scripts/ui/profile.cjs
-          node scripts/ui/support.cjs
-          node scripts/ui/report-details.cjs
-          UI_BROWSER_ENGINE=webkit node scripts/ui/report-details.cjs
-          UI_SCREENSHOT_DIR=ui-performance-results/report-pagination node scripts/ui/report-pagination.cjs
-          UI_SCREENSHOT_DIR=ui-performance-results/report-pagination UI_BROWSER_ENGINE=webkit node scripts/ui/report-pagination.cjs
-          node scripts/ui/audit-log.cjs
-          node scripts/ui/workspaces.cjs
-          node scripts/ui/workspace-navigation.cjs
-          node scripts/ui/control-pickers.cjs
-          node scripts/ui/email-login.cjs
-          node scripts/ui/email-invitations.cjs
-          UI_BROWSER_ENGINE=webkit node scripts/ui/email-invitations.cjs
-          node scripts/ui/installation-setup.cjs
-          node scripts/ui/email-delivery.cjs
-          node scripts/ui/catalog-sync.cjs
-          UI_BROWSER_ENGINE=webkit node scripts/ui/catalog-sync.cjs
-          node scripts/ui/provider-reference-state.cjs
-          UI_BROWSER_ENGINE=webkit node scripts/ui/provider-reference-state.cjs
-          node scripts/ui/model-picker.cjs
-          node scripts/ui/provider-assets.cjs
-          UI_BROWSER_ENGINE=webkit node scripts/ui/provider-assets.cjs
-          node scripts/ui/references.cjs
-          UI_BROWSER_ENGINE=webkit node scripts/ui/references.cjs
-          node scripts/ui/model-information.cjs
-          node scripts/ui/accounting-references.cjs
-          UI_SCREENSHOT_DIR=ui-performance-results/reference-intent-chromium node scripts/ui/reference-intent.cjs
-          UI_SCREENSHOT_DIR=ui-performance-results/reference-intent-webkit UI_BROWSER_ENGINE=webkit node scripts/ui/reference-intent.cjs
-          UI_SCREENSHOT_DIR=ui-performance-results/voice-chooser-chromium UI_VOICE_UPLOAD=chooser node scripts/ui/reference-intent.cjs
-          UI_SCREENSHOT_DIR=ui-performance-results/voice-chooser-webkit UI_VOICE_UPLOAD=chooser UI_BROWSER_ENGINE=webkit node scripts/ui/reference-intent.cjs
-          node scripts/ui/logout-security.cjs
-          node scripts/ui/provider-connections.cjs
-          UI_BROWSER=webkit node scripts/ui/provider-connections.cjs
-          node scripts/ui/payments.cjs
-          UI_BROWSER_ENGINE=webkit node scripts/ui/payments.cjs
-          node scripts/ui/stablecoins.cjs
-          UI_BROWSER=webkit node scripts/ui/stablecoins.cjs
-          node scripts/ui/organizations.cjs
-          UI_EVIDENCE_DIR=ui-performance-results/member-roles/chromium UI_MEMBER_ROLE_ONLY=1 node scripts/ui/organizations.cjs
-          UI_EVIDENCE_DIR=ui-performance-results/member-roles/webkit UI_MEMBER_ROLE_ONLY=1 UI_BROWSER_ENGINE=webkit node scripts/ui/organizations.cjs
-          node scripts/ui/organization-roles.cjs
-          UI_BROWSER_ENGINE=webkit node scripts/ui/organization-roles.cjs
-          node scripts/ui/sales.cjs
-          node scripts/ui/sonilo.cjs
-          node scripts/ui/openai.cjs
-          node scripts/ui/storage-settings.cjs
-          UI_BROWSER_ENGINE=webkit node scripts/ui/storage-settings.cjs
+          mkdir -p .local/ci-ui-stage
+          container="gateway-ui-export-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          docker create --name "$container" gateway-ui:ci
+          trap 'docker rm -f "$container" >/dev/null 2>&1 || true' EXIT
+          docker cp "$container:/usr/bin/caddy" .local/ci-ui-stage/caddy
+          docker cp "$container:/etc/caddy/Caddyfile" .local/ci-ui-stage/Caddyfile
+          docker cp "$container:/srv" .local/ci-ui-stage/public
+          cp dist/gateway-ui.tar.gz .local/ci-ui-stage/gateway-ui.tar.gz
+          image_id=$(docker inspect --format '{{.Id}}' gateway-ui:ci)
+          test "$(docker inspect --format '{{.Os}}/{{.Architecture}}' gateway-ui:ci)" = linux/amd64
+          digest=$(python3 scripts/ci/ui-runtime.py pack --staging .local/ci-ui-stage --output ci-ui-runtime.tar.gz --source-sha "$GITHUB_SHA" --image-id "$image_id")
+          echo "sha256=$digest" >> "$GITHUB_OUTPUT"
+          echo "image_id=$image_id" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ci-ui-runtime
+          path: ci-ui-runtime.tar.gz
+          compression-level: 0
+          retention-days: 14
+          if-no-files-found: error
 
       - name: Verify real Grafana provisioning and browser dashboard
         env:
@@ -398,3 +347,66 @@ jobs:
           name: browser-performance
           path: ui-performance-results
           if-no-files-found: ignore
+
+  ui-performance:
+    name: UI performance and billing
+    needs: [prior-ci, container]
+    if: needs.prior-ci.outputs.reuse != 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Run isolated UI partition
+        uses: ./.github/actions/ui-checks
+        with:
+          partition: ui-performance
+          runtime_sha256: ${{ needs.container.outputs.ui_runtime_sha256 }}
+          ui_image_id: ${{ needs.container.outputs.ui_image_id }}
+
+  ui-media:
+    name: UI media and navigation
+    needs: [prior-ci, container]
+    if: needs.prior-ci.outputs.reuse != 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Run isolated UI partition
+        uses: ./.github/actions/ui-checks
+        with:
+          partition: ui-media
+          runtime_sha256: ${{ needs.container.outputs.ui_runtime_sha256 }}
+          ui_image_id: ${{ needs.container.outputs.ui_image_id }}
+
+  ui-console:
+    name: UI console and security
+    needs: [prior-ci, container]
+    if: needs.prior-ci.outputs.reuse != 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Run isolated UI partition
+        uses: ./.github/actions/ui-checks
+        with:
+          partition: ui-console
+          runtime_sha256: ${{ needs.container.outputs.ui_runtime_sha256 }}
+          ui_image_id: ${{ needs.container.outputs.ui_image_id }}

@@ -65,7 +65,7 @@ class Acceptance(unittest.TestCase):
         receipt = self.validate()
         self.assertTrue(receipt['reuse'])
         self.assertEqual(receipt['source_sha'], SHA)
-        self.assertEqual(len(receipt['jobs']), 5)
+        self.assertEqual(len(receipt['jobs']), 8)
         self.assertEqual(receipt['max_age_seconds'], 21600)
         self.assertEqual(sum(p.endswith('/actions/runs/123') for p in self.calls), 2)
 
@@ -267,8 +267,12 @@ class WorkflowContracts(unittest.TestCase):
         self.assertIn('trivy fs --scanners vuln --severity HIGH,CRITICAL --exit-code 1', security)
         self.assertIn('run: make vulncheck', security)
         for job in ['go', 'profile-name', 'container']:
-            self.assertIn(f"  {job}:\n    needs: prior-ci\n    if: needs.prior-ci.outputs.reuse != 'true'", ci)
+            block = re.search(rf"^  {job}:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", ci, re.M | re.S)[1]
+            self.assertIn('    needs: prior-ci', block)
+            self.assertIn("    if: needs.prior-ci.outputs.reuse != 'true'", block)
         self.assertIn('prior_ci_run_id: ${{ inputs.prior_ci_run_id }}', (ROOT / '.github/workflows/release.yml').read_text())
+        for job in ['ui-performance', 'ui-media', 'ui-console']:
+            self.assertIn(f"  {job}:\n    name:", ci)
         self.assertIn('actions: read', ci)
 
 

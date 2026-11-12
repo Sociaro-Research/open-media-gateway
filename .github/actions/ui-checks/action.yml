@@ -1,0 +1,66 @@
+name: Isolated UI command partition
+description: Run a manifest partition against the exact UI runtime built by this workflow.
+inputs:
+  partition:
+    required: true
+    description: Explicit manifest partition name
+  runtime_sha256:
+    required: true
+    description: Bundle SHA-256 from this run's Container job
+  ui_image_id:
+    required: true
+    description: Exact built UI image ID from this run's Container job
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '24'
+    - uses: actions/setup-go@v7
+      with:
+        go-version-file: go.mod
+        cache-dependency-path: go.sum
+    - uses: actions/download-artifact@v4
+      with:
+        name: ci-ui-runtime
+        path: .local/ci-ui-bundle
+    - name: Restore exact built UI runtime
+      shell: bash
+      env:
+        UI_RUNTIME_SHA256: ${{ inputs.runtime_sha256 }}
+        UI_IMAGE_ID: ${{ inputs.ui_image_id }}
+      run: |
+        python3 scripts/ci/ui-runtime.py restore --bundle .local/ci-ui-bundle/ci-ui-runtime.tar.gz --sha256 "$UI_RUNTIME_SHA256" --source-sha "$GITHUB_SHA" --image-id "$UI_IMAGE_ID"
+        mkdir -p ui-results
+        cp .local/ci-ui-runtime/runtime.json ui-results/runtime.json
+        python3 scripts/check-ui-updates.py
+    - name: Use existing Ubuntu archive fallbacks
+      shell: bash
+      run: sudo python3 scripts/ci/ubuntu-apt-mirrors.py
+    - name: Install isolated browser-test dependencies
+      shell: bash
+      run: |
+        npm install --prefix /tmp/gateway-ui-tests --no-save --package-lock=false playwright@1.62.1
+        /tmp/gateway-ui-tests/node_modules/.bin/playwright install --with-deps chromium chrome webkit
+    - name: Prepare synthetic video fixtures
+      shell: bash
+      run: |
+        if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y ffmpeg
+        fi
+        python3 scripts/ui/template-video-fixtures.py .local/video-workflow/clips
+    - name: Execute serial partition with per-command timings
+      shell: bash
+      env:
+        NODE_PATH: /tmp/gateway-ui-tests/node_modules
+        CADDY_BIN: ${{ github.workspace }}/.local/ci-ui-runtime/caddy
+        UI_PARTITION: ${{ inputs.partition }}
+      run: python3 scripts/ci/run-ui-job.py --job "$UI_PARTITION" --output ui-results
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: ui-${{ inputs.partition }}
+        path: ui-results
+        retention-days: 14
+        if-no-files-found: warn

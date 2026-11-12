@@ -1,0 +1,678 @@
+{
+  "version": 1,
+  "baseline_sha": "b43c4a0c6563747b61d7cbe773300615331d48ed",
+  "commands": [
+    {
+      "id": "01-validation-layout-chromium",
+      "job": "ui-console",
+      "argv": [
+        "node",
+        "scripts/ui/validation-layout.cjs"
+      ],
+      "env": {
+        "UI_EVIDENCE_DIR": "ui-performance-results/validation-layout/chromium"
+      }
+    },
+    {
+      "id": "02-validation-layout-webkit",
+      "job": "ui-console",
+      "argv": [
+        "node",
+        "scripts/ui/validation-layout.cjs"
+      ],
+      "env": {
+        "UI_EVIDENCE_DIR": "ui-performance-results/validation-layout/webkit",
+        "UI_BROWSER_ENGINE": "webkit"
+      }
+    },
+    {
+      "id": "03-legal-footer-state-chromium",
+      "job": "ui-console",
+      "argv": [
+        "node",
+        "scripts/ui/legal-footer-state.cjs"
+      ],
+      "env": {
+        "UI_EVIDENCE_DIR": "ui-performance-results/legal-footer-state/chromium"
+      }
+    },
+    {
+      "id": "04-legal-footer-state-webkit",
+      "job": "ui-console",
+      "argv": [
+        "node",
+        "scripts/ui/legal-footer-state.cjs"
+      ],
+      "env": {
+        "UI_EVIDENCE_DIR": "ui-performance-results/legal-footer-state/webkit",
+        "UI_BROWSER_ENGINE": "webkit"
+      }
+    },
+    {
+      "id": "05-auto-update-test-chromium",
+      "job": "ui-media",
+      "argv": [
+        "node",
+        "--test",
+        "scripts/ui/auto-update-test.cjs"
+      ],
+      "env": {}
+    },
+    {
+      "id": "06-generation-page-fixture.test-chromium",
+      "job": "ui-media",
+      "argv": [
+        "node",
+        "scripts/ui/generation-page-fixture.test.cjs"
+      ],
+      "env": {}
+    },
+    {
+      "id": "07-automatic-update-dom-chromium",
+      "job": "ui-media",
+      "argv": [
+        "node",
+        "scripts/ui/automatic-update-dom.cjs"
+      ],
+      "env": {}
+    },
+    {
+      "id": "08-automatic-update-dom-webkit",
+      "job": "ui-media",
+      "argv": [
+        "node",
+        "scripts/ui/automatic-update-dom.cjs"
+      ],
+      "env": {
+        "UI_BROWSER_ENGINE": "webkit"
+      }
+    },
+    {
+      "id": "09-templates-chromium",
+      "job": "ui-media",
+      "argv": [
+        "node",
+        "scripts/ui/templates.cjs"
+      ],
+      "env": {}
+    },
+    {
+      "id": "10-templates-webkit",
+      "job": "ui-media",
+      "argv": [
+        "node",
+        "scripts/ui/templates.cjs"
+      ],
+      "env": {
+        "UI_BROWSER_ENGINE": "webkit"
+      }
+    },
+    {
+      "id": "11-separation-chromium",
+      "job": "ui-console",
+      "argv": [
+        "node",
+        "scripts/ui/separation.cjs"
+      ],
+      "env": {
+        "UI_SCREENSHOT_DIR": "ui-performance-results/separation/chromium"
+      }
+    },
+    {
+      "id": "12-separation-webkit",
+      "job": "ui-console",
+      "argv": [
+        "node",
+        "scripts/ui/separation.cjs"
+      ],
+      "env": {
+        "UI_SCREENSHOT_DIR": "ui-performance-results/separation/webkit",
+        "UI_BROWSER_ENGINE": "webkit"
+      }
+    },
+    {
+      "id": "13-monitoring-chromium",
+      "job": "ui-console",
+      "argv": [
+        "node",
+        "scripts/ui/monitoring.cjs"
+      ],
+      "env": {}
+    },
+    {
+      "id": "14-origin-security-chromium",
+      "job": "ui-console",
+      "argv": [
+        "node",
+        "scripts/ui/origin-security.cjs"
+      ],
+      "env": {}
+    },
+    {
+      "id": "15-log-security-chromium",
+      "job": "ui-console",
+      "argv": [
+        "node",
+        "scripts/ui/log-security.cjs"
+      ],
+      "env": {}
+    },
+    {
+      "id": "16-smoke-chromium",
+      "job": "ui-console",
+      "argv": [
+        "node",
+        "scripts/ui/smoke.cjs",
+        "--generations-only"
+      ],
+      "env": {}
+    },
+    {
+      "id": "17-performance-chromium",
+      "job": "ui-performance",
+      "argv": [
+        "node",
+        "scripts/ui/performance.cjs"
+      ],
+      "env": {}
+    },
+    {
+      "id": "18-performance-webkit",
+      "job": "ui-performance",
+      "argv": [
+        "node",
+        "scripts/ui/performance.cjs"
+      ],
+      "env": {
+        "UI_BROWSER_ENGINE": "webkit"
+      }
+    },
+    {
+      "id": "19-branding-chromium",
+      "job": "ui-console",
+      "argv": [
+        "node",
+        "scripts/ui/branding.cjs"
+      ],
+      "env": {}
+    },
+    {
+      "id": "20-branding-startup-chromium",
+      "job": "ui-console",
+      "argv": [
+        "node",
+        "scripts/ui/branding-startup.cjs"
+      ],
+      "env": {}
+    },
+    {
+      "id": "21-profile-chromium",
+      "job": "ui-console",
+      "argv": [
+        "node",
+        "scripts/ui/profile.cjs"
+      ],
+      "env": {}
+    },
+    {
+      "id": "22-support-chromium",
+      "job": "ui-console",
+      "argv": [
+        "node",
+        "scripts/ui/support.cjs"
+      ],
+      "env": {}
+    },
+    {
+      "id": "23-report-details-chromium",
+      "job": "ui-media",
+      "argv": [
+        "node",
+        "scripts/ui/report-details.cjs"
+      ],
+      "env": {}
+    },
+    {
+      "id": "24-report-details-webkit",
+      "job": "ui-media",
+      "argv": [
+        "node",
+        "scripts/ui/report-details.cjs"
+      ],
+      "env": {
+        "UI_BROWSER_ENGINE": "webkit"
+      }
+    },
+    {
+      "id": "25-report-pagination-chromium",
+      "job": "ui-media",
+      "argv": [
+        "node",
+        "scripts/ui/report-pagination.cjs"
+      ],
+      "env": {
+        "UI_SCREENSHOT_DIR": "ui-performance-results/report-pagination"
+      }
+    },
+    {
+      "id": "26-report-pagination-webkit",
+      "job": "ui-media",
+      "argv": [
+        "node",
+        "scripts/ui/report-pagination.cjs"
+      ],
+      "env": {
+        "UI_SCREENSHOT_DIR": "ui-performance-results/report-pagination",
+        "UI_BROWSER_ENGINE": "webkit"
+      }
+    },
+    {
+      "id": "27-audit-log-chromium",
+      "job": "ui-media",
+      "argv": [
+        "node",
+        "scripts/ui/audit-log.cjs"
+      ],
+      "env": {}
+    },
+    {
+      "id": "28-workspaces-chromium",
+      "job": "ui-media",
+      "argv": [
+        "node",
+        "scripts/ui/workspaces.cjs"
+      ],
+      "env": {}
+    },
+    {
+      "id": "29-workspace-navigation-chromium",
+      "job": "ui-media",
+      "argv": [
+        "node",
+        "scripts/ui/workspace-navigation.cjs"
+      ],
+      "env": {}
+    },
+    {
+      "id": "30-control-pickers-chromium",
+      "job": "ui-console",
+      "argv": [
+        "node",
+        "scripts/ui/control-pickers.cjs"
+      ],
+      "env": {}
+    },
+    {
+      "id": "31-email-login-chromium",
+      "job": "ui-console",
+      "argv": [
+        "node",
+        "scripts/ui/email-login.cjs"
+      ],
+      "env": {}
+    },
+    {
+      "id": "32-email-invitations-chromium",
+      "job": "ui-console",
+      "argv": [
+        "node",
+        "scripts/ui/email-invitations.cjs"
+      ],
+      "env": {}
+    },
+    {
+      "id": "33-email-invitations-webkit",
+      "job": "ui-console",
+      "argv": [
+        "node",
+        "scripts/ui/email-invitations.cjs"
+      ],
+      "env": {
+        "UI_BROWSER_ENGINE": "webkit"
+      }
+    },
+    {
+      "id": "34-installation-setup-chromium",
+      "job": "ui-console",
+      "argv": [
+        "node",
+        "scripts/ui/installation-setup.cjs"
+      ],
+      "env": {}
+    },
+    {
+      "id": "35-email-delivery-chromium",
+      "job": "ui-console",
+      "argv": [
+        "node",
+        "scripts/ui/email-delivery.cjs"
+      ],
+      "env": {}
+    },
+    {
+      "id": "36-catalog-sync-chromium",
+      "job": "ui-console",
+      "argv": [
+        "node",
+        "scripts/ui/catalog-sync.cjs"
+      ],
+      "env": {}
+    },
+    {
+      "id": "37-catalog-sync-webkit",
+      "job": "ui-console",
+      "argv": [
+        "node",
+        "scripts/ui/catalog-sync.cjs"
+      ],
+      "env": {
+        "UI_BROWSER_ENGINE": "webkit"
+      }
+    },
+    {
+      "id": "38-provider-reference-state-chromium",
+      "job": "ui-media",
+      "argv": [
+        "node",
+        "scripts/ui/provider-reference-state.cjs"
+      ],
+      "env": {}
+    },
+    {
+      "id": "39-provider-reference-state-webkit",
+      "job": "ui-media",
+      "argv": [
+        "node",
+        "scripts/ui/provider-reference-state.cjs"
+      ],
+      "env": {
+        "UI_BROWSER_ENGINE": "webkit"
+      }
+    },
+    {
+      "id": "40-model-picker-chromium",
+      "job": "ui-media",
+      "argv": [
+        "node",
+        "scripts/ui/model-picker.cjs"
+      ],
+      "env": {}
+    },
+    {
+      "id": "41-provider-assets-chromium",
+      "job": "ui-media",
+      "argv": [
+        "node",
+        "scripts/ui/provider-assets.cjs"
+      ],
+      "env": {}
+    },
+    {
+      "id": "42-provider-assets-webkit",
+      "job": "ui-media",
+      "argv": [
+        "node",
+        "scripts/ui/provider-assets.cjs"
+      ],
+      "env": {
+        "UI_BROWSER_ENGINE": "webkit"
+      }
+    },
+    {
+      "id": "43-references-chromium",
+      "job": "ui-media",
+      "argv": [
+        "node",
+        "scripts/ui/references.cjs"
+      ],
+      "env": {}
+    },
+    {
+      "id": "44-references-webkit",
+      "job": "ui-media",
+      "argv": [
+        "node",
+        "scripts/ui/references.cjs"
+      ],
+      "env": {
+        "UI_BROWSER_ENGINE": "webkit"
+      }
+    },
+    {
+      "id": "45-model-information-chromium",
+      "job": "ui-media",
+      "argv": [
+        "node",
+        "scripts/ui/model-information.cjs"
+      ],
+      "env": {}
+    },
+    {
+      "id": "46-accounting-references-chromium",
+      "job": "ui-media",
+      "argv": [
+        "node",
+        "scripts/ui/accounting-references.cjs"
+      ],
+      "env": {}
+    },
+    {
+      "id": "47-reference-intent-chromium",
+      "job": "ui-media",
+      "argv": [
+        "node",
+        "scripts/ui/reference-intent.cjs"
+      ],
+      "env": {
+        "UI_SCREENSHOT_DIR": "ui-performance-results/reference-intent-chromium"
+      }
+    },
+    {
+      "id": "48-reference-intent-webkit",
+      "job": "ui-media",
+      "argv": [
+        "node",
+        "scripts/ui/reference-intent.cjs"
+      ],
+      "env": {
+        "UI_SCREENSHOT_DIR": "ui-performance-results/reference-intent-webkit",
+        "UI_BROWSER_ENGINE": "webkit"
+      }
+    },
+    {
+      "id": "49-reference-intent-chromium-chooser",
+      "job": "ui-media",
+      "argv": [
+        "node",
+        "scripts/ui/reference-intent.cjs"
+      ],
+      "env": {
+        "UI_SCREENSHOT_DIR": "ui-performance-results/voice-chooser-chromium",
+        "UI_VOICE_UPLOAD": "chooser"
+      }
+    },
+    {
+      "id": "50-reference-intent-webkit-chooser",
+      "job": "ui-media",
+      "argv": [
+        "node",
+        "scripts/ui/reference-intent.cjs"
+      ],
+      "env": {
+        "UI_SCREENSHOT_DIR": "ui-performance-results/voice-chooser-webkit",
+        "UI_VOICE_UPLOAD": "chooser",
+        "UI_BROWSER_ENGINE": "webkit"
+      }
+    },
+    {
+      "id": "51-logout-security-chromium",
+      "job": "ui-console",
+      "argv": [
+        "node",
+        "scripts/ui/logout-security.cjs"
+      ],
+      "env": {}
+    },
+    {
+      "id": "52-provider-connections-chromium",
+      "job": "ui-console",
+      "argv": [
+        "node",
+        "scripts/ui/provider-connections.cjs"
+      ],
+      "env": {}
+    },
+    {
+      "id": "53-provider-connections-webkit",
+      "job": "ui-console",
+      "argv": [
+        "node",
+        "scripts/ui/provider-connections.cjs"
+      ],
+      "env": {
+        "UI_BROWSER": "webkit"
+      }
+    },
+    {
+      "id": "54-payments-chromium",
+      "job": "ui-performance",
+      "argv": [
+        "node",
+        "scripts/ui/payments.cjs"
+      ],
+      "env": {}
+    },
+    {
+      "id": "55-payments-webkit",
+      "job": "ui-performance",
+      "argv": [
+        "node",
+        "scripts/ui/payments.cjs"
+      ],
+      "env": {
+        "UI_BROWSER_ENGINE": "webkit"
+      }
+    },
+    {
+      "id": "56-stablecoins-chromium",
+      "job": "ui-console",
+      "argv": [
+        "node",
+        "scripts/ui/stablecoins.cjs"
+      ],
+      "env": {}
+    },
+    {
+      "id": "57-stablecoins-webkit",
+      "job": "ui-console",
+      "argv": [
+        "node",
+        "scripts/ui/stablecoins.cjs"
+      ],
+      "env": {
+        "UI_BROWSER": "webkit"
+      }
+    },
+    {
+      "id": "58-organizations-chromium",
+      "job": "ui-console",
+      "argv": [
+        "node",
+        "scripts/ui/organizations.cjs"
+      ],
+      "env": {}
+    },
+    {
+      "id": "59-organizations-chromium-member",
+      "job": "ui-console",
+      "argv": [
+        "node",
+        "scripts/ui/organizations.cjs"
+      ],
+      "env": {
+        "UI_EVIDENCE_DIR": "ui-performance-results/member-roles/chromium",
+        "UI_MEMBER_ROLE_ONLY": "1"
+      }
+    },
+    {
+      "id": "60-organizations-webkit-member",
+      "job": "ui-console",
+      "argv": [
+        "node",
+        "scripts/ui/organizations.cjs"
+      ],
+      "env": {
+        "UI_EVIDENCE_DIR": "ui-performance-results/member-roles/webkit",
+        "UI_MEMBER_ROLE_ONLY": "1",
+        "UI_BROWSER_ENGINE": "webkit"
+      }
+    },
+    {
+      "id": "61-organization-roles-chromium",
+      "job": "ui-console",
+      "argv": [
+        "node",
+        "scripts/ui/organization-roles.cjs"
+      ],
+      "env": {}
+    },
+    {
+      "id": "62-organization-roles-webkit",
+      "job": "ui-console",
+      "argv": [
+        "node",
+        "scripts/ui/organization-roles.cjs"
+      ],
+      "env": {
+        "UI_BROWSER_ENGINE": "webkit"
+      }
+    },
+    {
+      "id": "63-sales-chromium",
+      "job": "ui-performance",
+      "argv": [
+        "node",
+        "scripts/ui/sales.cjs"
+      ],
+      "env": {}
+    },
+    {
+      "id": "64-sonilo-chromium",
+      "job": "ui-media",
+      "argv": [
+        "node",
+        "scripts/ui/sonilo.cjs"
+      ],
+      "env": {}
+    },
+    {
+      "id": "65-openai-chromium",
+      "job": "ui-media",
+      "argv": [
+        "node",
+        "scripts/ui/openai.cjs"
+      ],
+      "env": {}
+    },
+    {
+      "id": "66-storage-settings-chromium",
+      "job": "ui-media",
+      "argv": [
+        "node",
+        "scripts/ui/storage-settings.cjs"
+      ],
+      "env": {}
+    },
+    {
+      "id": "67-storage-settings-webkit",
+      "job": "ui-media",
+      "argv": [
+        "node",
+        "scripts/ui/storage-settings.cjs"
+      ],
+      "env": {
+        "UI_BROWSER_ENGINE": "webkit"
+      }
+    }
+  ]
+}

@@ -17,7 +17,7 @@ WORKFLOW = '.github/workflows/ci.yml'
 MAX_AGE = dt.timedelta(hours=6)
 REQUIRED = {
     'Validate prior CI result': {'Test CI reuse guard offline',
-                                 'Validate explicit prior run or require full CI'},
+                                 'Validate explicit prior run or require full CI', 'Test UI partition coverage offline'},
     'Secret history and dependency security': {
         'Check out complete history', 'Install checksum-pinned scanners',
         'Scan complete Git history for secrets', 'Check all dependency versions for known vulnerabilities'},
@@ -34,9 +34,11 @@ REQUIRED = {
                         'Scan built application and UI images',
                         'Validate UI configuration and extract its runtime',
                         'Verify installation without source files',
-                        'Prepare synthetic video fixtures',
-                        'Verify independent UI and current workflows',
+                        'Package exact UI runtime for browser jobs',
                         'Verify real Grafana provisioning and browser dashboard'},
+    'UI performance and billing': {'Check out repository', 'Run isolated UI partition'},
+    'UI media and navigation': {'Check out repository', 'Run isolated UI partition'},
+    'UI console and security': {'Check out repository', 'Run isolated UI partition'},
 }
 # These are conditional only because a standalone full CI already runs govulncheck in make verify.
 OPTIONAL_STEPS = {'Set up Go for fresh vulnerability assessment',

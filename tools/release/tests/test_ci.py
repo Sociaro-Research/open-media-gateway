@@ -1,5 +1,6 @@
 """CI orchestration tests without Docker, network or production access."""
 import importlib.util
+import json
 import contextlib
 from pathlib import Path
 import tempfile
@@ -27,6 +28,27 @@ class LocalCI(unittest.TestCase):
             self.assertIn(('references.cjs','UI_BROWSER_ENGINE=webkit'),selected)
             self.assertIn(('reference-intent.cjs','UI_SCREENSHOT_DIR=shots','UI_VOICE_UPLOAD=chooser'),selected)
             self.assertFalse(any(check[0]=='unsafe.cjs' for check in selected))
+
+    def test_manifest_preserves_the_original_local_workflow_selection(self):
+        project = SOURCE.parents[1]
+        baseline = (project/'scripts/tests/fixtures/ci-ui-baseline.txt').read_text()
+        manifest = (project/'scripts/ci/ui-commands.json').read_text()
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);workflow=root/'.github/workflows/ci.yml';workflow.parent.mkdir(parents=True)
+            workflow.write_text(baseline)
+            expected=checks.project_ui_checks(root)
+            workflow.write_text('node scripts/ui/monitoring.cjs\n')
+            path=root/'scripts/ci/ui-commands.json';path.parent.mkdir(parents=True);path.write_text(manifest)
+            actual=checks.project_ui_checks(root)
+            self.assertEqual(set(actual),set(expected))
+            self.assertEqual(len(actual),len(expected))
+
+    def test_unsafe_manifest_arguments_stop_local_acceptance(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);path=root/'scripts/ci/ui-commands.json';path.parent.mkdir(parents=True)
+            path.write_text(json.dumps({'commands':[{'argv':['node','scripts/ui/unsafe.cjs; echo bad'],'env':{}}]}))
+            with self.assertRaisesRegex(RuntimeError,'Invalid UI command manifest'):
+                checks.project_ui_checks(root)
 
     def test_remote_docker_is_refused_before_any_check(self):
         with patch.dict(ci.os.environ,{'DOCKER_HOST':'tcp://production:2375'},clear=True),patch.object(ci.subprocess,'run'),patch.object(ci.subprocess,'check_output',return_value='tcp://production:2375'),patch.object(ci,'print'):

@@ -38,6 +38,28 @@ def project_ui_checks(project):
                 check = (match.group(2), *match.group(3).split(), *settings)
                 if check not in selected:
                     selected.append(check)
+    manifest = project / 'scripts/ci/ui-commands.json'
+    if manifest.exists():
+        # The hosted UI block is now partitioned; keep the same narrow, data-only local selection.
+        try:
+            commands = json.loads(manifest.read_text())['commands']
+            for command in commands:
+                argv, settings = command['argv'], command['env']
+                if argv[:2] == ['node', '--test']:
+                    continue  # auto-update-test.cjs is already in the original local defaults.
+                require = (isinstance(argv, list) and len(argv) >= 2 and argv[0] == 'node'
+                           and re.fullmatch(r'scripts/ui/[\w.-]+\.cjs', argv[1])
+                           and all(re.fullmatch(r'--[\w-]+', arg) for arg in argv[2:])
+                           and isinstance(settings, dict)
+                           and all(re.fullmatch(r'UI_[A-Z_]+', key) and re.fullmatch(r'[\w./-]+', value)
+                                   for key, value in settings.items()))
+                if not require:
+                    raise ValueError('Invalid UI command data')
+                check = (Path(argv[1]).name, *argv[2:], *(key+'='+value for key,value in settings.items()))
+                if check not in selected:
+                    selected.append(check)
+        except (KeyError, TypeError, ValueError):
+            raise RuntimeError('Invalid UI command manifest; local acceptance stopped.') from None
     edited = edited_ui_checks(project)
     selected.sort(key=lambda check: 'scripts/ui/' + check[0] not in edited)
     return selected
