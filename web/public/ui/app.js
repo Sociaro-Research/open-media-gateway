@@ -334,20 +334,23 @@ function displayGeneration(task) {
 }
 // An empty unfiltered Journal shows the first-run order; only the key step can already be done.
 function journalFirstSteps() {
-  const keyReady = !!window.GenerationKey.value();
+  const keyReady = !!window.GenerationKey.value(), promptless = !!selectedModel()?.no_prompt;
   const add = (parent, tag, text, className) => { const el = parent.appendChild(document.createElement(tag)); if (text) el.textContent = text; if (className) el.className = className; return el; };
-  const box = document.createElement('div'); box.className = 'empty-state journal-first-steps';
+  const box = document.createElement('div'); box.className = 'empty-state journal-first-steps'; box.dataset.promptless = promptless;
   add(box, 'strong', 'Start your first generation');
   const list = add(box, 'ol'); list.setAttribute('aria-label', 'First steps');
-  [['Connect a Gateway API key', keyReady ? 'Key connected.' : 'Paste a key or create a Playground key.', 'Enter a key', '#apiKey'],
-   ['Choose a model and write a prompt', 'Settings and references are optional.', 'Write a prompt', '#prompt'],
+  // Resolved on click: a promptless model hides and disables #prompt, so fall back to the model picker.
+  const promptOrModel = () => !elements.prompt.disabled && !elements.prompt.closest('[hidden]') ? elements.prompt : elements.model.closest('.floating-field')?.querySelector('.select-trigger') || elements.model;
+  [['Connect a Gateway API key', keyReady ? 'Key connected.' : 'Paste a key or create a Playground key.', 'Enter a key', () => document.querySelector('#apiKey')],
+   promptless ? ['Choose a model and fill in its fields', 'This model needs no prompt. Its fields are below the model.', 'Choose a model', promptOrModel]
+     : ['Choose a model and write a prompt', 'Settings and references are optional.', 'Write a prompt', promptOrModel],
    ['Press Generate', 'Check the price and confirm. The result appears here.']].forEach(([title, hint, action, target], index) => {
     const done = index === 0 && keyReady, current = index === (keyReady ? 1 : 0);
     const item = add(list, 'li', '', done ? 'done' : current ? 'current' : '');
     const mark = add(item, 'span', done ? '' : String(index + 1), 'journal-step-mark'); mark.setAttribute('aria-hidden', 'true');
     if (done) mark.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
     const text = add(item, 'span'); add(text, 'b', title); if (done) add(text, 'span', ' (done)', 'sr-only'); add(text, 'small', hint);
-    if (current) { const go = add(text, 'button', action, 'secondary'); go.type = 'button'; go.onclick = () => document.querySelector(target)?.focus(); }
+    if (current) { const go = add(text, 'button', action, 'secondary'); go.type = 'button'; go.onclick = () => target()?.focus(); }
   });
   return box;
 }
@@ -1033,6 +1036,8 @@ function updateModelUI({preserve=true}={}) {
   const session=preserve?playgroundResources?.action():null;
   const provider = selectedProvider();
   const model = selectedModel();
+  const firstSteps = elements.taskList.querySelector('.journal-first-steps');
+  if (firstSteps && firstSteps.dataset.promptless !== String(!!model?.no_prompt)) firstSteps.replaceWith(journalFirstSteps());
   document.querySelector('#generationSettings').hidden = !provider || !model;
   elements.priceCard.hidden = !model;
   syncOverrideSound(model);

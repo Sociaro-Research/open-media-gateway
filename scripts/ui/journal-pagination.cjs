@@ -31,7 +31,7 @@ const server=http.createServer((req,res)=>{const p=new URL(req.url,'http://fixtu
   if(p==='/v1/organizations')return json({data:[]});
   if(p==='/v1/playground-key/restore')return json({error:{message:'No saved synthetic key'}},404);
   if(p==='/v1/key')return json({key:{name:'Fixture',resource_mode:'personal'}});
-  if(p==='/v1/providers')return json({data:[{id:'mock',name:'Mock',default_model:'video',models:[{id:'video',display_name:'Test video',media_type:'video',resolutions:['720p'],ratios:['16:9'],min_duration:2,max_duration:10,default_duration:5}]}]});
+  if(p==='/v1/providers')return json({data:[{id:'mock',name:'Mock',default_model:'video',models:[{id:'video',display_name:'Test video',media_type:'video',resolutions:['720p'],ratios:['16:9'],min_duration:2,max_duration:10,default_duration:5},{id:'promptless',display_name:'Test promptless',media_type:'video',no_prompt:true}]}]});
   if(p==='/v1/projects')return json({data:projects,scope:'company',can_manage_projects:true});
   if(p==='/v1/generations/estimate')return json({cost:{expected_usd:0},can_generate:true});
   if(p==='/v1/generations'){
@@ -106,6 +106,12 @@ const server=http.createServer((req,res)=>{const p=new URL(req.url,'http://fixtu
   await choose('All Projects');await count(10,28);gate={...deferred(),started:deferred(),match:r=>!!r.cursor&&!r.through};await page.locator('#journalPagination').scrollIntoViewIfNeeded();await gate.started.promise;
   tasks=[{...task(900),prompt:'Replacement key task'}];key='replacement-key';await page.evaluate(key=>{GenerationKey.value=()=>key;dispatchEvent(new Event('gateway-key-change'));},key);await count(1,1);gate.resolve();gate=null;await page.waitForFunction(()=>document.querySelectorAll('#taskList .task').length===1);assert.match(await page.locator('#taskList').innerText(),/Replacement key task/);
   tasks=[];await page.evaluate(()=>dispatchEvent(new Event('gateway-key-change')));await page.locator('#taskList .journal-first-steps li.done').waitFor();assert.equal(await page.locator('#taskList .journal-first-steps li.current').innerText().then(t=>t.includes('Choose a model')),true);assert.equal(await page.locator('#journalPagination').isVisible(),false);
+  // The prompt step picks its target on click; a promptless model gets model-picker guidance instead of "Write a prompt".
+  const firstStep=()=>page.locator('#taskList .journal-first-steps li.current');await page.waitForFunction(()=>selectedModel()?.id==='video');
+  await firstStep().getByRole('button',{name:'Write a prompt',exact:true}).click();assert.equal(await page.evaluate(()=>document.activeElement===elements.prompt),true);
+  await page.evaluate(()=>{elements.model.value=modelSelectionValue('mock','promptless');elements.model.dispatchEvent(new Event('change'));});
+  await firstStep().filter({hasText:'Choose a model and fill in its fields'}).waitFor();assert.equal(await firstStep().getByRole('button',{name:'Write a prompt',exact:true}).count(),0);
+  await firstStep().getByRole('button',{name:'Choose a model',exact:true}).click();assert.equal(await page.evaluate(()=>{const n=document.activeElement;return n!==document.body&&n.checkVisibility()&&!!n.closest('.floating-field')?.contains(elements.model);}),true);
   await page.evaluate(()=>{GenerationKey.value=()=>'';dispatchEvent(new Event('gateway-key-change'));});await page.locator('#taskList .journal-first-steps li.current').filter({hasText:'Connect a Gateway API key'}).waitFor();assert.equal(await page.locator('#taskList .journal-first-steps li.done').count(),0);
   record('Empty and end states are exact; a key change clears old pages and ignores delayed results; an empty unfiltered Journal shows the first steps');
   assert.deepEqual(errors,[]);assert.deepEqual(external,[]);assert.ok(writes.every(w=>['/v1/generations/estimate','/v1/playground-key/restore'].includes(w.path)));assert.ok(reads.every(r=>r.view==='versions'?r.limit===100&&r.fullCards===0:r.ids?r.limit===50&&r.returned<=50:r.limit===10&&r.returned<=10));
