@@ -12,7 +12,7 @@
     try{const data=await api('/v1/system/settings');if(token!==epoch)return;FormUI.message(status,'');
       const tabs=el('div',undefined,'organization-tabs system-settings-tabs'),panels=el('div',undefined,'system-settings-panels'),sections={};tabs.setAttribute('role','tablist');tabs.setAttribute('aria-label','Settings sections');content.append(tabs,panels);
       const selectTab=id=>{settingsTab=id;for(const [key,section]of Object.entries(sections)){const active=key===id;section.panel.hidden=!active;section.tab.setAttribute('aria-selected',String(active));section.tab.setAttribute('aria-pressed',String(active));section.tab.tabIndex=active?0:-1;}FormUI.refresh();};
-      for(const [id,label]of [['system','System'],['appearance','Appearance'],['markups','Markups'],['sales','Sales'],['limits','Request limits'],['catalog','Model catalogue'],['payments','Payments'],['email','Email delivery'],['login','Login methods']]){
+      for(const [id,label]of [['system','System'],['appearance','Appearance'],['markups','Markups'],['sales','Sales'],['limits','Request limits'],['catalog','Catalogue sync'],['payments','Payments'],['email','Email delivery'],['login','Login methods']]){
        const tab=button(label,()=>selectTab(id)),panel=el('section',undefined,'system-settings-panel');tab.id='settings-tab-'+id;tab.setAttribute('role','tab');tab.setAttribute('aria-controls','settings-panel-'+id);panel.id='settings-panel-'+id;panel.setAttribute('role','tabpanel');panel.setAttribute('aria-labelledby',tab.id);sections[id]={tab,panel};tabs.append(tab);panels.append(panel);
       }
       GatewayLayout.bind(tabs,{scope:content,label:'Settings',anchor:view.querySelector('[data-system-page=settings]')});
