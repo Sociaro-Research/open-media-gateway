@@ -8,6 +8,7 @@
  const tableColumns={organizations:['organization','balance','credit_limit','shared_storage','actions'],client_companies:['organization','balance','spend','last_activity','credit_limit','shared_storage','actions'],organization_members:['member','role','this_week','total_consumption','weekly_limit'],organization_invitations:['role','expires','status','accepted_by','actions']};
  const table=(id,parent,heads,rows)=>{const wrap=el('div',null,'docs-table-wrap'),t=el('table',null,'docs-table'),head=el('tr');heads.forEach(h=>{const th=el('th');th.append(h instanceof Node?h:document.createTextNode(h));th.scope='col';head.append(th)});const thead=el('thead');thead.append(head);t.append(thead);const body=el('tbody');rows.forEach(values=>{const tr=el('tr');values.forEach((v,index)=>{const td=el('td',null,heads[index]===''?'table-row-actions':null);td.append(v instanceof Node?v:document.createTextNode(String(v??'')));tr.append(td)});body.append(tr)});t.append(body);window.TableUI?.attach(t,{id,columns:tableColumns[id],api});wrap.append(t);parent.append(wrap);return t;};
  const nullable=n=>n.value===''?null:Number(n.value);
+ const invitationState=(i,now=Date.now())=>i.accepted_by?'Accepted':i.revoked_at?'Revoked':new Date(i.expires_at).getTime()<=now?'Expired':'Pending';
  function form(parent,title,submit){const f=el('form',null,'keys-form organization-form');f.append(el('h2',title));parent.append(f);const status=el('p');status.setAttribute('role','status');const save=el('button','Save','primary compact');save.type='submit';f.finish=(caption='Save',valid=()=>true)=>{save.textContent=caption;const actions=el('div',null,'form-actions');actions.append(save,status);f.append(actions);FormUI.watch(f,save,{valid})};f.onsubmit=async e=>{e.preventDefault();if(save.disabled)return;const saved=FormUI.snapshot(f);save.disabled=true;FormUI.message(status,'Saving…');try{await submit();FormUI.saved(f,saved);FormUI.message(status,'')}catch(error){FormUI.message(status,error.message,'error')}finally{save.disabled=false;FormUI.update(f)}};return f;}
  function confirmAction(title,text,action,{danger=false}={}){const d=el('dialog',null,'keys-revoke-dialog organization-dialog'),message=el('p'),cancel=button('Cancel',()=>d.close()),yes=button('Confirm',async()=>{yes.disabled=true;message.replaceChildren(text.cloneNode?text.cloneNode(true):document.createTextNode(text));try{await action();d.close()}catch(e){FormUI.message(message,e.message,'error');yes.disabled=false}});yes.classList.toggle('danger',danger);message.append(text.cloneNode?text.cloneNode(true):text);const actions=el('div',null,'form-actions');actions.append(cancel,yes);d.append(el('h2',title),message,actions);document.body.append(d);d.onclose=()=>d.remove();d.showModal();cancel.focus();}
  let epoch=0;
@@ -97,7 +98,7 @@
    key:async()=>(await api('/v1/api-keys?organization_id='+encodeURIComponent(o.id))).data.some(k=>k.organization_id===o.id),
    credit:async()=>Number(o.balance_usd)>0||Number(o.credit_limit_usd)>0,
    request:async()=>(await api(base+'/reports?'+new URLSearchParams({from:'0001-01-01',to:'9999-12-30',limit:'1',timezone}))).data.length>0,
-   team:async()=>(members=(await api(base+'/members')).data).length>1||(await api(base+'/invitations')).data.some(i=>!i.revoked_at),
+   team:async()=>(members=(await api(base+'/members')).data).length>1||(await api(base+'/invitations')).data.some(i=>invitationState(i)==='Pending'),
   };
   const done=new Set(),section=el('section',null,'keys-form organization-setup'),title=el('h2','Get started'),progress=el('p',null,'organization-setup-progress'),list=el('ol'),close=el('button','×','icon-close');
   title.id='organizationSetupTitle';section.setAttribute('aria-labelledby',title.id);section.hidden=true;close.type='button';close.setAttribute('aria-label','Dismiss Get started');
@@ -235,7 +236,7 @@
   history.replaceChildren();if(!items.length)return;
   const now=Date.now();
   table('organization_invitations',history,['Role','Expires','Status','Accepted by',''],items.map(i=>{
-   const expires=new Date(i.expires_at),state=i.accepted_by?'Accepted':i.revoked_at?'Revoked':expires.getTime()<=now?'Expired':'Pending';
+   const expires=new Date(i.expires_at),state=invitationState(i,now);
    return [memberRoleLabel(i.role||'member'),expires.toLocaleString(),state,i.accepted_by_email?UserUI.identity({id:i.accepted_by,email:i.accepted_by_email,picture:i.accepted_by_picture}):'—',state==='Pending'?button('Revoke',async()=>{try{await api(base+'/invitations/'+i.id,{method:'DELETE'});await loadInvitations()}catch(e){FormUI.message(status,e.message,'error')}},true):''];
   }));
  }
