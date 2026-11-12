@@ -44,6 +44,15 @@
 
     if(!memberReport&&!scope?.personal){const field=node('div'),label=node('label','User ID or email'),user=node('input');user.id='reportUser';label.htmlFor=user.id;field.append(label,user);content.querySelector('form button').before(field);}
     const form=content.querySelector('form'),from=form.querySelector('#reportFrom'),to=form.querySelector('#reportTo'),status=content.querySelector('[role=status]'),body=content.querySelector('tbody'),prev=content.querySelector('[data-prev]'),next=content.querySelector('[data-next]');
+    // First-run empty state: what will appear here and where requests come from. Filtered-empty stays a plain line.
+    const empty=node('div',undefined,'empty-state report-empty'),emptyActions=node('div',undefined,'report-empty-actions');empty.hidden=true;
+    empty.append(node('span','◎'),node('strong','No requests yet.'),node('p','Requests appear here after someone uses an API key or the Playground.'),emptyActions);status.after(empty);
+    function showEmpty(show){
+      empty.hidden=!show;if(!show)return;
+      // Shortcuts only for the workspace the header navigation opens.
+      const here=window.Workspace?.id()===(scope?.personal?'personal':organizationID);
+      emptyActions.replaceChildren(...[['Open Playground','#generationNav'],['Open API keys','#keysNav']].map(([label,id])=>[label,document.querySelector(id)]).filter(([,nav])=>here&&nav&&!nav.hidden).map(([label,nav])=>{const b=node('button',label,'secondary');b.type='button';b.onclick=()=>nav.click();return b;}));
+    }
     const summary=usage?ReportSummary.mount(content.querySelector('.report-summary-host')):null;
     let key=form.querySelector('#reportKey');
     if(!usage)form.querySelector('#reportGeneration').value=filters?.generationID||'';
@@ -105,9 +114,9 @@
         form.hidden=false;tableWrap.hidden=!result.data.length;download.hidden=!result.data.length;
         applied=new URLSearchParams(query);download.disabled=false;hasMore=result.has_more;body.replaceChildren();
         rows=result.data;renderRows();
-        FormUI.message(status,result.data.length?'':hasHistory?'No requests match these filters.':'No requests yet.');
+        FormUI.message(status,!result.data.length&&hasHistory?'No requests match these filters.':'');showEmpty(!result.data.length&&!hasHistory);
         content.querySelector('[data-page]').textContent=`Page ${Math.floor(offset/50)+1}`;prev.disabled=offset===0;next.disabled=!hasMore;prev.parentElement.hidden=offset===0&&!hasMore;
-      } catch(error){if(currentMount()&&current===request){FormUI.message(status,`Could not load requests: ${error.message}`,'error');body.replaceChildren();tableWrap.hidden=true;download.hidden=true;form.hidden=false;prev.parentElement.hidden=true;prev.disabled=next.disabled=true;}}
+      } catch(error){if(currentMount()&&current===request){FormUI.message(status,`Could not load requests: ${error.message}`,'error');showEmpty(false);body.replaceChildren();tableWrap.hidden=true;download.hidden=true;form.hidden=false;prev.parentElement.hidden=true;prev.disabled=next.disabled=true;}}
     }
     form.addEventListener('submit',e=>{e.preventDefault();offset=0;load();});if(!usage){prev.addEventListener('click',()=>{offset=Math.max(0,offset-50);load(true);});next.addEventListener('click',()=>{offset+=50;load(true);});}
     if(shared){await load();return;}
