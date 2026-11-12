@@ -79,7 +79,7 @@ Save pending edits before changing the switch. There is one current template, ei
 The administrator API accepts Save as `{version, content}` and visibility as `{version, action: "publish"}` or `{version, action: "unpublish"}`. Responses expose `content` and `is_published`; legacy `draft` and `published` aliases describe the same current content. If both request content aliases are supplied, they must agree. `is_published` is response-only. Migration 081 preserves legacy data without keeping a second editable source or deleting history.
 Unpublish prevents new template submissions. Administrators can select **Delete**
 in the editor, including for an incomplete unpublished draft. The confirmation
-identifies the saved title (or Untitled template), ID and version. Cancel, close
+names the saved title (or Untitled template) without its ID or version. Cancel, close
 and Escape retain unsaved fields. Confirming sends only the saved version to
 `DELETE /v1/system/templates/{id}`; it does not save or publish edits first.
 While deletion is pending, another mutation cannot be submitted from that editor.
