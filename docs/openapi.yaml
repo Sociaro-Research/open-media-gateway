@@ -2220,7 +2220,7 @@ paths:
           minimum: 1
           type: integer
       responses:
-        "200":
+        "200": &GenerationListResponse
           content:
             application/json:
               schema:
@@ -7650,6 +7650,7 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
         '422': {description: Verified pricing unavailable.}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
   "/v1/provider-resources/{id}/actions/{action}":
     parameters:
     - {name: id, in: path, required: true, schema: {type: string, format: uuid}}
@@ -7675,10 +7676,12 @@ paths:
               schema: {$ref: '#/components/schemas/Generation'}
         '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
+        '402': {description: 'Generation budget exhausted (budget_exceeded).'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {description: "Idempotency conflict, active work or changed estimate."}
         '422': {description: Verified price unavailable.}
+        '429': {$ref: '#/components/responses/TooManyRequests'}
         '503': {$ref: '#/components/responses/ServiceUnavailable'}
   "/v1/provider-resources/{id}/actions/{action}/estimate":
     parameters:
@@ -7690,8 +7693,6 @@ paths:
       summary: Quote a typed session action without provider submission
       description: Uses only an authorized local session binding and its exact revision. Native IDs, source evidence and upstream URLs are never accepted. Mutations serialize with active work; an uncertain mutation makes the session unusable until an explicitly requested recovery clear. Coordinates retain exact submitted precision. Unknown prices cannot be submitted.
       x-required-scope: generation
-      parameters:
-      - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -7704,7 +7705,7 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
-        '409': {description: "Idempotency conflict, active work or changed estimate."}
+        '409': {description: "Resource lifecycle, provider configuration or estimate changed."}
         '422': {description: Verified price unavailable.}
         '503': {$ref: '#/components/responses/ServiceUnavailable'}
   "/v1/provider-resources/{id}":
@@ -7724,6 +7725,7 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
 
   "/v1/provider-resource-jobs/{id}":
     get:
@@ -7740,8 +7742,11 @@ paths:
             application/json:
               schema: {$ref: '#/components/schemas/ProviderResourceJob'}
         '401': {$ref: '#/components/responses/Unauthorized'}
+        '400': {description: Invalid resource job request or malformed job ID (invalid_resource).}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
+        '409': {description: Resource lifecycle changed or conflicts with the job (resource_in_use).}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
   "/v1/generations/{id}/media-access":
     parameters:
     - "$ref": "#/components/parameters/TaskID"
@@ -7829,40 +7834,53 @@ paths:
           "bearerAuth": []
         -
           "sessionAuth": []
-      "description": "Organization role checks apply. Key mutations require organizations:manage; system-only operations additionally require system:manage. Amounts are USD."
+      description: Organization-scoped alias of GET /v1/generations. Browser sessions are supported. Live membership and role checks apply; Developers and Members see their own generations, and Managers receive metadata only. Project and author filters apply before pagination. Supports the same offset/cursor pagination and full or versions-only responses as GET /v1/generations.
       "responses":
-        "200":
-          "description": "Success"
-          "content":
-            "application/json":
-              "schema":
-                "type": "object"
-                "properties":
-                  "data":
-                    "type": "array"
-                    "items":
-                      "$ref": "#/components/schemas/Generation"
+        "200": *GenerationListResponse
+        "400": {$ref: '#/components/responses/BadRequest'}
+        "401": {description: Sign in or provide a valid Gateway API key}
         "403":
           "description": "Insufficient role, membership or scope"
         "409":
           "description": "Last supermanager, used invitation or conflicting payment ID"
-      "parameters":
-        - {in: query, name: offset, schema: {type: integer, minimum: 0, maximum: 1000000, default: 0}}
-        -
-          "in": "path"
-          "name": "org"
-          "required": true
-          "schema":
-            "type": "string"
-        -
-          "in": "query"
-          "name": "limit"
-          "schema":
-            "type": "integer"
-            "minimum": 1
-            "maximum": 100
-            "default": 50
-
+        "503": {$ref: '#/components/responses/ServiceUnavailable'}
+      parameters:
+      - in: query
+        name: project_id
+        schema:
+          oneOf:
+          - {type: string, format: uuid}
+          - {type: string, enum: [none]}
+        description: Optional workspace project UUID or none for unassigned generations only. Omit for all generations. The none sentinel is a read-only filter and cannot be assigned or managed as a project.
+      - {in: query, name: offset, schema: {type: integer, minimum: 0, maximum: 1000000, default: 0}}
+      - in: query
+        name: cursor
+        schema: {type: string, maxLength: 1024}
+        description: Opt in to cursor pagination, using an empty value for the first page. Use the returned next_cursor for the next older page. Cannot be combined with offset. next_cursor is also returned on a final nonempty page so its position can bound a later refresh.
+      - in: query
+        name: through
+        schema: {type: string, maxLength: 1024}
+        description: Optional inclusive oldest position for refreshing an already loaded range. Requires cursor pagination. Walk from cursor= through that saved tail, following has_more/next_cursor within the bounded range. The total still counts the full filtered set. Reuse the saved tail to load older history afterward.
+      - in: query
+        name: view
+        schema: {type: string, enum: [versions]}
+        description: Cursor mode only. Return only id and an opaque journal_revision for each matching record. Reconcile the loaded range with these lightweight pages, then request full data only for changed/new IDs. The revision includes the viewer/role/filter context and changes after task or stored-result availability updates, including same-timestamp writes.
+      - in: query
+        name: ids
+        schema: {type: string}
+        description: Cursor mode only. Comma-separated set of 1 to 50 unique canonical generation UUIDs for changed-card reads. All workspace, author and project restrictions still apply before pagination. The total counts the full viewer/project filter, independently of these IDs.
+      - in: query
+        name: include_total
+        schema: {type: boolean, default: true}
+        description: Cursor mode only. Set false on continuation inventory pages to omit total and avoid repeating the same count query. Reconciliation can count once per inventory walk.
+      - in: query
+        name: limit
+        schema:
+          default: 50
+          maximum: 100
+          minimum: 1
+          type: integer
+      - {in: path, name: org, required: true, schema: {type: string}}
   /v1/system/model-settings:
     get:
       operationId: get_v1_system_model_settings
@@ -7879,6 +7897,9 @@ paths:
                 type: object
                 properties:
                   data: {type: array, items: {$ref: '#/components/schemas/ModelSetting'}}
+        '401': {description: Sign in or provide a valid Gateway API key}
+        '403': {description: Administrator access required}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
   /v1/system/model-settings/{modelId}:
     parameters:
     - {in: path, name: modelId, required: true, schema: {type: string, format: uuid}}
@@ -7915,8 +7936,10 @@ paths:
             application/json:
               schema: {$ref: '#/components/schemas/ModelSetting'}
         '400': {description: Invalid public ID or missing fields}
+        '401': {description: Sign in or provide a valid Gateway API key}
         '403': {description: Administrator access required}
         '409': {description: Name already in use or version changed; reload settings}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
   /v1/organizations/{organizationId}/model-access:
     parameters:
     - {in: path, name: organizationId, required: true, schema: {type: string, format: uuid}}
@@ -7938,6 +7961,11 @@ paths:
                   data: {type: array, items: {$ref: '#/components/schemas/ModelSetting'}}
                   model_ids: {type: array, items: {type: string, format: uuid}}
                   version: {type: integer, minimum: 1}
+        '400': {description: Invalid organization ID after authorization}
+        '401': {description: Sign in or provide a valid Gateway API key}
+        '403': {description: Administrator access or a sales browser session with effective models permission for this client is required.}
+        '404': {description: Organization does not exist}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
     put:
       operationId: put_v1_organizations_organizationId_model_access
       tags: [Organizations]
@@ -7955,9 +7983,12 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/OrganizationModelAccess'}
+        '400': {description: Invalid organization ID or malformed grants/version after authorization}
+        '401': {description: Sign in or provide a valid Gateway API key}
         '403': {description: Administrator access or a sales browser session with effective models permission for this client is required.}
         '404': {description: Organization or model setting does not exist}
         '409': {description: Version changed; reload settings}
+        '503': {$ref: '#/components/responses/ServiceUnavailable'}
 
   /v1/organizations/{org}/generations/{id}:
     get:
