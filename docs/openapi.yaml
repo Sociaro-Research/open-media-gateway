@@ -7999,6 +7999,11 @@ paths:
       operationId: get_organization__generations_id
       parameters:
       - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+      - in: path
         name: org
         required: true
         schema:

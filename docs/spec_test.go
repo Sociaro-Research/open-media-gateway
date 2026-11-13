@@ -112,6 +112,53 @@ func TestResponseObjectsPreserveDescriptions(t *testing.T) {
 	}
 }
 
+func TestGenerationReadPathParameters(t *testing.T) {
+	data, err := JSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	type parameter struct {
+		Name     string
+		In       string
+		Required bool
+		Schema   struct{ Type, Format string }
+	}
+	type pathItem struct {
+		Parameters []parameter
+		Get        struct{ Parameters []parameter }
+	}
+	var spec struct{ Paths map[string]pathItem }
+	if err := json.Unmarshal(data, &spec); err != nil {
+		t.Fatal(err)
+	}
+	for path, names := range map[string][]string{
+		"/v1/generations/{id}":                     {"id"},
+		"/v1/organizations/{org}/generations/{id}": {"org", "id"},
+	} {
+		t.Run(path, func(t *testing.T) {
+			item := spec.Paths[path]
+			effective := map[string]parameter{}
+			// Operation declarations override matching Path Item declarations.
+			for _, parameters := range [][]parameter{item.Parameters, item.Get.Parameters} {
+				for _, p := range parameters {
+					if p.In == "path" {
+						effective[p.Name] = p
+					}
+				}
+			}
+			for _, name := range names {
+				p, ok := effective[name]
+				if !ok || !p.Required || p.Schema.Type != "string" {
+					t.Errorf("missing required string path parameter %q", name)
+				}
+			}
+			if effective["id"].Schema.Format != "" {
+				t.Error("generation ID must retain the canonical unrestricted string schema")
+			}
+		})
+	}
+}
+
 func TestModelIdentityDescriptionsSeparatePublicAndReferenceIDs(t *testing.T) {
 	data, err := JSON()
 	if err != nil {
