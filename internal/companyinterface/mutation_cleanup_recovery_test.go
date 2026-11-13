@@ -62,9 +62,21 @@ func TestCompanyMutationAbandonedDeletionLeaseExpiresAfterRestart(t *testing.T) 
 	// Exercise the actual SQL clock/lease predicate, without rewriting custody or
 	// shortening the lease in the fixture.
 	t.Log("waiting for real abandoned lease expiry", expiry.UTC())
-	timer := time.NewTimer(time.Until(expiry) + 100*time.Millisecond)
-	defer timer.Stop()
-	<-timer.C
+	time.Sleep(time.Until(expiry))
+	// Go timers are monotonic but the lease is wall-clock. Wait on the database
+	// clock itself: hosts that step the wall clock (WSL time sync) lag by seconds.
+	for start := time.Now(); ; time.Sleep(100 * time.Millisecond) {
+		var expired bool
+		if e = f.centralDB.QueryRow(`SELECT lease_until<clock_timestamp() FROM reference_deletion_admissions WHERE reference_id=$1`, item.ID).Scan(&expired); e != nil {
+			t.Fatal(e)
+		}
+		if expired {
+			break
+		}
+		if time.Since(start) > time.Minute {
+			t.Fatal("database clock did not pass the lease expiry")
+		}
+	}
 	if e = references.New(postgres.NewReferenceRepository(f.centralDB), store).CleanupDeletions(context.Background()); e != nil {
 		t.Fatal(e)
 	}
