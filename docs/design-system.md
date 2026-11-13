@@ -270,6 +270,10 @@ explicit Shared images block. Preview backgrounds follow their target palette,
 and every image identifies its resolved source. Header images follow the site
 theme; favicons follow the browser system theme. Brand images
 fit the existing header height while preserving their own aspect ratios.
+When the navigation does not fit beside the logo even with the compact logo, the
+header wraps into two rows: the logo and the account share the first row (the full
+logo returns when it fits there), and the navigation takes the full width below,
+left aligned in reading order, without extra space between its wrapped lines.
 Appearance uses shared floating fields, action headings, saves, feedback and the
 shared theme dropdown. Native color inputs complement editable hex fields: this
 is a justified exception because the browser provides a keyboard-accessible color

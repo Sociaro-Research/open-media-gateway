@@ -825,10 +825,11 @@ table .floating-field > .select-trigger { min-height:44px; padding:9px 42px 9px 
 .section-nav { gap:20px; justify-self:end; align-items:stretch; flex-wrap:nowrap; }
 .section-nav > :not([hidden]) { flex-shrink:0; }
 .topbar-actions { align-self:stretch; }
-.topbar.wrapped { grid-template-columns:minmax(0,1fr) max-content; grid-template-rows:auto minmax(max-content,auto); }
-.topbar.wrapped .brand { grid-row:1; grid-column:1 / -1; min-height:70px; }
-.topbar.wrapped .topbar-actions { grid-row:2; grid-column:2; }
-.topbar.wrapped .section-nav { grid-row:2; grid-column:1; width:100%; min-width:0; max-width:100%; min-height:48px; flex-wrap:wrap; justify-content:flex-end; }
+/* Wrapped: logo and account share the first row; navigation gets the full width below, in reading order. */
+.topbar.wrapped { grid-template-columns:minmax(0,1fr) max-content; grid-template-rows:auto auto; }
+.topbar.wrapped .brand { grid-row:1; grid-column:1; min-height:64px; }
+.topbar.wrapped .topbar-actions { grid-row:1; grid-column:2; }
+.topbar.wrapped .section-nav { grid-row:2; grid-column:1 / -1; width:100%; min-width:0; max-width:100%; min-height:48px; flex-wrap:wrap; row-gap:0; justify-content:flex-start; }
 .topbar.wrapped .section-nav > :not([hidden]) { min-height:48px; }
 .topbar.wrapped .workspace-picker { max-width:min(250px,100%); }
 
