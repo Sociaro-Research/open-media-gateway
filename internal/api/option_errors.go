@@ -28,7 +28,20 @@ func generationValidationError(w http.ResponseWriter, input core.CreateMediaInpu
 	}
 	var option *core.OptionValidationError
 	if !errors.As(err, &option) {
-		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		switch {
+		case errors.Is(err, core.ErrPromptRequired):
+			field := "prompt"
+			if input.MediaType == "speech" {
+				field = "input"
+			}
+			invalidParameter(w, field, field+" is required")
+		case errors.Is(err, core.ErrWebhookInvalid):
+			invalidParameter(w, "webhook_url", err.Error())
+		case errors.Is(err, core.ErrModelUnavailable), errors.Is(err, core.ErrProviderUnavailable):
+			invalidParameter(w, "model", err.Error())
+		default:
+			writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
+		}
 		return
 	}
 	hint := option.Hint
