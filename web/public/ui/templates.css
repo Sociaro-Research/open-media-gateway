@@ -67,6 +67,7 @@
 #templatesGallery { grid-template-columns:repeat(3,minmax(0,1fr)); gap:20px; align-items:start; }
 #templatesGallery .template-card { padding:16px; gap:16px; min-width:0; }
 .template-card > p { margin:0; overflow-wrap:anywhere; }
+.template-card > .status-badge { align-self:flex-start; }
 #templatesView .template-media { aspect-ratio:auto; display:block; overflow:visible; }
 #templatesView .template-media :is(img,video) { display:block; width:100%; height:auto; aspect-ratio:auto; object-fit:contain; border-radius:12px; background:var(--field); }
 #templatesView .template-media audio { width:100%; }

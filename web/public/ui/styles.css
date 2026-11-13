@@ -223,9 +223,10 @@ code { color: var(--text); }
 .task-icon { display: grid; place-items: center; flex: 0 0 auto; width: 34px; height: 34px; border-radius: 10px; background: var(--accent-dark); color: var(--accent-text,var(--accent)); font-size: 11px; }
 .task-title { display: block; }
 .task-title { max-width: 330px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
-.status-badge { flex: 0 0 auto; padding: 5px 8px; border-radius: 7px; background: color-mix(in srgb,var(--muted) 10%,transparent); color: var(--muted); font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; }
-.status-badge.completed { background: color-mix(in srgb,var(--accent) 10.0%,transparent); color: var(--accent-text,var(--accent)); }
-.status-badge.in_progress { background: color-mix(in srgb,var(--blue) 10%,transparent); color: var(--blue); }
+.status-badge { flex: 0 0 auto; padding: 5px 8px; border-radius: 7px; background: color-mix(in srgb,var(--muted) 10%,transparent); color: var(--muted); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; }
+/* Status uses the shared feedback tokens; the label text stays, so colour is never the only signal. */
+.status-badge.completed { background: color-mix(in srgb,var(--success) 10%,transparent); color: var(--success); }
+.status-badge:is(.in_progress,.draft) { background: color-mix(in srgb,var(--yellow) 10%,transparent); color: var(--yellow); }
 .status-badge.failed { background: color-mix(in srgb,var(--red) 10%,transparent); color: var(--red); }
 .task-meta { display: flex; justify-content: space-between; margin: 15px 0 9px 46px; color: var(--muted); font-size: 10px; }
 .progress { height: 3px; margin-left: 46px; overflow: hidden; border-radius: 9px; background: var(--line); }

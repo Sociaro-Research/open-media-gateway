@@ -45,7 +45,7 @@ saved column choices. Dispose owned controls and observers on unmount.
 | --- | --- |
 | Colors | Background `--bg` #0a0a0a; panel `--panel` #141414; field `--field` #101010; popup `--popup` #1c1c1c; border `--line` #303030. |
 | Text and actions | Text `--text` #f5f5f5; secondary `--muted` #a3a3a3; accent `--accent` #e5e5e5; hover/focus `--highlight` #ffffff. Use tokens, not local color copies. |
-| Feedback | Error `--red` #f08088; success `--success` #79d6a0; warning `--yellow` #f3c45b. Include text, not color alone. |
+| Feedback | Error `--red` #f08088; success `--success` #79d6a0; warning `--yellow` #f3c45b. Include text, not color alone. Status badges (11px uppercase) use them: Completed success, Running and the Templates Not published label warning, Failed error, Queued muted; tint 10% of the same token behind the text. |
 | Typography | Inherit the Inter/system font stack. Page/section/group headings: 36/20/16px; fields/body: 14px; tables: 13px; secondary detail: 12px. Monospace only for code. |
 | Spacing | Sections: `--space-section` 32px. Heading-to-content: 24/20/16px for page/section/group; shared action heading: 24px. Field groups: 12–20px; panel padding: 24px, 20px on narrow screens. |
 | Shape | Fields and popups: 12px radius, 1px border. Use existing shared classes; do not invent per-screen radii or shadows. |
