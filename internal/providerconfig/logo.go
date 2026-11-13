@@ -17,11 +17,12 @@ type LogoRepository interface {
 }
 
 func ValidateLogo(data []byte) error {
-	if len(data) > MaxLogoBytes {
-		return errors.New("logo must be at most ≈1.05 MB (1048576 bytes)")
-	}
+	// Type before size, so a large JPG is told PNG only (GW-350).
 	if !bytes.HasPrefix(data, []byte("\x89PNG\r\n\x1a\n")) {
 		return errors.New("logo must be a PNG image; other formats are unsupported")
+	}
+	if len(data) > MaxLogoBytes {
+		return errors.New("logo must be at most ≈1.05 MB (1048576 bytes)")
 	}
 	config, err := png.DecodeConfig(bytes.NewReader(data))
 	if err != nil {

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"mime"
@@ -65,7 +66,8 @@ func (s *Server) uploadProviderLogo(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, providerconfig.MaxLogoBytes)
 	defer r.Body.Close()
 	data, err := io.ReadAll(r.Body)
-	if err != nil {
+	// A cut-off body that is not a PNG falls through to ValidateLogo's "PNG only" (GW-350).
+	if err != nil && (len(data) < 8 || bytes.HasPrefix(data, []byte("\x89PNG\r\n\x1a\n"))) {
 		writeError(w, 400, "invalid_logo", "upload did not complete or exceeded ≈1.05 MB (1048576 bytes); choose a PNG and retry")
 		return
 	}

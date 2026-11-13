@@ -107,11 +107,12 @@
   });
 
   async function validate(file) {
-    if (file.size > limit) throw new Error('Logo must be at most '+ReferenceUpload.formatLimit(limit)+' ('+FileSize.exact(limit)+').');
-    const bytes = new Uint8Array(await file.arrayBuffer());
+    // Type before size: a large JPG must say "PNG only", not "too big". Only the header is read.
+    const bytes = new Uint8Array(await file.slice(0,33).arrayBuffer());
     if (!/\.png$/i.test(file.name) || (file.type && file.type !== 'image/png') || !signature.every((b,i) => bytes[i] === b)) {
       throw new Error('Choose a PNG image. Other formats are unsupported.');
     }
+    if (file.size > limit) throw new Error('Logo must be at most '+ReferenceUpload.formatLimit(limit)+' ('+FileSize.exact(limit)+').');
     // Check IHDR before decoding, bounding the browser's decoded allocation.
     if (bytes.length < 33 || String.fromCharCode(...bytes.slice(12,16)) !== 'IHDR') throw new Error('Invalid PNG image. Choose a complete, valid PNG file.');
     const view = new DataView(bytes.buffer), width = view.getUint32(16), height = view.getUint32(20);
@@ -162,7 +163,7 @@
       const retry=operationState.kind==='remove'?' Use Remove logo to retry.':' Choose a file to retry.';
       operationState.message=(error.name==='AbortError'?'Operation interrupted.':error.message)+retry;
       if(sent){
-        try{const latest=await api(`/v1/admin/providers/${encodeURIComponent(provider.id)}`);operationState.iconURL=latest.icon_url||'';saved(operationState.iconURL);operationState.message+=' Current server logo is shown.';}
+        try{const latest=await api(`/v1/admin/providers/${encodeURIComponent(provider.id)}`);operationState.iconURL=latest.icon_url||'';saved(operationState.iconURL);operationState.message+=operationState.iconURL?' Current server logo is shown.':' No logo installed.';}
         catch{operationState.message+=' Result not confirmed; reopen provider settings to check.';}
       }
     }
