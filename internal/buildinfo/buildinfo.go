@@ -3,15 +3,20 @@ package buildinfo
 
 import "runtime/debug"
 
-// Identity returns "<name> <module version>" plus VCS metadata when the build
-// recorded it; unversioned builds report "(devel)".
+// version is the release tag set by image builds through
+// -ldflags "-X github.com/Sociaro-Research/open-media-gateway/internal/buildinfo.version=vX.Y.Z".
+var version string
+
+// Identity returns "<name> <version>" plus VCS metadata when the build recorded
+// it. The version is the linked release tag, else the module version; builds
+// with neither (Docker builds exclude .git) report "(devel)".
 func Identity(name string) string {
-	version := "(devel)"
+	v := version
 	var revision string
 	var modified bool
 	if info, ok := debug.ReadBuildInfo(); ok {
-		if info.Main.Version != "" {
-			version = info.Main.Version
+		if v == "" {
+			v = info.Main.Version
 		}
 		for _, setting := range info.Settings {
 			switch setting.Key {
@@ -22,7 +27,10 @@ func Identity(name string) string {
 			}
 		}
 	}
-	identity := name + " " + version
+	if v == "" {
+		v = "(devel)"
+	}
+	identity := name + " " + v
 	if revision != "" {
 		identity += " revision=" + revision
 	}

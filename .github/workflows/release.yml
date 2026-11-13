@@ -80,6 +80,7 @@ jobs:
             if [ "$name" = ui ]; then context=web; fi
             if [ "$name" = postgres ] || [ "$name" = redis ]; then context="deploy/$name"; fi
             docker buildx build --load --tag "gateway-$name:release-test" \
+              --build-arg "VERSION=$RELEASE_VERSION" \
               --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
               --label "org.opencontainers.image.revision=$GITHUB_SHA" \
               --label "org.opencontainers.image.version=$RELEASE_VERSION" "$context"
