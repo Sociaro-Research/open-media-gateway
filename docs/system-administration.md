@@ -135,7 +135,9 @@ installation address or wildcard cross-window messaging. The local UI shows
 **Connected** only after redemption, binding verification and local credential
 save. Reload resumes the retained request. An uncertain start, redemption or
 cancellation is reconciled against the saved request/connection before another
-intent is allowed; retries never silently replace the proof. Existing connected
+intent is allowed; retries never silently replace the proof. A new request
+whose start fails (central server unreachable or refusing) is not kept, because
+no key can exist for its proof, so the next try can start at once. Existing connected
 metadata and version must match before a lost reply can be treated as success.
 If a verified dedicated save committed before pending-request cleanup failed,
 the backend locks and checks the exact owned attempt and one-step saved revision

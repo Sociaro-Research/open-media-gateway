@@ -94,7 +94,7 @@ func (m *Manager) BeginAuthorization(ctx context.Context, owner, origin, name, c
 func (m *Manager) BeginCompanyAuthorization(ctx context.Context, owner, origin, name, clientOrigin string, version int64) (AuthorizationView, error) {
 	return m.beginAuthorization(ctx, owner, origin, name, clientOrigin, version, wa.CompanyAccess)
 }
-func (m *Manager) beginAuthorization(ctx context.Context, owner, origin, name, clientOrigin string, version int64, access string) (AuthorizationView, error) {
+func (m *Manager) beginAuthorization(ctx context.Context, owner, origin, name, clientOrigin string, version int64, access string) (view AuthorizationView, err error) {
 	repo, err := m.authorizationRepo()
 	if err != nil {
 		return AuthorizationView{}, err
@@ -143,9 +143,23 @@ func (m *Manager) beginAuthorization(ctx context.Context, owner, origin, name, c
 	if err != nil {
 		return AuthorizationView{}, err
 	}
-	attempt, err := repo.SaveAuthorizationAttempt(ctx, Attempt{Access: access, Owner: owner, ID: uuid.NewString(), Origin: origin, Name: name, ClientOrigin: clientOrigin, Cipher: encrypted, Version: version, Expires: time.Now().UTC().Add(wa.Lifetime)})
+	id := uuid.NewString()
+	attempt, err := repo.SaveAuthorizationAttempt(ctx, Attempt{Access: access, Owner: owner, ID: id, Origin: origin, Name: name, ClientOrigin: clientOrigin, Cipher: encrypted, Version: version, Expires: time.Now().UTC().Add(wa.Lifetime)})
 	if err != nil {
 		return AuthorizationView{}, err
+	}
+	accepted := false
+	if attempt.ID == id {
+		// This call created the request and nothing has redeemed its proof, so no key
+		// can exist for it. Drop it on failure: keeping it blocks every retry until the
+		// central server confirms a cancellation it may never have received.
+		// Once the central server has accepted the start, keep it: the owner can still
+		// finish or cancel it even if reading it back failed here.
+		defer func() {
+			if err != nil && !accepted {
+				_ = repo.ClearAuthorizationAttempt(context.WithoutCancel(ctx), owner, id)
+			}
+		}()
 	}
 	if !attempt.Expires.After(time.Now()) {
 		return AuthorizationView{}, wa.ErrUnavailable
@@ -211,7 +225,8 @@ func (m *Manager) beginAuthorization(ctx context.Context, owner, origin, name, c
 	if json.Unmarshal(data, &reply) != nil || reply.Code != wa.UserCode(string(raw)) {
 		return AuthorizationView{}, ErrUnavailable
 	}
-	view, e := m.Authorization(ctx, owner)
+	accepted = true
+	view, e = m.Authorization(ctx, owner)
 	if e != nil {
 		return AuthorizationView{}, e
 	}
