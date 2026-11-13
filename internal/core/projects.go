@@ -7,6 +7,8 @@ import (
 	"time"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
 )
 
 // NoProjectFilter is a read-only list filter, outside the UUID project namespace.
@@ -18,7 +20,7 @@ var ErrProjectForbidden = errors.New("project changes are not allowed for this r
 var ErrProjectInvalid = errors.New("project is unavailable or invalid")
 var ErrProjectConflict = errors.New("project changed; review the current value before saving")
 var ErrProjectNameTaken = errors.New("a project with this name already exists")
-var ErrProjectName = errors.New("project name must contain 1 to 80 characters without control characters")
+var ErrProjectName = errors.New("project name must contain 1 to 80 characters, at least one visible, without control or text-direction characters")
 
 type Project struct {
 	Version   int64     `json:"version"`
@@ -29,7 +31,7 @@ type Project struct {
 
 func ProjectName(name string) (string, error) {
 	name = strings.TrimSpace(name)
-	if !utf8.ValidString(name) || utf8.RuneCountInString(name) < 1 || utf8.RuneCountInString(name) > 80 {
+	if !utf8.ValidString(name) || utf8.RuneCountInString(name) < 1 || utf8.RuneCountInString(name) > 80 || identity.UnreadableName(name) {
 		return "", ErrProjectName
 	}
 	for _, c := range name {

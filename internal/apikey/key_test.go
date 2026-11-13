@@ -6,6 +6,20 @@ import (
 	"time"
 )
 
+// GW-352: a key name must show something and must not reverse the text around it.
+func TestKeyNameMustBeVisible(t *testing.T) {
+	for _, name := range []string{" ", "\u200b", "\u200f", "\u202eQA"} {
+		if _, _, err := Generate(CreateInput{Name: name}, time.Now()); err == nil {
+			t.Fatalf("accepted %q", name)
+		}
+	}
+	for _, name := range []string{"Production bot", "Ключ 项目 🙂"} {
+		if _, _, err := Generate(CreateInput{Name: name}, time.Now()); err != nil {
+			t.Fatal(name, err)
+		}
+	}
+}
+
 func TestRandomSecretsAndNormalizedMetadata(t *testing.T) {
 	now := time.Now()
 	seen := map[string]bool{}
