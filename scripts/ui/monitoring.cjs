@@ -103,8 +103,8 @@ const grafana=http.createServer((req,res)=>{
   if(real)await delay(3000);
   await page.screenshot({path:path.join(screenshots,`monitoring-dashboard-${theme}-${width}.png`)});
  }
- if(!real){grafanaDown=true;const health=page.waitForResponse(r=>r.url().endsWith('/monitoring/api/health'));await page.goto(base+'/system');await page.locator('#systemNav').click();assert.equal((await health).status(),502);assert.equal(await page.getByRole('button',{name:'Monitoring ↗',exact:true}).isVisible(),false,'Monitoring offered without Grafana');grafanaDown=false;}
- await page.goto(base+'/system');await page.locator('#systemNav').click();
+ if(!real){grafanaDown=true;const health=page.waitForResponse(r=>r.url().endsWith('/monitoring/api/health'));await page.goto(base+'/system');await page.locator('#systemNav').click();assert.equal((await health).status(),502);assert.equal(await page.getByRole('button',{name:'Monitoring ↗',exact:true}).isVisible(),false,'Monitoring offered without Grafana');await page.waitForLoadState('networkidle');grafanaDown=false;await page.locator('[data-system-page="settings"]').click();}
+ else{await page.goto(base+'/system');await page.locator('#systemNav').click();}
  const action=page.getByRole('button',{name:'Monitoring ↗',exact:true});await action.waitFor();await action.focus();await page.keyboard.press('Enter');await page.waitForURL('**/monitoring/d/gateway-overview/gateway-overview');
  assert.deepEqual(errors.filter(message=>!message.includes('ResizeObserver')),[]);
  fs.writeFileSync(path.join(screenshots,'monitoring-summary.json'),JSON.stringify({proxy_boundary:'passed',login_return:'passed',administrator_navigation:'passed',desktop_mobile_keyboard:'passed',real_grafana:real?'passed':'unexecuted',screenshots},null,2)+'\n');
