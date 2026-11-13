@@ -513,6 +513,11 @@ func (s *Server) submitGeneration(w http.ResponseWriter, r *http.Request, input 
 	case errors.Is(err, core.ErrIdempotencyConflict):
 		writeError(w, http.StatusConflict, "idempotency_conflict", core.ErrIdempotencyConflict.Error())
 	case err != nil:
+		// OpenAI SDKs resend 5xx POSTs by default; without an Idempotency-Key that
+		// resend could admit the same generation again, so ask them not to.
+		if r.Header.Get("Idempotency-Key") == "" {
+			w.Header().Set("X-Should-Retry", "false")
+		}
 		writeError(w, http.StatusServiceUnavailable, "service_unavailable", generationAcceptanceUnconfirmed)
 	default:
 		view := core.GenerationView(task)
