@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"mime"
 	"net/http"
 	"slices"
 	"strconv"
@@ -286,7 +287,8 @@ func (s *Server) listGenerations(w http.ResponseWriter, r *http.Request) {
 func (s *Server) createOpenAIGeneration(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	var fields map[string]json.RawMessage
-	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
+	// Media type names are case-insensitive (RFC 9110 section 8.3.1).
+	if mediaType, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type")); mediaType == "multipart/form-data" {
 		var ok bool
 		fields, ok = s.multipartGeneration(w, r)
 		if !ok {

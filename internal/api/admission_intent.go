@@ -10,6 +10,7 @@ import (
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
 	"github.com/Sociaro-Research/open-media-gateway/internal/references"
 	"io"
+	"mime"
 	"net/http"
 	"strings"
 	"time"
@@ -39,7 +40,7 @@ func (s *Server) generationIntent(next http.Handler) http.Handler {
 		}
 		var value any
 		encoding := "json"
-		if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/") {
+		if mediaType, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type")); strings.HasPrefix(mediaType, "multipart/") {
 			encoding = "multipart"
 			if r.URL.Path != "/v1/images/edits" && r.URL.Path != "/v1/videos" {
 				serveUnrecovered()
