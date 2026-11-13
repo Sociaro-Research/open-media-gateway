@@ -85,7 +85,8 @@
   const seen=new Set();
   for(const item of result.data||[]){seen.add(item.id);const card=el('article','','card template-card');card.dataset.updateKey=item.id;card.dataset.templateId=item.id;card.onclick=event=>{if(event.defaultPrevented||event.target.closest('button,a,input,select,textarea'))return;event.currentTarget.querySelector('[data-use-template]')?.click();};card.append(media(item.cover_url,item.cover_type,item.title,{hover:true}));const select=button(item.title,()=>use(item.id),'template-card-title');select.dataset.useTemplate='';select.setAttribute('aria-pressed',String(browseID===item.id));card.append(select);if(item.description)card.append(el('p',item.description,'body-copy'));if(canEdit){const record=authorRecords.find(r=>r.id===item.id);if(record){const edit=button('Edit',event=>{event.stopPropagation();renderEditor(localDrafts.get(record.id)||record);});edit.setAttribute('aria-label','Edit '+(record.draft.title||item.title));card.append(edit);}}nextGrid.append(card);}
   if(canEdit)for(const record of authorRecords){if(seen.has(record.id))continue;const card=el('article','','card template-card template-draft-card');card.dataset.updateKey=record.id;card.append(el('h2',record.draft.title||'Untitled template'),el('p',record.published?'Published template unavailable to this key':'Not published'));const edit=button('Edit',()=>renderEditor(localDrafts.get(record.id)||record));edit.setAttribute('aria-label','Edit '+(record.draft.title||'Untitled template'));card.append(edit);nextGrid.append(card);}
-  if(!nextGrid.childElementCount)nextGrid.append(el('p','No templates have been published yet.'));
+  // Without a key the gallery is unknown, not empty; the connect card explains it.
+  if(!nextGrid.childElementCount&&GenerationKey.value())nextGrid.append(el('p','No templates have been published yet.'));
   for(const old of galleryHost.children){const incoming=[...nextGrid.children].find(n=>n.dataset.updateKey===old.dataset.updateKey);if(!incoming||old.querySelector('.template-media')?.dataset.updateKey!==incoming.querySelector('.template-media')?.dataset.updateKey)stopMedia(old);}
   GatewayAutoUpdate.reconcile(galleryHost,nextGrid);selectedCard();
  }
@@ -111,7 +112,7 @@
    if(screen==='edit')return;
    const incoming=GenerationKey.value()?await api('/v1/templates',{signal}):{data:[]};if(!valid())return;
    result=incoming;renderList();
-   if(!GenerationKey.value()){emptySelection();if(!failure)say('Enter the same Gateway API key used in Playground to browse and generate.');}
+   if(!GenerationKey.value()){emptySelection();if(!failure)say('');}
    else if(screen!=='use'&&!failure)say('');
   }
   async function detail(){
