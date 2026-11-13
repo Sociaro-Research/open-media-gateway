@@ -3,7 +3,8 @@ package main
 import (
 	"fmt"
 	"io"
-	"runtime/debug"
+
+	"github.com/Sociaro-Research/open-media-gateway/internal/buildinfo"
 )
 
 const cliUsage = `Usage: gateway [--help | --version | healthcheck | admin COMMAND [OPTIONS]]
@@ -38,7 +39,7 @@ func executeCLI(args []string, out io.Writer, handlers cliHandlers) error {
 			_, err := io.WriteString(out, cliUsage)
 			return err
 		case "--version", "version":
-			_, err := fmt.Fprintln(out, buildIdentity())
+			_, err := fmt.Fprintln(out, buildinfo.Identity("gateway"))
 			return err
 		default:
 			return handlers.health()
@@ -67,31 +68,4 @@ func validateAdminCommand(args []string) error {
 	default:
 		return fmt.Errorf("unknown admin command; %s; example: gateway admin users", adminUsage)
 	}
-}
-
-func buildIdentity() string {
-	version := "(devel)"
-	var revision string
-	var modified bool
-	if info, ok := debug.ReadBuildInfo(); ok {
-		if info.Main.Version != "" {
-			version = info.Main.Version
-		}
-		for _, setting := range info.Settings {
-			switch setting.Key {
-			case "vcs.revision":
-				revision = setting.Value
-			case "vcs.modified":
-				modified = setting.Value == "true"
-			}
-		}
-	}
-	identity := "gateway " + version
-	if revision != "" {
-		identity += " revision=" + revision
-	}
-	if modified {
-		identity += " modified=true"
-	}
-	return identity
 }
