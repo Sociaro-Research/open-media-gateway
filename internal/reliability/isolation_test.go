@@ -9,7 +9,9 @@ import (
 )
 
 func TestReliabilityBusyOwnerDoesNotBlockAnotherOwner(t *testing.T) {
-	s := newStack(t, 30*time.Second)
+	// 100 tasks polled every 100 ms saturate a shared -race CI runner and slow
+	// every step below; this deadline is only a hang guard, not a latency check.
+	s := newStack(t, 2*time.Minute)
 	s.personalKey()
 	firstKey := s.key
 	s.fixture.ready = false
