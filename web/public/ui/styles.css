@@ -1253,6 +1253,8 @@ table .control-row { --control-height:44px; }
 .report-chart-switches { gap:20px; }
 .report-chart-switch { display:flex; align-items:center; gap:10px; margin:0; font-size:13px; font-weight:400; }
 .report-chart-empty { color:var(--muted); margin:24px 0; font-size:14px; }
+.report-empty-actions { display:flex; flex-wrap:wrap; justify-content:center; gap:12px; margin-top:8px; }
+.report-empty-actions:empty { display:none; }
 .report-spend-layout { display:grid; grid-template-columns:max-content minmax(0,1fr); gap:12px; }
 .report-spend-axis { min-width:60px; height:240px; display:flex; flex-direction:column; justify-content:space-between; text-align:right; font-size:12px; color:var(--muted); }
 .report-spend-scroll { overflow-x:auto; padding:0 0 12px; }
