@@ -2,11 +2,13 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -171,6 +173,73 @@ func TestExpiredLocalAttemptCannotLoseRevocationProofOnNewStart(t *testing.T) {
 	kept, e := repo.AuthorizationAttempt(ctx, owner.ID)
 	if e != nil || kept.ID != original.ID {
 		t.Fatal("pending proof missing", e)
+	}
+}
+
+func TestFailedNewStartKeepsNoRequestSoRetryWorks(t *testing.T) {
+	db := workspaceDatabase(t)
+	ctx := context.Background()
+	owner, e := postgres.NewAuthRepository(db).UpsertGoogleUser(ctx, uuid.NewString(), uuid.NewString()+"@fixture.test", "Local admin", "")
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = db.Exec(`UPDATE users SET is_system_admin=TRUE WHERE id=$1`, owner.ID); e != nil {
+		t.Fatal(e)
+	}
+	var status atomic.Int32
+	status.Store(http.StatusServiceUnavailable)
+	host := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if code := int(status.Load()); code != http.StatusOK {
+			w.WriteHeader(code)
+			return
+		}
+		var in struct {
+			Device string `json:"device_code"`
+		}
+		if json.NewDecoder(r.Body).Decode(&in) != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		fmt.Fprintf(w, `{"user_code":%q}`, wa.UserCode(in.Device))
+	}))
+	defer host.Close()
+	down := httptest.NewTLSServer(http.NotFoundHandler())
+	downURL, downClient := down.URL, down.Client()
+	down.Close()
+	cipher, _ := providerconfig.NewCipher(strings.Repeat("r", 32))
+	repo := postgres.NewSystemRepository(db)
+	manager := remote.New(repo, cipher, host.Client())
+	begin := func(m *remote.Manager, origin string) (remote.AuthorizationView, error) {
+		return m.BeginAuthorization(ctx, owner.ID, origin, "Local installation", "http://localhost:8088", 0)
+	}
+	kept := func() (remote.Attempt, bool) {
+		attempt, err := repo.AuthorizationAttempt(ctx, owner.ID)
+		return attempt, !errors.Is(err, remote.ErrNotFound)
+	}
+	if _, e = begin(remote.New(repo, cipher, downClient), downURL); !errors.Is(e, remote.ErrUnavailable) {
+		t.Fatal("unreachable server accepted start", e)
+	}
+	if _, ok := kept(); ok {
+		t.Fatal("unreachable server left a request that blocks the next try")
+	}
+	if _, e = begin(manager, host.URL); !errors.Is(e, remote.ErrUnavailable) {
+		t.Fatal("refused start succeeded", e)
+	}
+	if _, ok := kept(); ok {
+		t.Fatal("refused start left a request that blocks the next try")
+	}
+	status.Store(http.StatusOK)
+	view, e := begin(manager, host.URL)
+	if e != nil || view.Code == "" {
+		t.Fatal("retry after a failed start did not begin at once", e)
+	}
+	// A request the server already accepted keeps its proof when a later retry fails.
+	status.Store(http.StatusBadGateway)
+	if _, e = begin(manager, host.URL); !errors.Is(e, remote.ErrUnavailable) {
+		t.Fatal("failed retry succeeded", e)
+	}
+	if attempt, ok := kept(); !ok || attempt.ID != view.ID {
+		t.Fatal("accepted request lost its proof on a failed retry")
 	}
 }
 

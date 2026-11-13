@@ -223,7 +223,16 @@ func TestLegacyRecoveryRealProducerCanContinueAfterOriginalHostFailure(t *testin
 					want = remote.ErrUnavailable
 				}
 				if !errors.Is(e, want) {
-					t.Fatal("real producer did not retain failed initial state", e)
+					t.Fatal("real producer did not report failed initial state", e)
+				}
+				// A failed new start now keeps nothing; seed the request older releases left behind.
+				if _, e = f.repo.AuthorizationAttempt(ctx, f.owner.ID); !errors.Is(e, remote.ErrNotFound) {
+					t.Fatal("failed new start kept its request", e)
+				}
+				device, _ := wa.DeviceCode()
+				sealed, _ := f.cipher.Encrypt([]byte(device))
+				if _, e = f.repo.SaveAuthorizationAttempt(ctx, remote.Attempt{Owner: f.owner.ID, ID: uuid.NewString(), Origin: legacyWrongOrigin, Name: "Original attempt", ClientOrigin: legacyLocalOrigin, Cipher: sealed, Version: version, Expires: time.Now().Add(wa.Lifetime)}); e != nil {
+					t.Fatal(e)
 				}
 				view, e = f.manager.Authorization(ctx, f.owner.ID)
 			}
