@@ -45,7 +45,8 @@ module.exports=async function(page,{writes,oid,uid,account}){
  if(baseline){console.log('PASS: baseline screenshots');return;}
  assert.equal(await role().inputValue(),'member');
  assert.deepEqual(await role().locator('option').evaluateAll(nodes=>nodes.map(n=>[n.value,n.textContent])),[['supermanager','Supermanager'],['admin','Manager'],['content_officer','Content Officer'],['developer','Developer'],['member','Member']]);
- assert.equal(await assignment().getByRole('button',{name:'Assign',exact:true}).isVisible(),false);
+ // Create flows show their action disabled until the form is valid (design-system.md).
+ assert.equal(await assignment().getByRole('button',{name:'Assign',exact:true}).isDisabled(),true);
  // Enter/Space operate the shared picker; Escape returns focus without a write.
  const picker=assignment().getByRole('combobox',{name:'Role',exact:true});
  await picker.focus();await page.keyboard.press('Enter');await page.getByRole('option',{name:'Developer',exact:true}).click();
