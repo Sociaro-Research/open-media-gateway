@@ -5,8 +5,10 @@ RUN apk add --no-cache ca-certificates python3
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/gateway ./cmd/gateway && \
-    CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/worker ./cmd/worker && \
+# Release tag for gateway/worker --version; empty keeps the "(devel)" identity.
+ARG VERSION=
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w -X github.com/Sociaro-Research/open-media-gateway/internal/buildinfo.version=${VERSION}" -o /out/gateway ./cmd/gateway && \
+    CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w -X github.com/Sociaro-Research/open-media-gateway/internal/buildinfo.version=${VERSION}" -o /out/worker ./cmd/worker && \
     CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/webhook-receiver ./cmd/webhook-receiver
 RUN python3 deploy/ghcr/collect-licenses.py /out/licenses
 RUN mkdir -p /out/media && chown 65532:65532 /out/media

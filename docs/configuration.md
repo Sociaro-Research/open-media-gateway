@@ -463,7 +463,8 @@ against an installation database.
 `gateway --help` (also `-h` or `help`) and `gateway --version` (also `version`)
 return locally without loading configuration or connecting to services. Version
 output reports available Go build identity and VCS metadata; unversioned builds
-report `(devel)` rather than an assumed release number.
+report `(devel)` rather than an assumed release number. Published release images
+report their release tag, set with `docker build --build-arg VERSION=vX.Y.Z`.
 
 `gateway healthcheck` checks the running server's loopback health endpoint.
 `gateway admin --help` lists administrative commands; valid administrative
