@@ -470,3 +470,8 @@ report `(devel)` rather than an assumed release number.
 operations retain their database requirements and migration behavior. Unknown
 commands and extra arguments to help, version or healthcheck fail with nonzero
 status before service startup.
+
+`worker` follows the same rule: only a bare `worker` starts the worker.
+`worker --help` (also `-h` or `help`) and `worker --version` (also `version`)
+return locally without loading configuration, connecting to services or
+migrating; any other argument fails with nonzero status before startup.

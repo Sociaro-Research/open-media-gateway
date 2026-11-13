@@ -3,12 +3,14 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/Sociaro-Research/open-media-gateway/internal/buildinfo"
 	"github.com/Sociaro-Research/open-media-gateway/internal/config"
 	"github.com/Sociaro-Research/open-media-gateway/internal/httpclient"
 	"github.com/Sociaro-Research/open-media-gateway/internal/monitoring"
@@ -22,10 +24,38 @@ import (
 	workerprocess "github.com/Sociaro-Research/open-media-gateway/internal/worker"
 )
 
+const cliUsage = `Usage: worker [--help | --version]
+
+With no arguments, start the media and webhook worker using its environment configuration.
+  --help, -h, help       Show this help without connecting to services.
+  --version, version     Show available build identity without connecting to services.
+`
+
 func main() {
-	if err := run(); err != nil {
+	if err := executeCLI(os.Args[1:], os.Stdout, run); err != nil {
 		slog.Error("worker stopped", "error", err)
 		os.Exit(1)
+	}
+}
+
+// Only a bare invocation may load configuration, connect to services or migrate.
+func executeCLI(args []string, out io.Writer, serve func() error) error {
+	if len(args) == 0 {
+		return serve()
+	}
+	switch args[0] {
+	case "--help", "-h", "help", "--version", "version":
+		if len(args) != 1 {
+			return fmt.Errorf("unexpected arguments for %s; use worker --help", args[0])
+		}
+		if args[0] == "--version" || args[0] == "version" {
+			_, err := fmt.Fprintln(out, buildinfo.Identity("worker"))
+			return err
+		}
+		_, err := io.WriteString(out, cliUsage)
+		return err
+	default:
+		return fmt.Errorf("unknown command %q; use worker --help", args[0])
 	}
 }
 
