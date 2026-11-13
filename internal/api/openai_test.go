@@ -477,3 +477,38 @@ func TestModelIDIsStableAndRoundTrips(t *testing.T) {
 		}
 	}
 }
+
+// Speech rejects prompt, so its missing-text error must name input instead.
+func TestOpenAIAdmissionErrorsNameTheRejectedField(t *testing.T) {
+	service := core.NewTaskServiceWithProviders(&admissionRepository{}, &admissionQueue{}, map[string]core.MediaProvider{"mock": mock.New(time.Second, "")}, map[string]string{"mock": "mock-video-v1"}, "mock")
+	service.EnableAccounting()
+	real := New(service, healthStub{}, "secret")
+	rejected := func(err error) http.Handler {
+		return New(&unavailableAdmissionService{err: err}, healthStub{}, "secret")
+	}
+	for _, tc := range []struct {
+		h                          http.Handler
+		path, body, param, message string
+	}{
+		{real, "/v1/audio/speech", `{"model":"mock/mock-speech-v1","input":" "}`, "input", "input is required"},
+		{real, "/v1/generations/estimate", `{"model":"mock/mock-speech-v1"}`, "input", "input is required"},
+		{real, "/v1/images/generations", `{"model":"mock/mock-image-v1","prompt":""}`, "prompt", "prompt is required"},
+		{real, "/v1/videos", `{"model":"mock/mock-video-v1","prompt":"fixture","webhook_url":"http://127.0.0.1/hook"}`, "webhook_url", core.ErrWebhookInvalid.Error()},
+		{rejected(core.ErrModelUnavailable), "/v1/videos", `{"model":"mock/mock-video-v1","prompt":"fixture"}`, "model", core.ErrModelUnavailable.Error()},
+		{rejected(core.ErrProviderUnavailable), "/v1/videos", `{"model":"mock/mock-video-v1","prompt":"fixture"}`, "model", core.ErrProviderUnavailable.Error()},
+	} {
+		r := httptest.NewRequest("POST", tc.path, strings.NewReader(tc.body))
+		r.Header.Set("Authorization", "Bearer secret")
+		w := httptest.NewRecorder()
+		tc.h.ServeHTTP(w, r)
+		var response struct {
+			Error struct {
+				Param   *string
+				Message string
+			}
+		}
+		if w.Code != 400 || json.Unmarshal(w.Body.Bytes(), &response) != nil || response.Error.Param == nil || *response.Error.Param != tc.param || response.Error.Message != tc.message {
+			t.Errorf("%s %s: %d %s", tc.path, tc.body, w.Code, w.Body)
+		}
+	}
+}
