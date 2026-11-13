@@ -19,13 +19,14 @@
  if(all){let name,domain,admin;const f=form(parent,'Create organization',async()=>{await api('/v1/organizations',{method:'POST',body:JSON.stringify({name:name.value,domain:domain.value,admin_user:admin.value})});await window.Workspace?.refresh();await open(parent,all)});name=field(f,'Name','text','',true);domain=field(f,'Company website','text','',true);domain.maxLength=2048;domain.autocomplete='url';admin=field(f,'First supermanager (optional)');admin.title='Email or user ID';f.classList.add('organization-create');f.finish('Create',()=>!!name.value.trim()&&!!domain.value.trim());}
  const installationActions=all?window.WorkspaceAuthorization?.organizationActions(items,()=>token===epoch):null;
  if(installationActions?.feedback)parent.append(installationActions.feedback);
- const organizationsTable=table('organizations',parent,['Organization','Balance','Credit Limit','Shared storage',''],items.map(o=>[o.name,!OrganizationRoles.statistics(o.role)?'—':money(o.balance_usd),!OrganizationRoles.statistics(o.role)?'—':money(o.credit_limit_usd),!OrganizationRoles.statistics(o.role)?'—':StorageQuota.size(o.storage_bytes),(()=>{const actions=el('div',null,'form-actions');actions.append(button('Manage',()=>details(parent,o,all)));if(all){const revoke=installationActions?.get(o.id);if(revoke)actions.append(revoke);}return actions;})()]));
+ // No empty table: a new invitee sees the status line and then the invitation.
+ if(items.length){const organizationsTable=table('organizations',parent,['Organization','Balance','Credit Limit','Shared storage',''],items.map(o=>[o.name,!OrganizationRoles.statistics(o.role)?'—':money(o.balance_usd),!OrganizationRoles.statistics(o.role)?'—':money(o.credit_limit_usd),!OrganizationRoles.statistics(o.role)?'—':StorageQuota.size(o.storage_bytes),(()=>{const actions=el('div',null,'form-actions');actions.append(button('Manage',()=>details(parent,o,all)));if(all){const revoke=installationActions?.get(o.id);if(revoke)actions.append(revoke);}return actions;})()]));
  organizationsTable.querySelectorAll('tbody tr').forEach((row,index)=>{
   const manage=row.querySelector('button');if(!manage||manage.disabled)return;
   row.classList.add('organization-row');row.tabIndex=0;row.setAttribute('aria-label','Manage '+items[index].name);
   row.addEventListener('click',e=>{if(!e.target.closest('button,a,input,select,textarea'))manage.click();});
   row.addEventListener('keydown',e=>{if(e.target===row&&(e.key==='Enter'||e.key===' ')){e.preventDefault();manage.click();}});
- });
+ });}
  const pending=sessionStorage.getItem('gateway-pending-invite');if(pending&&!clientManager)await invitation(parent,pending);
  }catch(e){FormUI.message(status,e.message,'error')}}
 
