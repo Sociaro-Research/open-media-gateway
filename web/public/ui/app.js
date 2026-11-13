@@ -1352,10 +1352,38 @@ document.querySelector('#reportsNav').addEventListener('click', () => showConsol
 document.querySelector('#keysNav').addEventListener('click', () => showConsoleSection('keys',{historyMode:'push'}));
 document.querySelector('#storageNav').addEventListener('click', () => showConsoleSection('storage'));
 document.querySelector('#docsNav').addEventListener('click', () => showConsoleSection('docs'));
+// Without email delivery or Google the sign-in page offers no way back in (docs/system-administration.md).
+async function noBrowserSignIn() {
+	try {
+		const response = await fetch('/auth/methods', {credentials: 'same-origin'});
+		if (!response.ok) return false;
+		const methods = await response.json();
+		return !methods.setup_required && !methods.email && !methods.google;
+	} catch { return false; }
+}
+function confirmSignOutWithoutSignIn() {
+	return new Promise(resolve => {
+		const panel = document.createElement('dialog'), form = document.createElement('form'), text = document.createElement('p'), actions = document.createElement('div');
+		panel.className = 'keys-revoke-dialog'; panel.dataset.signOutWarning = ''; panel.append(form);
+		const done = value => { panel.close(); panel.remove(); resolve(value); };
+		const {heading} = FormUI.dialogHeading(form, 'Sign out without a way back in?', () => done(false));
+		heading.id = 'sign-out-warning-title'; panel.setAttribute('aria-labelledby', heading.id);
+		text.textContent = 'No sign-in method is set up: email login needs Email delivery, and Google sign-in is not configured. After you sign out, the sign-in page only says “Sign-in is currently unavailable.” Set up Email delivery or Google in Administration → Settings first.';
+		const stay = document.createElement('button'), leave = document.createElement('button');
+		stay.type = leave.type = 'button'; stay.className = 'secondary'; leave.className = 'secondary danger compact';
+		stay.textContent = 'Stay signed in'; leave.textContent = 'Sign out anyway';
+		stay.onclick = () => done(false); leave.onclick = () => done(true);
+		actions.className = 'dialog-actions'; actions.append(stay, leave); form.append(text, actions);
+		form.onsubmit = event => event.preventDefault();
+		panel.addEventListener('cancel', event => { event.preventDefault(); done(false); });
+		document.body.append(panel); FormUI.refresh(); panel.showModal(); stay.focus();
+	});
+}
 elements.logout.addEventListener('click', async () => {
 	elements.logout.disabled = true;
 	elements.sessionMessage.hidden = true;
 	try {
+		if (await noBrowserSignIn() && !await confirmSignOutWithoutSignIn()) return;
 		const response = await fetch('/auth/logout', {method: 'POST', credentials: 'same-origin'});
 		if (!response.ok) throw new Error('Sign out could not be completed. Please try again.');
 		window.GenerationKey.signOut();

@@ -32,7 +32,7 @@ share the code publicly. Only one concurrent setup can succeed. Existing
 installations with any users do not offer this screen on upgrade, and deleting
 an owner's account does not reopen completed setup.
 
-Email login is hidden until delivery is configured, even if its enabled preference is retained. Google availability is independent. Existing sessions and confirmation/reset links remain usable, and the password API retains its existing configured-method policy. Configure delivery or Google before signing out of the initial administrator session; if no browser method is available, use the existing server-side management-key recovery below.
+Email login is hidden until delivery is configured, even if its enabled preference is retained. Google availability is independent. Existing sessions and confirmation/reset links remain usable, and the password API retains its existing configured-method policy. Configure delivery or Google before signing out of the initial administrator session. While no browser method is available, Sign out first asks for confirmation (**Stay signed in** / **Sign out anyway**). If you are already signed out, use the existing server-side management-key recovery below.
 
 ### Headless installation and existing accounts
 
