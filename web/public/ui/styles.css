@@ -666,6 +666,25 @@ button, input, textarea, select { font-family: inherit; }
 .organization-summary { display:flex; gap:20px 32px; flex-wrap:wrap; margin:20px 0; }
 .organization-summary dt { font-size:12px; color:var(--muted); }
 .organization-summary dd { display:flex; align-items:center; gap:12px; min-height:36px; margin:6px 0 0; font-size:16px; font-variant-numeric:tabular-nums; }
+/* Organization first-run checklist: one panel, steps in order, each with its own action. */
+:is(#configurationView,#systemView) .organization-setup { gap:4px; margin:0 0 var(--space-section,32px); }
+.organization-setup-heading { display:flex; align-items:center; gap:12px; margin:-10px -10px 0 0; }
+:is(#configurationView,#systemView) .organization-setup-heading h2 { margin:0; font-size:20px; }
+:is(#configurationView,#systemView) .organization-setup-progress { margin:0 auto 0 0; color:var(--muted); font-size:13px; font-variant-numeric:tabular-nums; }
+.organization-setup ol { margin:0; padding:0; list-style:none; }
+.organization-setup li { display:grid; grid-template-columns:24px minmax(0,1fr) auto; align-items:center; gap:16px; padding:16px 0; border-top:1px solid var(--line); }
+.organization-setup li:first-child { border-top:0; }
+.organization-setup li:last-child { padding-bottom:0; }
+.organization-setup strong { display:block; font-size:14px; font-weight:600; }
+:is(#configurationView,#systemView) .organization-setup li p { margin:2px 0 0; color:var(--muted); font-size:13px; line-height:1.5; }
+.organization-setup-mark { display:grid; width:24px; height:24px; color:var(--muted); }
+.organization-setup li.done .organization-setup-mark { color:var(--success); }
+.organization-setup li.done strong { color:var(--muted); font-weight:400; }
+.organization-setup li > button { min-height:40px; white-space:nowrap; }
+@media (max-width:600px) {
+  .organization-setup li { grid-template-columns:24px minmax(0,1fr); align-items:start; gap:4px 12px; }
+  .organization-setup li > button { grid-column:2; justify-self:start; margin-top:8px; }
+}
 .report-actions { display:flex; justify-content:flex-end; margin:16px 0; }
 @media(max-width:760px){.organization-create{grid-template-columns:minmax(0,1fr)}.role-editor>.floating-field{flex-basis:160px}}
 @media(prefers-reduced-motion:reduce){.floating-label{transition:none!important}}

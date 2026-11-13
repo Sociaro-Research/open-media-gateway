@@ -8,6 +8,7 @@
  const tableColumns={organizations:['organization','balance','credit_limit','shared_storage','actions'],client_companies:['organization','balance','spend','last_activity','credit_limit','shared_storage','actions'],organization_members:['member','role','this_week','total_consumption','weekly_limit'],organization_invitations:['role','expires','status','accepted_by','actions']};
  const table=(id,parent,heads,rows)=>{const wrap=el('div',null,'docs-table-wrap'),t=el('table',null,'docs-table'),head=el('tr');heads.forEach(h=>{const th=el('th');th.append(h instanceof Node?h:document.createTextNode(h));th.scope='col';head.append(th)});const thead=el('thead');thead.append(head);t.append(thead);const body=el('tbody');rows.forEach(values=>{const tr=el('tr');values.forEach((v,index)=>{const td=el('td',null,heads[index]===''?'table-row-actions':null);td.append(v instanceof Node?v:document.createTextNode(String(v??'')));tr.append(td)});body.append(tr)});t.append(body);window.TableUI?.attach(t,{id,columns:tableColumns[id],api});wrap.append(t);parent.append(wrap);return t;};
  const nullable=n=>n.value===''?null:Number(n.value);
+ const invitationState=(i,now=Date.now())=>i.accepted_by?'Accepted':i.revoked_at?'Revoked':new Date(i.expires_at).getTime()<=now?'Expired':'Pending';
  function form(parent,title,submit){const f=el('form',null,'keys-form organization-form');f.append(el('h2',title));parent.append(f);const status=el('p');status.setAttribute('role','status');const save=el('button','Save','primary compact');save.type='submit';f.finish=(caption='Save',valid=()=>true)=>{save.textContent=caption;const actions=el('div',null,'form-actions');actions.append(save,status);f.append(actions);FormUI.watch(f,save,{valid})};f.onsubmit=async e=>{e.preventDefault();if(save.disabled)return;const saved=FormUI.snapshot(f);save.disabled=true;FormUI.message(status,'Saving…');try{await submit();FormUI.saved(f,saved);FormUI.message(status,'')}catch(error){FormUI.message(status,error.message,'error')}finally{save.disabled=false;FormUI.update(f)}};return f;}
  function confirmAction(title,text,action,{danger=false}={}){const d=el('dialog',null,'keys-revoke-dialog organization-dialog'),message=el('p'),cancel=button('Cancel',()=>d.close()),yes=button('Confirm',async()=>{yes.disabled=true;message.replaceChildren(text.cloneNode?text.cloneNode(true):document.createTextNode(text));try{await action();d.close()}catch(e){FormUI.message(message,e.message,'error');yes.disabled=false}});yes.classList.toggle('danger',danger);message.append(text.cloneNode?text.cloneNode(true):text);const actions=el('div',null,'form-actions');actions.append(cancel,yes);d.append(el('h2',title),message,actions);document.body.append(d);d.onclose=()=>d.remove();d.showModal();cancel.focus();}
  let epoch=0;
@@ -79,6 +80,54 @@
   await load();
   await window.ClientOnboarding?.mount(parent,{current:()=>token===epoch,refresh:async()=>{await load();await window.Workspace?.refresh();}});
  }
+ // First-run checklist for organization managers. Each step is detected from existing data; the card is
+ // remembered as finished (per user and organization) once it is dismissed or every step is done.
+ const setupIcons={done:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 2.5 2.5L16 9.5"/></svg>',todo:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/></svg>'};
+ function setupGuide(o,base,parent,before,open,current){
+  const playground=document.querySelector('#generationNav'),docs=document.querySelector('#docsNav'),tryHere=playground&&!playground.hidden?['Open Playground',()=>playground.click()]:['Open Docs',()=>docs?.click()];
+  // Enhance fields now: the scheduled FormUI pass would re-wrap the input and drop its focus.
+  const focus=async(name,selector)=>{await open(name);FormUI.refresh();const target=parent.querySelector(selector);target?.scrollIntoView({block:'center'});target?.focus();};
+  const steps=[
+   ['key','Create an API key','Your apps and scripts send requests with it.','Create key',()=>focus('API keys','#newKeyName')],
+   ['credit','Add credit','Requests are paid from the balance or the credit limit.','Open Billing',()=>open('Billing')],
+   ['request','Send your first request','Try a model in the Playground, or call the API from your app.',...tryHere],
+   ['team','Invite your team','Members get their own API keys and weekly limits.','Invite members',()=>focus('Members','.member-invitations button[type=submit]')],
+  ];
+  const timezone=Intl.DateTimeFormat().resolvedOptions().timeZone;let members=null;
+  const checks={
+   key:async()=>(await api('/v1/api-keys?organization_id='+encodeURIComponent(o.id))).data.some(k=>k.organization_id===o.id),
+   credit:async()=>Number(o.balance_usd)>0||Number(o.credit_limit_usd)>0,
+   request:async()=>(await api(base+'/reports?'+new URLSearchParams({from:'0001-01-01',to:'9999-12-30',limit:'1',timezone}))).data.length>0,
+   team:async()=>(members=(await api(base+'/members')).data).length>1||(await api(base+'/invitations')).data.some(i=>invitationState(i)==='Pending'),
+  };
+  const done=new Set(),section=el('section',null,'keys-form organization-setup'),title=el('h2','Get started'),progress=el('p',null,'organization-setup-progress'),list=el('ol'),close=el('button','×','icon-close');
+  title.id='organizationSetupTitle';section.setAttribute('aria-labelledby',title.id);section.hidden=true;close.type='button';close.setAttribute('aria-label','Dismiss Get started');
+  const heading=el('div',null,'organization-setup-heading');heading.append(title,progress,close);section.append(heading,list);before.before(section);
+  let storageKey='',shown=false;
+  const finished=()=>{try{return localStorage.getItem(storageKey)==='1'}catch{return false}};
+  const finish=()=>{try{localStorage.setItem(storageKey,'1')}catch{/* The card still closes for this view. */}};
+  close.onclick=()=>{finish();section.remove();const h1=parent.querySelector('h1');if(h1){h1.tabIndex=-1;h1.focus();}};
+  function render(){
+   const complete=done.size===steps.length;title.textContent=complete?'You’re all set':'Get started';progress.textContent=`${done.size} of ${steps.length} done`;
+   list.replaceChildren(...steps.map(([id,name,text,label,action])=>{
+    const item=el('li',null,done.has(id)?'done':null),mark=el('span',null,'organization-setup-mark'),copy=el('div'),state=el('span',done.has(id)?'Done: ':'To do: ','sr-only');
+    mark.innerHTML=setupIcons[done.has(id)?'done':'todo'];copy.append(el('strong'),el('p',text));copy.firstChild.append(state,name);item.append(mark,copy);
+    if(!done.has(id))item.append(button(label,action));return item;
+   }));
+  }
+  async function refresh(){
+   if(!section.isConnected)return;
+   const pending=steps.map(s=>s[0]).filter(id=>!done.has(id));
+   let results;try{results=await Promise.all(pending.map(id=>checks[id]()));}catch{return;/* Guidance is optional: hide nothing new on a failed read. */}
+   if(!current()||!section.isConnected)return;
+   pending.forEach((id,index)=>{if(results[index])done.add(id)});
+   const self=members?.find(m=>window.Workspace?.isSelf(m.id));if(!storageKey&&self)storageKey='gateway-organization-setup-v1:'+self.id+':'+o.id;
+   if(!storageKey||finished()){section.remove();return;}
+   if(done.size===steps.length){finish();if(!shown){section.remove();return;}}
+   render();section.hidden=false;shown=true;
+  }
+  refresh();return {refresh};
+ }
  async function details(parent,o,all,selectedPage=null){const token=++epoch;window.WorkspaceAuthorization?.closeInstallations();window.ContactLinks?.closeMember();const base='/v1/organizations/'+o.id;GatewayLayout.clear(parent);parent.replaceChildren(el('h1',o.name));
  if(clientManager){const heading=el('div',null,'report-heading console-section-heading');heading.append(parent.firstChild,button('Bonuses',()=>SalesBonuses.open(api)),button('Companies',()=>open(parent,false,true)));parent.prepend(heading);}
  const summary=el('dl',null,'organization-summary'),summaryValues={};const stat=(label,value)=>{const item=el('div'),description=el('dd'),valueNode=el('span',value);summaryValues[label]=valueNode;description.append(valueNode);item.append(el('dt',label),description);summary.append(item)};
@@ -98,6 +147,7 @@
  let commercial={};if(clientManager){try{commercial=await api(base+'/sales-permissions');if(token!==epoch)return;}catch(e){FormUI.message(status,e.message,'error');}}
  const tabs=el('div',null,'organization-tabs'),body=el('div',null,'organization-page');parent.append(tabs,body);
  const manage=OrganizationRoles.manage(o.role);
+ const setup=manage&&!clientManager?setupGuide(o,base,parent,tabs,name=>page(name),()=>token===epoch):null;
  if(manage){try{const methods=await api(base+'/payment-methods');if(token!==epoch)return;if(methods.data?.length)summaryValues.Balance.parentElement.append(button('Top Up',async()=>{await page('Billing');body.querySelector('.organization-topups')?.scrollIntoView({block:'start',behavior:'smooth'})}));}catch{}}
  const readStatistics=OrganizationRoles.statistics(o.role);
  const canIssue=manage||o.role==='developer';
@@ -105,7 +155,7 @@
  pages.push('Support');
  if(clientManager&&(commercial.pricing||commercial.models))pages.push('Commercial settings');
  if(manage)pages.push('Audit Log');if(manage||systemAdministrator||window.RemoteWorkspace?.managesCompany(o.id))pages.push('Management');if(systemAdministrator)pages.push('Settings');
- async function page(name,initial=false){if(!pages.includes(name))return;window.syncWorkspacePage?.(name,{initial});window.ContactLinks?.closeMember();activePage=name;for(const tab of tabs.children){tab.setAttribute('aria-pressed',String(tab.textContent===name))}subsections?.sync();GatewayLayout.clear(body);body.replaceChildren();FormUI.message(status,'');try{
+ async function page(name,initial=false){if(!pages.includes(name))return;if(!initial)setup?.refresh();window.syncWorkspacePage?.(name,{initial});window.ContactLinks?.closeMember();activePage=name;for(const tab of tabs.children){tab.setAttribute('aria-pressed',String(tab.textContent===name))}subsections?.sync();GatewayLayout.clear(body);body.replaceChildren();FormUI.message(status,'');try{
  if(name==='Support'){await ContactLinks.support(body,api,o,()=>token===epoch&&activePage==='Support');
  }else if(name==='Requests'){await window.OrganizationJournal.mount(body,o,api);
  }else if(name==='Audit Log'){await window.AuditLog.mount(body,api,{organization:o,current:()=>token===epoch&&activePage==='Audit Log'});
@@ -186,7 +236,7 @@
   history.replaceChildren();if(!items.length)return;
   const now=Date.now();
   table('organization_invitations',history,['Role','Expires','Status','Accepted by',''],items.map(i=>{
-   const expires=new Date(i.expires_at),state=i.accepted_by?'Accepted':i.revoked_at?'Revoked':expires.getTime()<=now?'Expired':'Pending';
+   const expires=new Date(i.expires_at),state=invitationState(i,now);
    return [memberRoleLabel(i.role||'member'),expires.toLocaleString(),state,i.accepted_by_email?UserUI.identity({id:i.accepted_by,email:i.accepted_by_email,picture:i.accepted_by_picture}):'—',state==='Pending'?button('Revoke',async()=>{try{await api(base+'/invitations/'+i.id,{method:'DELETE'});await loadInvitations()}catch(e){FormUI.message(status,e.message,'error')}},true):''];
   }));
  }
