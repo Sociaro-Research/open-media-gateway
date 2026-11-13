@@ -230,6 +230,12 @@ records initially and append ten near the bottom, with a keyboard-accessible
 Load more fallback. Its bottom feedback uses the shared secondary action,
 muted text, spacing and error tokens: show the server-filtered Shown N of M
 count, pending loading text, retryable failures and a clear empty/end state.
+An empty result hides the count strip instead of showing Shown 0 of 0. Without a
+key, or with no generations under All Projects, the Journal lists the three first
+steps (connect a key, choose a model and write a prompt, Generate) in field-style
+rows; a connected key marks the first step done and the next step uses the accent
+edge. For a promptless model the second step points to the model picker instead of
+the prompt. Filtered empty projects keep their short explanation.
 Background reconciliation checks lightweight ID/revision pages and retrieves only
 changed/new cards, retaining attached cards, playback, focus and the page scroll
 anchor. A failed page retains existing records; changing viewer/project
