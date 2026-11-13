@@ -148,12 +148,15 @@ func (m *Manager) beginAuthorization(ctx context.Context, owner, origin, name, c
 	if err != nil {
 		return AuthorizationView{}, err
 	}
+	accepted := false
 	if attempt.ID == id {
 		// This call created the request and nothing has redeemed its proof, so no key
 		// can exist for it. Drop it on failure: keeping it blocks every retry until the
 		// central server confirms a cancellation it may never have received.
+		// Once the central server has accepted the start, keep it: the owner can still
+		// finish or cancel it even if reading it back failed here.
 		defer func() {
-			if err != nil {
+			if err != nil && !accepted {
 				_ = repo.ClearAuthorizationAttempt(context.WithoutCancel(ctx), owner, id)
 			}
 		}()
@@ -222,6 +225,7 @@ func (m *Manager) beginAuthorization(ctx context.Context, owner, origin, name, c
 	if json.Unmarshal(data, &reply) != nil || reply.Code != wa.UserCode(string(raw)) {
 		return AuthorizationView{}, ErrUnavailable
 	}
+	accepted = true
 	view, e = m.Authorization(ctx, owner)
 	if e != nil {
 		return AuthorizationView{}, e

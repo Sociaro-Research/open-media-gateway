@@ -243,6 +243,60 @@ func TestFailedNewStartKeepsNoRequestSoRetryWorks(t *testing.T) {
 	}
 }
 
+// failingLookupRepository fails the read that follows an accepted start, like a
+// database error right after the central server said yes.
+type failingLookupRepository struct {
+	*postgres.SystemRepository
+	fail atomic.Bool
+}
+
+func (r *failingLookupRepository) AuthorizationAttempt(ctx context.Context, owner string) (remote.Attempt, error) {
+	if r.fail.Load() {
+		return remote.Attempt{}, errors.New("synthetic database failure")
+	}
+	return r.SystemRepository.AuthorizationAttempt(ctx, owner)
+}
+
+func TestAcceptedStartKeepsRequestWhenReadingItBackFails(t *testing.T) {
+	db := workspaceDatabase(t)
+	ctx := context.Background()
+	owner, e := postgres.NewAuthRepository(db).UpsertGoogleUser(ctx, uuid.NewString(), uuid.NewString()+"@fixture.test", "Local admin", "")
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = db.Exec(`UPDATE users SET is_system_admin=TRUE WHERE id=$1`, owner.ID); e != nil {
+		t.Fatal(e)
+	}
+	repo := &failingLookupRepository{SystemRepository: postgres.NewSystemRepository(db)}
+	host := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var in struct {
+			Device string `json:"device_code"`
+		}
+		if json.NewDecoder(r.Body).Decode(&in) != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		// The central server accepts; only the local read after it fails.
+		repo.fail.Store(true)
+		fmt.Fprintf(w, `{"user_code":%q}`, wa.UserCode(in.Device))
+	}))
+	defer host.Close()
+	cipher, _ := providerconfig.NewCipher(strings.Repeat("a", 32))
+	manager := remote.New(repo, cipher, host.Client())
+	if _, e = manager.BeginAuthorization(ctx, owner.ID, host.URL, "Local installation", "http://localhost:8088", 0); e == nil {
+		t.Fatal("start succeeded although reading the request back failed")
+	}
+	repo.fail.Store(false)
+	kept, e := repo.AuthorizationAttempt(ctx, owner.ID)
+	if e != nil || len(kept.Cipher) == 0 {
+		t.Fatal("request the central server accepted was dropped", e)
+	}
+	// The owner can still see the code and finish or cancel it.
+	if view, e := manager.Authorization(ctx, owner.ID); e != nil || view.ID != kept.ID || view.Code == "" {
+		t.Fatal("accepted request cannot be resumed", e)
+	}
+}
+
 func TestLegacyIssuedReplyCannotBecomeDedicated(t *testing.T) {
 	calls := 0
 	host := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
