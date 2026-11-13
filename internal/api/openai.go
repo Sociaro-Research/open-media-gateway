@@ -329,6 +329,11 @@ func (s *Server) openAIInput(r *http.Request, fields map[string]json.RawMessage)
 			delete(fields, k)
 		}
 	}
+	// money.USD rejects a wrong type or format without field metadata, so the
+	// decoder below could only blame "body".
+	if raw, ok := base["max_expected_cost_usd"]; ok && json.Unmarshal(raw, &input.MaxExpectedUSD) != nil {
+		return fail("max_expected_cost_usd", "max_expected_cost_usd must be a JSON number with at most six decimal places")
+	}
 	b, _ := json.Marshal(base)
 	d := json.NewDecoder(bytes.NewReader(b))
 	d.DisallowUnknownFields()
