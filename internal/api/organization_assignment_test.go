@@ -34,6 +34,7 @@ func TestOrganizationAssignmentIntent(t *testing.T) {
 		}{
 			{"add", `{"role":"developer","add_only":true}`, true, nil, 204, true},
 			{"already-active", `{"role":"member","add_only":true}`, true, org.ErrAlreadyMember, 409, true},
+			{"unknown-user", `{"role":"member","add_only":true}`, true, org.ErrUnknownUser, 404, true},
 			{"intentional-apply", `{"role":"admin"}`, true, nil, 204, false},
 			{"explicit-update", `{"role":"admin","add_only":false}`, true, nil, 204, false},
 			{"non-admin", `{"role":"member","add_only":true}`, false, nil, 403, false},
@@ -56,6 +57,14 @@ func TestOrganizationAssignmentIntent(t *testing.T) {
 					}
 					if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil || body.Error.Code != "already_member" || body.Error.Message != org.ErrAlreadyMember.Error() {
 						t.Fatal("duplicate member diagnostic", err, w.Body.String())
+					}
+				}
+				if w.Code == 404 {
+					var body struct {
+						Error struct{ Code, Message string }
+					}
+					if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil || body.Error.Code != "not_found" || body.Error.Message != org.ErrUnknownUser.Error() {
+						t.Fatal("unknown user diagnostic", err, w.Body.String())
 					}
 				}
 				if tc.name == "intentional-apply" || tc.name == "explicit-update" {
