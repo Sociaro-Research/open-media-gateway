@@ -23,38 +23,70 @@ func interpretLifecycle(source catalogsync.Source, text string) ([]catalogsync.E
 		return nil, errors.New("deprecation document not recognized")
 	}
 	var entries []catalogsync.Entry
-	rows := false
+	var header []string
+	dateCol, modelCol, features := -1, -1, false
 	ids := regexp.MustCompile("`([a-z][a-z0-9._-]+)`")
 	for _, line := range strings.Split(text, "\n") {
 		cells := catalogdoc.Row(line)
-		mediaRow := len(cells) > 1 && mediaLifecycleID(cells[1])
-		if len(cells) != 3 {
+		if cells == nil {
+			header = nil
+			continue
+		}
+		if header == nil {
+			// Each table's first row names its columns; a repeated name counts as missing.
+			header, dateCol, modelCol, features = cells, -1, -1, false
+			featureCol := -1
+			for i, name := range cells {
+				name = strings.ToLower(name)
+				col := &featureCol
+				if name == "shutdown date" {
+					col = &dateCol
+				} else if strings.HasPrefix(name, "model") || strings.HasPrefix(name, "affected model") {
+					col = &modelCol
+				} else if !strings.HasPrefix(name, "affected feature") {
+					continue
+				}
+				if *col == -1 {
+					*col = i
+				} else {
+					*col = -2
+				}
+			}
+			if modelCol == -1 {
+				modelCol, features = featureCol, true
+			}
+			continue
+		}
+		if strings.HasPrefix(cells[0], "---") {
+			continue
+		}
+		mediaRow := mediaLifecycleID(line)
+		if dateCol < 0 || modelCol < 0 {
+			if mediaRow {
+				return nil, errors.New("media shutdown table header not recognized")
+			}
+			continue
+		}
+		if len(cells) != len(header) {
 			if mediaRow {
 				return nil, errors.New("media shutdown table columns changed")
 			}
-			rows = false
 			continue
 		}
-		if cells[0] == "Shutdown date" && (strings.HasPrefix(cells[1], "Model") || cells[1] == "Model family / snapshot") {
-			rows = true
-			continue
-		}
-		if !rows && mediaRow {
-			return nil, errors.New("media shutdown table header not recognized")
-		}
-		if !rows || strings.HasPrefix(cells[0], "---") {
-			continue
-		}
-		// Inspect the model cell only: recommended replacements are never retired.
+		// Inspect the affected cell only: replacements, status and notices are never retired.
 		raw := strings.ReplaceAll(line, `\|`, "\x00")
 		rawCells := strings.Split(strings.Trim(strings.TrimSpace(raw), "|"), "|")
-		for _, match := range ids.FindAllStringSubmatch(rawCells[1], -1) {
+		for _, match := range ids.FindAllStringSubmatch(rawCells[modelCol], -1) {
 			id := match[1]
 			// Only file-generating media families are in this adapter's scope.
 			if !mediaLifecycleID(id) {
 				continue
 			}
-			date := catalogdoc.Date(cells[0])
+			// A feature or endpoint shutdown does not say the model itself retires.
+			if features {
+				return nil, errors.New("media model in feature shutdown table")
+			}
+			date := catalogdoc.Date(cells[dateCol])
 			if date == "" {
 				return nil, errors.New("media shutdown date not recognized")
 			}
