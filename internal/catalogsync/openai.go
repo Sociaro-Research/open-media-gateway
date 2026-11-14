@@ -105,6 +105,39 @@ func openAIPriceColumns(value any) (input, output int, valid bool) {
 	return input, output, seen["Input"] && seen["Output"] && seen["Cached input"]
 }
 
+// Since 2026-11-10 one note on the Multimodal h2 heading covers its h3/h4
+// tables. The nearest note or h2 at or before the table decides, so a table
+// never inherits a unit across a section or past a closer subsection note.
+func openAISectionUnit(n *html.Node) bool {
+	for a := n.Parent; a != nil; a = a.Parent {
+		if strings.Contains(" "+attribute(a, "class")+" ", " pricing-subsection ") {
+			n = a
+			break
+		}
+	}
+	for s := n; s != nil; s = s.PrevSibling {
+		heading, notes := false, []string{}
+		var walk func(*html.Node)
+		walk = func(x *html.Node) {
+			if x.Type == html.ElementNode {
+				class := " " + attribute(x, "class") + " "
+				if strings.Contains(class, " pricing-switcher-meta ") || strings.Contains(class, " pricing-section-meta ") {
+					notes = append(notes, nodeText(x))
+				}
+				heading = heading || x.Data == "h2"
+			}
+			for c := x.FirstChild; c != nil; c = c.NextSibling {
+				walk(c)
+			}
+		}
+		walk(s)
+		if heading || len(notes) > 0 {
+			return heading && len(notes) == 1 && notes[0] == "Prices per 1M tokens unless noted."
+		}
+	}
+	return false
+}
+
 func parseOpenAIPrices(body []byte) ([]Entry, string, error) {
 	root, err := html.Parse(bytes.NewReader(body))
 	if err != nil {
@@ -152,6 +185,9 @@ func parseOpenAIPrices(body []byte) ([]Entry, string, error) {
 								}
 								break
 							}
+						}
+						if !unitConfirmed {
+							unitConfirmed = openAISectionUnit(n)
 						}
 						if !unitConfirmed {
 							invalidUnits = true

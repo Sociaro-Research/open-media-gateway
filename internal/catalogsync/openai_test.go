@@ -2,7 +2,9 @@ package catalogsync
 
 import (
 	"encoding/json"
+	"fmt"
 	"html"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -59,6 +61,69 @@ func TestOpenAICharacterTariffsAndUnsupportedChanges(t *testing.T) {
 	entries, _, err := parseOpenAIPrices(body)
 	if err != nil || len(entries) != 1 || entries[0].Rates[0].Components[1].Price != 40_000_000 {
 		t.Fatal("batch price mixed into standard", entries, err)
+	}
+}
+
+func TestOpenAIMultimodalHeadingUnit(t *testing.T) {
+	// Multimodal section of the 2026-11-14 pricing page (full download SHA-256
+	// 099c9496f75ffe6f08a57f30b007c5abf79f6eb26ecba5ddecf50ffdf4ec8028). Astro
+	// props are verbatim; rendered table markup, scripts and icons were removed.
+	body, err := os.ReadFile("testdata/openai-pricing-20261114.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	entries, _, err := parseOpenAIPrices(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]string{}
+	for _, e := range entries {
+		parts := []string{}
+		for _, r := range e.Rates {
+			if r.Unit == "character" {
+				parts = append(parts, fmt.Sprintf("character=%g", r.Price.Float64()))
+			}
+			for _, c := range r.Components {
+				parts = append(parts, fmt.Sprintf("%s=%g", c.Metric, c.Price.Float64()))
+			}
+		}
+		got[e.ID] = strings.Join(parts, " ")
+	}
+	image2 := "image_input_tokens=8 image_output_tokens=30 text_input_tokens=5"
+	image15 := "image_input_tokens=8 image_output_tokens=32 text_input_tokens=5 text_output_tokens=10"
+	audio := "audio_input_tokens=32 audio_output_tokens=64 text_input_tokens=2.5 text_output_tokens=10"
+	want := map[string]string{
+		"gpt-image-2.6-sunburst": image2,
+		"gpt-image-2.6-flare":    image2,
+		"gpt-image-2.5-sunburst": image2,
+		"gpt-image-2.5-flare":    image2,
+		"gpt-image-2":            image2,
+		"gpt-image-1.5":          image15,
+		"chatgpt-image-latest":   image15,
+		"gpt-image-1-mini":       "image_input_tokens=2.5 image_output_tokens=8 text_input_tokens=2",
+		"gpt-audio-1.5":          audio,
+		"gpt-audio":              audio,
+		"gpt-audio-mini":         "audio_input_tokens=10 audio_output_tokens=20 text_input_tokens=0.6 text_output_tokens=2.4",
+		"gpt-4o-mini-tts":        "audio_output_tokens=12 text_input_tokens=0.6",
+		"tts-1":                  "character=15",
+		"tts-1-hd":               "character=30",
+	}
+	if len(entries) != len(want) || !reflect.DeepEqual(got, want) {
+		t.Fatal(got)
+	}
+	realtime := `<div class="pricing-subsection pricing-section-heading pricing-multimodal-subsection"><div class="anchor-heading-wrapper"><h4 id="audio-tokens"`
+	for _, change := range [][2]string{
+		{"Prices per 1M tokens unless noted.", "Prices per 1K tokens unless noted."},
+		{realtime, "<h2>Video</h2>" + realtime},
+		{realtime, `<p class="pricing-section-meta">Prices per second.</p>` + realtime},
+	} {
+		changed := strings.Replace(string(body), change[0], change[1], 1)
+		if changed == string(body) {
+			t.Fatal("fixture no longer matches", change[0])
+		}
+		if _, _, err := parseOpenAIPrices([]byte(changed)); err == nil {
+			t.Fatal("unit accepted without its own section note", change[1])
+		}
 	}
 }
 
