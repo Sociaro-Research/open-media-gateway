@@ -19,6 +19,7 @@ const (
 	InvalidManagedCreditAmount
 	InvalidManagedCreditKind
 	InvalidManagedCreditReason
+	InvalidDomain
 )
 
 func (e ValidationError) Diagnostic() (string, string) {
@@ -51,6 +52,8 @@ func (e ValidationError) Diagnostic() (string, string) {
 		return "kind", "kind: choose payment for a managed client top-up"
 	case InvalidManagedCreditReason:
 		return "reason", "reason: provide a nonblank reason for a managed client payment"
+	case InvalidDomain:
+		return "domain", "domain: provide the company website or public domain name, such as example.com"
 	default:
 		return "", ErrInvalid.Error()
 	}
