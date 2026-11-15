@@ -1,0 +1,210 @@
+`POST https://ark.ap-southeast.bytepluses.com/api/v3/contents/generations/tasks` [Try](https://api.byteplus.com/api-explorer/?action=CreateContentsGenerationsTasks&groupName=Video%20Generation%20API&serviceCode=ark&version=2024-01-01)
+> Dreamina Seedance 2.5 and Dreamina Seedance 2.5 flash (collectively referred to as the Dreamina Seedance 2.5 series) are now fully available. You can call the API and try the models online on the BytePlus ModelArk platform. Before calling a model, **carefully read [Must-read before use](/docs/seedance-2-5#2.5_compatibility) to ensure that you correctly set the task type and configure parameters**.
+**Model capabilities**
+
+* **Dreamina Seedance 2.5 series<sup>==new==</sup>** (video with audio / silent video)
+  * **Omni reference-to-video**: Input reference images, reference videos, reference audio clips, and an optional text prompt to generate one target video. Audio-only input is supported. The model supports generating new videos, editing videos, extending videos, and coherently generating videos up to 30 seconds long.
+    * **Dreamina Seedance 2.5**: 0-30 reference images, 0-10 reference videos, and 0-10 reference audio clips.
+    * **Dreamina Seedance 2.5 flash**: 0-10 reference images, 0-5 reference videos, and 0-5 reference audio clips.
+  * **Image-to-video (first and last frames)**: Input a first-frame image, a last-frame image, and an optional text prompt to generate one target video.
+  * **Image-to-video (first frame)**: Input a first-frame image and an optional text prompt to generate one target video.
+  * **Text-to-video**: Input a text prompt to generate one target video.
+* **Dreamina Seedance 2.0 series** (video with audio / silent video)
+  * **Omni reference-to-video**: Input reference images (0–9), reference videos (0–3), reference audio clips (0–3), and an optional text prompt to generate one target video. Audio-only input is not supported; include at least one reference image or video. The models support generating new videos, editing videos, and extending videos.
+  * **Image-to-video (first and last frames)**: Input a first-frame image, a last-frame image, and an optional text prompt to generate one target video.
+  * **Image-to-video (first frame)**: Input a first-frame image and an optional text prompt to generate one target video.
+  * **Text-to-video**: Input a text prompt to generate one target video.
+* **Seedance 1.0 pro**
+  * Supports image-to-video (first and last frames), image-to-video (first frame), and text-to-video.
+* **Seedance 1.0 pro fast**
+  * Supports image-to-video (first frame) and text-to-video.
+
+## Request parameters
+* Text (optional) + image
+* Text (optional) + video
+* Text (optional) + audio (Dreamina Seedance 2.5 series supports audio-only input)
+> **Note: Requirements for uploading a single image**
+>
+> * Format: `jpeg`, `png`, `webp`, `bmp`, `tiff`, or `gif`. Dreamina Seedance 2.0 series and later models also support `heic` and `heif`.
+> * Aspect ratio (width/height): `[0.4, 2.5]`
+> * Width and height (px): `[300, 6000]`
+> * Size:
+>   * Single image must be less than 30 MB
+>   * Request body size does not exceed 64 MB.
+>   * Do not use Base64 encoding for large files.
+> * Quantity limit:
+>   * Image-to-video (first frame): 1
+>   * Image-to-video (first and last frames): 2
+>   * Omni reference-to-video:
+>     * Dreamina Seedance 2.5: 30 images
+>     * Dreamina Seedance 2.5 flash: 10 images
+>     * Dreamina Seedance 2.0 series: 9 images
+
+**role** `string` `Required under certain conditions` | Role/purpose
+Image-to-video (reference images)
+* **Supported models:** Dreamina Seedance 2.5 (1-30 images), Dreamina Seedance 2.5 flash (1-10 images), and Dreamina Seedance 2.0 series (1-9 images)
+* **Values**: Required. The **role** field for each reference image must be set to `reference_image`
+> **Note: Video input requirements**
+>
+> * Video format: `mp4`, `mov`. Supported encoding formats are listed in the table below.
+> * Resolution: `480p`, `720p`, `1080p`, `4K`
+> * Duration:
+>   * **Dreamina Seedance 2.5 series:**
+>     * Non-video-editing tasks: Each video must be 2–30 seconds long.
+>     * [Video editing tasks](/docs/seedance-2-5#2.5_task_type_intro): Each video must be 4–30 seconds long.
+>     * The total duration of all videos must not exceed 30 seconds.
+>   * **Dreamina Seedance 2.0 series:** Each video must be 2–15 seconds long. The total duration of all videos must not exceed 15 seconds.
+> * Quantity limit:
+>   * **Dreamina Seedance 2.5:** 10 videos
+>   * **Dreamina Seedance 2.5 flash:** 5 videos
+>   * **Dreamina Seedance 2.0 series:** 3 videos
+> * Dimensions:
+>   * Aspect ratio (width/height): `[0.4, 2.5]`
+>   * Width and height (px): `[300, 6000]`
+>   * Total pixels: `[614×664=407696, 3326×2494=8295044]`, that is, the product of width and height must fall in the range `[407696, 8295044]`.
+> * Size: Each video must not exceed 200 MB.
+> * Frame rate (FPS): `[24, 60]`
+
+| Container Format | Common Extension Name | **MIME** | Supported Encodings |
+| --- | --- | --- | --- |
+| MP4 | .mp4 | video/mp4 | Video: H.264/AVC, H.265/HEVC<br>Audio: AAC, MP3 |
+| QuickTime | .mov | video/quicktime | Video: H.264/AVC, H.265/HEVC<br>Audio: AAC, MP3, PCM |
+
+**role** `string` `Required` | Role/purpose
+
+`content.role`
+
+Position or purpose of the video. Fixed to `reference_video`.
+> **Note: Audio input requirements**
+>
+> * Format: `wav`, `mp3`
+> * Duration:
+>   * **Dreamina Seedance 2.5 series:** Each audio clip must be 2–30 seconds long. The total duration of all audio clips must not exceed 30 seconds.
+>   * **Dreamina Seedance 2.0 series:** Each audio clip must be 2–15 seconds long. The total duration of all audio clips must not exceed 15 seconds.
+> * Quantity limit:
+>   * **Dreamina Seedance 2.5:** 10 audio clips
+>   * **Dreamina Seedance 2.5 flash:** 5 audio clips
+>   * **Dreamina Seedance 2.0 series:** 3 audio clips
+> * Size:
+>   * Each audio file must not exceed 15 MB.
+>   * The request body size must not exceed 64 MB.
+>   * Do not use Base64 encoding for large files.
+
+**role** `string` `Required` | Role/purpose
+
+`content.role`
+
+Position or purpose of the audio. Fixed to `reference_audio`.
+
+**Supported models:**
+
+* **Dreamina Seedance 2.5 series:** Supports audio-only input and combining audio with images or videos.
+* **Dreamina Seedance 2.0 series:** Audio-only input is not supported; include at least one reference image or video.
+**omni_reference_task_type<sup>==new==</sup>** `string` `Default value: auto` | Task type hint
+
+Dreamina Seedance 2.5 series **omni reference-to-video tasks** include three subtasks: reference-to-video, video editing, and video extension. Different task types have special parameter constraints. To reduce asynchronous errors after task creation, use this parameter to specify the subtask type and validate the corresponding constraints earlier.
+
+* By default, when `omni_reference_task_type=auto`, the model automatically determines the task type from the input assets and prompt, and then validates the parameter values. If the parameters are incompatible with the actual task type, the task triggers an [asynchronous error](/docs/seedance-2-5#2.5_error_handling) (error code: [`InvalidParameter.TaskTypeConstraint`](/docs/error-codes)).
+* When `omni_reference_task_type` is explicitly set to `reference`, `edit`, or `extend`, the API validates the special constraints for the specified task when you submit the task. If the request does not meet the requirements, the API immediately returns an error and the task is not created.
+
+**Supported values:**
+
+* `auto`: The model determines the task type from the input assets and prompt.
+* `reference`: A reference-to-video task that generates a new video based on reference images, reference videos, or reference audio. When set to `reference`, `ratio` and `duration` have no special constraints.
+* `edit`: A video editing task that edits the visuals or audio of an original video. When set to `edit`, `content` must contain at least one `reference_video`, the video must be 4–30 seconds long, `ratio` must be `adaptive`, and `duration` must be `-1`.
+* `extend`: A video extension task that extends an original video forward or backward. When set to `extend`, `content` must contain at least one `reference_video`, and `ratio` must be `adaptive`.
+
+> **Warning: Note**
+>
+> When actually processing the task, the model still further determines the task type based on the prompt. If the actual task type identified by the model does not match the specified value, the task still triggers an [asynchronous error](/docs/seedance-2-5#2.5_error_handling) (error code: [`InvalidParameter.TaskTypeMismatch`](/docs/error-codes)). Follow the [prompting guidance for each task type](/docs/seedance-2-5#2.5_param_constraints) to reduce the chance of errors.
+
+**Supported models:**
+
+* `Dreamina Seedance 2.5 series`
+**resolution** `string` | Video resolution
+**Supported models and values:**
+
+* **Dreamina Seedance 2.5:** Default `720p`; supports `480p`, `720p`, and `1080p`.
+* **Dreamina Seedance 2.5 flash:** Default `720p`; supports `480p` and `720p`.
+* **Dreamina Seedance 2.0:** Default `720p`; supports `480p`, `720p`, `1080p`, and `4k`.
+* **Dreamina Seedance 2.0 fast:** Default `720p`; supports `480p` and `720p`.
+* **Dreamina Seedance 2.0 mini:** Default `720p`; supports `480p` and `720p`.
+* **Seedance 1.0 pro:** Default `1080p`; supports `480p`, `720p`, and `1080p`.
+* **Seedance 1.0 pro fast:** Default `1080p`; supports `480p`, `720p`, and `1080p`.
+**ratio** `string` | Video aspect ratio
+
+Aspect ratio of the generated video.
+
+* Supported values: `16:9`, `4:3`, `1:1`, `3:4`, `9:16`, `21:9`, and `adaptive`. The `adaptive` value automatically selects an aspect ratio based on the task type and input.
+
+Value restrictions and `adaptive` behavior by model
+
+|Task type | |Dreamina Seedance 2.5 series |Dreamina Seedance 2.0 series |Seedance 1.0 series |
+|---|---|---|---|---|
+|Text-to-video | |Supports specifying an available aspect ratio or allowing the model to select one based on the prompt |Supports specifying an available aspect ratio or allowing the model to select one based on the prompt |Only supports specifying an available aspect ratio | \
+| | |> Supports `adaptive` or a specified aspect ratio |> Supports `adaptive` or a specified aspect ratio |> Does not support `adaptive` |
+|First-frame or first-and-last-frame image-to-video | |**Automatically preserves the aspect ratio of the first-frame image specified by `first_frame`** |Supports specifying an available aspect ratio or allowing the model to select one based on the first-frame image |Supports specifying an available aspect ratio or allowing the model to select one based on the first-frame image | \
+| | |> Defaults to and only supports `adaptive` |> Supports `adaptive` or a specified aspect ratio |> Supports `adaptive` or a specified aspect ratio |
+|Omni reference video generation |Video editing / video extension |**The model selects the video to edit or extend based on the prompt intent, then automatically preserves the aspect ratio of the selected video; you cannot specify another ratio** |Supports specifying an available aspect ratio or allowing the model to select one based on the video to edit or extend |— | \
+| | |> Defaults to and only supports `adaptive` |> Supports `adaptive` or a specified aspect ratio | |
+|^^ |Reference-to-video |Supports specifying an available aspect ratio or allowing the model to select one based on the prompt |Supports specifying an available aspect ratio or allowing the model to select one based on the prompt |— | \
+| | |> Supports `adaptive` or a specified aspect ratio |> Supports `adaptive` or a specified aspect ratio | |
+
+Width and height pixel values corresponding to different aspect ratios
+For image to video tasks, when the selected video aspect ratio is inconsistent with the aspect ratio of your uploaded image, ModelArk will crop your image, and the cropping will be centered. See [Image cropping rules](/docs/video-generation-tutorial#f76aafc8) for detailed rules.
+
+| Resolution | Aspect ratio | Dreamina Seedance 2.5 series | Dreamina Seedance 2.0 series | Seedance 1.0 series |
+| --- | --- | --- | --- | --- |
+| 480p | `16:9` | 854×480 | 864×496 | 864×480 |
+| ^^ | `4:3` | 752×560 | 752×560 | 736×544 |
+| ^^ | `1:1` | 640×640 | 640×640 | 640×640 |
+| ^^ | `3:4` | 560×752 | 560×752 | 544×736 |
+| ^^ | `9:16` | 480×854 | 496×864 | 480×864 |
+| ^^ | `21:9` | 992×432 | 992×432 | 960×416 |
+| 720p | `16:9` | 1280×720 | 1280×720 | 1248×704 |
+| ^^ | `4:3` | 1112×834 | 1112×834 | 1120×832 |
+| ^^ | `1:1` | 960×960 | 960×960 | 960×960 |
+| ^^ | `3:4` | 834×1112 | 834×1112 | 832×1120 |
+| ^^ | `9:16` | 720×1280 | 720×1280 | 704×1248 |
+| ^^ | `21:9` | 1470×630 | 1470×630 | 1504×640 |
+| 1080p<br>(Dreamina Seedance 2.5 flash, Dreamina Seedance 2.0 fast, and Dreamina Seedance 2.0 mini are not supported) | `16:9` | 1920×1080 | 1920×1080 | 1920×1088 |
+| ^^ | `4:3` | 1664×1248 | 1664×1248 | 1664×1248 |
+| ^^ | `1:1` | 1440×1440 | 1440×1440 | 1440×1440 |
+| ^^ | `3:4` | 1248×1664 | 1248×1664 | 1248×1664 |
+| ^^ | `9:16` | 1080×1920 | 1080×1920 | 1088×1920 |
+| ^^ | `21:9` | 2206×946 | 2206×946 | 2176×928 |
+| 4k | `16:9` | — | 3840×2160 | — |
+| ^^ | `4:3` | — | 3326×2494 | — |
+| ^^ | `1:1` | — | 2880×2880 | — |
+| ^^ | `3:4` | — | 2494×3326 | — |
+| ^^ | `9:16` | — | 2160×3840 | — |
+| ^^ | `21:9` | — | 4398×1886 | — |
+
+> **Warning: Note**
+>
+> Dreamina Seedance 2.5 series has special constraints for **video editing, video extension, and first-frame/first-and-last-frame image-to-video tasks**. For task definitions, see [Task types and constraints](/docs/seedance-2-5#2.5_task_type_intro).
+>
+> * `ratio` only supports `adaptive`; you cannot specify another aspect ratio.
+>   * For video editing and extension, the model selects the video to edit or extend based on the prompt intent, then automatically preserves the aspect ratio of the selected video.
+>   * For first-frame and first-and-last-frame image-to-video, the model automatically preserves the aspect ratio of the first-frame image specified by `first_frame`.
+
+**Supported models and defaults:**
+
+* **Dreamina Seedance 2.5 series:** Default `adaptive`.
+* **Dreamina Seedance 2.0 series:** Default `adaptive`.
+* **Seedance 1.0 pro:** Defaults to `16:9` for text-to-video and `adaptive` for image-to-video.
+* **Seedance 1.0 pro fast:** Defaults to `16:9` for text-to-video and `adaptive` for image-to-video.
+**duration** `integer` | Video duration
+> Dreamina Seedance 2.5 series has special constraints for **video editing tasks**. For task definitions, see [Task types and constraints](/docs/seedance-2-5#2.5_task_type_intro).
+>
+> * `duration` only supports `-1`; you cannot specify an output duration.
+> * The video to edit must be 4–30 seconds long.
+
+**Supported models and values:**
+
+* **Dreamina Seedance 2.5 series:** Default `-1`; supports `[4, 30]` or `-1`.
+* **Dreamina Seedance 2.0 series:** Default `5`; supports `[4, 15]` or `-1`.
+* **Seedance 1.0 pro:** Default `5`; supports `[2, 12]`.
+* **Seedance 1.0 pro fast:** Default `5`; supports `[2, 12]`.
+**frames** `integer` | Video frame count
+"text": "... The strawberry flavor refers to @Image1. ... referring to the composition of @Video1, ..."

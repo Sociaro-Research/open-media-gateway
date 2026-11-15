@@ -43,6 +43,10 @@ func referenceModes(m core.MediaModel) []core.ReferenceMode {
 		if strings.Contains(id, "2-5") {
 			base.MaxAudios = 10
 			base.MaxVideos = 10
+			if id == "dreamina-seedance-2-5-flash-261115" {
+				base.MaxAudios = 5
+				base.MaxVideos = 5
+			}
 			frame.Ratios = []string{"adaptive"}
 			frames.Ratios = []string{"adaptive"}
 		}

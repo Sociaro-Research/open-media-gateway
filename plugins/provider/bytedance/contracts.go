@@ -12,11 +12,17 @@ func knownModel(id string) bool {
 		return true
 	}
 	switch id {
-	case "seedance-1-0-pro-fast-251015", "seedance-1-0-lite-t2v-250428", "seedance-1-0-lite-i2v-250428", "seedance-1-0-pro-250528", "seedance-1-5-pro-251215", "dreamina-seedance-2-0-mini-260615", "dreamina-seedance-2-0-fast-260128", "dreamina-seedance-2-0-260128", "dreamina-seedance-2-5-260628":
+	case "seedance-1-0-pro-fast-251015", "seedance-1-0-lite-t2v-250428", "seedance-1-0-lite-i2v-250428", "seedance-1-0-pro-250528", "seedance-1-5-pro-251215", "dreamina-seedance-2-0-mini-260615", "dreamina-seedance-2-0-fast-260128", "dreamina-seedance-2-0-260128", "dreamina-seedance-2-5-260628", "dreamina-seedance-2-5-flash-261115":
 		return true
 	default:
 		return false
 	}
+}
+
+// seedance25 is the documented 2.5 series. Members share task semantics,
+// not reference limits, resolutions or tariffs.
+func seedance25(id string) bool {
+	return id == "dreamina-seedance-2-5-260628" || id == "dreamina-seedance-2-5-flash-261115"
 }
 
 func (a *Adapter) ValidateRequest(ctx context.Context, r core.MediaRequest) error {
@@ -25,7 +31,7 @@ func (a *Adapter) ValidateRequest(ctx context.Context, r core.MediaRequest) erro
 	if !core.IsManualCall(ctx) && modelcatalog.IsInactive("bytedance", r.Model, a.now()) {
 		return core.ErrModelUnavailable
 	}
-	if r.Model == "dreamina-seedance-2-5-260628" && (r.Options.ReferenceMode == "first_frame" || r.Options.ReferenceMode == "first_last_frames") && r.Options.Ratio != "" && r.Options.Ratio != "adaptive" {
+	if seedance25(r.Model) && (r.Options.ReferenceMode == "first_frame" || r.Options.ReferenceMode == "first_last_frames") && r.Options.Ratio != "" && r.Options.Ratio != "adaptive" {
 		return core.ErrOptionsInvalid
 	}
 	if err := core.ValidateReferenceURLs(describeModel(r.Model), r.Options); err != nil {

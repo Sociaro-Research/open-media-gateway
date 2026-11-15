@@ -5849,6 +5849,44 @@
     }
   },
   "bytedance": {
+    "dreamina-seedance-2-5-flash-261115": {
+      "checked_at": "2026-11-15",
+      "facts": [
+        {
+          "label": "Published standard tariff (USD / million tokens)",
+          "value": "For 480p and 720p outputs: Input without video: 7.0 Input with video: 4.3"
+        },
+        {
+          "label": "Published offline tariff (USD / million tokens)",
+          "value": "Not supported"
+        },
+        {
+          "label": "Video billing",
+          "value": "Estimated tokens = (input video seconds + output video seconds) × output width × height × FPS / 1024. Video inputs have separate rates and minimum token charges. Actual completion_tokens governs metered usage."
+        }
+      ],
+      "sources": [
+        {
+          "title": "BytePlus model pricing",
+          "url": "https://docs.byteplus.com/en/docs/modelark/1544106"
+        },
+        {
+          "title": "BytePlus model catalogue",
+          "url": "https://docs.byteplus.com/en/docs/modelark/1330310"
+        },
+        {
+          "title": "BytePlus video generation API",
+          "url": "https://ai.byteplus.com/ark/region:ap-southeast-1/docs/create-video-generation-task-api.md"
+        },
+        {
+          "title": "BytePlus release history",
+          "url": "https://docs.byteplus.com/en/docs/modelark/1159178"
+        }
+      ],
+      "version_date": "2026-11-15",
+      "description": "Lower-cost Seedance 2.5 series video generation at 480p and 720p.",
+      "release_date": "2026-11"
+    },
     "dreamina-seedance-2-5-260628": {
       "checked_at": "2026-10-12",
       "facts": [

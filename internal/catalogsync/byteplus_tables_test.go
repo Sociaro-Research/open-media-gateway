@@ -67,6 +67,42 @@ func TestBytePlusRedesignedMediaPrices(t *testing.T) {
 	}
 }
 
+func TestBytePlusSeedance25FlashPricesStayApartFromBase(t *testing.T) {
+	body, err := os.ReadFile("testdata/byteplus-pricing-20261115.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	const flash, base = "dreamina-seedance-2-5-flash-261115", "dreamina-seedance-2-5-260628"
+	parse := func(document string) map[string][]Rate {
+		entries, _, err := Parse(Source{Parser: "byteplus-pricing"}, []byte(document))
+		if err != nil {
+			t.Fatal(err)
+		}
+		rates := map[string][]Rate{}
+		for _, e := range entries {
+			rates[e.ID] = e.Rates
+		}
+		return rates
+	}
+	rates := parse(string(body))
+	if len(rates[flash]) != 4 || len(rates[base]) != 6 {
+		t.Fatal(rates[flash], rates[base])
+	}
+	for _, r := range rates[flash] {
+		want := int64(7_000_000)
+		if r.VideoInput != nil && *r.VideoInput {
+			want = 4_300_000
+		}
+		if r.Resolution != "480p" && r.Resolution != "720p" || int64(r.Price) != want || r.Unit != "token" || r.Per != 1_000_000 || r.Region != "Singapore" {
+			t.Fatal("Flash tariff", r)
+		}
+	}
+	broken := strings.Replace(string(body), "|dreamina-seedance-2-5-flash-261115 |$4.3 |", "|dreamina-seedance-2-5-flash-261115 |Contact sales |", 1)
+	if rates = parse(broken); len(rates[flash]) != 0 || len(rates[base]) != 6 {
+		t.Fatal("unknown Flash value accepted or spread", rates[flash], rates[base])
+	}
+}
+
 func TestBytePlusPartialRedesignPreservesConfirmedPrices(t *testing.T) {
 	body, err := os.ReadFile("testdata/byteplus-pricing-20261024.md")
 	if err != nil {

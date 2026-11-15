@@ -313,7 +313,7 @@ func applyCatalogQuote(base core.TaskCost, err error, model core.MediaModel, req
 	// Input-reference and fixed surcharges cannot inherit a no-reference tariff.
 	reviewedAudioRefs := false
 	switch model.ID {
-	case "dreamina-seedance-2-0-260128", "dreamina-seedance-2-0-fast-260128", "dreamina-seedance-2-0-mini-260615", "dreamina-seedance-2-5-260628":
+	case "dreamina-seedance-2-0-260128", "dreamina-seedance-2-0-fast-260128", "dreamina-seedance-2-0-mini-260615", "dreamina-seedance-2-5-260628", "dreamina-seedance-2-5-flash-261115":
 		reviewedAudioRefs = true
 	}
 	entry, ok := state.Models[model.ID]
