@@ -369,6 +369,14 @@ func (r *SystemRepository) setOrganizationMember(ctx context.Context, actor, id,
 	if e != nil {
 		return e
 	}
+	// An invitation is a bearer link. A removed or demoted manager must not keep
+	// unused links granting more than they may now assign; Administrators invite
+	// without membership, so theirs stay.
+	if remove || !org.FullControl(role) {
+		if _, e = tx.ExecContext(ctx, `UPDATE organization_invites SET revoked_at=NOW() WHERE organization_id=$1 AND created_by=$2 AND accepted_by IS NULL AND revoked_at IS NULL AND expires_at>NOW() AND NOT first_owner AND NOT ($3 AND role IN ('developer','member')) AND NOT EXISTS(SELECT 1 FROM users WHERE id=$2 AND is_system_admin)`, id, uid, !remove && role == org.Manager); e != nil {
+			return e
+		}
+	}
 	return tx.Commit()
 }
 func (r *SystemRepository) OrganizationCredits(ctx context.Context, actor, id string, offset int) ([]org.Credit, error) {
