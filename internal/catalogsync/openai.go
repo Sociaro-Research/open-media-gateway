@@ -108,7 +108,8 @@ func openAIPriceColumns(value any) (input, output int, valid bool) {
 // Since 2026-11-10 one note on the Multimodal h2 heading covers its h3/h4
 // tables. The nearest note or h2 at or before the table decides, so a table
 // never inherits a unit across a section or past a closer subsection note.
-func openAISectionUnit(n *html.Node) bool {
+func openAISectionUnit(table *html.Node) bool {
+	n := table
 	for a := n.Parent; a != nil; a = a.Parent {
 		if strings.Contains(" "+attribute(a, "class")+" ", " pricing-subsection ") {
 			n = a
@@ -116,15 +117,22 @@ func openAISectionUnit(n *html.Node) bool {
 		}
 	}
 	for s := n; s != nil; s = s.PrevSibling {
-		heading, notes := false, []string{}
+		heading, notes, done := false, []string{}, false
 		var walk func(*html.Node)
 		walk = func(x *html.Node) {
+			// Only content before the table counts, and only notes after the nearest h2.
+			if done || x == table {
+				done = true
+				return
+			}
 			if x.Type == html.ElementNode {
 				class := " " + attribute(x, "class") + " "
+				if x.Data == "h2" {
+					heading, notes = true, notes[:0]
+				}
 				if strings.Contains(class, " pricing-switcher-meta ") || strings.Contains(class, " pricing-section-meta ") {
 					notes = append(notes, nodeText(x))
 				}
-				heading = heading || x.Data == "h2"
 			}
 			for c := x.FirstChild; c != nil; c = c.NextSibling {
 				walk(c)

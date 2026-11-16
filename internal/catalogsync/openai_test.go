@@ -116,6 +116,7 @@ func TestOpenAIMultimodalHeadingUnit(t *testing.T) {
 		{"Prices per 1M tokens unless noted.", "Prices per 1K tokens unless noted."},
 		{realtime, "<h2>Video</h2>" + realtime},
 		{realtime, `<p class="pricing-section-meta">Prices per second.</p>` + realtime},
+		{realtime, `<div><small class="pricing-switcher-meta">Prices per 1M tokens unless noted.</small><h2>Video</h2></div>` + realtime},
 	} {
 		changed := strings.Replace(string(body), change[0], change[1], 1)
 		if changed == string(body) {
@@ -124,6 +125,16 @@ func TestOpenAIMultimodalHeadingUnit(t *testing.T) {
 		if _, _, err := parseOpenAIPrices([]byte(changed)); err == nil {
 			t.Fatal("unit accepted without its own section note", change[1])
 		}
+	}
+	// Content after a table inside its own subsection never sets the table's unit.
+	images := `<div class="pricing-subsection pricing-switcher-layout`
+	later := strings.Replace(string(body), images, `<p class="pricing-section-meta">Prices per 1K tokens.</p>`+images, 1)
+	later = strings.Replace(later, `<div data-value="batch">`, `<div data-value="batch"><h2>Later</h2><small class="pricing-switcher-meta">Prices per 1M tokens unless noted.</small>`, 1)
+	if strings.Count(string(body), images) != 1 || strings.Count(string(body), `<div data-value="batch">`) != 1 {
+		t.Fatal("fixture no longer matches the images subsection")
+	}
+	if _, _, err := parseOpenAIPrices([]byte(later)); err == nil {
+		t.Fatal("unit taken from content after the table")
 	}
 }
 
