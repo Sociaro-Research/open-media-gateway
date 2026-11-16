@@ -50,7 +50,9 @@ func TestLogoValidation(t *testing.T) {
 	}{
 		{[]byte(`<svg onload="alert(1)"/>`), "unsupported"},
 		{[]byte("\x89PNG\r\n\x1a\nmalformed"), "invalid PNG"},
-		{make([]byte, MaxLogoBytes+1), "1.05 MB"},
+		{append([]byte("\x89PNG\r\n\x1a\n"), make([]byte, MaxLogoBytes)...), "1.05 MB"},
+		// GW-350: type before size.
+		{append([]byte("\xff\xd8\xff\xe0"), make([]byte, MaxLogoBytes)...), "unsupported"},
 	} {
 		if err := ValidateLogo(tc.data); err == nil || !strings.Contains(err.Error(), tc.want) {
 			t.Fatal(err)

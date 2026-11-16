@@ -249,7 +249,9 @@ func TestProviderLogoAuthorizationValidationAndAtomicFailure(t *testing.T) {
 		want string
 	}{
 		{"image/svg+xml", valid, "Content-Type"}, {"image/png", []byte(`<svg onload="alert(1)"/>`), "unsupported"},
-		{"image/png", []byte("\x89PNG\r\n\x1a\ninvalid"), "invalid PNG"}, {"image/png", make([]byte, providerconfig.MaxLogoBytes+1), "1.05 MB"},
+		{"image/png", []byte("\x89PNG\r\n\x1a\ninvalid"), "invalid PNG"}, {"image/png", append([]byte("\x89PNG\r\n\x1a\n"), make([]byte, providerconfig.MaxLogoBytes)...), "1.05 MB"},
+		// GW-350: an oversized non-PNG is told PNG only, not "too big".
+		{"image/png", append([]byte("\xff\xd8\xff\xe0"), make([]byte, providerconfig.MaxLogoBytes)...), "unsupported"},
 	} {
 		w := put("/v1/admin/providers/mock/logo", "alice", tc.mime, io.NopCloser(bytes.NewReader(tc.body)))
 		if w.Code != 400 || !strings.Contains(w.Body.String(), tc.want) {
