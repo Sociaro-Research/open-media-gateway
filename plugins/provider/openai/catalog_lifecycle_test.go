@@ -31,7 +31,7 @@ func TestOfficialDeprecationsUseModelCellsAndExactDates(t *testing.T) {
 	if got["gpt-image-2.6-flare"] != "" || got["gpt-image-replacement"] != "" {
 		t.Fatal("retired a replacement", got)
 	}
-	for _, body := range []string{strings.Replace(lifecycleFixture, "Dec 1, 2026", "Dec 32, 2026", 1), strings.Replace(lifecycleFixture, "Shutdown date", "Unknown boundary", 1), "JavaScript required"} {
+	for _, body := range []string{strings.Replace(lifecycleFixture, "Dec 1, 2026", "Dec 32, 2026", 1), strings.Replace(lifecycleFixture, "Shutdown date", "Unknown boundary", 1), lifecycleFixture + "\n| Jan 6, 2027 | `tts-1-hd` | `gpt-realtime-2.1-mini` |\n", "JavaScript required"} {
 		if _, err := interpretLifecycle(source, body); err == nil {
 			t.Fatal("silently accepted incomplete lifecycle evidence", body)
 		}

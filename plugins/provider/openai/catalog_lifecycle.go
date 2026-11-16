@@ -55,6 +55,10 @@ func interpretLifecycle(source catalogsync.Source, text string) ([]catalogsync.E
 			if modelCol == -1 {
 				modelCol, features = featureCol, true
 			}
+			// A media row without a header above it must not be read as one and skipped.
+			if (dateCol < 0 || modelCol < 0) && mediaLifecycleID(line) {
+				return nil, errors.New("media shutdown table header not recognized")
+			}
 			continue
 		}
 		if strings.HasPrefix(cells[0], "---") {
