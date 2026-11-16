@@ -44,7 +44,8 @@ func TestSeedance25FlashDiscoveryKeepsExactID(t *testing.T) {
 func TestSeedance25FlashProfileUsesOwnLimits(t *testing.T) {
 	m, base := describeModel(flashID), describeModel("dreamina-seedance-2-5-260628")
 	l := m.ReferenceMediaLimits
-	if !reflect.DeepEqual(m.Resolutions, []string{"480p", "720p"}) || len(m.Ratios) != 7 || !slices.Contains(m.Ratios, "adaptive") || m.MinDuration != 4 || m.MaxDuration != 30 || !m.DurationMayBeInferred ||
+	// The first listed resolution is the default; the provider default is 720p.
+	if !reflect.DeepEqual(m.Resolutions, []string{"720p", "480p"}) || len(m.Ratios) != 7 || !slices.Contains(m.Ratios, "adaptive") || m.MinDuration != 4 || m.MaxDuration != 30 || !m.DurationMayBeInferred ||
 		m.MaxImageInputs != 10 || m.SupportsDraft || !m.SupportsAudio || !m.SupportsLastFrame || m.Pricing.USDPerMillionTokens != 7 ||
 		l.MaxFiles != 20 || l.Video.MinDuration != 2 || l.Video.MaxDuration != 30 || l.Video.MaxTotalDuration != 30 || l.Audio.MinDuration != 2 || l.Audio.MaxDuration != 30 || l.Audio.MaxTotalDuration != 30 {
 		t.Fatalf("Flash contract: %+v %+v", m, l)

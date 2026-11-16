@@ -413,6 +413,7 @@ func describeModel(id string) (result core.MediaModel) {
 		// draft, 10 reference images.
 		model.DisplayName = "Seedance 2.5 Flash"
 		configure2x(&model, 7.0, 0.3402, false)
+		model.Resolutions = []string{"720p", "480p"} // the first listed is the default; the provider default is 720p
 		model.MaxDuration = 30
 		model.MaxImageInputs = 10
 	}
