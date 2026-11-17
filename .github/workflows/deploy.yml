@@ -28,7 +28,7 @@ jobs:
       name: production
       deployment: false
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: Prepare private deployment profile
@@ -84,7 +84,7 @@ jobs:
       url: ${{ vars.PRODUCTION_PUBLIC_URL }}
     steps:
       - name: Check out the exact tested commit and previous release history
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           persist-credentials: false
