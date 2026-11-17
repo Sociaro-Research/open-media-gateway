@@ -103,6 +103,39 @@ func TestBytePlusSeedance25FlashPricesStayApartFromBase(t *testing.T) {
 	}
 }
 
+func TestBytePlusSeedance25Base4KPricesFromNovember16(t *testing.T) {
+	body, err := os.ReadFile("testdata/byteplus-pricing-20261116.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	entries, _, err := Parse(Source{Parser: "byteplus-pricing"}, body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rates := map[string][]Rate{}
+	for _, e := range entries {
+		rates[e.ID] = e.Rates
+	}
+	const flash, base = "dreamina-seedance-2-5-flash-261115", "dreamina-seedance-2-5-260628"
+	got4K := map[bool]int64{}
+	for _, r := range rates[base] {
+		if r.Resolution == "4k" {
+			got4K[r.VideoInput != nil && *r.VideoInput] = int64(r.Price)
+		}
+	}
+	if len(rates[base]) != 8 || got4K[false] != 4_700_000 || got4K[true] != 2_900_000 {
+		t.Fatal("base 2.5 4K tariff", rates[base])
+	}
+	if len(rates[flash]) != 4 {
+		t.Fatal("Flash gained a rate", rates[flash])
+	}
+	for _, r := range rates[flash] {
+		if r.Resolution == "4k" || r.Resolution == "1080p" {
+			t.Fatal("Flash borrowed a base 2.5 resolution", r)
+		}
+	}
+}
+
 func TestBytePlusPartialRedesignPreservesConfirmedPrices(t *testing.T) {
 	body, err := os.ReadFile("testdata/byteplus-pricing-20261024.md")
 	if err != nil {

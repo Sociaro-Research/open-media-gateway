@@ -19,6 +19,8 @@ func TestVideoReferenceReserveAndActualTokenMetering(t *testing.T) {
 		{"dreamina-seedance-2-5-260628", "480p", "6.400000", "2.152080"},
 		{"dreamina-seedance-2-5-260628", "720p", "6.400000", "4.838400"},
 		{"dreamina-seedance-2-5-260628", "1080p", "7.000000", "11.907000"},
+		// Published 5 s 16:9 base 2.5 4K example with 30 s input: USD 19.7316.
+		{"dreamina-seedance-2-5-260628", "4k", "2.900000", "19.731600"},
 	} {
 		t.Run(tc.id+tc.resolution, func(t *testing.T) {
 			request := core.MediaRequest{Model: tc.id, Options: core.MediaOptions{Duration: 5, Resolution: tc.resolution, Ratio: "16:9", VideoURLs: []string{"https://example.test/one.mp4", "https://example.test/two.mp4"}}}
@@ -69,7 +71,7 @@ func TestVideoMinimumTableDimensionsAndReserveCoverage(t *testing.T) {
 			}
 		}
 	}
-	for _, o := range []core.MediaOptions{{Resolution: "4k", Ratio: "16:9", Duration: 5}, {Resolution: "720p", Ratio: "adaptive", Duration: 5}, {Resolution: "720p", Ratio: "16:9", Duration: 31}} {
+	for _, o := range []core.MediaOptions{{Resolution: "4k", Ratio: "adaptive", Duration: 5}, {Resolution: "4k", Ratio: "16:9", Duration: 3}, {Resolution: "720p", Ratio: "adaptive", Duration: 5}, {Resolution: "720p", Ratio: "16:9", Duration: 31}} {
 		if _, _, err := video2xUnits("dreamina-seedance-2-5-260628", o); err == nil {
 			t.Fatal("unreviewed configuration admitted", o)
 		}

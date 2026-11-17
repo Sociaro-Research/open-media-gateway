@@ -24,6 +24,10 @@ func quotePublic(endpoint string, model core.MediaModel, request core.MediaReque
 		// Reviewed separately; the shared tariff review predates this model.
 		price.Version, price.CheckedAt = "2026-11-15.1", time.Date(2026, 11, 15, 0, 0, 0, 0, time.UTC)
 	}
+	if id == "dreamina-seedance-2-5-260628" && o.Resolution == "4k" {
+		// Base 2.5 4K was published 2026-11-16; its lower resolutions keep the 2026-10-12 review.
+		price.Version, price.CheckedAt = "2026-11-16.1", time.Date(2026, 11, 16, 0, 0, 0, 0, time.UTC)
+	}
 
 	u, _ := url.Parse(endpoint)
 	if u == nil || u.Hostname() != "ark.ap-southeast.bytepluses.com" {

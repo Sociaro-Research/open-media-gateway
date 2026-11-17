@@ -46,6 +46,8 @@ func video2xUnits(id string, o core.MediaOptions) (float64, string, error) {
 			inputRate = "6.4"
 		case "1080p":
 			inputRate = "7.0"
+		case "4k":
+			inputRate = "2.9"
 		}
 	case "dreamina-seedance-2-5-flash-261115":
 		// Pricing page 2026-11-15. The linked minimum-token table needs sign-in;

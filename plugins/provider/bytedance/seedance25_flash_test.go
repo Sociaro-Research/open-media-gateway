@@ -233,7 +233,7 @@ func TestSeedance25SeriesLayoutKeepsModelLimitsApart(t *testing.T) {
 		}
 		return got
 	}
-	base := limits{"1080p,480p,720p", 30, 10, 10, 50}
+	base := limits{"1080p,480p,4k,720p", 30, 10, 10, 50}
 	if got := read(string(body)); !reflect.DeepEqual(got, map[string]limits{"dreamina-seedance-2-5-260628": base, flashID: {"480p,720p", 10, 5, 5, 20}}) {
 		t.Fatal(got)
 	}
