@@ -1,6 +1,18 @@
 package api
 
-import "github.com/Sociaro-Research/open-media-gateway/internal/core"
+import (
+	"github.com/Sociaro-Research/open-media-gateway/internal/core"
+	"github.com/Sociaro-Research/open-media-gateway/internal/referencevalidation"
+)
+
+// unavailableReferenceTarget explains a failed referenceTargetModel lookup. A
+// model sent without its provider is a request mistake, not a missing model.
+func unavailableReferenceTarget(target *referencevalidation.Target) error {
+	if target.Provider == "" && target.Model != "" {
+		return referencevalidation.Invalid("References", "provider is required next to model. Send the provider of this model from GET /v1/models.")
+	}
+	return referencevalidation.Invalid("References", "The selected model is unavailable to this account or key. Choose an available model.")
+}
 
 // Resolve only within the caller's authorized catalog and selected connection.
 // Public IDs are opaque: custom aliases and slash-bearing native IDs must not

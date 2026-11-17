@@ -131,17 +131,27 @@ func TestReferenceTargetCurrentAccessAndConflicts(t *testing.T) {
 	for _, tc := range []struct {
 		provider, id string
 		status       int
+		message      string
 	}{
-		{"mock", "studio/cinema", 200},
-		{"mock", "dance", 200},
-		{"mock", "mock/dance", 400},
-		{"other", "studio/cinema", 400},
-		{"mock", "missing", 400},
+		{"mock", "studio/cinema", 200, ""},
+		{"mock", "dance", 200, ""},
+		{"mock", "mock/dance", 400, "model is unavailable"},
+		{"other", "studio/cinema", 400, "model is unavailable"},
+		{"mock", "missing", 400, "model is unavailable"},
+		// The public ID from GET /v1/models without its provider names the missing field (GW-340).
+		{"", "studio/cinema", 400, "provider is required"},
 	} {
 		target := &referencevalidation.Target{Provider: tc.provider, Model: tc.id, Options: core.MediaOptions{ReferenceMode: "references"}}
 		raw, _ := json.Marshal(map[string]any{"validation": target})
-		if out := sendTest(h, "POST", "/v1/references/validate", string(raw), "", key); out.Code != tc.status {
+		if out := sendTest(h, "POST", "/v1/references/validate", string(raw), "", key); out.Code != tc.status || !strings.Contains(out.Body.String(), tc.message) {
 			t.Fatal(tc, out.Code, out.Body.String())
+		}
+		if tc.status != 400 {
+			continue
+		}
+		raw, _ = json.Marshal(references.UploadInput{Name: "plan.png", ContentType: "image/png", SizeBytes: 100, SHA256: strings.Repeat("a", 64), Validation: target})
+		if out := sendTest(h, "POST", "/v1/references/uploads", string(raw), "", key); out.Code != 400 || !strings.Contains(out.Body.String(), tc.message) {
+			t.Fatal("planned upload", tc, out.Code, out.Body.String())
 		}
 	}
 	policy.models[0].EnabledByDefault = false

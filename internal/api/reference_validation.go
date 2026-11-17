@@ -51,7 +51,7 @@ func (s *Server) referenceValidator(r *http.Request) referencevalidation.Validat
 		}
 		model, ok := referenceTargetModel(catalog, target.Provider, target.Model)
 		if !ok {
-			return referencevalidation.Invalid("References", "The selected model is unavailable to this account or key. Choose an available model.")
+			return unavailableReferenceTarget(target)
 		}
 		options := target.Options
 		// Client-supplied reference URLs and voices are never consulted or fetched.
