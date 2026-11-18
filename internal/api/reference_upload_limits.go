@@ -24,7 +24,7 @@ func (s *Server) referenceUploadLimit(r *http.Request, target *referencevalidati
 	}
 	model, ok := referenceTargetModel(s.visibleCatalog(r), target.Provider, target.Model)
 	if !ok {
-		return 0, referencevalidation.Invalid("References", "The selected model is unavailable to this account or key. Choose an available model.")
+		return 0, unavailableReferenceTarget(target)
 	}
 	if target.Role != "" && target.Role != "reference_voice" {
 		return 0, referencevalidation.Invalid("References", "Unknown reference role.")
