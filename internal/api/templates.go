@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"reflect"
 	"strconv"
@@ -352,7 +353,7 @@ func (s *Server) templateUpload(w http.ResponseWriter, r *http.Request) {
 	var data []byte
 	var filename, sourceID string
 	var validation *referencevalidation.Target
-	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
+	if mediaType, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type")); mediaType == "multipart/form-data" {
 		if s.references == nil {
 			templateError(w, templates.ErrInvalid)
 			return
