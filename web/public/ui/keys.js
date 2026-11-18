@@ -105,7 +105,10 @@
       table(organizationID?'organization_keys':'personal_keys',['Key',...(organizationID?['User','Issued by']:[]),'Spending','Permissions','Activity','Status',''],visibleKeys.map(key=>{
         const state=keyStatus(key,currentTime),revoked=state==='revoked';
         const identity=node('div');identity.append(node('strong',key.name),node('code',key.prefix+'…'));
-        const activity=node('div');activity.append(node('small','Created '+new Date(key.created_at).toLocaleDateString()),node('small',key.last_used_at ? 'Used '+new Date(key.last_used_at).toLocaleString() : 'Not used yet'),node('small',key.expires_at ? 'Expires '+new Date(key.expires_at).toLocaleDateString() : 'No expiration'));
+        const activity=node('div');activity.append(node('small','Created '+new Date(key.created_at).toLocaleDateString()),node('small',key.last_used_at ? 'Used '+new Date(key.last_used_at).toLocaleString() : 'Not used yet'));
+        // An active key that stops working within a week is called out before apps start failing.
+        const soon=state==='active'&&key.expires_at&&Date.parse(key.expires_at)-currentTime<=7*86400000;
+        activity.append(soon?node('small','Expires soon: '+new Date(key.expires_at).toLocaleDateString(),'report-warning'):node('small',key.expires_at ? 'Expires '+new Date(key.expires_at).toLocaleDateString() : 'No expiration'));
         const revoke=node('button',revoked?'Revoked':'Revoke','secondary danger');revoke.type='button';revoke.disabled=revoked;
         revoke.addEventListener('click',()=>confirmRevoke(key,revoke));
         const spend=node('div'),item=loadedMonth===month.value?usage.find(item=>item.api_key_id===key.id):null;
@@ -114,7 +117,7 @@
           spend.append(node('small',`${item.tasks} ${item.tasks===1?'task':'tasks'}`));
           if(item.unknown_cost_tasks) spend.append(node('small',`${item.unknown_cost_tasks} legacy tasks with unknown cost`, 'keys-incomplete'));
         }
-        return [identity,...(organizationID?[UserUI.identity(members.find(m=>m.id===key.user_id)||{id:key.user_id,email:key.user_email,picture:key.user_picture}),UserUI.identity(members.find(m=>m.id===key.created_by)||{id:key.created_by,email:key.creator_email,picture:key.creator_picture})]:[]),spend,key.scopes.join(', '),activity,({revoked:'Revoked',expired:'Expired',disabled:'Disabled by system settings',active:'Active'})[state],revoked?'':revoke];
+        return [identity,...(organizationID?[UserUI.identity(members.find(m=>m.id===key.user_id)||{id:key.user_id,email:key.user_email,picture:key.user_picture}),UserUI.identity(members.find(m=>m.id===key.created_by)||{id:key.created_by,email:key.creator_email,picture:key.creator_picture})]:[]),spend,key.scopes.join(', '),activity,node('span',({revoked:'Revoked',expired:'Expired',disabled:'Disabled by system settings',active:'Active'})[state],'table-status '+({active:'report-success',disabled:'report-warning'}[state]||'')),revoked?'':revoke];
       }),keyList);
     }
     function confirmRevoke(key,button) {
