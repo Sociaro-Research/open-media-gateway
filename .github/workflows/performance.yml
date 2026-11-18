@@ -68,7 +68,8 @@ jobs:
       - name: Recovery with real lease expiry and race detector
         env:
           GATEWAY_REAL_LEASE_EXPIRY: '1'
-        run: go test -race -count=1 -timeout=5m -v ./internal/reliability > performance-results/recovery.log 2>&1
+        # Each real lease expiry waits ~60 s; the whole package took over 5 minutes.
+        run: go test -race -count=1 -timeout=20m -v ./internal/reliability > performance-results/recovery.log 2>&1
       - name: Measured API, reports, files and polling load
         env:
           GATEWAY_PERF: '1'
