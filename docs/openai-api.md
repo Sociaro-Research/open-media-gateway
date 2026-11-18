@@ -361,6 +361,8 @@ makes their download routes unavailable, while retaining history and costs.
 - **Provider controls:** capabilities and parameter limits come from our model
   catalog. Unsupported OpenAI controls (such as masks, input fidelity, speed or
   user tracking when not implemented) are rejected, not silently discarded.
+  Video downloads accept only `variant=video`; `thumbnail` and `spritesheet`
+  return 400.
 - **No invented APIs:** chat/completions, Responses, fine-tuning, assistants,
   transcription and other unimplemented capabilities are not advertised. File
   management, administration, reports, webhooks, and result deletion retain

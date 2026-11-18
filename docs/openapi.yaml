@@ -2970,6 +2970,7 @@ paths:
       required: true
       schema:
         type: string
+    - {in: query, name: variant, schema: {type: string, enum: [video], default: video}, description: 'OpenAI download variant. Only the video is stored; thumbnail and spritesheet return 400.'}
   /v1/organizations/{id}/request-logging:
     parameters:
     - {in: path, name: id, required: true, schema: {type: string, format: uuid}}
