@@ -906,14 +906,18 @@ Supermanagers and Managers who are members of an organization see one Get starte
 panel between the organization summary and its sections until every step is done
 or they dismiss it. The steps are Create an API key, Add credit, Send your first
 request and Invite your team; each is detected from existing reads (keys, balance or
-credit limit, one request record, members or open invitations) and rechecked when
-another section opens. A pending step shows one secondary action that opens the
-matching section (the Playground or Docs for the first request) and focuses its
-field. Done steps use the shared success color with a drawn check and a text label.
+credit limit, one request record, members or open invitations). Opening another
+section rechecks only the pending steps; a done step stays done. A pending step
+shows one secondary action that opens the matching section (the Playground or Docs
+for the first request). Create key and Invite members also move focus to their field;
+Open Billing, Open Playground and Open Docs only navigate. A recheck that finds no
+change leaves the list, and keyboard focus, as it was. Done steps use the shared
+success color with a drawn check and a text label.
 The panel reuses the console panel (`.keys-form`) and the shared `.icon-close`
 dismiss control; dismissal and completion are remembered per user and organization
-in browser storage, so the panel never returns once finished. A failed read leaves
-the panel hidden. Client managers and Administrators who are not members do not see it.
+in browser storage, so the panel never returns once finished. If the first reads fail
+the panel stays hidden; a failed recheck leaves the visible panel unchanged. Client
+managers and Administrators who are not members do not see it.
 
 ## Unified media selection
 

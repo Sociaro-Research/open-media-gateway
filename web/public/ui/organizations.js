@@ -106,17 +106,20 @@
   const done=new Set(),section=el('section',null,'keys-form organization-setup'),title=el('h2','Get started'),progress=el('p',null,'organization-setup-progress'),list=el('ol'),close=el('button','×','icon-close');
   title.id='organizationSetupTitle';section.setAttribute('aria-labelledby',title.id);section.hidden=true;close.type='button';close.setAttribute('aria-label','Dismiss Get started');
   const heading=el('div',null,'organization-setup-heading');heading.append(title,progress,close);section.append(heading,list);before.before(section);
-  let storageKey='',shown=false;
+  let storageKey='',shown=false,rendered=-1;
   const finished=()=>{try{return localStorage.getItem(storageKey)==='1'}catch{return false}};
   const finish=()=>{try{localStorage.setItem(storageKey,'1')}catch{/* The card still closes for this view. */}};
   close.onclick=()=>{finish();section.remove();const h1=parent.querySelector('h1');if(h1){h1.tabIndex=-1;h1.focus();}};
   function render(){
+   // Steps only ever become done, so an unchanged count means nothing to redraw; rebuilding would drop keyboard focus.
+   if(done.size===rendered)return;rendered=done.size;const focused=list.contains(document.activeElement)?document.activeElement.textContent:null;
    const complete=done.size===steps.length;title.textContent=complete?'You’re all set':'Get started';progress.textContent=`${done.size} of ${steps.length} done`;
    list.replaceChildren(...steps.map(([id,name,text,label,action])=>{
     const item=el('li',null,done.has(id)?'done':null),mark=el('span',null,'organization-setup-mark'),copy=el('div'),state=el('span',done.has(id)?'Done: ':'To do: ','sr-only');
     mark.innerHTML=setupIcons[done.has(id)?'done':'todo'];copy.append(el('strong'),el('p',text));copy.firstChild.append(state,name);item.append(mark,copy);
     if(!done.has(id))item.append(button(label,action));return item;
    }));
+   if(focused)[...list.querySelectorAll('button')].find(b=>b.textContent===focused)?.focus();
   }
   async function refresh(){
    if(!section.isConnected)return;

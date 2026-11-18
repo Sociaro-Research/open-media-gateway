@@ -3,7 +3,7 @@ const {evidencePath} = require('./evidence.cjs');
 // Organization console fixtures: no provider calls or production data.
 const {[process.env.UI_BROWSER_ENGINE||'chromium']:chromium}=require('playwright'),http=require('node:http'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const root=process.env.UI_SOURCE_DIR||path.resolve(__dirname,'../../web/public/ui');const server=http.createServer((req,res)=>{let file=path.join(root,path.basename(req.url.split('?')[0]));if(!path.extname(file))file=path.join(root,'index.html');if(!fs.existsSync(file))return res.writeHead(404).end();res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html');res.end(fs.readFileSync(file));});
-(async()=>{await new Promise(r=>server.listen(0,'127.0.0.1',r));const browser=await chromium.launch({headless:true,executablePath:process.env.UI_BROWSER_PATH}),page=await browser.newPage({viewport:{width:1440,height:1080}}),errors=[],writes=[];page.on('pageerror',e=>errors.push(e.message));page.setDefaultTimeout(10000);let storageFixture={driver:'gateway'};let clientManagerFixture=false,assignedManager='',admin=true,role='admin',balance=100,accepted=false,summaryFailure=0,summaryState='all';let bootstrapDelayed=false,paymentMethodsHold=null;const companyRequests=[];let onboardingCards=[],createFailure=false,duplicateFailure='',ownerInvitation=false;const onboardingRequests=[];
+(async()=>{await new Promise(r=>server.listen(0,'127.0.0.1',r));const browser=await chromium.launch({headless:true,executablePath:process.env.UI_BROWSER_PATH}),page=await browser.newPage({viewport:{width:1440,height:1080}}),errors=[],writes=[];page.on('pageerror',e=>errors.push(e.message));page.setDefaultTimeout(10000);let storageFixture={driver:'gateway'};let clientManagerFixture=false,assignedManager='',admin=true,role='admin',balance=100,accepted=false,summaryFailure=0,summaryState='all';let bootstrapDelayed=false,paymentMethodsHold=null,keysHold=null;const companyRequests=[];let onboardingCards=[],createFailure=false,duplicateFailure='',ownerInvitation=false;const onboardingRequests=[];
 const oid='22222222-2222-4222-8222-222222222222',uid='11111111-1111-4111-8111-111111111111';const organization=()=>({id:oid,name:'Example team',role,balance_usd:balance,available_usd:balance,credit_limit_usd:0,default_weekly_limit_usd:0,weekly_limit_usd:20,weekly_committed_usd:5,storage_bytes:2048,client_manager_email:assignedManager});
 const members=[{id:uid,email:'tester@example.test',name:'Tester',role:process.env.UI_MEMBER_ROLE_ONLY?'supermanager':'admin',weekly_limit_usd:20,weekly_committed_usd:5}];
 let holdMembers=null;
@@ -66,6 +66,7 @@ if(p.endsWith('/invitations'))return method==='POST'?json({id:'invite-id',token:
 if(p.startsWith('/v1/invitations/')){if(p.endsWith('/accept'))accepted=true;return json({organization_name:'Example team',organization_id:oid,role:ownerInvitation?'supermanager':undefined,first_owner:ownerInvitation});}
 if(p.endsWith('/generations'))return json({data:[],has_more:false});
 if(p.endsWith('/reports'))return json({data:[],has_more:false});
+if(p==='/v1/api-keys'&&method==='GET'&&keysHold)await keysHold;
 if(p==='/v1/api-keys')return method==='POST'?json({id:'key',secret:'fixture-key',...data}):json({data:[]});
 if(p==='/v1/api-keys/usage')return json({month:'2026-09',data:[]});
 if(p==='/v1/api-keys/billing')return json({data:[]});
@@ -104,6 +105,10 @@ try{const base='http://127.0.0.1:'+server.address().port;
  await guide.getByRole('button',{name:'Create key',exact:true}).click();await page.locator('#newKeyName').waitFor();assert.equal(await activeTab(),'API keys');
  await guide.getByRole('button',{name:'Invite members',exact:true}).click();await page.locator('.member-invitations').first().waitFor();assert.equal(await activeTab(),'Members');
  releasePaymentMethods();paymentMethodsHold=null;await page.getByRole('button',{name:'Top Up',exact:true}).waitFor();assert.equal(await activeTab(),'Members');
+ // A recheck that finds nothing new keeps keyboard focus on the checklist action.
+ let releaseKeys;keysHold=new Promise(resolve=>releaseKeys=resolve);await page.locator('.organization-tabs').getByRole('tab',{name:'Usage',exact:true}).click();
+ await guide.getByRole('button',{name:'Invite members',exact:true}).focus();const keysRead=page.waitForResponse(r=>new URL(r.url()).pathname==='/v1/api-keys');releaseKeys();keysHold=null;await keysRead;await page.evaluate(()=>new Promise(r=>setTimeout(r,200)));
+ assert.equal(await page.evaluate(()=>document.activeElement?.textContent),'Invite members','an unchanged recheck keeps focus');
  assert.deepEqual(errors.filter(e=>!e.startsWith('ResizeObserver loop')),[]);
  admin=false;role='member';await visit(base+'/organizations');await page.locator('.organization-tabs').getByRole('tab',{name:'Billing',exact:true}).click();await page.locator('.organization-reports .report-table').waitFor({state:'attached'});assert.equal(await page.getByRole('tab',{name:'Members',exact:true}).count(),0);
  await page.locator('.organization-reports').getByText('No requests yet.',{exact:true}).waitFor();
