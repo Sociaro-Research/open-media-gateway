@@ -303,14 +303,15 @@
   const requiresDeleteReview=()=>{const check=deletionChecks.get(record.id);return !!check&&sameDeletionContext(check.context);};
   const readSignal=()=>AbortSignal.any([signal,readController.signal]);
   const currentRead=serial=>currentEditor()&&!deleting&&!requiresDeleteReview()&&serial===readSerial;
-  let dropping=false;
+  // Only the editor that Create template opened may remove its draft, until the first edit: leaving it any other way keeps the draft.
+  let dropping=false,removable=createdDrafts.get(record.id)===record.version;createdDrafts.delete(record.id);
   form.append(button('Back to templates',async()=>{
    if(dropping)return;
    // A draft left right after Create template, never saved or edited, has nothing to keep.
-   if(createdDrafts.get(record.id)===record.version&&!writing&&!uploading&&!removal&&draftStamp(read())===baseline){
+   if(removable&&!writing&&!uploading&&!removal&&draftStamp(read())===baseline){
     // Lock fields, Save and the other writes first: anything accepted during the removal would go with the draft.
-    dropping=true;createdDrafts.delete(record.id);lock(true);
-    try{await api('/v1/system/templates/'+encodeURIComponent(record.id),{method:'DELETE',body:JSON.stringify({version:record.version}),signal});localDrafts.delete(record.id);authorRecords=authorRecords.filter(item=>item.id!==record.id);listFingerprint='';if(currentEditor()){editing=null;gallery();}return;}
+    dropping=true;removable=false;lock(true);
+    try{await api('/v1/system/templates/'+encodeURIComponent(record.id),{method:'DELETE',body:JSON.stringify({version:record.version}),signal});localDrafts.delete(record.id);if(currentEditor()){authorRecords=authorRecords.filter(item=>item.id!==record.id);listFingerprint='';editing=null;gallery();}return;}
     catch{/* Keep the draft when removal fails; Delete in the editor still works. */}
     finally{dropping=false;if(fresh(token))lock(false);}
     if(!currentEditor())return;
@@ -357,7 +358,7 @@
   function read(){const [p,m]=model.value?JSON.parse(model.value):[draft.provider,draft.model],reference_counts={};if(!countFields.hidden)for(const kind of ['image','video','audio'])if(selected()?.['supports_'+kind+'_input']&&counts[kind].value!=='')reference_counts[kind]=Number(counts[kind].value);return {...draft,title:title.value,description:description.value,prompt:prompt.value,provider:p,model:m,media_type:selected()?.media_type||draft.media_type,syntax,reference_counts,slots:bindings,options:{...generationOptions(),reference_mode:mode.value||modelOptions.reference_mode||draft.options?.reference_mode||''},cover_id:coverID,override_sound_id:overrideSoundID};}
   function snapshotRecord(){const content=read();return {...record,content,draft:content,savedDraft};}
   function workflowReady(){return !!model.value&&mode.value==='references'&&(!templateParameters||templateParameters.valid())&&(!templateResources||templateResources.valid())&&Object.values(generationFields).every(input=>input.validity.valid);}
-  function cache(){if(inferenceWarning){if(status.textContent===inferenceWarning)say('');inferenceWarning='';}FormUI.updatePrompt(prompt,selected());sound.root.hidden=selected()?.media_type!=='video'&&!overrideSoundID;sound.sync();countVisibility();infer.disabled=writing||!!uploading||requiresDeleteReview()||!workflowReady();syncPublication();localDrafts.set(record.id,snapshotRecord());promptEditor?.refresh();for(const widget of widgets)widget.sync();FormUI.update(form);}
+  function cache(){removable=false;if(inferenceWarning){if(status.textContent===inferenceWarning)say('');inferenceWarning='';}FormUI.updatePrompt(prompt,selected());sound.root.hidden=selected()?.media_type!=='video'&&!overrideSoundID;sound.sync();countVisibility();infer.disabled=writing||!!uploading||requiresDeleteReview()||!workflowReady();syncPublication();localDrafts.set(record.id,snapshotRecord());promptEditor?.refresh();for(const widget of widgets)widget.sync();FormUI.update(form);}
   const validation=()=>{const d=read();return ReferenceValidation.target(d.provider,d.model,targetOptions(d,selected()));};
   async function checkDraftMedia(d,operationSignal=readSignal()){if(!d.provider||!d.model)return;await api(`/v1/system/templates/${record.id}/validate-media`,{method:'POST',body:JSON.stringify({draft:d}),signal:operationSignal});}
   function checkMedia(){

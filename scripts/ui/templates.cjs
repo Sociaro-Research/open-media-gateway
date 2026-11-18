@@ -15,6 +15,7 @@ const server=http.createServer(async(req,res)=>{const u=new URL(req.url,'http://
   if(req.method==='GET'&&(/\/assets\/[^/]+$/.test(u.pathname)||u.pathname.endsWith('/content'))){if(previewFailure&&u.pathname.endsWith('/cover')){res.writeHead(503,{'Content-Type':'application/json'});return res.end(JSON.stringify({error:{message:'Temporary preview outage'}}));}if(heldPreview&&u.pathname.endsWith('/'+heldPreview.id))await heldPreview.promise;if(res.destroyed)return;res.setHeader('Content-Type','image/png');return res.end(png);}
   const contextField=raw.match(/name="validation"\r\n\r\n([^\r]*)/);let validationContext;if(contextField)validationContext=JSON.parse(contextField[1]);requests.push({path:u.pathname,method:req.method,key,body,validationContext});let result={data:[]};
   const templateID=u.pathname.match(/^\/v1\/system\/templates\/([^/]+)$/)?.[1];if(req.method==='DELETE'&&templateID&&removalHold){const hold=removalHold;await hold.promise;if(hold.fail){res.writeHead(503,{'Content-Type':'application/json'});return res.end(JSON.stringify({error:{message:'Synthetic removal failure.'}}));}}
+  if(req.method==='DELETE'&&templateID&&templateID===keptDraft?.id&&body?.version===keptDraft.version)keptDraft=null;
   if(req.method==='PUT'&&templateID&&templateID===keptDraft?.id)result=keptDraft={...keptDraft,version:keptDraft.version+1,draft:body.content};
   if(u.pathname==='/v1/info')result={auth_mode:admin?'google':'api_key',provider:'mock',console:{generation_ui:true}};
   if(u.pathname==='/v1/me')result={id:'owner',email:'owner@example.test',name:'Owner',is_system_admin:true};
@@ -148,15 +149,25 @@ const server=http.createServer(async(req,res)=>{const u=new URL(req.url,'http://
    let release;removalHold={fail,promise:new Promise(resolve=>release=resolve)};await page.getByRole('button',{name:'Create template',exact:true}).click();const held=page.locator('.template-editor');await held.waitFor();
    const post=requests.filter(x=>x.path==='/v1/system/templates'&&x.method==='POST').at(-1),removals=()=>requests.filter(x=>x.method==='DELETE'&&x.path==='/v1/system/templates/'+post.body.id).length;
    await held.getByRole('button',{name:'Back to templates',exact:true}).click();for(const deadline=Date.now()+5000;!removals();await new Promise(r=>setTimeout(r,20)))assert.ok(Date.now()<deadline,'Back did not send DELETE');
-   for(const label of ['Title','Prompt'])await assert.rejects(held.getByLabel(label,{exact:true}).fill('Typed during removal',{timeout:500}),label+' accepts no input while the removal is pending');
-   assert.equal(await page.evaluate(()=>[...document.querySelectorAll('.template-editor button')].filter(b=>b.textContent.trim()==='Save').every(b=>b.disabled)),true,'Save is locked while the removal is pending');
-   if(fail)keptDraft={...record,id:post.body.id,draft:post.body.content,published:null};
+   for(const label of ['Title','Prompt'])assert.equal(await held.getByLabel(label,{exact:true}).isDisabled(),true,label+' accepts no input while the removal is pending');
+   assert.deepEqual(await page.evaluate(()=>[...document.querySelectorAll('.template-editor button')].filter(b=>b.textContent.trim()==='Save').map(b=>b.disabled)),[true],'Save is locked while the removal is pending');
+   keptDraft={...record,id:post.body.id,draft:post.body.content,published:null};// listed until a successful DELETE of its version removes it
    release();removalHold=null;await held.waitFor({state:'detached'});assert.equal(removals(),1);
-   if(!fail){assert.equal(await page.getByRole('button',{name:'Edit Untitled template',exact:true}).count(),0);continue;}
+   if(!fail){await page.getByRole('button',{name:'Dance',exact:true}).waitFor();assert.equal(keptDraft,null);assert.equal(await page.getByRole('button',{name:'Edit Untitled template',exact:true}).count(),0);continue;}
    await page.getByRole('button',{name:'Edit Untitled template',exact:true}).click();await held.getByLabel('Title',{exact:true}).fill('Kept after failed removal');await held.getByRole('button',{name:'Save',exact:true}).click();await page.locator('#templatesStatus').filter({hasText:'Saved.'}).waitFor();
    assert.equal(keptDraft.draft.title,'Kept after failed removal');keptDraft=null;await held.getByRole('button',{name:'Back to templates',exact:true}).click();await held.waitFor({state:'detached'});
   }
   pass('Back right after Create locks the editor while DELETE is pending; a delayed success removes the draft, a delayed failure keeps it editable and saves later edits');
+  // A new draft left another way, or edited first (even back to empty), is kept: only an untouched first Back removes it.
+  for(const leave of ['sidebar','edit']){
+   await page.getByRole('button',{name:'Create template',exact:true}).click();const opened=page.locator('.template-editor');await opened.waitFor();
+   const post=requests.filter(x=>x.path==='/v1/system/templates'&&x.method==='POST').at(-1);keptDraft={...record,id:post.body.id,draft:post.body.content,published:null};
+   if(leave==='sidebar'){await page.locator('#generationNav').click();await page.locator('#templatesNav').click();await page.getByRole('button',{name:'Edit Untitled template',exact:true}).click();await opened.waitFor();}
+   else{const title=opened.getByLabel('Title',{exact:true});await title.fill('Typed');await title.fill('');}
+   await opened.getByRole('button',{name:'Back to templates',exact:true}).click();await opened.waitFor({state:'detached'});
+   assert.equal(requests.filter(x=>x.method==='DELETE'&&x.path==='/v1/system/templates/'+post.body.id).length,0,'Back keeps a new draft after '+leave);keptDraft=null;
+  }
+  pass('A new draft left through the sidebar or edited before Back is kept');
   await page.getByRole('button',{name:'Create template',exact:true}).click();await page.locator('.template-editor').waitFor();
   const created=requests.filter(x=>x.path==='/v1/system/templates'&&x.method==='POST').at(-1);assert.equal(created.body.content.options.reference_mode,'references');assert.equal(created.body.content.model,'dance');
   await page.getByRole('button',{name:'Back to templates',exact:true}).click();let releasePreview;if(!process.env.UI_BASELINE)heldPreview={id:'cover',promise:new Promise(r=>releasePreview=r)};await page.getByRole('button',{name:/^Edit /}).first().click();
