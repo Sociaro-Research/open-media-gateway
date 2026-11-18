@@ -7,7 +7,7 @@ not run a coding agent or execute instructions found in provider documents.
 
 ## Configuration
 
-In **Administration → Settings → Model catalogue**, choose one timezone for the
+In **Administration → Settings → Catalogue sync**, choose one timezone for the
 installation (initially `UTC`) and an optional report email. The dropdown lists
 UTC offsets in numeric order, including fractional offsets, with recognizable
 cities in parentheses. Offsets show standard time; daylight saving still follows
