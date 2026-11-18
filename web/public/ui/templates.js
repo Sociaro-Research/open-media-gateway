@@ -466,7 +466,8 @@
    const current=()=>!operation.closed&&removal===operation&&currentEditor()&&sameDeletionContext(context);
    const close=(force=false,restore=true)=>{if(operation.closed||operation.pending&&!force)return;const interrupted=operation.pending&&current();operation.closed=true;scope.controller.abort();panel.close();panel.remove();if(removal===operation)removal=null;if(interrupted){deleting=false;operation.pending=false;lock(false);FormUI.message(deletionNotice,deletionChecks.get(target.id)?.reason||'Deletion is unconfirmed. Review the saved state.','error');}if(restore&&currentEditor())removeTemplate.focus({preventScroll:true});};
    const {heading,close:closeButton}=FormUI.dialogHeading(confirmation,'Delete template?',()=>close());heading.id='delete-template-'+crypto.randomUUID();panel.setAttribute('aria-labelledby',heading.id);
-   description.textContent='“'+target.title+'”\nTemplate ID: '+target.id+'\nSaved version: '+target.version;description.id=heading.id+'-description';panel.setAttribute('aria-describedby',description.id);
+   // The saved version stays in target for the DELETE check; people only need the title.
+   description.append(el('strong',target.title),' will be removed from Templates.');description.id=heading.id+'-description';panel.setAttribute('aria-describedby',description.id);
    const warning=el('p','Any unsaved edits to this template will be discarded. Existing jobs and shared library media will be kept.');
    const cancel=button('Cancel',()=>close()),confirm=button('Delete template',async()=>{
     if(!current()||operation.pending||writing||uploading)return;
