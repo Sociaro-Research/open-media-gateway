@@ -60,10 +60,11 @@
       form.elements.providers.closest('label').remove();form.elements.storage.closest('label').remove();
     }
     content.append(form);
-    FormUI.watch(form,form.querySelector('button[type=submit]'),{valid:()=>!!form.elements.name.value.trim()});
     const secretPanel=node('div',undefined,'keys-secret'); secretPanel.hidden=true; content.append(secretPanel);
+    // Create is a create flow: visible, disabled until named, and locked while creating or while the new secret is shown.
+    let creating=false;FormUI.watch(form,form.querySelector('button[type=submit]'),{placement:'footer',valid:()=>!creating&&secretPanel.hidden&&!!form.elements.name.value.trim()});
     form.addEventListener('submit',async e=> {
-      e.preventDefault();const button=form.querySelector('button[type=submit]');button.disabled=true;
+      e.preventDefault();const button=form.querySelector('button[type=submit]');if(button.disabled)return;creating=true;button.disabled=true;
       const message=form.querySelector('[role=status]');FormUI.message(message,'Creating…');
       const input={name:form.elements.name.value,scopes:['generation'],resource_mode:organizationID?'shared':'personal'};if(organizationID){input.organization_id=organizationID;input.user_id=form.elements.user_id.value;}
       if(form.elements.providers?.checked) input.scopes.push('providers:manage');
@@ -78,10 +79,10 @@
         if(token!==pageToken) return;
         secretPanel.replaceChildren(node('h3','Save your key now'),node('p','Shown once. Copy and store it safely.'));
         const secretField=node('input');secretField.readOnly=true;secretField.value=result.secret;secretField.autocomplete='off';secretField.setAttribute('aria-label','Gateway API key');secretPanel.append(secretField);
-        const dismiss=node('button','I saved my key','secondary');dismiss.type='button';dismiss.addEventListener('click',()=>{secretPanel.replaceChildren();secretPanel.hidden=true;form.querySelector('button[type=submit]').disabled=false;});secretPanel.append(dismiss);secretPanel.hidden=false;
+        const dismiss=node('button','I saved my key','secondary');dismiss.type='button';dismiss.addEventListener('click',()=>{secretPanel.replaceChildren();secretPanel.hidden=true;FormUI.update(form);});secretPanel.append(dismiss);secretPanel.hidden=false;
         const {secret,...metadata}=result;keys.unshift(metadata);renderKeys();form.reset();FormUI.commit(form);FormUI.message(message,'');
       } catch(err) {FormUI.message(message,`Could not create key: ${err.message}. If the response was lost, refresh the list before creating another key.`,'error');}
-      finally {button.disabled=!secretPanel.hidden;}
+      finally {creating=false;FormUI.update(form);}
     });
 
     const toolbar=node('div',undefined,'keys-toolbar'),monthField=node('div'),monthLabel=node('label','Month');monthLabel.htmlFor=month.id;monthField.append(monthLabel,month);
