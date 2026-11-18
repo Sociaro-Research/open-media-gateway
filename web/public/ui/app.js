@@ -1179,6 +1179,12 @@ function formatPrice(value) {
   return `≈ ${formatUSD(value)}`;
 }
 
+// Admission blocks every task, free ones too, once nothing is left (remaining <= 0).
+function budgetBlockedMessage(quote) {
+  if (quote.weekly_limit_usd === 0) return 'Your weekly limit is $0, so generation is blocked, even for free models. Ask an organization manager to raise it.';
+  return `Your weekly limit or the organization balance is used up (${formatUSD(quote.remaining_usd)} left). Generation is blocked, even for free models, until a manager raises the limit or adds credit.`;
+}
+
 function setActionEstimate(value, priced=false) {
  FormUI.setText(elements.priceValue,value);
  FormUI.setText(document.querySelector('#priceSeparator'),priced?' for ':' — ');
@@ -1208,9 +1214,9 @@ function updatePrice() {
    const quote=await fetchEstimate(request);
    if(sequence!==quoteSequence) return;
    const amount=quote.cost?.customer_expected_usd??quote.cost?.expected_usd;if(quote.cost?.quantity_unknown||!Number.isFinite(amount)||amount<0)throw Error('Verified estimate unavailable.');
-   setActionEstimate(formatPrice(amount),true);
+   setActionEstimate(quote.can_generate ? formatPrice(amount) : 'Limit reached',quote.can_generate);
    elements.priceCard.classList.toggle('unknown',!quote.can_generate);
-   setEstimateFeedback(quote.can_generate ? (quote.cost.pricing?.estimate_description || '') : `Exceeds the available organization or weekly allowance (${formatUSD(quote.remaining_usd)}).`,quote.can_generate?'':'error');
+   setEstimateFeedback(quote.can_generate ? (quote.cost.pricing?.estimate_description || '') : budgetBlockedMessage(quote),quote.can_generate?'':'error');
   } catch(error) {
    if(sequence!==quoteSequence) return;
    const hasInput=request.prompt || selectedModel()?.prompt_optional || selectedModel()?.no_prompt;
@@ -1246,7 +1252,8 @@ async function refreshGenerationBudget() {
   item.append(node('dt','Weekly limit'),node('dd',limit));stats.append(item);panel.append(stats);
   if(result.key.resource_mode==='shared'&&o){
    const weeklyRemaining=o.weekly_limit_usd==null?Infinity:o.weekly_limit_usd-o.weekly_committed_usd;
-   panel.classList.toggle('over-budget', Math.min(o.available_usd,weeklyRemaining)<0);
+   // Nothing left of the weekly limit already blocks generation, so $0 / $0 is a warning too.
+   panel.classList.toggle('over-budget', weeklyRemaining<=0 || o.available_usd<0);
   }
 
  } catch (error) {
@@ -1634,7 +1641,7 @@ async function openGenerationConfirmation(source, trigger) {
    confirmButton.disabled=!submission.canGenerate;
    confirmStatus.hidden=quote.can_generate && amount===0;
    confirmStatus.className=quote.can_generate ? '' : 'error';
-   confirmStatus.textContent=quote.can_generate ? (amount===0 ? '' : 'Cost is recorded after generation.') : `Your budget is exhausted (${formatUSD(quote.remaining_usd)} remaining).`;
+   confirmStatus.textContent=quote.can_generate ? (amount===0 ? '' : 'Cost is recorded after generation.') : budgetBlockedMessage(quote);
   } catch(error) {
    if(pendingSubmission!==submission) return;
    if(request.template&&error.code==='template_conflict'){dialog.close();pendingSubmission=null;await window.GatewayTemplates?.currentChanged(request.template.id,request.template.revision);return;}

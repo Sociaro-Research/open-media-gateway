@@ -200,7 +200,7 @@ const deferred = () => { let resolve; const promise = new Promise(r => {resolve=
     for(const error of ['Permission denied','Pricing unavailable']){
       quoteFailure=error;const before=posts.length;await retry('history-video');await page.locator('#confirmStatus').getByText(error,{exact:true}).waitFor();assert.equal(await page.locator('#confirmSubmit').isDisabled(),true);await page.locator('#cancelConfirm').click();assert.equal(posts.length,before);
     }
-    quoteFailure=null;canGenerate=false;await retry('history-video');await page.getByText(/Your budget is exhausted/).waitFor();assert.equal(await page.locator('#confirmSubmit').isDisabled(),true);await page.locator('#cancelConfirm').click();canGenerate=true;
+    quoteFailure=null;canGenerate=false;await retry('history-video');await page.locator('#confirmStatus').getByText(/even for free models/).waitFor();assert.equal(await page.locator('#confirmSubmit').isDisabled(),true);await page.locator('#cancelConfirm').click();canGenerate=true;
     record('Permission, pricing and exhausted budget estimates cannot be confirmed');
 
     failure={status:409,code:'estimate_changed',message:'Price changed'};await retry('history-video');await ready();await page.locator('#confirmSubmit').click();await hidden();assert.deepEqual(await state(),edited);
