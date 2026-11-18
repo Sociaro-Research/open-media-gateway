@@ -140,7 +140,8 @@ func (s *TaskService) CreateMediaRequest(ctx context.Context, input CreateMediaI
 	}
 	stored, _, err := s.repo.CreateOrGet(ctx, task, idempotencyKey, hash)
 	if err != nil {
-		return Task{}, fmt.Errorf("store task: %w", err)
+		// Unwrapped: the API echoes validation errors (project, options) to the caller as-is.
+		return Task{}, err
 	}
 	if stored.Status == TaskQueued || stored.Status == TaskRunning {
 		if err := s.queue.Enqueue(ctx, stored.ID); err == nil {

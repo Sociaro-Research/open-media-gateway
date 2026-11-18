@@ -309,8 +309,8 @@ func TestGenerationAdmissionEstimateProjectScopeAndAcceptedRecovery(t *testing.T
 	if _, e = svc.Estimate(ctx, input); !errors.Is(e, core.ErrProjectInvalid) {
 		t.Fatal("deleted project estimate", e)
 	}
-	if _, e = svc.CreateMediaRequest(ctx, input, "new"); !errors.Is(e, core.ErrProjectInvalid) {
-		t.Fatal("new request accepted deleted project", e)
+	if _, e = svc.CreateMediaRequest(ctx, input, "new"); !errors.Is(e, core.ErrProjectInvalid) || e.Error() != core.ErrProjectInvalid.Error() {
+		t.Fatal("new request accepted deleted project or exposed internal error context", e)
 	}
 	recovered, e := svc.CreateMediaRequest(ctx, input, "original")
 	if e != nil || recovered.ID != accepted.ID {
