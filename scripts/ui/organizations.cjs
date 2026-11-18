@@ -3,7 +3,7 @@ const {evidencePath} = require('./evidence.cjs');
 // Organization console fixtures: no provider calls or production data.
 const {[process.env.UI_BROWSER_ENGINE||'chromium']:chromium}=require('playwright'),http=require('node:http'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const root=process.env.UI_SOURCE_DIR||path.resolve(__dirname,'../../web/public/ui');const server=http.createServer((req,res)=>{let file=path.join(root,path.basename(req.url.split('?')[0]));if(!path.extname(file))file=path.join(root,'index.html');if(!fs.existsSync(file))return res.writeHead(404).end();res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html');res.end(fs.readFileSync(file));});
-(async()=>{await new Promise(r=>server.listen(0,'127.0.0.1',r));const browser=await chromium.launch({headless:true,executablePath:process.env.UI_BROWSER_PATH}),page=await browser.newPage({viewport:{width:1440,height:1080}}),errors=[],writes=[];page.on('pageerror',e=>errors.push(e.message));page.setDefaultTimeout(10000);let storageFixture={driver:'gateway'};let clientManagerFixture=false,assignedManager='',admin=true,role='admin',balance=100,accepted=false,summaryFailure=0,summaryState='all';let bootstrapDelayed=false;const companyRequests=[];let onboardingCards=[],createFailure=false,duplicateFailure='',ownerInvitation=false;const onboardingRequests=[];
+(async()=>{await new Promise(r=>server.listen(0,'127.0.0.1',r));const browser=await chromium.launch({headless:true,executablePath:process.env.UI_BROWSER_PATH}),page=await browser.newPage({viewport:{width:1440,height:1080}}),errors=[],writes=[];page.on('pageerror',e=>errors.push(e.message));page.setDefaultTimeout(10000);let storageFixture={driver:'gateway'};let clientManagerFixture=false,assignedManager='',admin=true,role='admin',balance=100,accepted=false,summaryFailure=0,summaryState='all';let bootstrapDelayed=false,paymentMethodsHold=null;const companyRequests=[];let onboardingCards=[],createFailure=false,duplicateFailure='',ownerInvitation=false;const onboardingRequests=[];
 const oid='22222222-2222-4222-8222-222222222222',uid='11111111-1111-4111-8111-111111111111';const organization=()=>({id:oid,name:'Example team',role,balance_usd:balance,available_usd:balance,credit_limit_usd:0,default_weekly_limit_usd:0,weekly_limit_usd:20,weekly_committed_usd:5,storage_bytes:2048,client_manager_email:assignedManager});
 const members=[{id:uid,email:'tester@example.test',name:'Tester',role:process.env.UI_MEMBER_ROLE_ONLY?'supermanager':'admin',weekly_limit_usd:20,weekly_committed_usd:5}];
 let holdMembers=null;
@@ -43,6 +43,7 @@ if(p==='/v1/organizations'){
  return json(method==='POST'?organization():{data:[organization()]});
 }
 if(p==='/v1/organizations/'+oid)return method==='PUT'?route.fulfill({status:204}):json(organization());
+if(p.endsWith('/payment-methods')&&paymentMethodsHold){await paymentMethodsHold;return json({data:[{id:'fixture-card'}]});}
 if(p.endsWith('/storage/check'))return json({status:'ok'});
 if(p.endsWith('/storage')){if(method==='PUT'){storageFixture={...data,secret_access_key:'',credentials_configured:true};return json(storageFixture)}return json({settings:storageFixture,can_manage:true,gateway_allowance_bytes:10000000000});}
 if(p.endsWith('/client-manager')){assignedManager=data.user;return route.fulfill({status:204})}
@@ -96,6 +97,14 @@ try{const base='http://127.0.0.1:'+server.address().port;
  // The updated balance precedes the async Billing/report reload. Finish it before
  // replacing the mocked account and document; an old networkidle load state does not.
  await page.locator('.organization-reports').getByText('No requests yet.',{exact:true}).waitFor();
+ // Get started actions work while payment methods are still loading, and the late answer keeps the chosen section.
+ let releasePaymentMethods;paymentMethodsHold=new Promise(resolve=>releasePaymentMethods=resolve);
+ await page.locator('[data-system-page=organizations]').click();await page.locator('.organization-row').hover();await page.getByRole('button',{name:'Manage',exact:true}).click();
+ const guide=page.locator('.organization-setup'),activeTab=()=>page.locator('.organization-tabs [aria-pressed=true]').textContent();await guide.waitFor();
+ await guide.getByRole('button',{name:'Create key',exact:true}).click();await page.locator('#newKeyName').waitFor();assert.equal(await activeTab(),'API keys');
+ await guide.getByRole('button',{name:'Invite members',exact:true}).click();await page.locator('.member-invitations').first().waitFor();assert.equal(await activeTab(),'Members');
+ releasePaymentMethods();paymentMethodsHold=null;await page.getByRole('button',{name:'Top Up',exact:true}).waitFor();assert.equal(await activeTab(),'Members');
+ assert.deepEqual(errors.filter(e=>!e.startsWith('ResizeObserver loop')),[]);
  admin=false;role='member';await visit(base+'/organizations');await page.locator('.organization-tabs').getByRole('tab',{name:'Billing',exact:true}).click();await page.locator('.organization-reports .report-table').waitFor({state:'attached'});assert.equal(await page.getByRole('tab',{name:'Members',exact:true}).count(),0);
  await page.locator('.organization-reports').getByText('No requests yet.',{exact:true}).waitFor();
  clientManagerFixture=true;role='client_manager';admin=false;const writesBefore=writes.length;await visit(base+'/organizations');await page.locator('.organization-reports .report-table').waitFor({state:'attached'});for(const id of ['generationNav','providersNav','storageNav','keysNav','systemNav'])assert.equal(await page.locator('#'+id).isVisible(),false);assert.equal(await page.getByRole('tab',{name:'Settings',exact:true}).count(),0);await page.getByRole('tab',{name:'Members',exact:true}).click();const memberCell=page.getByRole('cell').filter({has:page.getByText('tester@example.test',{exact:true})});await memberCell.waitFor();assert.equal(await memberCell.getByText('Tester',{exact:true}).count(),1);assert.equal(await memberCell.locator('.user-avatar').count(),1);assert.equal(await page.locator('.member-limit-form').count(),0);assert.equal(writes.length,writesBefore);await capture('client-manager-members');
