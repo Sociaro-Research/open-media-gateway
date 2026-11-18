@@ -56,6 +56,10 @@ func (r *SystemRepository) SaveAuthorizationAttempt(ctx context.Context, next re
 		if current.Access != next.Access || current.Origin != next.Origin || current.Name != next.Name || current.ClientOrigin != next.ClientOrigin || current.Version != next.Version || current.ConnectionRevision != next.ConnectionRevision {
 			return next, remote.ErrConflict
 		}
+		// Under the same row lock as the creator's cleanup, so it holds across instances.
+		if _, err = tx.ExecContext(ctx, `UPDATE remote_workspace_authorizations SET shared=TRUE WHERE owner_id=$1`, next.Owner); err != nil {
+			return next, err
+		}
 		return current, tx.Commit()
 	}
 	if !errors.Is(err, remote.ErrNotFound) {
@@ -71,13 +75,10 @@ func (r *SystemRepository) ClearAuthorizationAttempt(ctx context.Context, owner,
 	return r.changeAuthorizationAttempt(ctx, owner, id, `DELETE FROM remote_workspace_authorizations WHERE owner_id=$1 AND id::text=$2`)
 }
 
-// ClearUnacceptedAuthorizationAttempt keeps a request any start has had accepted:
+// ClearUnsharedAuthorizationAttempt keeps a request another start has reused:
 // starts with the same details share one saved request, also across instances.
-func (r *SystemRepository) ClearUnacceptedAuthorizationAttempt(ctx context.Context, owner, id string) error {
-	return r.changeAuthorizationAttempt(ctx, owner, id, `DELETE FROM remote_workspace_authorizations WHERE owner_id=$1 AND id::text=$2 AND NOT accepted`)
-}
-func (r *SystemRepository) AcceptAuthorizationAttempt(ctx context.Context, owner, id string) error {
-	return r.changeAuthorizationAttempt(ctx, owner, id, `UPDATE remote_workspace_authorizations SET accepted=TRUE WHERE owner_id=$1 AND id::text=$2`)
+func (r *SystemRepository) ClearUnsharedAuthorizationAttempt(ctx context.Context, owner, id string) error {
+	return r.changeAuthorizationAttempt(ctx, owner, id, `DELETE FROM remote_workspace_authorizations WHERE owner_id=$1 AND id::text=$2 AND NOT shared`)
 }
 func (r *SystemRepository) changeAuthorizationAttempt(ctx context.Context, owner, id, statement string) error {
 	tx, err := beginAuditTx(ctx, r.db)

@@ -42,10 +42,7 @@ func (f *cancelConfirmationFixture) ClearAuthorizationAttempt(context.Context, s
 	f.cleared = true
 	return nil
 }
-func (f *cancelConfirmationFixture) ClearUnacceptedAuthorizationAttempt(context.Context, string, string) error {
-	return nil
-}
-func (f *cancelConfirmationFixture) AcceptAuthorizationAttempt(context.Context, string, string) error {
+func (f *cancelConfirmationFixture) ClearUnsharedAuthorizationAttempt(context.Context, string, string) error {
 	return nil
 }
 func TestCancellationKeepsProofUnlessHostConfirms(t *testing.T) {
@@ -294,7 +291,13 @@ func TestFailedCreatorKeepsRequestAConcurrentStartReturned(t *testing.T) {
 	}
 	creator := make(chan error, 1)
 	go func() { _, err := begin(); creator <- err }()
-	<-held
+	select {
+	case <-held:
+	case e := <-creator:
+		t.Fatal("creator start failed before the host received it", e)
+	case <-time.After(30 * time.Second):
+		t.Fatal("host never received the creator start")
+	}
 	view, e := begin()
 	if e != nil || view.Code == "" {
 		t.Fatal("concurrent start did not reuse the pending request", e)
@@ -386,5 +389,84 @@ func TestLegacyIssuedReplyCannotBecomeDedicated(t *testing.T) {
 	manager := remote.New(repo, cipher, host.Client())
 	if _, err := manager.PollAuthorization(context.Background(), "alice", "attempt"); !errors.Is(err, wa.ErrLegacy) || repo.cleared || calls != 1 {
 		t.Fatal("legacy reply relabeled or discarded", err, calls)
+	}
+}
+
+// The creator fails after the central server answered the reusing start but before
+// that start has finished, so nothing has marked the request accepted yet.
+func TestFailedCreatorKeepsRequestAReusingStartIsStillFinishing(t *testing.T) {
+	db := workspaceDatabase(t)
+	ctx := context.Background()
+	owner, e := postgres.NewAuthRepository(db).UpsertGoogleUser(ctx, uuid.NewString(), uuid.NewString()+"@fixture.test", "Local admin", "")
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = db.Exec(`UPDATE users SET is_system_admin=TRUE WHERE id=$1`, owner.ID); e != nil {
+		t.Fatal(e)
+	}
+	var starts atomic.Int32
+	creatorHeld, releaseCreator := make(chan struct{}), make(chan struct{})
+	reuserAnswered, finishReuser := make(chan struct{}), make(chan struct{})
+	host := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var in struct {
+			Device string `json:"device_code"`
+		}
+		if json.NewDecoder(r.Body).Decode(&in) != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		if starts.Add(1) == 1 {
+			close(creatorHeld)
+			<-releaseCreator
+			w.WriteHeader(http.StatusBadGateway)
+			return
+		}
+		// The reply is sent, but the body only ends once the creator has failed.
+		fmt.Fprintf(w, `{"user_code":%q}`, wa.UserCode(in.Device))
+		w.(http.Flusher).Flush()
+		close(reuserAnswered)
+		<-finishReuser
+	}))
+	defer host.Close()
+	letCreatorFail, letReuserFinish := sync.OnceFunc(func() { close(releaseCreator) }), sync.OnceFunc(func() { close(finishReuser) })
+	defer letReuserFinish()
+	defer letCreatorFail()
+	cipher, _ := providerconfig.NewCipher(strings.Repeat("s", 32))
+	repo := postgres.NewSystemRepository(db)
+	manager := remote.New(repo, cipher, host.Client())
+	type result struct {
+		view remote.AuthorizationView
+		err  error
+	}
+	begin := func(out chan<- result) {
+		view, err := manager.BeginAuthorization(ctx, owner.ID, host.URL, "Local installation", "http://localhost:8088", 0)
+		out <- result{view, err}
+	}
+	wait := func(ready <-chan struct{}, what string) {
+		select {
+		case <-ready:
+		case <-time.After(30 * time.Second):
+			t.Fatal(what)
+		}
+	}
+	creator, reuser := make(chan result, 1), make(chan result, 1)
+	go begin(creator)
+	wait(creatorHeld, "host never received the creator start")
+	go begin(reuser)
+	wait(reuserAnswered, "host never answered the reusing start")
+	letCreatorFail()
+	if r := <-creator; !errors.Is(r.err, remote.ErrUnavailable) {
+		t.Fatal("held creator start did not fail", r.err)
+	}
+	if _, e = repo.AuthorizationAttempt(ctx, owner.ID); e != nil {
+		t.Fatal("failed creator dropped the request another start was still finishing", e)
+	}
+	letReuserFinish()
+	r := <-reuser
+	if r.err != nil || r.view.Code == "" {
+		t.Fatal("start the central server accepted failed after the creator failed", r.err)
+	}
+	if resumed, e := manager.Authorization(ctx, owner.ID); e != nil || resumed.ID != r.view.ID || resumed.Code != r.view.Code {
+		t.Fatal("returned request cannot be resumed", e)
 	}
 }

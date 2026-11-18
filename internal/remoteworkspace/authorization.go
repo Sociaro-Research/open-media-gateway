@@ -31,8 +31,7 @@ type AuthorizationRepository interface {
 	AuthorizationAttempt(context.Context, string) (Attempt, error)
 	SaveAuthorizationAttempt(context.Context, Attempt) (Attempt, error)
 	ClearAuthorizationAttempt(context.Context, string, string) error
-	ClearUnacceptedAuthorizationAttempt(context.Context, string, string) error
-	AcceptAuthorizationAttempt(context.Context, string, string) error
+	ClearUnsharedAuthorizationAttempt(context.Context, string, string) error
 }
 type AuthorizationView struct {
 	CurrentRevision int64 `json:"current_connection_revision"`
@@ -155,11 +154,15 @@ func (m *Manager) beginAuthorization(ctx context.Context, owner, origin, name, c
 		// This call created the request and nothing has redeemed its proof, so no key
 		// can exist for it. Drop it on failure: keeping it blocks every retry until the
 		// central server confirms a cancellation it may never have received.
-		// Once the central server has accepted a start for it, here or in a concurrent
-		// start that reused it, keep it: the owner can still finish or cancel it.
+		// Once the central server has accepted this start, or another start has
+		// reused the request and may still have it accepted, keep it: the owner can
+		// still finish or cancel it.
 		defer func() {
 			if err != nil && !accepted {
-				_ = repo.ClearUnacceptedAuthorizationAttempt(context.WithoutCancel(ctx), owner, id)
+				// Bounded: a blocked delete must not hold the failed start's response.
+				cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+				defer cancel()
+				_ = repo.ClearUnsharedAuthorizationAttempt(cleanup, owner, id)
 			}
 		}()
 	}
@@ -228,9 +231,6 @@ func (m *Manager) beginAuthorization(ctx context.Context, owner, origin, name, c
 		return AuthorizationView{}, ErrUnavailable
 	}
 	accepted = true
-	if e = repo.AcceptAuthorizationAttempt(ctx, owner, attempt.ID); e != nil {
-		return AuthorizationView{}, e
-	}
 	view, e = m.Authorization(ctx, owner)
 	if e != nil {
 		return AuthorizationView{}, e
