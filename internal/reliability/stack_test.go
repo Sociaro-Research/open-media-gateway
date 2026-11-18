@@ -281,6 +281,9 @@ func newStack(t *testing.T, timeout time.Duration) *testStack {
 		base.Close()
 		t.Fatal(err)
 	}
+	// No idle connection: a fault test can cut it, and the driver reuses a connection
+	// used within the last second without checking it, so DROP SCHEMA would fail.
+	base.SetMaxIdleConns(0)
 	t.Cleanup(func() {
 		_, err := base.Exec("DROP SCHEMA " + schema + " CASCADE")
 		if err != nil {
