@@ -216,6 +216,22 @@ code { color: var(--text); }
 .empty-state > span { display: grid; place-items: center; width: 54px; height: 54px; margin-bottom: 16px; border: 1px solid var(--line); border-radius: 50%; color: var(--muted); font-size: 24px; }
 .empty-state strong { color: var(--text); }
 .empty-state p { max-width: 310px; line-height: 1.5; font-size: 13px; }
+/* Playground Journal first-run steps: a vertical stepper; the next step has the filled accent mark and one focus action. */
+.journal-first-steps { padding: 48px 30px 56px; }
+.journal-first-steps > strong { font-size: var(--type-group); }
+.journal-first-steps ol { display: grid; gap: 20px; width: min(100%, 380px); margin: 24px 0 0; padding: 0; list-style: none; text-align: left; }
+.journal-first-steps li { position: relative; display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: 16px; align-items: start; }
+.journal-first-steps li:not(:last-child)::after { content: ''; position: absolute; left: 16px; top: 40px; bottom: -12px; border-left: 1px solid var(--line); }
+.journal-step-mark { display: grid; place-items: center; width: 32px; height: 32px; border: 1px solid var(--line); border-radius: 50%; color: var(--muted); font-size: 13px; font-weight: 700; }
+.journal-step-mark svg { width: 18px; height: 18px; }
+.journal-first-steps li.current .journal-step-mark { border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
+.journal-first-steps li.done .journal-step-mark { border-color: var(--success); color: var(--success); }
+.journal-first-steps li > span:last-child { display: grid; gap: 4px; padding-top: 6px; }
+.journal-first-steps b { color: var(--text); font-size: var(--type-body); }
+.journal-first-steps li.done b { color: var(--muted); }
+.journal-first-steps small { color: var(--muted); font-size: var(--type-detail); line-height: 1.5; }
+.journal-first-steps li button { justify-self: start; min-height: 44px; margin-top: 8px; }
+@media(max-width:600px) { .journal-first-steps { padding: 32px 22px 40px; } }
 .task { padding: 22px 28px; border-bottom: 1px solid var(--line); }
 .task:last-child { border-bottom: 0; }
 .task-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
