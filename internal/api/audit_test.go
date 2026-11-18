@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -152,11 +153,31 @@ func TestAuditOrganizationProjectionAppliesToListAndDetails(t *testing.T) {
 func TestAuditFiltersPaginationAndSafeFailures(t *testing.T) {
 	s, _, f := auditServer()
 	h := s.handler()
-	for _, filter := range []string{"before_id=-1", "from=invalid", "from=2026-10-10&to=2026-10-01", "organization_id=bad", "outcome=whatever", "timezone=bad"} {
-		w := sendTest(h, "GET", "/v1/audit/events?"+filter, "", "alice", "")
-		if w.Code != 400 {
-			t.Fatal(filter, w.Code, w.Body)
+	for _, tc := range []struct{ path, param string }{
+		{"/v1/audit/events?before_id=-1", "before_id"},
+		{"/v1/audit/events?from=invalid", "from"},
+		{"/v1/audit/events?to=2026-13-01", "to"},
+		{"/v1/audit/events?from=2026-10-10&to=2026-10-01", "to"},
+		{"/v1/audit/events?to=2000-01-01", "to"},
+		{"/v1/audit/events?from=2999-01-01", "from"},
+		{"/v1/audit/events?organization_id=bad", "organization_id"},
+		{"/v1/audit/events?object_id=" + strings.Repeat("x", 201), "object_id"},
+		{"/v1/audit/events?scope=whatever", "scope"},
+		{"/v1/audit/events?outcome=whatever", "outcome"},
+		{"/v1/audit/events?timezone=bad", "timezone"},
+		{"/v1/audit/revoked-keys?offset=100001", "offset"},
+	} {
+		w := sendTest(h, "GET", tc.path, "", "alice", "")
+		if w.Code != 400 || !strings.Contains(w.Body.String(), `"param":"`+tc.param+`"`) || !strings.Contains(w.Body.String(), `"message":"`+tc.param+` must`) && !strings.Contains(w.Body.String(), "from must be on or before to") {
+			t.Fatal(tc.path, w.Code, w.Body)
 		}
+	}
+	// The limit is 200 UTF-8 bytes: 100 "я" (200 bytes) pass, 101 (202 bytes) are rejected.
+	if w := sendTest(h, "GET", "/v1/audit/events?object_id="+url.QueryEscape(strings.Repeat("я", 100)), "", "alice", ""); w.Code != 200 {
+		t.Fatal("200 bytes rejected", w.Code, w.Body)
+	}
+	if w := sendTest(h, "GET", "/v1/audit/events?object_id="+url.QueryEscape(strings.Repeat("я", 101)), "", "alice", ""); w.Code != 400 || !strings.Contains(w.Body.String(), `"param":"object_id"`) || !strings.Contains(w.Body.String(), "object_id must be at most 200 bytes") {
+		t.Fatal("202 bytes accepted or unclear", w.Code, w.Body)
 	}
 	w := sendTest(h, "GET", "/v1/audit/events?before_id=10", "", "alice", "")
 	if w.Code != 200 || f.filters[len(f.filters)-1].BeforeID != 10 {

@@ -105,64 +105,65 @@ func auditFilter(w http.ResponseWriter, r *http.Request, org string, revoked boo
 	if org == "" {
 		f.OrganizationID = q.Get("organization_id")
 	}
+	bad := func(param, message string) (audit.Filter, bool) {
+		writeAPIError(w, 400, "invalid_filter", message, &param)
+		return f, false
+	}
 	zone := time.UTC
 	var err error
 	if v := q.Get("timezone"); v != "" {
 		zone, err = time.LoadLocation(v)
 		if err != nil {
-			writeError(w, 400, "invalid_filter", "invalid timezone")
-			return f, false
+			return bad("timezone", "timezone must be an IANA time zone, for example Europe/Berlin")
 		}
 	}
 	now := time.Now().In(zone)
 	f.From = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, zone)
 	f.Until = time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, zone)
-	bad := func() (audit.Filter, bool) {
-		writeError(w, 400, "invalid_filter", "use valid dates, IDs, result and pagination values")
-		return f, false
-	}
 	if v := q.Get("from"); v != "" {
 		f.From, err = time.ParseInLocation("2006-01-02", v, zone)
 		if err != nil {
-			return bad()
+			return bad("from", "from must be a date in YYYY-MM-DD format")
 		}
 	}
 	if v := q.Get("to"); v != "" {
 		f.Until, err = time.ParseInLocation("2006-01-02", v, zone)
 		if err != nil {
-			return bad()
+			return bad("to", "to must be a date in YYYY-MM-DD format")
 		}
 		f.Until = f.Until.AddDate(0, 0, 1)
 	}
 	if !f.From.Before(f.Until) {
-		return bad()
+		param := "from"
+		if q.Get("to") != "" {
+			param = "to"
+		}
+		return bad(param, "from must be on or before to. Without them, from is the first day of this month and to is today.")
 	}
-	for _, id := range []string{f.OrganizationID} {
-		if id != "" {
-			if _, e := uuid.Parse(id); e != nil {
-				return bad()
-			}
+	if f.OrganizationID != "" {
+		if _, e := uuid.Parse(f.OrganizationID); e != nil {
+			return bad("organization_id", "organization_id must be an organization ID (UUID)")
 		}
 	}
-	for _, v := range []string{f.ActorID, f.Action, f.ObjectType, f.ObjectID, f.CorrelationID} {
-		if len(v) > 200 {
-			return bad()
+	for _, name := range []string{"actor_id", "action", "object_type", "object_id", "correlation_id"} {
+		if len(q.Get(name)) > 200 {
+			return bad(name, name+" must be at most 200 bytes")
 		}
 	}
 	if f.Scope != "" && f.Scope != "system" && f.Scope != "organization" && f.Scope != "personal" {
-		return bad()
+		return bad("scope", "scope must be system, organization or personal")
 	}
 	if f.Outcome != "" && f.Outcome != "success" && f.Outcome != "denied" && f.Outcome != "failed" {
-		return bad()
+		return bad("outcome", "outcome must be success, denied or failed")
 	}
-	page := "before_id"
+	page, rule := "before_id", "before_id must be an event ID, 0 or more"
 	if revoked {
-		page = "offset"
+		page, rule = "offset", "offset must be from 0 to 100000"
 	}
 	if v := q.Get(page); v != "" {
 		f.BeforeID, err = strconv.ParseInt(v, 10, 64)
 		if err != nil || f.BeforeID < 0 || revoked && f.BeforeID > 100000 {
-			return bad()
+			return bad(page, rule)
 		}
 	}
 	return f, true
