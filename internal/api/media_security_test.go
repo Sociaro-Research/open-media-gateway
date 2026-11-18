@@ -78,17 +78,21 @@ func TestVideoContentRejectsUnavailableVariants(t *testing.T) {
 		return w
 	}
 	// OpenAI SDK downloadContent(id, {variant}) sends these; returning the MP4 for them would be wrong silently.
-	for _, variant := range []string{"thumbnail", "spritesheet", ""} {
+	for _, query := range []string{"variant=thumbnail", "variant=spritesheet", "variant=", "variant=video&variant=thumbnail", "variant=thumb%ZZ"} {
 		for _, method := range []string{"GET", "HEAD"} {
-			w := get(method, "/v1/videos/"+id+"/content?variant="+variant)
+			w := get(method, "/v1/videos/"+id+"/content?"+query)
 			if w.Code != http.StatusBadRequest || method == "GET" && !strings.Contains(w.Body.String(), `"param":"variant"`) {
-				t.Fatalf("%s variant=%q: %d %s", method, variant, w.Code, w.Body)
+				t.Fatalf("%s %s: %d %s", method, query, w.Code, w.Body)
 			}
 		}
 	}
-	for _, path := range []string{"/v1/videos/" + id + "/content", "/v1/videos/" + id + "/content?variant=video", "/v1/generations/" + id + "/content"} {
+	// The gate is only on the OpenAI video route; the generations route keeps ignoring variant.
+	for _, path := range []string{"/v1/videos/" + id + "/content", "/v1/videos/" + id + "/content?variant=video", "/v1/generations/" + id + "/content?variant=thumbnail"} {
 		if w := get("GET", path); w.Code != http.StatusOK || w.Body.String() != "fixture video bytes" {
-			t.Fatalf("%s: %d %s", path, w.Code, w.Body)
+			t.Fatalf("GET %s: %d %s", path, w.Code, w.Body)
+		}
+		if w := get("HEAD", path); w.Code != http.StatusOK {
+			t.Fatalf("HEAD %s: %d %s", path, w.Code, w.Body)
 		}
 	}
 }

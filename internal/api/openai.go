@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"mime"
 	"net/http"
+	"net/url"
 	"slices"
 	"strconv"
 	"strings"
@@ -194,8 +195,10 @@ func (s *Server) generationContent(w http.ResponseWriter, r *http.Request) {
 
 // OpenAI SDKs ask for ?variant=thumbnail or spritesheet; only the video itself is stored.
 func (s *Server) videoContent(w http.ResponseWriter, r *http.Request) {
-	if q := r.URL.Query(); q.Has("variant") && q.Get("variant") != "video" {
-		invalidParameter(w, "variant", "variant must be video; thumbnail and spritesheet are not available")
+	// ParseQuery, not URL.Query: a malformed or repeated variant must not fall through to the video.
+	q, err := url.ParseQuery(r.URL.RawQuery)
+	if v, has := q["variant"]; err != nil || has && (len(v) != 1 || v[0] != "video") {
+		invalidParameter(w, "variant", "variant must be video, given once; thumbnail and spritesheet are not available")
 		return
 	}
 	s.generationContent(w, r)
