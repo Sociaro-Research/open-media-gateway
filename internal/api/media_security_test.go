@@ -57,3 +57,38 @@ func TestStoredSVGIsSandboxed(t *testing.T) {
 		t.Log(strings.TrimSpace(string(output)))
 	}
 }
+
+func TestVideoContentRejectsUnavailableVariants(t *testing.T) {
+	store, err := storage.NewLocal(t.TempDir(), http.DefaultClient, 4096)
+	if err != nil {
+		t.Fatal(err)
+	}
+	const id = "6f1d2a4e-3b7c-4d8e-9f00-112233445566"
+	stored, err := store.Archive(context.Background(), id, "data:video/mp4;base64,"+base64.StdEncoding.EncodeToString([]byte("fixture video bytes")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	task := core.Task{ID: id, MediaType: "video", Status: core.TaskSucceeded, StorageKey: &stored.StorageKey}
+	handler := NewWithStorage(serviceStub{task: task}, healthStub{}, "secret", store, "media-secret", time.Hour)
+	get := func(method, path string) *httptest.ResponseRecorder {
+		r := httptest.NewRequest(method, path, nil)
+		r.Header.Set("Authorization", "Bearer secret")
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, r)
+		return w
+	}
+	// OpenAI SDK downloadContent(id, {variant}) sends these; returning the MP4 for them would be wrong silently.
+	for _, variant := range []string{"thumbnail", "spritesheet", ""} {
+		for _, method := range []string{"GET", "HEAD"} {
+			w := get(method, "/v1/videos/"+id+"/content?variant="+variant)
+			if w.Code != http.StatusBadRequest || method == "GET" && !strings.Contains(w.Body.String(), `"param":"variant"`) {
+				t.Fatalf("%s variant=%q: %d %s", method, variant, w.Code, w.Body)
+			}
+		}
+	}
+	for _, path := range []string{"/v1/videos/" + id + "/content", "/v1/videos/" + id + "/content?variant=video", "/v1/generations/" + id + "/content"} {
+		if w := get("GET", path); w.Code != http.StatusOK || w.Body.String() != "fixture video bytes" {
+			t.Fatalf("%s: %d %s", path, w.Code, w.Body)
+		}
+	}
+}

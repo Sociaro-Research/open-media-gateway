@@ -64,8 +64,8 @@ func (s *Server) registerOpenAIRoutes(mux *http.ServeMux) {
 	mux.Handle("GET /v1/generations/{id}/content", s.authenticate(http.HandlerFunc(s.generationContent)))
 	mux.Handle("HEAD /v1/generations/{id}/content", s.authenticate(http.HandlerFunc(s.generationContent)))
 	mux.Handle("GET /v1/videos/{id}", s.authenticate(http.HandlerFunc(s.getGeneration)))
-	mux.Handle("GET /v1/videos/{id}/content", s.authenticate(http.HandlerFunc(s.generationContent)))
-	mux.Handle("HEAD /v1/videos/{id}/content", s.authenticate(http.HandlerFunc(s.generationContent)))
+	mux.Handle("GET /v1/videos/{id}/content", s.authenticate(http.HandlerFunc(s.videoContent)))
+	mux.Handle("HEAD /v1/videos/{id}/content", s.authenticate(http.HandlerFunc(s.videoContent)))
 }
 
 func writeAPIError(w http.ResponseWriter, status int, code, message string, param *string) {
@@ -190,6 +190,15 @@ func (s *Server) generationContent(w http.ResponseWriter, r *http.Request) {
 	if _, ok := s.generationTask(w, r); ok {
 		s.serveAuthorizedMedia(w, r)
 	}
+}
+
+// OpenAI SDKs ask for ?variant=thumbnail or spritesheet; only the video itself is stored.
+func (s *Server) videoContent(w http.ResponseWriter, r *http.Request) {
+	if q := r.URL.Query(); q.Has("variant") && q.Get("variant") != "video" {
+		invalidParameter(w, "variant", "variant must be video; thumbnail and spritesheet are not available")
+		return
+	}
+	s.generationContent(w, r)
 }
 
 func (s *Server) generationArtifactContent(w http.ResponseWriter, r *http.Request) {
