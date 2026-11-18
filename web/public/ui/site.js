@@ -12,10 +12,12 @@
       const navWidth=visible.reduce((sum,n)=>sum+n.getBoundingClientRect().width,0)+Math.max(0,visible.length-1)*(parseFloat(navStyle.columnGap)||0);
       const maximum=parseFloat(style.getPropertyValue('--brand-full-width'))||190;
       const imageWidth=image=>image?.naturalHeight?Math.min(maximum,image.naturalWidth/image.naturalHeight*parseFloat(getComputedStyle(image).height)):40;
-      const controls=navWidth+(account?.getBoundingClientRect().width||0)+2*(parseFloat(style.columnGap)||0);
+      const accountWidth=account?.getBoundingClientRect().width||0,gap=parseFloat(style.columnGap)||0,controls=navWidth+accountWidth+2*gap;
       const compact=imageWidth(wordmark)+controls>header.clientWidth;
-      header.classList.toggle('compact-brand',compact);
-      header.classList.toggle('wrapped',(compact?imageWidth(symbol):imageWidth(wordmark))+controls>header.clientWidth);
+      const wrapped=(compact?imageWidth(symbol):imageWidth(wordmark))+controls>header.clientWidth;
+      // A wrapped header gives the logo its own row beside the account, so the wordmark fits again there.
+      header.classList.toggle('compact-brand',compact&&!(wrapped&&imageWidth(wordmark)+accountWidth+gap<=header.clientWidth));
+      header.classList.toggle('wrapped',wrapped);
     };
     let frame;const schedule=()=>{if(!frame)frame=requestAnimationFrame(()=>{frame=undefined;layout();});};
     const observer=new ResizeObserver(schedule);[header,brand,nav,account].filter(Boolean).forEach(n=>observer.observe(n));
