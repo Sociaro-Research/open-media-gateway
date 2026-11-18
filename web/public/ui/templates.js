@@ -308,10 +308,11 @@
    if(dropping)return;
    // A draft left right after Create template, never saved or edited, has nothing to keep.
    if(createdDrafts.get(record.id)===record.version&&!writing&&!uploading&&!removal&&draftStamp(read())===baseline){
-    dropping=true;createdDrafts.delete(record.id);
+    // Lock fields, Save and the other writes first: anything accepted during the removal would go with the draft.
+    dropping=true;createdDrafts.delete(record.id);lock(true);
     try{await api('/v1/system/templates/'+encodeURIComponent(record.id),{method:'DELETE',body:JSON.stringify({version:record.version}),signal});localDrafts.delete(record.id);authorRecords=authorRecords.filter(item=>item.id!==record.id);listFingerprint='';if(currentEditor()){editing=null;gallery();}return;}
     catch{/* Keep the draft when removal fails; Delete in the editor still works. */}
-    finally{dropping=false;}
+    finally{dropping=false;if(fresh(token))lock(false);}
     if(!currentEditor())return;
    }
    localDrafts.set(record.id,snapshotRecord());editing=null;gallery();}));const titleHeading=FormUI.sectionHeading(form,'Edit template'),heading=titleHeading.parentElement;
