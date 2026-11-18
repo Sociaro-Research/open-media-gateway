@@ -150,8 +150,8 @@
  let commercial={};if(clientManager){try{commercial=await api(base+'/sales-permissions');if(token!==epoch)return;}catch(e){FormUI.message(status,e.message,'error');}}
  const tabs=el('div',null,'organization-tabs'),body=el('div',null,'organization-page');parent.append(tabs,body);
  const manage=OrganizationRoles.manage(o.role);
+ // No await until the pages and tabs below exist: the Get started actions call page().
  const setup=manage&&!clientManager?setupGuide(o,base,parent,tabs,name=>page(name),()=>token===epoch):null;
- if(manage){try{const methods=await api(base+'/payment-methods');if(token!==epoch)return;if(methods.data?.length)summaryValues.Balance.parentElement.append(button('Top Up',async()=>{await page('Billing');body.querySelector('.organization-topups')?.scrollIntoView({block:'start',behavior:'smooth'})}));}catch{}}
  const readStatistics=OrganizationRoles.statistics(o.role);
  const canIssue=manage||o.role==='developer';
  const pages=manage?['Members','API keys','Requests','Billing','Usage']:readStatistics?(o.role==='client_manager'?['Billing','Usage','Members']:['Requests','Billing','Usage','Members']):[...(canIssue?['API keys']:[]),'Requests','Billing','Usage'];
@@ -267,7 +267,9 @@
  await window.GatewayReports.openUsage(false,{organization:o,parent:usage});
  }
  }catch(e){FormUI.message(status,e.message,'error')}}
- pages.forEach(p=>tabs.append(button(p,()=>page(p))));subsections=GatewayLayout.bind(tabs,{scope:parent,label:o.name,body});await page(pages.includes(selectedPage)?selectedPage:pages[0],true);
+ pages.forEach(p=>tabs.append(button(p,()=>page(p))));subsections=GatewayLayout.bind(tabs,{scope:parent,label:o.name,body});const initial=page(pages.includes(selectedPage)?selectedPage:pages[0],true);
+ if(manage){try{const methods=await api(base+'/payment-methods');if(token!==epoch)return;if(methods.data?.length)summaryValues.Balance.parentElement.append(button('Top Up',async()=>{await page('Billing');body.querySelector('.organization-topups')?.scrollIntoView({block:'start',behavior:'smooth'})}));}catch{}}
+ await initial;
  }
  async function invitation(parent,token){
   const box=el('div',null,'keys-form organization-invitation'),viewEpoch=epoch;
