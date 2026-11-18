@@ -15,7 +15,7 @@ const server=http.createServer((req,res)=>{if(new URL(req.url,'http://fixture').
  const org='11111111-1111-4111-8111-111111111111',id='abcdefab-1111-4111-8111-abcdefabcdef';
  const prompt='Full prompt with every line preserved.\n<script>window.injected=true</script>\n'+('Long prompt paragraph. '.repeat(120));
  const reference='https://example.test/references/'+('long-name-'.repeat(40))+'image.png';
- let mode='full',delay=0,version=1;
+ let mode='full',delay=0,version=1,quietOrg=false;
  const row={id,created_at:'2026-10-01T12:00:00Z',organization_id:org,organization_name:'Example organization',user_email:'alice@example.test',api_key_id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaabcd',api_key_name:'Production app',model:'mock-image',provider:'mock',status:'succeeded',usage:{input_tokens:12,output_tokens:25},cost:{expected_usd:0.1,metered_usd:0.1}};
  const detail=base=>{
   if(mode==='restricted')return {report:row,generation:{id,status:'completed',model:'mock-image',media_type:'image'},content_access:false,request_logging:'full'};
@@ -35,7 +35,7 @@ const server=http.createServer((req,res)=>{if(new URL(req.url,'http://fixture').
   if(p==='/v1/info')return json({auth_mode:'google',provider:'mock',console:{generation_ui:true,personal_providers:true,shared_resources:true,version:1}});
   if(p==='/v1/me')return json({id:'alice',name:'Report card tester',email:'alice@example.test',is_system_admin:true});
   if(p==='/v1/organizations')return json({data:[{id:org,name:'Example organization',role:'supermanager'}]});
-  if(p.endsWith('/reports'))return json({data:[row]});
+  if(p.endsWith('/reports'))return json({data:quietOrg&&p.startsWith('/v1/organizations/')?[]:[row]});
   if(p.endsWith('/reports/'+id)){requested.push(p);const data=detail(p),fail=mode==='error',wait=delay;if(wait)await new Promise(r=>setTimeout(r,wait));return fail?route.fulfill({status:503,json:{error:{message:'Temporary failure'}}}):json(data);}
   if(p.endsWith('/content')||p.endsWith('/last-frame'))return url.searchParams.has('video')?route.fulfill({contentType:'video/mp4',body:video}):url.searchParams.has('audio')?route.fulfill({contentType:'audio/wav',body:audio}):url.searchParams.has('missing')?route.fulfill({status:404,body:'Deleted file'}):route.fulfill({contentType:'image/svg+xml',headers:url.searchParams.has('download')?{'Content-Disposition':'attachment; filename="result.png"'}:{},body:image});
   return json({data:[]});
@@ -93,6 +93,9 @@ const server=http.createServer((req,res)=>{if(new URL(req.url,'http://fixture').
    await close();
   }
   mode='error';await page.locator('#reportsContent tbody tr').first().click();await dialog().getByText('Could not load request: Temporary failure',{exact:true}).waitFor();mode='full';await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await ready();await close();
+  // A selected organization without requests gets the first-run state even though All organizations has requests.
+  quietOrg=true;await page.locator('#reportOrganization').selectOption(org,{force:true});await page.locator('.report-empty:visible').getByText('No requests yet.',{exact:true}).waitFor();assert.equal(await page.getByText('No requests match these filters.',{exact:true}).count(),0);
+  quietOrg=false;await page.locator('#reportOrganization').selectOption('',{force:true});await page.waitForFunction(()=>document.querySelector('#reportsContent [role=status]')?.textContent===''&&!!document.querySelector('#reportsContent tbody tr'));
   await page.locator('#reportOrganization').selectOption(org,{force:true});await page.waitForFunction(()=>document.querySelector('#reportsContent [role=status]')?.textContent===''&&!!document.querySelector('#reportsContent tbody tr'));await open();assert.equal(requested.at(-1),'/v1/organizations/'+org+'/reports/'+id);await close();
   delay=300;await page.locator('#reportsContent tbody tr').first().click();await page.keyboard.press('Escape');await page.waitForTimeout(400);assert.equal(await dialog().count(),0);delay=0;
   await page.evaluate(id=>ReportDetails.open('/v1/admin/reports/'+id),id);await ready();assert.equal(requested.at(-1),'/v1/admin/reports/'+id);await dialog().getByText('All retained data',{exact:true}).click();assert.match(await dialog().locator('pre').textContent(),/Future custom setting/);await dialog().getByRole('button',{name:'Close request details',exact:true}).click();
