@@ -32,6 +32,11 @@ func organizationAccess(ctx context.Context, q rowQuerier, actor, id string) (st
 	return role, err
 }
 func (r *SystemRepository) OrganizationAccess(ctx context.Context, actor, id string) (string, error) {
+	// Callers pass the ID from the path or body; PostgreSQL would reject a
+	// malformed one as a server error (503) instead of the caller's mistake.
+	if _, e := uuid.Parse(id); e != nil || len(id) != 36 {
+		return "", org.ErrInvalid
+	}
 	return organizationAccess(ctx, r.db, actor, id)
 }
 func orgLock(ctx context.Context, tx *sql.Tx, actor, id string) (string, error) {
