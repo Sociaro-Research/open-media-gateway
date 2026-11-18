@@ -108,7 +108,7 @@ Create an organization using a system administrator's management key:
 ```sh
 curl "$GATEWAY_URL/v1/organizations" -H "Authorization: Bearer $ADMIN_KEY" \
   -H 'Content-Type: application/json' \
-  -d '{"name":"Example team","admin_user":"owner@example.com"}'
+  -d '{"name":"Example team","domain":"example.com","admin_user":"owner@example.com"}'
 ```
 
 Credit a confirmed payment (reuse the same operation ID on retries):
