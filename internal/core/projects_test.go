@@ -8,13 +8,19 @@ import (
 )
 
 func TestProjectNameAndSubmissionIdempotency(t *testing.T) {
-	for _, name := range []string{"", " \t", strings.Repeat("界", 81), "line\nbreak", "x\x00"} {
+	// GW-352: zero-width-only, direction-mark-only and direction-override names look empty or reversed.
+	for _, name := range []string{"", " \t", strings.Repeat("界", 81), "line\nbreak", "x\x00", "\u200b", "\u200b\u200b", "\u200f", "\u202eevil"} {
 		if _, err := ProjectName(name); !errors.Is(err, ErrProjectName) {
 			t.Fatalf("accepted %q: %v", name, err)
 		}
 	}
 	if name, err := ProjectName("  Проект 🎬  "); err != nil || name != "Проект 🎬" {
 		t.Fatal(name, err)
+	}
+	for _, name := range []string{"项目", "مشروع"} {
+		if _, err := ProjectName(name); err != nil {
+			t.Fatal(name, err)
+		}
 	}
 	repo := &memoryRepository{}
 	s := NewTaskService(repo, &memoryQueue{}, "mock", "mock-video-v1")

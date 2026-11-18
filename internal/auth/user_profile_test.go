@@ -21,7 +21,7 @@ func TestProfileValidation(t *testing.T) {
 	repo := &profileFixture{}
 	m := &Manager{repo: repo}
 	ctx := context.Background()
-	for _, name := range []string{"", "  ", "a\nb", strings.Repeat("é", 101)} {
+	for _, name := range []string{"", "  ", "a\nb", strings.Repeat("é", 101), "\u200b", "\u200e", "\u202eevil"} { // GW-352
 		if _, err := m.UpdateProfile(ctx, "self", ProfileUpdate{Name: &name}); !errors.Is(err, ErrInvalidProfile) {
 			t.Fatal(name, err)
 		}

@@ -7,6 +7,8 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
 )
 
 const DefaultCopyrightHolder = "[Your company name]"
@@ -41,6 +43,10 @@ func (f Footer) Validate() error {
 		return unicode.IsControl(r) || r == '\u2028' || r == '\u2029'
 	}) >= 0 {
 		return errors.New("copyright_holder must be a single line; remove control characters and line separators before saving")
+	}
+	// Blank stays allowed (it means the default holder); invisible-only or direction-override text does not.
+	if strings.TrimSpace(f.CopyrightHolder) != "" && identity.UnreadableName(f.CopyrightHolder) {
+		return errors.New("copyright_holder must show visible text; remove invisible and text-direction characters before saving")
 	}
 	return nil
 }

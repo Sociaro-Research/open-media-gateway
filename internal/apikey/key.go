@@ -105,8 +105,8 @@ func Generate(input CreateInput, now time.Time) (Key, string, error) {
 	}
 
 	name := strings.TrimSpace(input.Name)
-	if name == "" || utf8.RuneCountInString(name) > 80 {
-		return Key{}, "", errors.New("name must contain 1 to 80 characters")
+	if name == "" || utf8.RuneCountInString(name) > 80 || identity.UnreadableName(name) {
+		return Key{}, "", errors.New("name must contain 1 to 80 characters, at least one visible, without text-direction characters")
 	}
 	if input.ExpiresAt != nil && !input.ExpiresAt.After(now) {
 		return Key{}, "", errors.New("expires_at must be in the future")

@@ -37,8 +37,8 @@ func (m *Manager) UpdateProfile(ctx context.Context, id string, in ProfileUpdate
 	}
 	if in.Name != nil {
 		name := strings.TrimSpace(*in.Name)
-		if name == "" || utf8.RuneCountInString(name) > 100 || strings.ContainsFunc(name, unicode.IsControl) {
-			return identity.User{}, invalidProfile("name", "use 1–100 Unicode characters after trimming, without control characters")
+		if name == "" || utf8.RuneCountInString(name) > 100 || strings.ContainsFunc(name, unicode.IsControl) || identity.UnreadableName(name) {
+			return identity.User{}, invalidProfile("name", "use 1–100 Unicode characters after trimming, at least one visible, without control or text-direction characters")
 		}
 		in.Name = &name
 	}
