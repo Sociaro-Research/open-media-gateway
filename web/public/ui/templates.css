@@ -84,7 +84,7 @@
 .template-variable-reference .template-reference-preview:not(.media-picker-card) { max-width:240px; margin:0 auto 16px; }
 
 .template-fixed-reference .template-media { max-width:160px; }
-#templateSelection .template-use > :is(h2,p) { margin:0; }
+#templateSelection .template-use > :is(h2,p) { margin:0; overflow-wrap:anywhere; }
 
 .template-reference-library .reference-status { overflow-wrap:anywhere; }
 
