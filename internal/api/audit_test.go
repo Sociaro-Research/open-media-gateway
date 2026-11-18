@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -170,6 +171,13 @@ func TestAuditFiltersPaginationAndSafeFailures(t *testing.T) {
 		if w.Code != 400 || !strings.Contains(w.Body.String(), `"param":"`+tc.param+`"`) || !strings.Contains(w.Body.String(), `"message":"`+tc.param+` must`) && !strings.Contains(w.Body.String(), "from must be on or before to") {
 			t.Fatal(tc.path, w.Code, w.Body)
 		}
+	}
+	// The limit is 200 UTF-8 bytes: 100 "я" (200 bytes) pass, 101 (202 bytes) are rejected.
+	if w := sendTest(h, "GET", "/v1/audit/events?object_id="+url.QueryEscape(strings.Repeat("я", 100)), "", "alice", ""); w.Code != 200 {
+		t.Fatal("200 bytes rejected", w.Code, w.Body)
+	}
+	if w := sendTest(h, "GET", "/v1/audit/events?object_id="+url.QueryEscape(strings.Repeat("я", 101)), "", "alice", ""); w.Code != 400 || !strings.Contains(w.Body.String(), `"param":"object_id"`) || !strings.Contains(w.Body.String(), "object_id must be at most 200 bytes") {
+		t.Fatal("202 bytes accepted or unclear", w.Code, w.Body)
 	}
 	w := sendTest(h, "GET", "/v1/audit/events?before_id=10", "", "alice", "")
 	if w.Code != 200 || f.filters[len(f.filters)-1].BeforeID != 10 {

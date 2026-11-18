@@ -147,7 +147,7 @@ func auditFilter(w http.ResponseWriter, r *http.Request, org string, revoked boo
 	}
 	for _, name := range []string{"actor_id", "action", "object_type", "object_id", "correlation_id"} {
 		if len(q.Get(name)) > 200 {
-			return bad(name, name+" must be at most 200 characters")
+			return bad(name, name+" must be at most 200 bytes")
 		}
 	}
 	if f.Scope != "" && f.Scope != "system" && f.Scope != "organization" && f.Scope != "personal" {
