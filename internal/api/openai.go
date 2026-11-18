@@ -493,7 +493,10 @@ func (s *Server) openAIInput(r *http.Request, fields map[string]json.RawMessage)
 		if raw, ok := fields["n"]; ok {
 			delete(fields, "n")
 			var n int
-			if json.Unmarshal(raw, &n) != nil || n < 1 || n > max(1, matches[0].model.MaxOutputs) {
+			if json.Unmarshal(raw, &n) != nil || n < 1 {
+				return fail("n", "n must be an integer of at least 1")
+			}
+			if n > max(1, matches[0].model.MaxOutputs) {
 				return fail("n", "n exceeds the selected model output count capability")
 			}
 			input.Options.OutputCount = n
