@@ -3,6 +3,8 @@
  const content=document.querySelector('#templatesContent'),status=document.querySelector('#templatesStatus'),browser=document.querySelector('#templatesBrowser'),galleryHost=document.querySelector('#templatesGallery'),selection=document.querySelector('#templateSelection'),headingActions=document.querySelector('#templateHeadingActions');
  let requestedEdit=new URLSearchParams(location.search).get('edit');
  let canEdit=false,authorRecords=[],hovered=null;
+ // Drafts made by Create template in this page, by their created version.
+ const createdDrafts=new Map();
  const stopHover=()=>{const previous=hovered;hovered=null;previous?.player.pause();};
  // WebKit may omit leave events when a pointer exits native video controls.
  document.addEventListener('pointermove',event=>{if(event.pointerType==='mouse'&&hovered&&!hovered.card.contains(event.target))stopHover();},true);
@@ -290,7 +292,7 @@
    if(draft.revalidate){delete draft.revalidate;const sequence=++validationSequence;pending++;ready();checkInputs().then(()=>{if(fresh(token)&&sequence===validationSequence){validationIssue='';say('Selected references checked for the updated model settings.');}}).catch(error=>{if(fresh(token)&&sequence===validationSequence&&error.name!=='AbortError'){validationIssue=error.message;say(error.message,'error');}}).finally(()=>{pending--;if(fresh(token))ready();});}
  }
  async function create(){if(writing||!canEdit)return;const token=epoch;writing=true;
-  try{const provider=adminCatalog[0],model=provider?.models[0];if(!model){say('Choose an available model with a References workflow.','error');return;}const id=createID||(createID=crypto.randomUUID()),record=await api('/v1/system/templates',{method:'POST',body:JSON.stringify({id,version:0,content:{title:'',media_type:model.media_type,prompt:'',provider:provider.id,model:model.id,syntax:'',slots:[],options:{reference_mode:'references'},cover_id:''}}),signal:controller.signal});if(fresh(token)){createID='';renderEditor(record);}}catch(e){fail(e,token)}finally{writing=false;}
+  try{const provider=adminCatalog[0],model=provider?.models[0];if(!model){say('Choose an available model with a References workflow.','error');return;}const id=createID||(createID=crypto.randomUUID()),record=await api('/v1/system/templates',{method:'POST',body:JSON.stringify({id,version:0,content:{title:'',media_type:model.media_type,prompt:'',provider:provider.id,model:model.id,syntax:'',slots:[],options:{reference_mode:'references'},cover_id:''}}),signal:controller.signal});if(fresh(token)){createID='';createdDrafts.set(record.id,record.version);renderEditor(record);}}catch(e){fail(e,token)}finally{writing=false;}
  }
  function draftStamp(d){const normalized={...d,description:d.description||'',reference_counts:d.reference_counts||{}};const stable=value=>Array.isArray(value)?value.map(stable):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(key=>[key,stable(value[key])])):value;return JSON.stringify(stable(normalized));}
  function renderEditor(record){
@@ -301,7 +303,20 @@
   const requiresDeleteReview=()=>{const check=deletionChecks.get(record.id);return !!check&&sameDeletionContext(check.context);};
   const readSignal=()=>AbortSignal.any([signal,readController.signal]);
   const currentRead=serial=>currentEditor()&&!deleting&&!requiresDeleteReview()&&serial===readSerial;
-  form.append(button('Back to templates',()=>{localDrafts.set(record.id,snapshotRecord());editing=null;gallery();}));const titleHeading=FormUI.sectionHeading(form,'Edit template'),heading=titleHeading.parentElement;
+  // Only the editor that Create template opened may remove its draft, until the first edit: leaving it any other way keeps the draft.
+  let dropping=false,removable=createdDrafts.get(record.id)===record.version;createdDrafts.delete(record.id);
+  form.append(button('Back to templates',async()=>{
+   if(dropping)return;
+   // A draft left right after Create template, never saved or edited, has nothing to keep.
+   if(removable&&!writing&&!uploading&&!removal&&draftStamp(read())===baseline){
+    // Lock fields, Save and the other writes first: anything accepted during the removal would go with the draft.
+    dropping=true;removable=false;lock(true);
+    try{await api('/v1/system/templates/'+encodeURIComponent(record.id),{method:'DELETE',body:JSON.stringify({version:record.version}),signal});localDrafts.delete(record.id);if(currentEditor()){authorRecords=authorRecords.filter(item=>item.id!==record.id);listFingerprint='';editing=null;gallery();}return;}
+    catch{/* Keep the draft when removal fails; Delete in the editor still works. */}
+    finally{dropping=false;if(fresh(token))lock(false);}
+    if(!currentEditor())return;
+   }
+   localDrafts.set(record.id,snapshotRecord());editing=null;gallery();}));const titleHeading=FormUI.sectionHeading(form,'Edit template'),heading=titleHeading.parentElement;
   const title=field(form,'Title','text',draft.title);title.maxLength=120;
   const description=field(form,'Short description (optional)','textarea',draft.description);description.maxLength=500;
   const modelWorkflow=el('div','','keys-fields');form.append(modelWorkflow);
@@ -343,7 +358,7 @@
   function read(){const [p,m]=model.value?JSON.parse(model.value):[draft.provider,draft.model],reference_counts={};if(!countFields.hidden)for(const kind of ['image','video','audio'])if(selected()?.['supports_'+kind+'_input']&&counts[kind].value!=='')reference_counts[kind]=Number(counts[kind].value);return {...draft,title:title.value,description:description.value,prompt:prompt.value,provider:p,model:m,media_type:selected()?.media_type||draft.media_type,syntax,reference_counts,slots:bindings,options:{...generationOptions(),reference_mode:mode.value||modelOptions.reference_mode||draft.options?.reference_mode||''},cover_id:coverID,override_sound_id:overrideSoundID};}
   function snapshotRecord(){const content=read();return {...record,content,draft:content,savedDraft};}
   function workflowReady(){return !!model.value&&mode.value==='references'&&(!templateParameters||templateParameters.valid())&&(!templateResources||templateResources.valid())&&Object.values(generationFields).every(input=>input.validity.valid);}
-  function cache(){if(inferenceWarning){if(status.textContent===inferenceWarning)say('');inferenceWarning='';}FormUI.updatePrompt(prompt,selected());sound.root.hidden=selected()?.media_type!=='video'&&!overrideSoundID;sound.sync();countVisibility();infer.disabled=writing||!!uploading||requiresDeleteReview()||!workflowReady();syncPublication();localDrafts.set(record.id,snapshotRecord());promptEditor?.refresh();for(const widget of widgets)widget.sync();FormUI.update(form);}
+  function cache(){removable=false;if(inferenceWarning){if(status.textContent===inferenceWarning)say('');inferenceWarning='';}FormUI.updatePrompt(prompt,selected());sound.root.hidden=selected()?.media_type!=='video'&&!overrideSoundID;sound.sync();countVisibility();infer.disabled=writing||!!uploading||requiresDeleteReview()||!workflowReady();syncPublication();localDrafts.set(record.id,snapshotRecord());promptEditor?.refresh();for(const widget of widgets)widget.sync();FormUI.update(form);}
   const validation=()=>{const d=read();return ReferenceValidation.target(d.provider,d.model,targetOptions(d,selected()));};
   async function checkDraftMedia(d,operationSignal=readSignal()){if(!d.provider||!d.model)return;await api(`/v1/system/templates/${record.id}/validate-media`,{method:'POST',body:JSON.stringify({draft:d}),signal:operationSignal});}
   function checkMedia(){
