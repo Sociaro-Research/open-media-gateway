@@ -26,8 +26,10 @@ locked switch. Requests keeps `report_columns` authoritative for compatibility
 and has no locked column.
 
 The sticky right header action reuses the borderless Requests gear and an adjacent
-monochrome width toggle, both with 44px targets. Reuse `ControlPickers` switches,
-keyboard/focus behavior and viewport-bounded menus. Preserve row actions. Width
+monochrome width toggle, both with 44px targets. At 760px and below it is not
+sticky and stays at the end of the header row, so it never covers column names.
+Reuse `ControlPickers` switches, keyboard/focus behavior and viewport-bounded
+menus. Preserve row actions. Width
 mode expands the table into available viewport space with responsive gutters,
 leaving existing sidebars in place; it does not enter browser fullscreen or lock
 vertical document scrolling. Comparison popups widen their existing panel.
