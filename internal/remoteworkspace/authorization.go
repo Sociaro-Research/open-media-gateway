@@ -31,6 +31,8 @@ type AuthorizationRepository interface {
 	AuthorizationAttempt(context.Context, string) (Attempt, error)
 	SaveAuthorizationAttempt(context.Context, Attempt) (Attempt, error)
 	ClearAuthorizationAttempt(context.Context, string, string) error
+	ClearUnacceptedAuthorizationAttempt(context.Context, string, string) error
+	AcceptAuthorizationAttempt(context.Context, string, string) error
 }
 type AuthorizationView struct {
 	CurrentRevision int64 `json:"current_connection_revision"`
@@ -153,11 +155,11 @@ func (m *Manager) beginAuthorization(ctx context.Context, owner, origin, name, c
 		// This call created the request and nothing has redeemed its proof, so no key
 		// can exist for it. Drop it on failure: keeping it blocks every retry until the
 		// central server confirms a cancellation it may never have received.
-		// Once the central server has accepted the start, keep it: the owner can still
-		// finish or cancel it even if reading it back failed here.
+		// Once the central server has accepted a start for it, here or in a concurrent
+		// start that reused it, keep it: the owner can still finish or cancel it.
 		defer func() {
 			if err != nil && !accepted {
-				_ = repo.ClearAuthorizationAttempt(context.WithoutCancel(ctx), owner, id)
+				_ = repo.ClearUnacceptedAuthorizationAttempt(context.WithoutCancel(ctx), owner, id)
 			}
 		}()
 	}
@@ -226,6 +228,9 @@ func (m *Manager) beginAuthorization(ctx context.Context, owner, origin, name, c
 		return AuthorizationView{}, ErrUnavailable
 	}
 	accepted = true
+	if e = repo.AcceptAuthorizationAttempt(ctx, owner, attempt.ID); e != nil {
+		return AuthorizationView{}, e
+	}
 	view, e = m.Authorization(ctx, owner)
 	if e != nil {
 		return AuthorizationView{}, e

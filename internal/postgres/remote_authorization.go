@@ -68,6 +68,18 @@ func (r *SystemRepository) SaveAuthorizationAttempt(ctx context.Context, next re
 	return next, tx.Commit()
 }
 func (r *SystemRepository) ClearAuthorizationAttempt(ctx context.Context, owner, id string) error {
+	return r.changeAuthorizationAttempt(ctx, owner, id, `DELETE FROM remote_workspace_authorizations WHERE owner_id=$1 AND id::text=$2`)
+}
+
+// ClearUnacceptedAuthorizationAttempt keeps a request any start has had accepted:
+// starts with the same details share one saved request, also across instances.
+func (r *SystemRepository) ClearUnacceptedAuthorizationAttempt(ctx context.Context, owner, id string) error {
+	return r.changeAuthorizationAttempt(ctx, owner, id, `DELETE FROM remote_workspace_authorizations WHERE owner_id=$1 AND id::text=$2 AND NOT accepted`)
+}
+func (r *SystemRepository) AcceptAuthorizationAttempt(ctx context.Context, owner, id string) error {
+	return r.changeAuthorizationAttempt(ctx, owner, id, `UPDATE remote_workspace_authorizations SET accepted=TRUE WHERE owner_id=$1 AND id::text=$2`)
+}
+func (r *SystemRepository) changeAuthorizationAttempt(ctx context.Context, owner, id, statement string) error {
 	tx, err := beginAuditTx(ctx, r.db)
 	if err != nil {
 		return err
@@ -79,7 +91,7 @@ func (r *SystemRepository) ClearAuthorizationAttempt(ctx context.Context, owner,
 	if _, err = systemActor(ctx, tx, owner); err != nil {
 		return err
 	}
-	result, err := tx.ExecContext(ctx, `DELETE FROM remote_workspace_authorizations WHERE owner_id=$1 AND id::text=$2`, owner, id)
+	result, err := tx.ExecContext(ctx, statement, owner, id)
 	if err != nil {
 		return err
 	}
