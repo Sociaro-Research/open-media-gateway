@@ -404,10 +404,11 @@ func describeModel(id string) (result core.MediaModel) {
 	case "dreamina-seedance-2-5-260628":
 		model.DisplayName = "Seedance 2.5"
 		configure2x(&model, 10.7, 0.52002, false)
-		model.Resolutions = append(model.Resolutions, "1080p")
+		// 4K (10-bit HEVC, like 1080p) added by BytePlus 2026-11-16, task API + pricing + model list.
+		model.Resolutions = append(model.Resolutions, "1080p", "4k")
 		model.MaxDuration = 30
 		model.MaxImageInputs = 30
-		model.Pricing.USDPerMillionByResolution = map[string]float64{"480p": 10.7, "720p": 10.7, "1080p": 11.7}
+		model.Pricing.USDPerMillionByResolution = map[string]float64{"480p": 10.7, "720p": 10.7, "1080p": 11.7, "4k": 4.7}
 	case "dreamina-seedance-2-5-flash-261115":
 		// Task API checked 2026-11-15. Own contract, not base 2.5: no 1080p or
 		// draft, 10 reference images.

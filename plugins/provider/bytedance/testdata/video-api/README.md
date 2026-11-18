@@ -10,8 +10,10 @@ the older documentation alias's JavaScript shell is not substituted as evidence.
 2026-11-15, where Dreamina Seedance 2.5 and 2.5 flash share series entries but
 publish their own resolutions and reference counts. Its lines are copied in source
 order with unrelated prose omitted; the last line shortens the request example's
-prompt. `seedance-2-5-series-provenance.json` records the hashes. The October
-fixture remains for the earlier layout.
+prompt. `seedance-2-5-series-provenance.json` records the hashes. The base 2.5
+resolution line and 4k table rows were refreshed on 2026-11-17, after BytePlus
+added 4k for base 2.5 on 2026-11-16 (same document hash as the GW-389 capture);
+the layout is unchanged. The October fixture remains for the earlier layout.
 
 The existing exact adapter ID-to-family binding is explicit. A future model,
 snapshot or task mode requires a separate review; no prices or execution controls
