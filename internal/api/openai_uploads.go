@@ -221,6 +221,11 @@ func multipartGenerationFields(w http.ResponseWriter, values map[string][]string
 		}
 		switch key {
 		case "options", "n", "stream", "max_expected_cost_usd", "timeout_seconds":
+			// Text that is not JSON would empty the re-encoded request ("Request body is empty").
+			if key == "options" && !json.Valid([]byte(value)) {
+				invalidParameter(w, key, "options must be a JSON object")
+				return nil, false
+			}
 			fields[key] = json.RawMessage(value)
 		default:
 			fields[key], _ = json.Marshal(value)
