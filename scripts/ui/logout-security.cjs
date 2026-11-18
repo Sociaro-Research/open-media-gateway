@@ -3,8 +3,10 @@ const engine=process.env.UI_BROWSER_ENGINE||'chromium';
 const {[engine]:chromium}=require('playwright');
 const assert=require('node:assert/strict'),http=require('node:http'),fs=require('node:fs'),path=require('node:path');
 const ui=path.resolve(__dirname,'../../web/public/ui');
-let unavailable=true,logoutCalls=0;
+let unavailable=true,logoutCalls=0,stallMethods=false,noMethods=false;
 const server=http.createServer((req,res)=>{if(req.method==='GET'&&new URL(req.url,'http://fixture.test').pathname==='/auth/company-connection'){res.writeHead(404,{'Content-Type':'application/json'});return res.end(JSON.stringify({connected:false}));}
+ if(req.url==='/auth/methods'&&stallMethods)return;// never answers
+ if(req.url==='/auth/methods'&&noMethods)return res.writeHead(200,{'Content-Type':'application/json'}).end(JSON.stringify({email:false,google:false,setup_required:false}));
  if(req.url==='/auth/logout'){logoutCalls++;return res.writeHead(unavailable?503:204,{'Content-Type':'application/json'}).end(unavailable?JSON.stringify({error:{message:'retry'}}):undefined)}
  if(req.url==='/auth/session')return res.writeHead(204).end();
  const name=path.basename(req.url.split('?')[0]),file=path.join(ui,name.includes('.')?name:'index.html');
@@ -31,8 +33,18 @@ let browser;
   if(section==='profile'){await page.evaluate(()=>showConsoleSection('profile'));await page.locator('#profileView').waitFor()}
   const openLogout=async()=>{await page.locator('#userMenuToggle').focus();await page.keyboard.press('ArrowDown');await page.keyboard.press('End');await page.locator('#logoutButton').waitFor()};
   await page.evaluate(()=>GatewayTheme.apply('dark',{share:true}));
+  if(section==='generation'){
+   // Cancelling the no-sign-in warning returns focus to the visible menu button: the menu that held Sign out is closed.
+   noMethods=true;const warning=page.locator('dialog[data-sign-out-warning]'),calls=logoutCalls;
+   for(const [name,cancel] of [['Stay signed in',()=>warning.getByRole('button',{name:'Stay signed in',exact:true}).click()],['Escape',()=>page.keyboard.press('Escape')],['Close',()=>warning.locator('.dialog-close').click()]]){
+    await openLogout();await page.keyboard.press('Enter');await warning.waitFor();await cancel();await warning.waitFor({state:'detached'});
+    assert.equal(await page.evaluate(()=>document.activeElement?.id),'userMenuToggle',name+' returns focus to the user menu button');
+   }
+   assert.equal(logoutCalls,calls,'cancelling keeps the session');noMethods=false;
+  }
   await openLogout();
   unavailable=true;const before=logoutCalls;
+  stallMethods=section==='profile';// the profile pass also proves a stalled sign-in methods check cannot hold Sign out
   await page.locator('#logoutButton').focus();await page.keyboard.press('Enter');
   await page.waitForFunction(()=>document.querySelector('#sessionMessage').textContent.includes('Sign out could not'));
   assert.equal(await page.locator('#sessionMessage').isVisible(),true,'logout error must be visible in every section');
@@ -40,6 +52,7 @@ let browser;
   assert.equal(await page.locator('#logoutButton').isDisabled(),false);assert.equal(await page.evaluate(()=>localStorage.getItem('gateway-sign-out')),null);
   assert.equal(await page.evaluate(()=>localStorage.getItem('gateway-theme')),'dark','failed logout preserves preference');
   unavailable=false;await openLogout();await Promise.all([page.waitForEvent('load'),page.keyboard.press('Enter')]);
+  assert.equal(logoutCalls,before+2);stallMethods=false;
   assert.equal(await page.evaluate(()=>sessionStorage.getItem('gateway-generation-key')?.includes('fixture-personal-key')||false),false);
   assert.equal(await page.evaluate(()=>window.themeAtBoot),null,'successful logout clears preference before reload');
   assert.ok(await page.evaluate(()=>localStorage.getItem('gateway-sign-out')));assert.deepEqual(errors,[]);await page.close();

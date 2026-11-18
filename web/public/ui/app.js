@@ -1355,7 +1355,8 @@ document.querySelector('#docsNav').addEventListener('click', () => showConsoleSe
 // Without email delivery or Google the sign-in page offers no way back in (docs/system-administration.md).
 async function noBrowserSignIn() {
 	try {
-		const response = await fetch('/auth/methods', {credentials: 'same-origin'});
+		// A stalled check must not hold Sign out: after the deadline it counts as unknown, like an HTTP failure.
+		const response = await fetch('/auth/methods', {credentials: 'same-origin', signal: AbortSignal.timeout(3000)});
 		if (!response.ok) return false;
 		const methods = await response.json();
 		return !methods.setup_required && !methods.email && !methods.google;
@@ -1383,7 +1384,11 @@ elements.logout.addEventListener('click', async () => {
 	elements.logout.disabled = true;
 	elements.sessionMessage.hidden = true;
 	try {
-		if (await noBrowserSignIn() && !await confirmSignOutWithoutSignIn()) return;
+		if (await noBrowserSignIn() && !await confirmSignOutWithoutSignIn()) {
+			// The menu holding Sign out is closed, so return focus to its visible toggle.
+			document.querySelector('#userMenuToggle').focus();
+			return;
+		}
 		const response = await fetch('/auth/logout', {method: 'POST', credentials: 'same-origin'});
 		if (!response.ok) throw new Error('Sign out could not be completed. Please try again.');
 		window.GenerationKey.signOut();
