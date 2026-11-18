@@ -173,6 +173,21 @@ func TestReliabilityDependencyOutages(t *testing.T) {
 	}
 }
 
+// A database cut just before a test ends must not break the schema cleanup:
+// within a second of its last use the driver reuses an idle connection unchecked.
+func TestReliabilityStackCleanupAfterDatabaseCut(t *testing.T) {
+	u, err := url.Parse(getServiceURL(t, "GATEWAY_TEST_DATABASE_URL"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	proxy := newFaultProxy(t, u.Host)
+	u.Host = proxy.listener.Addr().String()
+	t.Setenv("GATEWAY_TEST_DATABASE_URL", u.String())
+	newStack(t, 30*time.Second)
+	proxy.cut(true)
+	proxy.cut(false)
+}
+
 func TestReliabilityReportsIsolationAndCancellation(t *testing.T) {
 	s := newStack(t, 30*time.Second)
 	user := s.personalKey()
