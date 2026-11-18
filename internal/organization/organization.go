@@ -11,10 +11,22 @@ import (
 )
 
 var ErrForbidden = errors.New("organization access denied")
-var ErrConflict = errors.New("conflict: preserve the last supermanager; invitation or operation may already be used")
+var ErrConflict = errors.New("conflict: invitation or operation may already be used")
 var ErrInvitationUnavailable = errors.New("This invitation is no longer available. Ask a manager for a new invitation.")
 var ErrNotFound = errors.New("organization or invitation not found")
 var ErrInvalid = errors.New("invalid organization request")
+
+// ErrLastSupermanager is still an ErrConflict for callers, with a message people can act on.
+var ErrLastSupermanager error = diagnostic{ErrConflict, "A company needs at least one Supermanager. Make another member Supermanager first."}
+
+// diagnostic keeps errors.Is matching a broad sentinel while showing a specific message.
+type diagnostic struct {
+	base    error
+	message string
+}
+
+func (d diagnostic) Error() string { return d.message }
+func (d diagnostic) Unwrap() error { return d.base }
 
 type Organization struct {
 	Usage                  *UsageSummary            `json:"usage,omitempty"`
