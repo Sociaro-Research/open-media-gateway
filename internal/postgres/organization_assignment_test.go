@@ -179,6 +179,9 @@ func (c *assignmentConn) ExecContext(ctx context.Context, q string, args []drive
 		}
 		return driver.RowsAffected(1), nil
 	}
+	if strings.Contains(q, "UPDATE organization_invites SET revoked_at=NOW()") {
+		return driver.RowsAffected(0), nil
+	}
 	return nil, errors.New("unexpected assignment exec: " + q)
 }
 
