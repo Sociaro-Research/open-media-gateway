@@ -80,6 +80,26 @@ func TestGenerationUnconfirmedAdmissionGuidance(t *testing.T) {
 	}
 }
 
+// Official OpenAI SDKs resend a 5xx POST unless X-Should-Retry says otherwise.
+// Without an Idempotency-Key that resend could admit the same generation again.
+func TestGenerationUnconfirmedAdmissionStopsUnkeyedSDKRetry(t *testing.T) {
+	for _, keyed := range []bool{false, true} {
+		svc := &unavailableAdmissionService{err: errors.New("private-body")}
+		r := httptest.NewRequest("POST", "/v1/videos", strings.NewReader(`{"model":"mock/mock-video-v1","prompt":"fixture"}`))
+		r.Header.Set("Authorization", "Bearer secret")
+		if keyed {
+			r.Header.Set("Idempotency-Key", "fixture-key")
+		}
+		w := httptest.NewRecorder()
+		New(svc, healthStub{}, "secret").ServeHTTP(w, r)
+		assertUnconfirmedAdmission(t, w)
+		// A keyed retry is the documented recovery, so only unkeyed requests opt out.
+		if want := map[bool]string{false: "false", true: ""}[keyed]; w.Header().Get("X-Should-Retry") != want {
+			t.Fatalf("keyed=%v: X-Should-Retry=%q, want %q", keyed, w.Header().Get("X-Should-Retry"), want)
+		}
+	}
+}
+
 func TestGenerationUnconfirmedMultipartHintDoesNotReadUpload(t *testing.T) {
 	svc := &unavailableAdmissionService{err: errors.New("private-body https://private.invalid/?token=private-token foreign-task")}
 	store := &directMedia{}

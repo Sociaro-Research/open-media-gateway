@@ -373,6 +373,9 @@ makes their download routes unavailable, while retaining history and costs.
   bytes or `data[].b64_json`. Use HTTP/custom job handling and polling. Video
   operations use OpenAI terminology, but the gateway still returns 202 and has
   provider-specific sizes/capabilities; do not assume every SDK method exists.
+  When admission cannot be confirmed (HTTP 503) for a request without
+  `Idempotency-Key`, the response carries `X-Should-Retry: false` so SDKs do not
+  resend it automatically. Send an `Idempotency-Key` to make retries safe.
 
 ## Single generation contract
 
