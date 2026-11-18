@@ -4,6 +4,8 @@ Every console table with more than three original columns has a column gear and
 an adjacent viewport-width toggle. Existing action columns count toward eligibility;
 the new control cell does not. Action cells remain available. Tables with three
 or fewer columns, documentation/email tables, cards and galleries are excluded.
+The first column names the row (member, organization, key…) and always stays
+visible; the chooser shows it as a locked switch. Requests has no locked column.
 
 Selections and width mode are stored in the signed-in user's profile, independently
 for each logical table, and survive navigation, reload and subsequent sign-ins.

@@ -21,7 +21,9 @@ Every console table with more than three original columns uses `TableUI` from
 `web/public/ui/table-ui.js`. Count its original action column, but not the control
 cell added by this component. Register an explicit stable table ID and stable
 column IDs at the actual renderer; do not derive persistence keys from labels.
-Requests keeps `report_columns` authoritative for compatibility.
+The first column names the row and cannot be hidden; the chooser shows it as a
+locked switch. Requests keeps `report_columns` authoritative for compatibility
+and has no locked column.
 
 The sticky right header action reuses the borderless Requests gear and an adjacent
 monochrome width toggle, both with 44px targets. Reuse `ControlPickers` switches,

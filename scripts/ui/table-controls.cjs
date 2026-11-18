@@ -27,10 +27,15 @@ const server=http.createServer(async(req,res)=>{
  try{
   await page.goto(base);await gear().waitFor();await settled();
   await page.locator('[name=value]').fill('Unsaved draft');const before=await page.evaluate(()=>{window.originalField=document.querySelector('[name=value]');return FormUI.snapshot(document.querySelector('#resource'))});
-  await gear().click();await page.getByRole('switch',{name:'Value',exact:true}).click();await page.waitForFunction(()=>!document.querySelector('body > select').disabled);await page.keyboard.press('Escape');
+  await gear().click();assert.equal(await page.getByRole('switch',{name:'Header',exact:true}).isDisabled(),true,'first column is locked');await page.getByRole('switch',{name:'Value',exact:true}).click();await page.waitForFunction(()=>!document.querySelector('body > select').disabled);await page.keyboard.press('Escape');
   assert.equal(await page.evaluate(()=>originalField===document.querySelector('[name=value]')),true);assert.equal(await page.evaluate(()=>FormUI.snapshot(document.querySelector('#resource'))),before);assert.equal(await page.locator('[name=value]').inputValue(),'Unsaved draft');assert.equal(await page.locator('#resource select').count(),0);assert.deepEqual(people.one.table_columns.provider_headers,['header','operation']);
   assert.equal(await page.getByRole('button',{name:'Remove',exact:true}).isVisible(),true);await page.getByRole('button',{name:'Show hidden fields',exact:true}).click();assert.equal(await page.locator('[name=value]').isVisible(),true);
   await page.evaluate(()=>{mount();});await gear().waitFor();await settled();await page.locator('[name=value]').evaluate(input=>{input.value='';input.dispatchEvent(new Event('input',{bubbles:true}));});await page.locator('#resource').evaluate(form=>form.reportValidity());assert.equal(await page.locator('[name=value]').isVisible(),true);
+  // An older saved selection without the locked first column shows it again, locked, and saves it with the next change.
+  const kept=people.one.table_columns.provider_headers;people.one.table_columns.provider_headers=['operation'];await page.reload();await gear().waitFor();await settled();
+  assert.equal(await page.locator('thead th').first().isVisible(),true,'older selection shows the locked column');assert.equal(await page.locator('[name=value]').isVisible(),false);
+  await gear().click();assert.equal(await page.getByRole('switch',{name:'Header',exact:true}).isDisabled(),true);await page.getByRole('switch',{name:'Value',exact:true}).click();await page.waitForFunction(()=>!document.querySelector('body > select').disabled);await page.keyboard.press('Escape');
+  assert.deepEqual(people.one.table_columns.provider_headers,['header','value','operation'],'next save includes the locked column');people.one.table_columns.provider_headers=kept;
   // Reopen/reload persists preferences; another profile gets its own defaults.
   await page.reload();await gear().waitFor();assert.equal(await page.locator('[name=value]').isVisible(),false);
   for(const theme of ['dark','light'])for(const width of [1440,2560,390,320]){
