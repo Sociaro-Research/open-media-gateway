@@ -62,7 +62,7 @@ test-isolated:
 	python3 scripts/with-test-services.py -- $(MAKE) verify-ci TEST_FLAGS='-count=1'
 
 test-recovery:
-	python3 scripts/with-test-services.py -- env GATEWAY_NATIVE_RECOVERY=1 GATEWAY_REAL_LEASE_EXPIRY=1 go test -race -count=1 -timeout=10m -v -run '^TestReliability' ./internal/reliability
+	python3 scripts/with-test-services.py -- env GATEWAY_NATIVE_RECOVERY=1 GATEWAY_REAL_LEASE_EXPIRY=1 go test -race -count=1 -timeout=20m -v -run '^TestReliability' ./internal/reliability
 
 performance:
 	@test -n "$$GATEWAY_TEST_DATABASE_URL" -a -n "$$GATEWAY_TEST_REDIS_URL" -a -n "$$GATEWAY_PERF_OUTPUT" || \

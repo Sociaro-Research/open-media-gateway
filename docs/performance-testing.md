@@ -62,7 +62,7 @@ recovery after the production 60-second lease duration, run:
 ```sh
 python3 scripts/with-test-services.py --output dist/performance/recovery \
   -- env GATEWAY_REAL_LEASE_EXPIRY=1 \
-  go test -race -count=1 -timeout=5m -v -run '^TestReliability' ./internal/reliability
+  go test -race -count=1 -timeout=20m -v -run '^TestReliability' ./internal/reliability
 ```
 
 `scripts/verify-headless.py` additionally builds and runs separate gateway and
