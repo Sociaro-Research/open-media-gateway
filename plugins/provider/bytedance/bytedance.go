@@ -164,7 +164,7 @@ func (a *Adapter) Generate(ctx context.Context, request core.MediaRequest) (core
 		ReturnLastFrame: request.Options.ReturnLastFrame}
 	// The selected workflow means new reference-based generation, not provider
 	// inference of an edit/extend task with incompatible duration/ratio semantics.
-	if request.Model == "dreamina-seedance-2-5-260628" && request.Options.ReferenceMode == "references" {
+	if seedance25(request.Model) && request.Options.ReferenceMode == "references" {
 		payload.OmniReferenceTaskType = "reference"
 	}
 	if !legacyCommands {
@@ -289,8 +289,11 @@ func describeModel(id string) (result core.MediaModel) {
 				Image: core.MediaFileLimits{ContentTypes: []string{"image/png", "image/jpeg", "image/gif", "image/webp"}, MaxBytes: 30_000_000, MinDimension: 300, MaxDimension: 6000, MinRatio: 0.4, MaxRatio: 2.5},
 				Video: core.MediaFileLimits{ContentTypes: []string{"video/mp4", "video/quicktime"}, Codecs: []string{"avc1", "avc3", "hvc1", "hev1"}, MaxBytes: 200_000_001, MinDimension: 300, MaxDimension: 6000, MinPixels: 407696, MaxPixels: 8295044, MinRatio: 0.4, MaxRatio: 2.5, MinDuration: 2, MaxDuration: 15, MaxTotalDuration: 15, MinFPS: 24, MaxFPS: 60},
 				Audio: core.MediaFileLimits{ContentTypes: []string{"audio/mpeg", "audio/wave", "audio/wav", "audio/x-wav"}, MaxBytes: 15_000_001, MinDuration: 2, MaxDuration: 15, MaxTotalDuration: 15}}
-			if result.ID == "dreamina-seedance-2-5-260628" {
+			if seedance25(result.ID) {
 				result.ReferenceMediaLimits.MaxFiles = 50
+				if result.ID == "dreamina-seedance-2-5-flash-261115" {
+					result.ReferenceMediaLimits.MaxFiles = 20 // 10 images + 5 videos + 5 audio clips
+				}
 				result.ReferenceMediaLimits.Video.MaxDuration = 30
 				result.ReferenceMediaLimits.Video.MaxTotalDuration = 30
 				result.ReferenceMediaLimits.Audio.MaxDuration = 30
@@ -405,6 +408,14 @@ func describeModel(id string) (result core.MediaModel) {
 		model.MaxDuration = 30
 		model.MaxImageInputs = 30
 		model.Pricing.USDPerMillionByResolution = map[string]float64{"480p": 10.7, "720p": 10.7, "1080p": 11.7}
+	case "dreamina-seedance-2-5-flash-261115":
+		// Task API checked 2026-11-15. Own contract, not base 2.5: no 1080p or
+		// draft, 10 reference images.
+		model.DisplayName = "Seedance 2.5 Flash"
+		configure2x(&model, 7.0, 0.3402, false)
+		model.Resolutions = []string{"720p", "480p"} // the first listed is the default; the provider default is 720p
+		model.MaxDuration = 30
+		model.MaxImageInputs = 10
 	}
 	return model
 }

@@ -47,6 +47,13 @@ func video2xUnits(id string, o core.MediaOptions) (float64, string, error) {
 		case "1080p":
 			inputRate = "7.0"
 		}
+	case "dreamina-seedance-2-5-flash-261115":
+		// Pricing page 2026-11-15. The linked minimum-token table needs sign-in;
+		// the published Flash 5 s examples (2-4 s and 30 s input) match this reserve and floor.
+		maxDuration, maxInput = 30, 30
+		if o.Resolution == "480p" || o.Resolution == "720p" {
+			inputRate = "4.3"
+		}
 	default:
 		return 0, "", core.ErrPricingUnavailable
 	}
@@ -54,7 +61,7 @@ func video2xUnits(id string, o core.MediaOptions) (float64, string, error) {
 	if !ok || inputRate == "" || o.Duration < 4 || o.Duration > maxDuration || o.Draft != nil && *o.Draft {
 		return 0, "", core.ErrPricingUnavailable
 	}
-	if id == "dreamina-seedance-2-5-260628" && o.Resolution == "480p" && (o.Ratio == "16:9" || o.Ratio == "9:16") {
+	if seedance25(id) && o.Resolution == "480p" && (o.Ratio == "16:9" || o.Ratio == "9:16") {
 		size = [2]int{854, 480}
 	}
 	unitsPerSecond := float64(size[0]*size[1]*24) / 1024

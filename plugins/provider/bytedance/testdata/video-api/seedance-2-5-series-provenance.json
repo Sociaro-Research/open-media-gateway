@@ -1,0 +1,13 @@
+{
+  "name": "seedance-2-5-series",
+  "url": "https://ai.byteplus.com/ark/region:ap-southeast-1/docs/create-video-generation-task-api.md",
+  "final_url": "https://ai.byteplus.com/ark/region:ap-southeast-1/docs/create-video-generation-task-api.md",
+  "checked_at": "2026-11-15T13:06:36+00:00",
+  "status": 200,
+  "content_type": "text/markdown; charset=utf-8",
+  "sha256": "144f378b34ff89662ed007bcf111d0104259217ef488296c39a1657bb8fbdd0a",
+  "bytes": 125342,
+  "normalized_sha256": "144f378b34ff89662ed007bcf111d0104259217ef488296c39a1657bb8fbdd0a",
+  "fixture_type": "Normalized factual parameter fixture; not a verbatim or complete source snapshot",
+  "fixture_sha256": "e8c55d9cd51ff2d02928c7b649495799e4faef3fe7bfe9ba47e6fedc3c58ba7a"
+}

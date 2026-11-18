@@ -8,7 +8,7 @@ import (
 )
 
 func TestCatalogProvenanceAndDates(t *testing.T) {
-	counts := map[string]int{"openai": 29, "alibaba": 116, "bytedance": 17}
+	counts := map[string]int{"openai": 29, "alibaba": 116, "bytedance": 18}
 	for provider, models := range catalog {
 		if len(models) != counts[provider] {
 			t.Fatalf("%s coverage: %d", provider, len(models))

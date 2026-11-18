@@ -20,6 +20,10 @@ func quotePublic(endpoint string, model core.MediaModel, request core.MediaReque
 	quantity := 1.0
 	var rate string
 	o, id := request.Options, request.Model
+	if id == "dreamina-seedance-2-5-flash-261115" {
+		// Reviewed separately; the shared tariff review predates this model.
+		price.Version, price.CheckedAt = "2026-11-15.1", time.Date(2026, 11, 15, 0, 0, 0, 0, time.UTC)
+	}
 
 	u, _ := url.Parse(endpoint)
 	if u == nil || u.Hostname() != "ark.ap-southeast.bytepluses.com" {
@@ -85,7 +89,7 @@ func quotePublic(endpoint string, model core.MediaModel, request core.MediaReque
 			if referenceRate != "" {
 				rate = referenceRate
 				maxInput := 15
-				if id == "dreamina-seedance-2-5-260628" {
+				if seedance25(id) {
 					maxInput = 30
 				}
 				price.EstimateDescription = fmt.Sprintf("Conservative reserve assumes %d seconds of total reference video and includes the provider token minimum. Metering uses actual completion_tokens.", maxInput)

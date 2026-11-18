@@ -238,8 +238,8 @@ Kling 4 Omni preserves omitted `settings.duration` for native prompt/base-video
 inference, as documented in [the direct Omni endpoint](https://kling.ai/document-api/api/video/4-0/video-omni.md).
 BytePlus Seedance 1.5 Pro and reviewed 2.x models translate Gateway omission to
 native `duration: -1` intelligent selection. Their positive bounds are 4–12 and
-4–15 seconds respectively; Seedance 2.5 permits 4–30. Seedance 1.0 remains
-2–12 seconds without Auto. These are the [direct video task API](https://docs.byteplus.com/en/docs/modelark/create-video-generation-task-api?redirect=1)
+4–15 seconds respectively; Seedance 2.5 and 2.5 Flash permit 4–30. Seedance 1.0
+remains 2–12 seconds without Auto. These are the [direct video task API](https://docs.byteplus.com/en/docs/modelark/create-video-generation-task-api?redirect=1)
 contracts, not defaults inferred from a general user guide. Gateway reference
 workflows remain new generation; this does not add native edit/extension modes.
 
