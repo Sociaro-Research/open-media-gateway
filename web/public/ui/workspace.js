@@ -76,7 +76,8 @@
   userToggle.onclick=()=>userMenuVisible(userDropdown.hidden);
   user.addEventListener('pointerenter',e=>{if(e.pointerType==='mouse')userMenuVisible(true)});
   user.addEventListener('pointerleave',e=>{if(e.pointerType==='mouse')userMenuVisible(false)});
-  user.addEventListener('focusout',e=>{if(!user.contains(e.relatedTarget))userMenuVisible(false)});
+  // WebKit blurs to no focus target when a menu button is pressed, before its click; outside clicks close the menu below.
+  user.addEventListener('focusout',e=>{if(e.relatedTarget&&!user.contains(e.relatedTarget))userMenuVisible(false)});
   user.addEventListener('keydown',e=>{if(e.key==='Escape'){userMenuVisible(false);userToggle.focus();e.preventDefault()}else if(['ArrowDown','ArrowUp','Home','End'].includes(e.key)){e.preventDefault();const buttons=[...userDropdown.querySelectorAll('button:not([hidden])')],index=buttons.indexOf(document.activeElement);if(userDropdown.hidden||index<0){userMenuVisible(true,true);return;}buttons[e.key==='Home'?0:e.key==='End'?buttons.length-1:(index+(e.key==='ArrowUp'?-1:1)+buttons.length)%buttons.length]?.focus();}});
   document.addEventListener('click',e=>{if(!user.contains(e.target))userMenuVisible(false)});
   document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(!userDropdown.hidden){userMenuVisible(false);userToggle.focus()}if(!menu.hidden){menuVisible(false);toggle.focus()}}});
