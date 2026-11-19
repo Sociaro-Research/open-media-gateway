@@ -141,3 +141,23 @@ func TestGenerationAdmissionChangedProviderIsConflict(t *testing.T) {
 		t.Fatal(w.Code, w.Body.String())
 	}
 }
+
+// A key over the documented 200 characters is a client error, not an
+// unconfirmed admission that tells the caller to retry with the same key.
+func TestGenerationAdmissionRejectsTooLongIdempotencyKey(t *testing.T) {
+	for _, length := range []int{200, 201} {
+		repo, queue := &admissionRepository{}, &admissionQueue{}
+		service := core.NewTaskServiceWithProviders(repo, queue, map[string]core.MediaProvider{"mock": mock.New(0, "embedded")}, map[string]string{"mock": "mock-video-v1"}, "mock")
+		r := httptest.NewRequest("POST", "/v1/videos", strings.NewReader(`{"model":"mock/mock-video-v1","prompt":"test"}`))
+		r.Header.Set("Authorization", "Bearer secret")
+		r.Header.Set("Idempotency-Key", strings.Repeat("k", length))
+		w := httptest.NewRecorder()
+		New(service, healthStub{}, "secret").ServeHTTP(w, r)
+		if length == 200 && (w.Code != 202 || repo.creates != 1) {
+			t.Fatal("200-character key rejected:", w.Code, w.Body.String())
+		}
+		if length == 201 && (w.Code != 400 || !strings.Contains(w.Body.String(), core.ErrIdempotencyKey.Error()) || repo.creates != 0 || len(queue.ids) != 0) {
+			t.Fatal("201-character key not rejected as a bad request:", w.Code, w.Body.String())
+		}
+	}
+}

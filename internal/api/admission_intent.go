@@ -116,6 +116,8 @@ func (s *Server) generationIntent(next http.Handler) http.Handler {
 				writeError(w, 409, "idempotency_conflict", e.Error())
 			} else if errors.Is(e, core.ErrKeyUnavailable) {
 				writeError(w, 401, "unauthorized", e.Error())
+			} else if errors.Is(e, core.ErrIdempotencyKey) {
+				writeError(w, 400, "invalid_request", e.Error())
 			} else {
 				writeError(w, 503, "service_unavailable", generationAcceptanceUnconfirmed)
 			}
