@@ -215,3 +215,54 @@ func TestInvitationRoleGrants(t *testing.T) {
 		}
 	}
 }
+
+// Revoking follows the same role rule as inviting: a Manager handles only
+// Developer and Member invitations, and an unknown invitation is not "revoked".
+func TestInvitationRevocationFollowsInviterRole(t *testing.T) {
+	ctx := context.Background()
+	db := auditDatabase(t, true)
+	people, repo := NewAuthRepository(db), NewSystemRepository(db)
+	user := func(name string) identity.User {
+		t.Helper()
+		u, err := people.UpsertGoogleUser(ctx, uuid.NewString(), uuid.NewString()+"@fixture.test", name, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		return u
+	}
+	admin, owner, manager := user("Administrator"), user("Supermanager"), user("Manager")
+	if _, err := db.Exec(`UPDATE users SET is_system_admin=TRUE WHERE id=$1`, admin.ID); err != nil {
+		t.Fatal(err)
+	}
+	company, err := repo.CreateOrganization(ctx, admin.ID, "Invitation revocation", owner.ID, uuid.NewString()+".fixture.test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = repo.SetOrganizationMember(ctx, admin.ID, company.ID, manager.ID, org.Manager, nil, false, false); err != nil {
+		t.Fatal(err)
+	}
+	invite := func(role string) org.Invite {
+		t.Helper()
+		i, err := repo.CreateOrganizationInvite(ctx, owner.ID, company.ID, role)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return i
+	}
+	high, low := invite(org.Supermanager), invite(org.Developer)
+	if err = repo.RevokeOrganizationInvite(ctx, manager.ID, company.ID, high.ID); !errors.Is(err, org.ErrForbidden) {
+		t.Fatalf("Manager revoked a Supermanager invitation: %v", err)
+	}
+	if _, err = repo.OrganizationInvitation(ctx, user("Guest").ID, high.Token, false); err != nil {
+		t.Fatalf("refused revocation still changed the invitation: %v", err)
+	}
+	if err = repo.RevokeOrganizationInvite(ctx, manager.ID, company.ID, low.ID); err != nil {
+		t.Fatalf("Manager could not revoke a Developer invitation: %v", err)
+	}
+	if err = repo.RevokeOrganizationInvite(ctx, owner.ID, company.ID, high.ID); err != nil {
+		t.Fatalf("Supermanager could not revoke: %v", err)
+	}
+	if err = repo.RevokeOrganizationInvite(ctx, owner.ID, company.ID, uuid.NewString()); !errors.Is(err, org.ErrNotFound) {
+		t.Fatalf("unknown invitation: %v", err)
+	}
+}
