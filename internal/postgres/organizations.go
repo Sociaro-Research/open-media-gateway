@@ -388,6 +388,14 @@ func (r *SystemRepository) setOrganizationMember(ctx context.Context, actor, id,
 	}
 	return tx.Commit()
 }
+
+// revokeFormerAdministratorInvites applies the same bearer-link rule once an
+// account stops being an Administrator: only links its company role may still
+// issue keep working (a Manager keeps Developer and Member invitations).
+func revokeFormerAdministratorInvites(ctx context.Context, tx *sql.Tx, issuer string) error {
+	_, err := tx.ExecContext(ctx, `UPDATE organization_invites i SET revoked_at=NOW() WHERE i.created_by=$1::uuid AND i.accepted_by IS NULL AND i.revoked_at IS NULL AND i.expires_at>NOW() AND NOT i.first_owner AND NOT EXISTS(SELECT 1 FROM organization_members m WHERE m.organization_id=i.organization_id AND m.user_id=i.created_by AND m.removed_at IS NULL AND (m.role='supermanager' OR m.role='admin' AND i.role IN ('developer','member')))`, issuer)
+	return err
+}
 func (r *SystemRepository) OrganizationCredits(ctx context.Context, actor, id string, offset int) ([]org.Credit, error) {
 	role, e := r.OrganizationAccess(ctx, actor, id)
 	if e != nil {

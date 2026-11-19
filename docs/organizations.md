@@ -95,7 +95,9 @@ An invitation link works for whoever holds it, so it does not outlive its
 issuer's authority. Removing a member revokes every unused invitation they
 created; lowering their role revokes the unused ones their new role could not
 issue (a Manager keeps Developer and Member invitations). Each revocation is in
-the Audit Log. An Administrator's invitations do not depend on membership.
+the Audit Log. An Administrator's invitations do not depend on membership;
+when the account stops being an Administrator, only those its company role
+may still issue keep working.
 
 Supermanagers and Content Officers can inspect retained organization content. Managers can inspect metadata and organization statistics. Developers and Members can read and delete only their own organization inputs and result files, and see only their own financial records. Their organization-wide balances, credit histories and provider settlement fields are hidden. Organization webhooks also carry consumption costs without provider settlement details. Removing a member revokes their organization keys immediately for new requests. Files, historical expenses and accepted tasks stay with the organization. API keys inherit only the actor's actual membership role in each organization unless the credential also has `system:manage` and its owner is currently a system administrator. A personal key with `organizations:manage` alone cannot use its owner's system role to read or modify unrelated organizations, promote its membership role, or make system-only changes. Organization-bound keys remain restricted to their organization unless both system permission and the current system role allow global access. Browser sessions retain account-role authorization.
 

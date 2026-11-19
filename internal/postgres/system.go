@@ -111,6 +111,11 @@ func (r *SystemRepository) SetAdmin(ctx context.Context, actor, target string, a
 	if _, err = tx.ExecContext(ctx, `UPDATE users SET is_system_admin=$2 WHERE id::text=$1`, target, admin); err != nil {
 		return err
 	}
+	if previous && !admin {
+		if err = revokeFormerAdministratorInvites(ctx, tx, target); err != nil {
+			return err
+		}
+	}
 	if err = auditSystem(ctx, tx, name, "administrator_role", target, map[string]any{"email": email, "before": previous, "after": admin}); err != nil {
 		return err
 	}

@@ -100,6 +100,11 @@ func (r *SystemRepository) SetUserRole(ctx context.Context, actor, target, role 
 	if _, err = tx.ExecContext(ctx, `UPDATE users SET is_system_admin=$2 WHERE id::text=$1`, target, role == "system_admin"); err != nil {
 		return err
 	}
+	if admin && role != "system_admin" {
+		if err = revokeFormerAdministratorInvites(ctx, tx, target); err != nil {
+			return err
+		}
+	}
 	if err = auditSystem(ctx, tx, name, "user_role", target, map[string]string{"before": before, "after": role}); err != nil {
 		return err
 	}
