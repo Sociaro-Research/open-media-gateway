@@ -551,8 +551,19 @@ func (r *SystemRepository) RevokeOrganizationInvite(ctx context.Context, actor, 
 	if e = guardCompanyMutation(ctx, tx, id); e != nil {
 		return e
 	}
-	if _, e = orgLock(ctx, tx, actor, id); e != nil {
+	access, e := orgLock(ctx, tx, actor, id)
+	if e != nil {
 		return e
+	}
+	var role string
+	if e = tx.QueryRowContext(ctx, `SELECT role FROM organization_invites WHERE id=$1 AND organization_id=$2`, invite, id).Scan(&role); errors.Is(e, sql.ErrNoRows) {
+		return org.ErrNotFound
+	} else if e != nil {
+		return e
+	}
+	// Revoke only invitations the actor's role could create.
+	if !org.MutateMember(access, org.MemberRole, role) {
+		return org.ErrForbidden
 	}
 	_, e = tx.ExecContext(ctx, `UPDATE organization_invites SET revoked_at=COALESCE(revoked_at,NOW()) WHERE id=$1 AND organization_id=$2`, invite, id)
 	if e != nil {
