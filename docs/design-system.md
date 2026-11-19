@@ -901,8 +901,9 @@ already confirmed changes. This does not change who may update either setting.
 Supermanagers and Managers who are members of an organization see one Get started
 panel between the organization summary and its sections until every step is done
 or they dismiss it. The steps are Create an API key, Add credit, Send your first
-request and Invite your team; each is detected from existing reads (keys, balance or
-credit limit, one request record, members or open invitations). Opening another
+request and Invite your team; each is detected from existing reads (a key that is
+not revoked or expired, balance or credit limit, one request record, members or open
+invitations). Opening another
 section rechecks only the pending steps; a done step stays done. A pending step
 shows one secondary action that opens the matching section (the Playground or Docs
 for the first request). Create key and Invite members also move focus to their field;
