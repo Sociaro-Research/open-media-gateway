@@ -494,6 +494,10 @@ func TestOpenAIAdmissionErrorsNameTheRejectedField(t *testing.T) {
 		{real, "/v1/generations/estimate", `{"model":"mock/mock-speech-v1"}`, "input", "input is required"},
 		{real, "/v1/images/generations", `{"model":"mock/mock-image-v1","prompt":""}`, "prompt", "prompt is required"},
 		{real, "/v1/videos", `{"model":"mock/mock-video-v1","prompt":"fixture","webhook_url":"http://127.0.0.1/hook"}`, "webhook_url", core.ErrWebhookInvalid.Error()},
+		{real, "/v1/images/edits", `{"model":"mock/mock-image-v1","prompt":"fixture","image":"www.example.com/cat.png"}`, "image.0", "media options are not supported by the selected model: image.0 must be an absolute http or https URL without credentials"},
+		{real, "/v1/videos", `{"model":"mock/mock-video-v1","prompt":"fixture","input_reference":["https://example.com/a.png","ftp://example.com/b.png"]}`, "input_reference.1", "media options are not supported by the selected model: input_reference.1 must be an absolute http or https URL without credentials"},
+		{real, "/v1/videos", `{"model":"mock/mock-video-v1","prompt":"fixture","options":{"video_urls":["https://user:secret@example.com/a.mp4"]}}`, "options.video_urls.0", "media options are not supported by the selected model: options.video_urls.0 must be an absolute http or https URL without credentials"},
+		{real, "/v1/videos", `{"model":"mock/mock-video-v1","prompt":"fixture","input_reference":"asset://asset-one"}`, "input_reference.0", "media options are not supported by the selected model: input_reference.0 is a registered asset reference, which this model does not support"},
 		{rejected(core.ErrModelUnavailable), "/v1/videos", `{"model":"mock/mock-video-v1","prompt":"fixture"}`, "model", core.ErrModelUnavailable.Error()},
 		{rejected(core.ErrProviderUnavailable), "/v1/videos", `{"model":"mock/mock-video-v1","prompt":"fixture"}`, "model", core.ErrProviderUnavailable.Error()},
 	} {
