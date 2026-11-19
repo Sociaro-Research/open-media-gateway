@@ -20,20 +20,31 @@ func IsAssetReference(value string) bool {
 // ValidateReferenceURLs gates provider-managed references on the model capability.
 // Reference modes separately enforce media counts and roles.
 func ValidateReferenceURLs(model MediaModel, options MediaOptions) error {
-	refs := append([]string{}, options.ImageURLs...)
-	refs = append(refs, options.VideoURLs...)
-	refs = append(refs, options.AudioURLs...)
-	refs = append(refs, options.VideoURL, options.AudioURL)
-	for _, ref := range refs {
+	// Name the rejected reference; transports map the field to their request name.
+	check := func(field, ref string) error {
 		if IsAssetReference(ref) {
 			if !model.SupportsAssetReferences {
-				return fmt.Errorf("%w: this model does not support registered asset references", ErrOptionsInvalid)
+				return optionError(field, "is a registered asset reference, which this model does not support")
 			}
-			continue
+			return nil
 		}
-		if err := validateOptionalURL(ref); err != nil {
-			return err
+		if validateOptionalURL(ref) != nil {
+			return optionError(field, "must be an absolute http or https URL without credentials")
+		}
+		return nil
+	}
+	for _, list := range []struct {
+		field string
+		refs  []string
+	}{{"image_urls", options.ImageURLs}, {"video_urls", options.VideoURLs}, {"audio_urls", options.AudioURLs}} {
+		for i, ref := range list.refs {
+			if err := check(fmt.Sprintf("%s.%d", list.field, i), ref); err != nil {
+				return err
+			}
 		}
 	}
-	return nil
+	if err := check("video_url", options.VideoURL); err != nil {
+		return err
+	}
+	return check("audio_url", options.AudioURL)
 }
