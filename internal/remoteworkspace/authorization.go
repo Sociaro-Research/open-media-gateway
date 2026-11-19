@@ -220,6 +220,9 @@ func (m *Manager) beginAuthorization(ctx context.Context, owner, origin, name, c
 	if response.StatusCode != 200 {
 		return AuthorizationView{}, ErrUnavailable
 	}
+	// A 200 may mean the central server accepted this start even when its reply
+	// cannot be read or checked, so from here on the request is kept.
+	accepted = true
 	data, err := io.ReadAll(io.LimitReader(response.Body, MaxJSON+1))
 	if err != nil || len(data) > MaxJSON {
 		return AuthorizationView{}, ErrUnavailable
@@ -230,7 +233,6 @@ func (m *Manager) beginAuthorization(ctx context.Context, owner, origin, name, c
 	if json.Unmarshal(data, &reply) != nil || reply.Code != wa.UserCode(string(raw)) {
 		return AuthorizationView{}, ErrUnavailable
 	}
-	accepted = true
 	view, e = m.Authorization(ctx, owner)
 	if e != nil {
 		return AuthorizationView{}, e

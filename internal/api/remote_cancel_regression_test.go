@@ -470,3 +470,44 @@ func TestFailedCreatorKeepsRequestAReusingStartIsStillFinishing(t *testing.T) {
 		t.Fatal("returned request cannot be resumed", e)
 	}
 }
+
+// A 200 whose body is cut off may still be an accepted start: keep its request.
+func TestUnreadableAcceptedStartKeepsRequest(t *testing.T) {
+	db := workspaceDatabase(t)
+	ctx := context.Background()
+	owner, e := postgres.NewAuthRepository(db).UpsertGoogleUser(ctx, uuid.NewString(), uuid.NewString()+"@fixture.test", "Local admin", "")
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = db.Exec(`UPDATE users SET is_system_admin=TRUE WHERE id=$1`, owner.ID); e != nil {
+		t.Fatal(e)
+	}
+	host := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/auth/workspace/cancel" {
+			fmt.Fprint(w, `{"cancelled":true}`)
+			return
+		}
+		fmt.Fprint(w, `{"user_code":`)
+	}))
+	defer host.Close()
+	cipher, _ := providerconfig.NewCipher(strings.Repeat("u", 32))
+	repo := postgres.NewSystemRepository(db)
+	manager := remote.New(repo, cipher, host.Client())
+	if _, e = manager.BeginAuthorization(ctx, owner.ID, host.URL, "Local installation", "http://localhost:8088", 0); !errors.Is(e, remote.ErrUnavailable) {
+		t.Fatal("unreadable reply was taken as a usable start", e)
+	}
+	kept, e := repo.AuthorizationAttempt(ctx, owner.ID)
+	if e != nil || len(kept.Cipher) == 0 {
+		t.Fatal("start with a 200 reply dropped its request", e)
+	}
+	resumed, e := manager.Authorization(ctx, owner.ID)
+	if e != nil || resumed.ID != kept.ID || resumed.Code == "" {
+		t.Fatal("kept request cannot be resumed", e)
+	}
+	if e = manager.CancelAuthorization(ctx, owner.ID, kept.ID); e != nil {
+		t.Fatal("kept request cannot be cancelled", e)
+	}
+	if _, e = repo.AuthorizationAttempt(ctx, owner.ID); !errors.Is(e, remote.ErrNotFound) {
+		t.Fatal("cancelled request is still saved", e)
+	}
+}
