@@ -550,6 +550,10 @@ func normalizeModelOptions(descriptor MediaModel, options MediaOptions, deferRes
 		if len(descriptor.Resolutions) > 0 && !slices.Contains(descriptor.Resolutions, options.Resolution) {
 			return MediaOptions{}, optionChoices("resolution", descriptor.Resolutions)
 		}
+		// Providers that take an image ratio advertise it; others dropped or vaguely rejected it.
+		if options.Ratio != "" && !slices.Contains(descriptor.Ratios, options.Ratio) {
+			return MediaOptions{}, optionChoices("ratio", descriptor.Ratios)
+		}
 	case "speech":
 		resourceVoice := hasVoiceResourceIntent(descriptor, options)
 		if resourceVoice && options.Voice != "" {
