@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
+	"github.com/Sociaro-Research/open-media-gateway/internal/httpclient"
 	"github.com/Sociaro-Research/open-media-gateway/internal/providerconfig"
 	"github.com/Sociaro-Research/open-media-gateway/internal/providerkit"
 	"github.com/google/uuid"
@@ -277,13 +278,13 @@ func publicConnection(c *providerkit.Connection) *providerkit.Connection {
 
 // configurationClient applies overrides only to API requests. Redirects are never
 // followed with credentials; result downloading uses the separate storage client.
-func configurationClient(client *http.Client, c Credentials) *http.Client {
+func configurationClient(client *http.Client, c Credentials, singlePOSTs *httpclient.SinglePOSTRoutes) *http.Client {
 	copy := *client
 	base := client.Transport
 	if base == nil {
 		base = http.DefaultTransport
 	}
-	copy.Transport = &connectionTransport{base: base, credentials: c, mediaRedirect: client.CheckRedirect}
+	copy.Transport = &connectionTransport{base: base, credentials: c, mediaRedirect: client.CheckRedirect, singlePOSTs: singlePOSTs}
 	copy.CheckRedirect = func(*http.Request, []*http.Request) error {
 		return errors.New("provider API redirects are not supported; configure the final endpoint")
 	}

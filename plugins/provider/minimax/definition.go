@@ -8,6 +8,7 @@ import (
 	"github.com/Sociaro-Research/open-media-gateway/internal/providerkit"
 	"net/http"
 	"strings"
+	"time"
 )
 
 const ContextIR = "MiniMax-H3-Context-IR"
@@ -18,7 +19,8 @@ const priceSource = docsBase + "pricing/overview"
 
 func Definition() providerkit.Definition {
 	return providerkit.Definition{
-		ID: "minimax", Name: "MiniMax", DefaultModel: "MiniMax-H3", ModelEnv: "MINIMAX_MODEL",
+		SinglePOSTRoutes: &h3ImageRoutes,
+		ID:               "minimax", Name: "MiniMax", DefaultModel: "MiniMax-H3", ModelEnv: "MINIMAX_MODEL",
 		Description:   "Direct MiniMax H3 multimodal video, documented legacy video, image generation and Video Agent templates.",
 		Fields:        []providerkit.Field{{Key: "api_key", Label: "Pay-as-you-go API key", Secret: true, Required: true, Env: "MINIMAX_API_KEY"}, {Key: "base_url", Label: "API endpoint", Default: DefaultBaseURL, Env: "MINIMAX_BASE_URL"}, {Key: "file_operation_price_usd", Label: "Confirmed file-operation USD/request price (blank means unknown)"}},
 		PublicCatalog: true, AuthenticatedCheck: true, CatalogSources: catalogSources(), CatalogInterpret: interpretPrices,
@@ -27,6 +29,9 @@ func Definition() providerkit.Definition {
 			a, err := New(c.Get("api_key"), c.Get("base_url"), h)
 			if err != nil {
 				return nil, err
+			}
+			if c.Connection != nil && c.Connection.TimeoutSeconds != nil {
+				a.connectionTimeout = time.Duration(*c.Connection.TimeoutSeconds) * time.Second
 			}
 			if value := strings.TrimSpace(c.Get("file_operation_price_usd")); value != "" {
 				price, e := money.Parse(value)

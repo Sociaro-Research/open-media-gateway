@@ -542,7 +542,7 @@ func (m *Manager) buildAdapter(id string, credentials Credentials) (core.MediaPr
 	}
 	client := &clientCopy
 	if credentials.Connection != nil {
-		client = configurationClient(client, credentials)
+		client = configurationClient(client, credentials, d.SinglePOSTRoutes)
 	}
 	adapter, err := d.Factory(credentials, m.runtimeSettings(d), client)
 	if err != nil {

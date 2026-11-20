@@ -24,10 +24,7 @@ func hasImmediateResult(result core.ProviderTask) bool {
 // owner/connection context; it never renews or bypasses a lost lease.
 func (w *Worker) acceptImmediateResult(ctx context.Context, provider core.MediaProvider, task core.Task, result core.ProviderTask) error {
 	if repo, ok := w.repo.(core.AcceptedReceiptRepository); ok {
-		persist, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
-		err := repo.SaveAcceptedReceipt(persist, task, result)
-		cancel()
-		if err != nil {
+		if err := saveAcceptedReceipt(ctx, repo, task, result); err != nil {
 			return err
 		}
 		ctx = context.WithValue(ctx, acceptedReceiptContextKey{}, true)
@@ -40,6 +37,29 @@ func (w *Worker) acceptImmediateResult(ctx context.Context, provider core.MediaP
 		}
 	}
 	return w.resumeAcceptedResult(ctx, provider, task, result)
+}
+
+// SaveAcceptedReceipt checks the live claim and compares the digest with any
+// already committed receipt. A lost commit acknowledgment can therefore retry
+// the identical envelope without calling Generate or recording usage twice.
+func saveAcceptedReceipt(ctx context.Context, repo core.AcceptedReceiptRepository, task core.Task, result core.ProviderTask) error {
+	return persistClaimedOutcome(ctx, func(persist context.Context) error {
+		return repo.SaveAcceptedReceipt(persist, task, result)
+	})
+}
+
+// Retry only the identical local, idempotent write under the original claim.
+func persistClaimedOutcome(ctx context.Context, write func(context.Context) error) error {
+	save := func() error {
+		persist, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancel()
+		return write(persist)
+	}
+	err := save()
+	if err == nil || errors.Is(err, core.ErrLeaseLost) || errors.Is(err, core.ErrAcceptedReceiptInvalid) || errors.Is(err, core.ErrProviderChanged) {
+		return err
+	}
+	return save()
 }
 
 func (w *Worker) resumeAcceptedResult(ctx context.Context, provider core.MediaProvider, task core.Task, result core.ProviderTask) error {

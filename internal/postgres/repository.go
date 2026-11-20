@@ -329,9 +329,9 @@ func (r *TaskRepository) MarkSucceeded(ctx context.Context, id string, media cor
 func (r *TaskRepository) MarkFailed(ctx context.Context, id, message string) error {
 	return r.transition(ctx, id, core.EventTaskFailed, `
 		UPDATE tasks
-		SET status = 'failed', error = CASE WHEN minimize_request_logging THEN 'Generation failed' ELSE $2 END, updated_at = NOW()
+		SET status = 'failed', error = CASE WHEN minimize_request_logging AND $2 <> $3 THEN 'Generation failed' ELSE $2 END, updated_at = NOW()
 		WHERE id = $1 AND status IN ('queued', 'running')
-		RETURNING `+taskColumns, []any{message}, func(tx *sql.Tx) error {
+		RETURNING `+taskColumns, []any{message, core.ErrProviderSubmissionUncertain.Error()}, func(tx *sql.Tx) error {
 		return failTaskSessionAction(ctx, tx, id)
 	})
 }
