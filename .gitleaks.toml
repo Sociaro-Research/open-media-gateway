@@ -36,6 +36,9 @@ regexTarget = "line"
 regexes = [
   '''\A(?:\r?\n)?\t\t\t\{Key: "kling4_720p_price", Label: "4\.0 720p override \(USD/s, optional\)", Env: "KLING4_720P_PRICE"\},\r?\n?\z''',
   '''\A(?:\r?\n)?\t\t\t\{Key: "kling4_1080p_price", Label: "4\.0 1080p override \(USD/s, optional\)", Env: "KLING4_1080P_PRICE"\},\r?\n?\z''',
+  '''\A(?:\r?\n)?\t\t\t\{Key: "kling4_1080p_price", Label: "4\.0 1080p SDR override \(USD/s, optional\)", Env: "KLING4_1080P_PRICE"\},\r?\n?\z''',
+  '''\A(?:\r?\n)?\t\t\t\{Key: "kling4_1080p_hdr_price", Label: "4\.0 1080p HDR total \(USD/s, optional\)", Env: "KLING4_1080P_HDR_PRICE"\},\r?\n?\z''',
+  '''\A(?:\r?\n)?\t\t\t\{Key: "kling4_4k_hdr_price", Label: "4\.0 4K HDR total \(USD/s, optional\)", Env: "KLING4_4K_HDR_PRICE"\},\r?\n?\z''',
 ]
 
 [[allowlists]]

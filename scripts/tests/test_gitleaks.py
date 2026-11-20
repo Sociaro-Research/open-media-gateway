@@ -11,18 +11,29 @@ import unittest
 ROOT = Path(__file__).resolve().parents[2]
 MARKER = "# Exact independently reviewed non-secret source lines."
 BINARY = os.environ.get("GITLEAKS_BIN") or shutil.which("gitleaks")
-REVIEWED = [('internal/postgres/remote_workspace.go', 52, 'd21e9820ce4b59fa0f5c15ca0c6e7de0c6660a0e24861fa3748395c87f166a3d'), ('plugins/provider/kling/definition.go', 36, 'c5c633700ca5def01e514c14f2d2f3b138e65da8d42c282fdc69be4490dc3e35'), ('plugins/provider/kling/definition.go', 37, '0a7d3ab58ec15e69c3c819d8ef22db50a9162578db86d19040e889c47cc5db74'), ('internal/postgres/override_sound_test.go', 22, 'e58793faab44d3f61b0a46708cb13f75a1762ec48183aacabc91b7fe82a3dd3a'), ('docs/openapi.yaml', 834, '00e782246cb94b8a9681eda775beb8bc23cc7569e53a4451b90df2c8c1fca293')]
-# This exact SQL exception protects a historical line changed by later schema
-# work. Read its immutable, HEAD-reachable blob instead of weakening its hash.
-# These full-history scanner tests require a complete Git checkout.
+REVIEWED = [
+    ("internal/postgres/remote_workspace.go", 52, "d21e9820ce4b59fa0f5c15ca0c6e7de0c6660a0e24861fa3748395c87f166a3d"),
+    ("plugins/provider/kling/definition.go", 36, "c5c633700ca5def01e514c14f2d2f3b138e65da8d42c282fdc69be4490dc3e35"),
+    ("plugins/provider/kling/definition.go", 37, "0a7d3ab58ec15e69c3c819d8ef22db50a9162578db86d19040e889c47cc5db74"),
+    ("plugins/provider/kling/definition.go", 37, "fea050603c74c8de188c887874dc72d3181e660ca7069a2bfa8133b1fa2cb9c7"),
+    ("plugins/provider/kling/definition.go", 39, "e4f5cd90e1170db9279bdca1bf751051092a2f6f1f26f87f9ea1bdf5ff1446bd"),
+    ("plugins/provider/kling/definition.go", 40, "e6aac6c36a11877fe3017520f844d89b2cc60d0269bf9c5ef7228eef9bf9098a"),
+    ("internal/postgres/override_sound_test.go", 22, "e58793faab44d3f61b0a46708cb13f75a1762ec48183aacabc91b7fe82a3dd3a"),
+    ("docs/openapi.yaml", 834, "00e782246cb94b8a9681eda775beb8bc23cc7569e53a4451b90df2c8c1fca293"),
+]
+# A later change can replace an allowlisted line while its historical form
+# remains in Git. Pin those fixtures to their existing, reachable blobs.
+# The key is the reviewed line hash, since one path can contain both forms.
 HISTORICAL_BLOBS = {
-    "internal/postgres/remote_workspace.go": "7b0deff9f68456f65504a118229eb1ce0d35710b",
+    "d21e9820ce4b59fa0f5c15ca0c6e7de0c6660a0e24861fa3748395c87f166a3d": "7b0deff9f68456f65504a118229eb1ce0d35710b",
+    "0a7d3ab58ec15e69c3c819d8ef22db50a9162578db86d19040e889c47cc5db74": "f59de852ac6198dfe90c4f62c8547c34ab3f67d1",
 }
 FIXTURES = []
 for path, number, expected_hash in REVIEWED:
+    blob = HISTORICAL_BLOBS.get(expected_hash)
     source = subprocess.check_output(
-        ["git", "cat-file", "blob", HISTORICAL_BLOBS[path]], cwd=ROOT, text=True,
-    ) if path in HISTORICAL_BLOBS else (ROOT / path).read_text()
+        ["git", "cat-file", "blob", blob], cwd=ROOT, text=True,
+    ) if blob else (ROOT / path).read_text()
     line = source.splitlines()[number - 1]
     if hashlib.sha256(line.encode()).hexdigest() != expected_hash:
         raise RuntimeError("Reviewed scanner fixture changed; independent review required")
