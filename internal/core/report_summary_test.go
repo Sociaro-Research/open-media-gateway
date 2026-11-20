@@ -92,3 +92,68 @@ func TestReportTokenAliases(t *testing.T) {
 		}
 	}
 }
+
+func TestReportSummaryBucketsAtMidnightTransitions(t *testing.T) {
+	for _, tc := range []struct {
+		interval, zone, from, until, boundary string
+		periods                               []ReportPeriod
+	}{
+		{
+			"day", "America/Santiago", "2026-09-05", "2026-09-08", "2026-09-06T04:00:00Z",
+			[]ReportPeriod{{From: "2026-09-05", To: "2026-09-05"}, {From: "2026-09-06", To: "2026-09-06"}, {From: "2026-09-07", To: "2026-09-07"}},
+		},
+		{
+			"week", "America/Santiago", "2026-09-06", "2026-09-09", "2026-09-07T03:00:00Z",
+			[]ReportPeriod{{From: "2026-09-06", To: "2026-09-06"}, {From: "2026-09-07", To: "2026-09-08"}},
+		},
+		{
+			"month", "Asia/Amman", "2011-03-30", "2011-05-03", "2011-03-31T22:00:00Z",
+			[]ReportPeriod{{From: "2011-03-30", To: "2011-03-31"}, {From: "2011-04-01", To: "2011-04-30"}, {From: "2011-05-01", To: "2011-05-02"}},
+		},
+		{
+			"day", "America/Havana", "2015-10-31", "2015-11-02", "2015-11-01T04:00:00Z",
+			[]ReportPeriod{{From: "2015-10-31", To: "2015-10-31"}, {From: "2015-11-01", To: "2015-11-01"}},
+		},
+		{
+			"day", "Pacific/Apia", "2011-12-29", "2012-01-01", "2011-12-30T10:00:00Z",
+			[]ReportPeriod{{From: "2011-12-29", To: "2011-12-29"}, {From: "2011-12-31", To: "2011-12-31"}},
+		},
+	} {
+		t.Run(tc.zone+"/"+tc.interval, func(t *testing.T) {
+			zone, err := time.LoadLocation(tc.zone)
+			if err != nil {
+				t.Fatal(err)
+			}
+			parse := func(layout, value string) time.Time {
+				t.Helper()
+				got, err := time.Parse(layout, value)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return got
+			}
+			f := ReportFilter{
+				From:  ReportDayStart(parse("2006-01-02", tc.from), zone),
+				Until: ReportDayStart(parse("2006-01-02", tc.until), zone),
+			}
+			at := parse(time.RFC3339, tc.boundary)
+			reader := &summaryRows{rows: []CostReportRow{
+				{CreatedAt: f.From.Add(-time.Nanosecond)}, {CreatedAt: at.Add(-time.Nanosecond)},
+				{CreatedAt: at}, {CreatedAt: f.Until},
+			}}
+			summary, err := SummarizeCostReport(context.Background(), reader, f, tc.interval)
+			if err != nil || summary.Requests != 2 || len(summary.Periods) != len(tc.periods) {
+				t.Fatalf("summary=%+v err=%v", summary, err)
+			}
+			for i, want := range tc.periods {
+				got := summary.Periods[i]
+				if i < 2 {
+					want.Requests = 1
+				}
+				if got != want {
+					t.Fatalf("bucket %d got %+v want %+v", i, got, want)
+				}
+			}
+		})
+	}
+}

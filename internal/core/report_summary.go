@@ -108,26 +108,29 @@ func SummarizeCostReport(ctx context.Context, reader ReportWalker, f ReportFilte
 		return out, ErrReportInterval
 	}
 	starts := []time.Time{}
-	shortMonth := interval == "month" && !f.Until.After(f.From.AddDate(0, 1, 0))
+	location := f.From.Location()
+	shortMonth := interval == "month" && !reportCivilDate(f.Until.In(location)).After(reportCivilDate(f.From).AddDate(0, 1, 0))
 	for start := f.From; start.Before(f.Until); {
 		if len(starts) >= 10000 {
 			return out, ErrReportInterval
 		}
-		next := start.AddDate(0, 0, 1)
+		intervalStart := reportCivilDate(start)
+		nextDate := intervalStart.AddDate(0, 0, 1)
 		if interval == "week" {
-			next = start.AddDate(0, 0, 7-(int(start.Weekday())+6)%7)
+			nextDate = intervalStart.AddDate(0, 0, 7-(int(intervalStart.Weekday())+6)%7)
 		}
 		if interval == "month" {
-			next = time.Date(start.Year(), start.Month()+1, 1, 0, 0, 0, 0, start.Location())
-			if shortMonth {
-				next = f.Until
-			}
+			nextDate = time.Date(intervalStart.Year(), intervalStart.Month()+1, 1, 0, 0, 0, 0, time.UTC)
 		}
-		if next.After(f.Until) {
-			next = f.Until
+		next := ReportDayStart(nextDate, location)
+		if shortMonth || next.After(f.Until) {
+			next = f.Until.In(location)
+		}
+		if !start.Before(next) {
+			return out, ErrReportInterval
 		}
 		starts = append(starts, start)
-		out.Periods = append(out.Periods, ReportPeriod{From: start.Format("2006-01-02"), To: next.AddDate(0, 0, -1).Format("2006-01-02")})
+		out.Periods = append(out.Periods, ReportPeriod{From: start.Format("2006-01-02"), To: next.Add(-time.Nanosecond).Format("2006-01-02")})
 		start = next
 	}
 	public, models, providers := map[string]*ReportGroup{}, map[string]*ReportGroup{}, map[string]*ReportGroup{}
