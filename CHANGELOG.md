@@ -5,6 +5,27 @@ All notable changes to Media Gateway will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project follows [Semantic Versioning](https://semver.org/).
 
+## [v1.0.4] - 2026-11-20
+
+### Added
+
+- Add BytePlus Seedance 2.5 Flash and 4K output for base Seedance 2.5.
+- Add 4K and HDR options and corresponding billing for supported Kling Video 4.0 models.
+
+### Fixed
+
+- Allow up to 8,847,360 pixels in Seedance 2.5 reference videos. Read current Alibaba and legacy Kling Image tariff formats and current OpenAI deprecation tables.
+- Correct report dates across midnight timezone changes, normalize report UUID filters, and keep Audit Log pagination tied to the applied filters.
+- Reduce unrelated provider-logo reads. Improve mobile layouts, empty states, and cleanup of untouched template drafts.
+- Recheck invitation issuer authority and restrict revocation by role. Clarify field errors for references, multipart input, and idempotency keys.
+- Avoid automatic SDK resubmission when generation admission is unconfirmed. Reject unsupported video download variants instead of returning the whole video.
+- Report the release version from the gateway and worker binaries without starting services.
+
+### Upgrade notes
+
+- Installations already on schema 98 need no PostgreSQL migration. Keep the documented backups, existing Compose project and volumes, and drain workers before updating.
+- Catalogue parser changes do not establish provider account access, live generation results, or pricing imports.
+
 ## [v1.0.3] - 2026-11-11
 
 ### Added
