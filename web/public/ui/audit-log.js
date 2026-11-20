@@ -43,18 +43,25 @@
     field('object_type','Object type','',[["",'All types'],...['system','organization','membership','invitation','user','api_key','provider','storage','model','login_provider','email_provider','payment_provider','payment','credit','request','branding'].map(v=>[v,label(v)])]);
     field('outcome','Result','',[["",'All results'],['success','Success'],['denied','Denied'],['failed','Failed']]);field('correlation_id','Correlation ID');
    }
-   const apply=button('Apply',()=>{});apply.type='submit';filters.append(apply);const status=node('p');status.setAttribute('role','status');const list=node('div'),pagination=node('div',null,'report-pagination');panel.append(status,list,pagination);let cursor=0,stack=[];
-   async function load(){const seq=++serial;apply.disabled=true;FormUI.message(status,'Loading…');const params=new URLSearchParams({timezone:Intl.DateTimeFormat().resolvedOptions().timeZone});for(const [k,input] of Object.entries(fields))if(input.value)params.set(k,input.value);params.set(mode==='events'?'before_id':'offset',cursor);
+   const apply=button('Apply',()=>{});apply.type='submit';filters.append(apply);const status=node('p');status.setAttribute('role','status');const list=node('div'),pagination=node('div',null,'report-pagination');panel.append(status,list,pagination);
+   // Keep draft input separate from the query and cursor of the rendered page.
+   let page=null,previous=null,next=null,busy=false;
+   function draftFilters(){const query=new URLSearchParams({timezone:Intl.DateTimeFormat().resolvedOptions().timeZone});for(const [name,input] of Object.entries(fields))if(input.value)query.set(name,input.value);return query;}
+   function updateControls(){apply.disabled=busy;if(previous)previous.disabled=busy||!page.stack.length;if(next)next.disabled=busy||!page.hasMore;}
+   async function load(query,cursor=0,stack=[]){const seq=++serial;busy=true;updateControls();FormUI.message(status,'Loading…');const params=new URLSearchParams(query);params.set(mode==='events'?'before_id':'offset',cursor);
     try{const data=await api(base+'/'+mode+'?'+params);if(seq!==serial||closed||!current())return;list.replaceChildren();FormUI.message(status,data.data.length?'':mode==='events'?'No matching changes.':'No matching revoked keys.');
      const body=table(mode==='events'?'audit_events':'audit_revoked_keys',list,mode==='events'?['Time','Actor','Organization','Action','Object','Result']:['Revoked','Key','Organization','Owner','Revoked by','Spend at revocation']);
      for(const e of data.data){const row=node('tr');if(mode==='events'){
       const who=e.actor_id?UserUI.identity({id:e.actor_id,name:e.actor_name,email:e.actor_email,picture:e.actor_picture},{secondary:true}):node('span',e.actor_name||e.actor_type);const object=node('div');object.append(e.object_type==='user'?UserUI.identity({id:e.object_id,name:e.object_name,picture:e.object_picture}):node('strong',e.object_name||label(e.object_type)),node('small',e.object_id));const outcome=node('span',label(e.outcome),'table-status '+(e.outcome==='success'?'report-success':e.outcome==='failed'?'operation-error':''));
       cells(row,[date(e.created_at),who,e.organization_name||e.organization_id||label(e.scope||'system'),action(e),object,outcome]);interactive(row,'Open audit event '+e.id,()=>eventDialog(e,row));
      }else{const s=e.snapshot,who=node('div');who.append(node('strong',s.name),node('small',s.prefix));cells(row,[date(e.revoked_at),who,s.organization_name||e.organization_id||'Personal',UserUI.identity({id:s.owner_id,email:s.owner_email}),s.revoker_email||s.revoked_by?UserUI.identity({id:s.revoked_by,name:s.revoker_name,email:s.revoker_email}):'Not recorded',s.spent_micros==null?'Not recorded':formatUSD(s.spent_micros/1e6)]);interactive(row,'Open revoked key '+e.id,()=>keyDialog(e,row));}body.append(row)}
-     const prev=button('Previous',()=>{cursor=stack.pop()||0;load()}),next=button('Next',()=>{stack.push(cursor);cursor=mode==='events'?data.next_before_id:data.next_offset;load()});prev.disabled=!stack.length;next.disabled=!data.has_more;pagination.replaceChildren(prev,node('span','Page '+(stack.length+1)),next);pagination.hidden=!stack.length&&!data.has_more;
-    }catch(e){if(seq===serial&&current())FormUI.message(status,e.message,'error')}finally{if(seq===serial)apply.disabled=false;}
+     page={query,cursor,stack,hasMore:data.has_more,nextCursor:mode==='events'?data.next_before_id:data.next_offset};
+     previous=button('Previous',()=>{if(!busy&&page.stack.length)load(page.query,page.stack.at(-1),page.stack.slice(0,-1));});
+     next=button('Next',()=>{if(!busy&&page.hasMore)load(page.query,page.nextCursor,[...page.stack,page.cursor]);});
+     pagination.replaceChildren(previous,node('span','Page '+(stack.length+1)),next);pagination.hidden=!stack.length&&!page.hasMore;
+    }catch(e){if(seq===serial&&current())FormUI.message(status,e.message,'error')}finally{if(seq===serial){busy=false;updateControls();}}
    }
-   filters.onsubmit=e=>{e.preventDefault();cursor=0;stack=[];load()};FormUI.refresh();load();
+   filters.onsubmit=e=>{e.preventDefault();load(draftFilters());};FormUI.refresh();load(draftFilters());
   }
   show('Events');return {close(){closed=true;serial++;layout.destroy();}};
  }
