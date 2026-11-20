@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"slices"
 	"strings"
 	"time"
@@ -60,7 +61,8 @@ func catalog() []core.MediaModel {
 			MaxPromptCharacters: promptCharacterLimit(id),
 			ID:                  id, DisplayName: "Kling 4.0 · Text to video", MediaType: "video",
 			NoSeed: true, NoLanguage: true, NoInstructions: true, NoWatermark: true,
-			Resolutions: []string{"1080p", "720p"}, MinDuration: 3, MaxDuration: 30, DefaultDuration: 10, DurationStep: 1,
+			Parameters:  kling4RangeFields(),
+			Resolutions: []string{"1080p", "720p", "4k"}, MinDuration: 3, MaxDuration: 30, DefaultDuration: 10, DurationStep: 1,
 			Pricing: core.MediaModelPricing{Known: true, ReferencePriceUSD: 2.35, ReferenceDescription: "10-second 1080p output at published USD balance list price; actual account charges and model access remain unverified."},
 		}
 		if id == TextToVideo4 {
@@ -101,6 +103,15 @@ func modelFor(id string) (core.MediaModel, bool) {
 		}
 	}
 	return core.MediaModel{}, false
+}
+func kling4RangeFields() []core.ParameterField {
+	return []core.ParameterField{{Key: "dynamic_range", Label: "Dynamic range", Type: "select", Default: "sdr", Choices: []string{"sdr", "hdr"}}}
+}
+func validateKling4Range(m core.MediaModel, o core.MediaOptions) error {
+	if o.Parameters["dynamic_range"] == "hdr" && resolutionFor(m, o) == "720p" {
+		return fmt.Errorf("%w: Kling 4.0 HDR requires 1080p or 4k", core.ErrOptionsInvalid)
+	}
+	return nil
 }
 func isKling4(id string) bool { return id == TextToVideo4 || id == ImageToVideo4 }
 func (a *Adapter) models() []core.MediaModel {
@@ -197,8 +208,13 @@ func (a *Adapter) ValidateRequest(ctx context.Context, r core.MediaRequest) erro
 			return invalid("Kling frame inputs require public HTTPS image URLs")
 		}
 	}
-	_, err := core.NormalizeParameters(m.Parameters, o.Parameters)
-	return err
+	if _, err := core.NormalizeParameters(m.Parameters, o.Parameters); err != nil {
+		return err
+	}
+	if isKling4(m.ID) {
+		return validateKling4Range(m, o)
+	}
+	return nil
 }
 
 func (a *Adapter) Quote(ctx context.Context, _ core.MediaModel, r core.MediaRequest) (core.TaskCost, string, error) {
@@ -245,6 +261,9 @@ func (a *Adapter) Quote(ctx context.Context, _ core.MediaModel, r core.MediaRequ
 	if f, ok := additionalNativeFamily(r.Model); ok {
 		return quoteAdditionalNative(f, m, r)
 	}
+	if isKling4(r.Model) {
+		return a.quoteKling4(m, r.Options, 0, false)
+	}
 	res := resolutionFor(m, r.Options)
 	source := priceSource
 	description := "Published USD balance list price for requested output duration. Prepaid units, discounts, trials and CNY charges are not converted; this is not a confirmed bill."
@@ -258,17 +277,6 @@ func (a *Adapter) Quote(ctx context.Context, _ core.MediaModel, r core.MediaRequ
 	if r.Options.GenerateAudio != nil && *r.Options.GenerateAudio && res != "4k" {
 		rate = rate * 3 / 2
 	}
-	if isKling4(r.Model) {
-		rate = 235000
-		if res == "720p" {
-			rate = 157000
-		}
-		if override, configured := a.kling4Prices[res]; configured {
-			rate = override
-			source = "Operator-confirmed Kling 4.0 account tariff (USD/second)"
-			description = "Operator-configured USD/second tariff for requested output duration. Account model access and actual charges remain unverified."
-		}
-	}
 	quantity := float64(durationFor(m, r.Options))
 	amount, err := rate.Multiply(quantity, 1)
 	if err != nil {
@@ -280,6 +288,81 @@ func (a *Adapter) Quote(ctx context.Context, _ core.MediaModel, r core.MediaRequ
 		CheckedAt:           time.Date(2026, 10, 29, 0, 0, 0, 0, time.UTC),
 		EstimateDescription: description,
 	}}, "", nil
+}
+
+func kling4TotalRate(base, surcharge money.USD) (money.USD, error) {
+	if base <= 0 || surcharge <= 0 || base > money.USD(math.MaxInt64)-surcharge {
+		return 0, core.ErrPricingUnavailable
+	}
+	return base + surcharge, nil
+}
+
+const kling4InputBilling = "output_plus_max_input_output"
+const billedVideoMetric = "billable_video_duration"
+
+func kling4HDRComponents(base, fee money.USD, billable, output float64) []core.PricingComponent {
+	return []core.PricingComponent{
+		{Metric: billedVideoMetric, Price: base, Per: 1, EstimatedUnits: billable},
+		{Metric: "output_video_duration", Price: fee, Per: 1, EstimatedUnits: output},
+	}
+}
+
+func (a *Adapter) quoteKling4(m core.MediaModel, o core.MediaOptions, input float64, hasVideo bool) (core.TaskCost, string, error) {
+	res := resolutionFor(m, o)
+	table := map[string]struct{ output, input, hdr money.USD }{
+		"720p": {157000, 94000, 0}, "1080p": {235000, 141000, 47000}, "4k": {549000, 329000, 78000},
+	}
+	tariff, ok := table[res]
+	if !ok {
+		return core.TaskCost{}, "", core.ErrPricingUnavailable
+	}
+	output := float64(durationFor(m, o))
+	quantity := output
+	snapshot := core.PricingSnapshot{Currency: "USD", Unit: "second", Per: 1, Region: "Singapore", Source: priceSource,
+		Version: "2026-11-19", CheckedAt: time.Date(2026, 11, 20, 0, 0, 0, 0, time.UTC), BillInputVideo: priceBool(false),
+		Price: tariff.output, EstimateDescription: "Published USD balance price per billable output second."}
+	if hasVideo {
+		quantity += max(input, output)
+		snapshot.Price = tariff.input
+		snapshot.DurationBillingRule = kling4InputBilling
+		snapshot.EstimateDescription = "The base price applies to output seconds plus the greater of input and output seconds, including video-character elements."
+	}
+	key := res
+	if o.Parameters["dynamic_range"] == "hdr" {
+		if tariff.hdr <= 0 {
+			return core.TaskCost{}, "", core.ErrPricingUnavailable
+		}
+		snapshot.RequiredCatalogParameters = map[string]string{"dynamic_range": "hdr"}
+		if hasVideo {
+			snapshot.Components = kling4HDRComponents(snapshot.Price, tariff.hdr, quantity, output)
+			snapshot.EstimateDescription += " HDR is charged separately on output seconds."
+		} else {
+			snapshot.Price = tariff.output + tariff.hdr
+			snapshot.EstimateDescription = "Published base price plus HDR surcharge per billable output second."
+		}
+		key += "_hdr"
+	}
+	if override, ok := a.kling4Prices[key]; ok && !hasVideo {
+		snapshot.Price = override
+		snapshot.AccountSpecific = true
+		snapshot.Source = "Operator-confirmed Kling 4.0 account tariff (USD/second)"
+		snapshot.EstimateDescription = "Account tariff for the selected resolution and dynamic range per billable output second."
+	}
+	amount, err := snapshot.Price.Multiply(quantity, 1)
+	if err != nil {
+		return core.TaskCost{}, "", err
+	}
+	if len(snapshot.Components) > 0 {
+		fee, err := tariff.hdr.Multiply(output, 1)
+		if err != nil {
+			return core.TaskCost{}, "", err
+		}
+		amount, err = kling4TotalRate(amount, fee)
+		if err != nil {
+			return core.TaskCost{}, "", err
+		}
+	}
+	return core.TaskCost{ExpectedUSD: amount, EstimatedUnits: quantity, Status: "estimated", QuotedAt: time.Now().UTC(), Pricing: snapshot}, "", nil
 }
 
 func durationFor(m core.MediaModel, o core.MediaOptions) int {
@@ -296,7 +379,7 @@ func resolutionFor(m core.MediaModel, o core.MediaOptions) string {
 }
 
 func (a *Adapter) setPrices(c providerkit.Credentials) error {
-	for _, res := range []string{"720p", "1080p"} {
+	for _, res := range []string{"720p", "1080p", "4k", "1080p_hdr", "4k_hdr"} {
 		field := "kling4_" + res + "_price"
 		raw := strings.TrimSpace(c.Get(field))
 		if raw == "" {

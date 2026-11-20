@@ -40,7 +40,7 @@ func TestFlash4CatalogIndependentConstraints(t *testing.T) {
 		}
 	}
 	standard, _ := modelFor(TextToVideo4)
-	if standard.MaxDuration != 30 || !reflect.DeepEqual(standard.Resolutions, []string{"1080p", "720p"}) {
+	if standard.MaxDuration != 30 || !reflect.DeepEqual(standard.Resolutions, []string{"1080p", "720p", "4k"}) {
 		t.Fatal("standard 4.0 changed", standard)
 	}
 }

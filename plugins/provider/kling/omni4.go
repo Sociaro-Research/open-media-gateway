@@ -10,10 +10,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
-	"github.com/Sociaro-Research/open-media-gateway/internal/money"
 )
 
 const OmniVideo4 = "kling-4.0-omni-video"
@@ -21,7 +19,7 @@ const OmniVideo4 = "kling-4.0-omni-video"
 func omni4Model() core.MediaModel {
 	return core.MediaModel{ID: OmniVideo4, DisplayName: "Kling 4.0 · Omni Reference", MediaType: "video", NoSeed: true, NoLanguage: true, NoInstructions: true,
 		MaxPromptCharacters: 26000, PromptPolicy: &core.PromptPolicy{MaxCharacters: 26000, ASCIIBudget: 26000, NonASCIIBudget: 11000},
-		Resolutions: []string{"1080p", "720p"}, Ratios: []string{"adaptive", "21:9", "16:9", "9:16", "1:1"}, MinDuration: 3, MaxDuration: 30, DefaultDuration: 10, DurationStep: 1, DurationMayBeInferred: true, RatioMayBeInferred: true,
+		Parameters: kling4RangeFields(), Resolutions: []string{"1080p", "720p", "4k"}, Ratios: []string{"adaptive", "21:9", "16:9", "9:16", "1:1"}, MinDuration: 3, MaxDuration: 30, DefaultDuration: 10, DurationStep: 1, DurationMayBeInferred: true, RatioMayBeInferred: true,
 		SupportsImageInput: true, MaxImageInputs: 10, SupportsVideoInput: true, MaxReferenceInputs: 15,
 		ResourceInputSchemas: []core.ResourceInputSchema{{Kind: "element", SupportsPresets: true, MaxCount: 7, Subtypes: []string{"multi_image", "video_character"}}, {Kind: "voice", SupportsPresets: true, MaxCount: 3}}, ReferencePromptSyntax: "kling-id", ReferencePromptTypes: []string{"image", "video"},
 		ReferenceModes:       []core.ReferenceMode{{ID: "references", Label: "References", MaxImages: 10, MaxVideos: 5, MaxVisuals: 15}},
@@ -126,6 +124,9 @@ func validateOmni4(m core.MediaModel, r core.MediaRequest) error {
 	if _, err := core.NormalizeModelOptions(m, o); err != nil {
 		return err
 	}
+	if err := validateKling4Range(m, o); err != nil {
+		return err
+	}
 	if err := core.ValidateResourceReferences(m, o); err != nil {
 		return err
 	}
@@ -179,9 +180,10 @@ type omni4Content struct {
 	ID        string `json:"id,omitempty"`
 }
 type omni4Settings struct {
-	Resolution  string `json:"resolution"`
-	Duration    *int   `json:"duration,omitempty"`
-	AspectRatio string `json:"aspect_ratio,omitempty"`
+	DynamicRange string `json:"dynamic_range,omitempty"`
+	Resolution   string `json:"resolution"`
+	Duration     *int   `json:"duration,omitempty"`
+	AspectRatio  string `json:"aspect_ratio,omitempty"`
 }
 type omni4Watermark struct {
 	Enabled bool `json:"enabled"`
@@ -201,6 +203,7 @@ func (a *Adapter) generateOmni4(ctx context.Context, m core.MediaModel, r core.M
 		return core.ProviderTask{}, err
 	}
 	p := omni4Payload{Contents: []omni4Content{{Type: "prompt", Text: omni4Prompt(r)}}, Settings: omni4Settings{Resolution: resolutionFor(m, r.Options), AspectRatio: r.Options.Ratio}}
+	p.Settings.DynamicRange, _ = r.Options.Parameters["dynamic_range"].(string)
 	if r.Options.Duration != 0 {
 		duration := r.Options.Duration
 		p.Settings.Duration = &duration
@@ -244,39 +247,12 @@ func (a *Adapter) quoteOmni4(m core.MediaModel, r core.MediaRequest) (core.TaskC
 	if r.Options.Duration == 0 {
 		return core.TaskCost{}, "", core.ErrPricingUnavailable
 	}
-	resolution := resolutionFor(m, r.Options)
-	rate := money.USD(235000)
-	if resolution == "720p" {
-		rate = 157000
-	}
-	quantity := float64(r.Options.Duration)
-	source := priceSource
-	rule := ""
-	billInput := false
-	accountSpecific := false
 	input, hasVideo, known, err := omni4InputDuration(r.Options)
 	if err != nil {
 		return core.TaskCost{}, "", err
 	}
-	if hasVideo {
-		if !known {
-			return core.TaskCost{}, "", core.ErrPricingUnavailable
-		}
-		quantity += max(input, quantity)
-		rate = 141000
-		if resolution == "720p" {
-			rate = 94000
-		}
-		rule = "output_plus_max_input_output"
-	} else if override, configured := a.kling4Prices[resolution]; configured {
-		rate = override
-		source = "Operator-confirmed Kling 4.0 account tariff (USD/second)"
-		accountSpecific = true
+	if hasVideo && !known {
+		return core.TaskCost{}, "", core.ErrPricingUnavailable
 	}
-	amount, err := rate.Multiply(quantity, 1)
-	if err != nil {
-		return core.TaskCost{}, "", err
-	}
-	description := "Published USD balance tariff; input-video billing uses output + max(total input, output), including inspected video-character element duration. Unknown resource duration cannot be quoted. Account access, discounts, units and actual charges remain separate."
-	return core.TaskCost{ExpectedUSD: amount, EstimatedUnits: quantity, Status: "estimated", QuotedAt: time.Now().UTC(), Pricing: core.PricingSnapshot{Currency: "USD", Unit: "second", Price: rate, Per: 1, Source: source, Version: "2026-10-31", Region: "Singapore", AccountSpecific: accountSpecific, BillInputVideo: &billInput, DurationBillingRule: rule, CheckedAt: time.Date(2026, 10, 31, 0, 0, 0, 0, time.UTC), EstimateDescription: description}}, "", nil
+	return a.quoteKling4(m, r.Options, input, hasVideo)
 }

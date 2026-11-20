@@ -19,8 +19,17 @@ func TestFlash4MissingOperationalSourcesAreExplicit(t *testing.T) {
 		ImageToVideo4Flash: {"kling4-flash-image-to-video|image-to-video"},
 		OmniVideo4Flash:    {"kling4-flash-omni|video-omni", "kling4-flash-elements|elements"},
 	}
-	if len(expected) != 3 || len(expected[TextToVideo4Flash]) != 1 || len(expected[ImageToVideo4Flash]) != 1 || len(expected[OmniVideo4Flash]) != 2 {
+	if len(expected) != 6 || len(expected[TextToVideo4Flash]) != 1 || len(expected[ImageToVideo4Flash]) != 1 || len(expected[OmniVideo4Flash]) != 2 {
 		t.Fatal("missing exact operation source bindings", expected)
+	}
+	for id, route := range map[string]string{TextToVideo4: "text-to-video", ImageToVideo4: "image-to-video"} {
+		want := catalogsync.Source{ID: "kling4-" + route, URL: docsBase + "api/video/4-0/" + route + ".md", Parser: "document"}
+		if !reflect.DeepEqual(expected[id], []catalogsync.Source{want}) {
+			t.Fatal("incorrect standard 4.0 endpoint source", id, expected[id])
+		}
+	}
+	if got := expected[OmniVideo4]; len(got) != 1 || got[0].URL != docsBase+"api/video/4-0/video-omni.md" || got[0].ID != "kling4-omni" {
+		t.Fatal("incorrect Omni 4.0 authority", got)
 	}
 	registered := map[catalogsync.Source]bool{}
 	for _, source := range definition.CatalogSources {

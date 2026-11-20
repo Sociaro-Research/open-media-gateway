@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Sociaro-Research/open-media-gateway/internal/catalogsync"
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
 	"github.com/Sociaro-Research/open-media-gateway/internal/money"
 )
@@ -30,17 +29,6 @@ func isKling4Flash(id string) bool {
 
 // Expected sources make omitted persisted schedules visible as not_checked for
 // the exact operation. A source URL alone never verifies an operational field.
-func flash4VerificationSources() map[string][]catalogsync.Source {
-	source := func(id, path string) catalogsync.Source {
-		return catalogsync.Source{ID: id, URL: docsBase + "api/video/4-0-flash/" + path + ".md", Parser: "document"}
-	}
-	return map[string][]catalogsync.Source{
-		TextToVideo4Flash:  {source("kling4-flash-text-to-video", "text-to-video")},
-		ImageToVideo4Flash: {source("kling4-flash-image-to-video", "image-to-video")},
-		OmniVideo4Flash:    {source("kling4-flash-omni", "video-omni"), source("kling4-flash-elements", "elements")},
-	}
-}
-
 func flash4Models() []core.MediaModel {
 	models := make([]core.MediaModel, 0, 3)
 	for _, id := range []string{TextToVideo4Flash, ImageToVideo4Flash, OmniVideo4Flash} {

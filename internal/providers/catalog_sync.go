@@ -302,6 +302,15 @@ func applyCatalogModel(model core.MediaModel, state catalogsync.State) core.Medi
 	model.Metadata = &metadata
 	return model
 }
+func matchesRequiredParameters(selectors, required map[string]string) bool {
+	for key, value := range required {
+		if got, ok := selectors[key]; !ok || got != value {
+			return false
+		}
+	}
+	return true
+}
+
 func applyCatalogQuote(base core.TaskCost, err error, model core.MediaModel, request core.MediaRequest, state catalogsync.State) (core.TaskCost, error) {
 	if err != nil || model.Manual || base.Pricing.AccountSpecific {
 		return base, err
@@ -335,7 +344,7 @@ func applyCatalogQuote(base core.TaskCost, err error, model core.MediaModel, req
 	var selected *catalogsync.Rate
 	for i := range entry.Rates {
 		r := &entry.Rates[i]
-		if !r.MatchesConditions(model, request) {
+		if !matchesRequiredParameters(r.Parameters, base.Pricing.RequiredCatalogParameters) || !r.MatchesConditions(model, request) {
 			continue
 		}
 		duration := request.Options.Duration
