@@ -9150,14 +9150,15 @@ paths:
                 type: object
                 properties:
                   icon_url: {type: string, enum: ['']}
+        '400': {description: Provider configuration or logo repository error}
         '401': {description: Authentication required}
         '403': {description: Administrator permission and applicable API-key scopes required}
         '404': {description: Provider not found}
-        '503': {description: Logo storage unavailable}
+        '503': {description: Provider administration does not implement the required logo operation}
     put:
       tags: [Providers admin]
       summary: Personal — Upload or replace a provider logo
-      description: Administrator only. Atomically replace this connection's logo without changing settings or credentials. PNG signature and full decoding are checked. Opaque and transparent PNG are accepted, including palette tRNS and 16-bit samples. SVG and other formats are rejected. Failures preserve the previous upload. No remote URL import is supported.
+      description: Administrator only. Atomically replace this connection's logo without changing settings or credentials. PNG signature and full decoding are checked. Opaque and transparent PNG are accepted, including palette tRNS and 16-bit samples. SVG and other formats are rejected. Validation failures preserve the previous upload; after a storage error, verify the current logo before retrying. No remote URL import is supported.
       security:
       - bearerAuth: []
       - sessionAuth: []
@@ -9175,11 +9176,11 @@ paths:
                 type: object
                 properties:
                   icon_url: {type: string}
-        '400': {description: "Unsupported content type, malformed PNG, exceeded byte/dimension limit or incomplete upload; previous logo retained"}
+        '400': {description: "Unsupported content type, malformed PNG, exceeded byte/dimension limit or incomplete upload (previous logo retained); also provider configuration or logo repository errors, for which persisted state may need to be checked"}
         '401': {description: Authentication required}
         '403': {description: Administrator permission and applicable API-key scopes required}
         '404': {description: Provider not found}
-        '503': {description: Logo storage unavailable}
+        '503': {description: Provider administration does not implement the required logo operation}
 
   "/v1/system/providers/{providerId}/logo":
     parameters:
@@ -9200,14 +9201,15 @@ paths:
                 type: object
                 properties:
                   icon_url: {type: string, enum: ['']}
+        '400': {description: Provider configuration or logo repository error}
         '401': {description: Authentication required}
         '403': {description: Administrator permission and applicable API-key scopes required}
         '404': {description: Provider not found}
-        '503': {description: Logo storage unavailable}
+        '503': {description: Provider administration does not implement the required logo operation}
     put:
       tags: [Providers admin]
       summary: Shared — Upload or replace a provider logo
-      description: Administrator only. Atomically replace this connection's logo without changing settings or credentials. PNG signature and full decoding are checked. Opaque and transparent PNG are accepted, including palette tRNS and 16-bit samples. SVG and other formats are rejected. Failures preserve the previous upload. No remote URL import is supported.
+      description: Administrator only. Atomically replace this connection's logo without changing settings or credentials. PNG signature and full decoding are checked. Opaque and transparent PNG are accepted, including palette tRNS and 16-bit samples. SVG and other formats are rejected. Validation failures preserve the previous upload; after a storage error, verify the current logo before retrying. No remote URL import is supported.
       security:
       - bearerAuth: []
       - sessionAuth: []
@@ -9225,11 +9227,11 @@ paths:
                 type: object
                 properties:
                   icon_url: {type: string}
-        '400': {description: "Unsupported content type, malformed PNG, exceeded byte/dimension limit or incomplete upload; previous logo retained"}
+        '400': {description: "Unsupported content type, malformed PNG, exceeded byte/dimension limit or incomplete upload (previous logo retained); also provider configuration or logo repository errors, for which persisted state may need to be checked"}
         '401': {description: Authentication required}
         '403': {description: Administrator permission and applicable API-key scopes required}
         '404': {description: Provider not found}
-        '503': {description: Logo storage unavailable}
+        '503': {description: Provider administration does not implement the required logo operation}
 
   "/provider-assets/{owner}/{providerId}/icon.png":
     get:
