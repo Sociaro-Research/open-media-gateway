@@ -1,6 +1,7 @@
 package bytedance
 
 import (
+	"encoding/json"
 	"errors"
 	"github.com/Sociaro-Research/open-media-gateway/internal/catalogsync"
 	"github.com/Sociaro-Research/open-media-gateway/plugins/provider/internal/catalogdoc"
@@ -110,6 +111,14 @@ func interpretVideoAPI(source catalogsync.Source, text string) ([]catalogsync.En
 				if total, found := catalogdoc.Int(spec, `total duration of[^.]{0,30}?(?:no more than|not exceed)\s*([0-9]+)`); found {
 					fields.Put("workflow.references."+item.kind+".duration", map[string]int{"min": min, "max": max, "min_total": 0, "max_total": total})
 				}
+			}
+		}
+		// Since 2026-11-20 reference-video total pixels are published per series.
+		if low, high, ok := catalogdoc.Range(seriesValue(catalogdoc.Between(video, `Total pixels:`, `Size:`), m.label), `=\s*([0-9]+),[^=]*=\s*([0-9]+)\]`); ok {
+			dims := map[string]any{}
+			if json.Unmarshal(fields["workflow.references.video.dimensions"], &dims) == nil {
+				dims["min_pixels"], dims["max_pixels"] = low, high
+				fields.Put("workflow.references.video.dimensions", dims)
 			}
 		}
 		// Shared series text alone never verifies a model without its own entries.

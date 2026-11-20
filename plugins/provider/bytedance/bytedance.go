@@ -294,6 +294,8 @@ func describeModel(id string) (result core.MediaModel) {
 				if result.ID == "dreamina-seedance-2-5-flash-261115" {
 					result.ReferenceMediaLimits.MaxFiles = 20 // 10 images + 5 videos + 5 audio clips
 				}
+				// Task API, checked 2026-11-20: 2.5 series 4096×2160; 2.0 keeps 3326×2494.
+				result.ReferenceMediaLimits.Video.MaxPixels = 8847360
 				result.ReferenceMediaLimits.Video.MaxDuration = 30
 				result.ReferenceMediaLimits.Video.MaxTotalDuration = 30
 				result.ReferenceMediaLimits.Audio.MaxDuration = 30
