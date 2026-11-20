@@ -209,8 +209,10 @@
  f.finish('Top up',()=>Number(amount.value)>0&&!!reason.value.trim());
  }
  if(systemAdministrator)await window.VATSettingsUI.verification(body,api,o,()=>token===epoch&&call===pageCall);
+ if(token!==epoch||call!==pageCall)return;
  if(systemAdministrator){let amount,kind,reason,external;const f=form(body,'Add credit or correction',async()=>{await api(base+'/credits',{method:'POST',body:JSON.stringify({amount_usd:Number(amount.value),kind:kind.value,reason:reason.value,external_id:external.value})});await reload()});f.querySelector('h2').outerHTML='<h3>Add credit or correction</h3>';amount=field(f,'Amount (USD)','number','',true);amount.min='-1000000';amount.removeAttribute('max');kind=el('select');kind.setAttribute('aria-label','Credit type');['payment','promo','adjustment'].forEach(v=>{const opt=el('option',v);opt.value=v;kind.append(opt)});const kindLabel=el('label','Credit type','organization-field');kindLabel.append(kind);f.append(kindLabel);reason=field(f,'Reason');reason.maxLength=1000;external=field(f,'Payment / operation ID','text',crypto.randomUUID(),true);const validateAmount=()=>{amount.min=kind.value==='adjustment'?'-1000000':'0.000001';amount.setCustomValidity(amount.value!==''&&Number(amount.value)===0?'Enter a non-zero amount.':'');FormUI.update(f);/* FormUI's capture-phase update ran before this custom error was set. */};kind.addEventListener('change',validateAmount);amount.addEventListener('input',validateAmount);validateAmount();f.finish('Add credit');}
  await window.BalanceHistory.mount(body,api,o,()=>token===epoch&&call===pageCall,async()=>{await window.Workspace?.refresh();await reload()},manage);
+ if(token!==epoch||call!==pageCall)return;
  }
  const reports=el('section',null,'organization-reports');body.append(reports);
  await window.GatewayReports.open(false,{organization:o,parent:reports});
