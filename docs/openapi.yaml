@@ -9308,7 +9308,7 @@ components:
           schema:
             "$ref": "#/components/schemas/ErrorResponse"
     Unauthorized:
-      description: Missing or invalid Gateway API key
+      description: Missing or invalid authentication for this operation. See the operation's security requirements for accepted credentials.
       content:
         application/json:
           schema:
