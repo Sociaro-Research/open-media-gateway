@@ -105,6 +105,9 @@ func (a *Adapter) Generate(ctx context.Context, r core.MediaRequest) (core.Provi
 	version := "kling-3.0"
 	if isKling4(r.Model) {
 		version = "kling-4.0"
+		if value, supplied := r.Options.Parameters["dynamic_range"]; supplied {
+			settings["dynamic_range"] = value
+		}
 	} else {
 		parameters, _ := core.NormalizeParameters(m.Parameters, r.Options.Parameters)
 		settings["audio"], settings["multi_shot"] = "off", parameters["multi_shot"]
@@ -218,14 +221,16 @@ func (a *Adapter) GetTask(ctx context.Context, id string) (core.ProviderResult, 
 			return a.getSolutionTask(ctx, handle.Operation, handle.ID)
 		}
 		if isKling4Flash(handle.Operation) {
-			return a.getNativeVideoTask(ctx, handle.ID, true)
+			return a.getNativeVideoTask(ctx, handle.ID, handle.Operation)
 		}
 		return core.ProviderResult{}, errors.New("unsupported Kling task handle operation")
 	}
-	return a.getNativeVideoTask(ctx, id, false)
+	request, _ := core.ProviderPollRequestFromContext(ctx)
+	return a.getNativeVideoTask(ctx, id, request.Model)
 }
 
-func (a *Adapter) getNativeVideoTask(ctx context.Context, id string, requireBillingDuration bool) (core.ProviderResult, error) {
+func (a *Adapter) getNativeVideoTask(ctx context.Context, id, model string) (core.ProviderResult, error) {
+	requireBillingDuration := isKling4(model) || model == OmniVideo4 || isKling4Flash(model)
 	if !validTaskID(id) {
 		return core.ProviderResult{}, errors.New("invalid Kling task ID")
 	}
@@ -256,6 +261,7 @@ func (a *Adapter) getNativeVideoTask(ctx context.Context, id string, requireBill
 			seconds = 0
 		}
 		usage := map[string]any{}
+		var inputSeconds float64
 		var optionalUsage struct {
 			InputDuration  json.RawMessage `json:"input_duration"`
 			OutputDuration json.RawMessage `json:"output_duration"`
@@ -274,7 +280,10 @@ func (a *Adapter) getNativeVideoTask(ctx context.Context, id string, requireBill
 		if inputDuration := taskOptionalString(optionalUsage.InputDuration); billableSeconds > 0 && inputDuration != "" {
 			input, e := strconv.ParseFloat(inputDuration, 64)
 			if e == nil && input > 0 && !math.IsNaN(input) && !math.IsInf(input, 0) {
-				usage["input_video_duration"] = input
+				if !isKling4(model) {
+					usage["input_video_duration"] = input
+				}
+				inputSeconds = input
 			}
 		}
 		// Retain only recognized billing counters. Units and CNY remain in their
@@ -302,7 +311,16 @@ func (a *Adapter) getNativeVideoTask(ctx context.Context, id string, requireBill
 		artifacts := []core.ProviderArtifact{{ID: string(task.Outputs[0].ID), MediaType: "video", Format: "mp4", URL: task.Outputs[0].URL, Duration: seconds, GroupID: string(task.Outputs[0].ID)}}
 		// The provider's watermark_url is an optional alternate copy, not the
 		// requested primary output. Do not make its archival a success gate.
-		return core.ProviderResult{Status: core.ProviderSucceeded, ResultURL: task.Outputs[0].URL, Artifacts: artifacts, Usage: core.NormalizeProviderUsage(usage)}, nil
+		normalized := core.NormalizeProviderUsage(usage)
+		if model == OmniVideo4 && normalized != nil && inputSeconds > 0 {
+			// Derived solely from the provider's two billing counters. Keep
+			// the separate durations in the raw usage and archive metadata.
+			total := billableSeconds + max(inputSeconds, billableSeconds)
+			if !math.IsInf(total, 0) {
+				normalized.Metrics = append(normalized.Metrics, core.UsageMetric{Name: billedVideoMetric, Unit: "second", Quantity: total})
+			}
+		}
+		return core.ProviderResult{Status: core.ProviderSucceeded, ResultURL: task.Outputs[0].URL, Artifacts: artifacts, Usage: normalized}, nil
 	default:
 		return core.ProviderResult{}, errors.New("Kling returned an unknown task status")
 	}

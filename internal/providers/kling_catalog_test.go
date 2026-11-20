@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -92,13 +93,18 @@ func TestKlingSynchronizedPricesMatchReviewedOperationContractsAndPreserveOverri
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, entry := range updates {
-		state.Models[entry.ID] = entry
-	}
-	state.Version++
+	state, _ = catalogsync.Reconcile(state, capture, []catalogsync.Observation{{Source: source, Entries: updates, Hash: "second", Text: changed}}, time.Now(), func(model core.MediaModel, rate catalogsync.Rate) error {
+		return m.CheckCatalogRate(ctx, "kling", model, rate)
+	})
 	m.SetCatalog(&providerCatalogFixture{state: state})
 	request := core.MediaRequest{Model: kling.TextToVideo4, Prompt: "Synthetic fixture"}
-	cost, _, err := provider.Quote(ctx, core.MediaModel{ID: kling.TextToVideo4, Resolutions: []string{"1080p", "720p"}}, request)
+	var textModel core.MediaModel
+	for _, model := range models {
+		if model.ID == kling.TextToVideo4 {
+			textModel = model
+		}
+	}
+	cost, _, err := provider.Quote(ctx, textModel, request)
 	if err != nil || cost.ExpectedUSD != 2400000 {
 		t.Fatal(cost, err)
 	}
@@ -109,13 +115,34 @@ func TestKlingSynchronizedPricesMatchReviewedOperationContractsAndPreserveOverri
 	if err != nil || cost.ExpectedUSD != 2000010 || !cost.Pricing.AccountSpecific {
 		t.Fatal("public synchronization replaced account override", cost, err)
 	}
+	// A saved SDR-only scalar predates the dynamic-range selector. It
+	// must never reprice HDR, even before the next successful refresh.
+	request.Options.Parameters = map[string]any{"dynamic_range": "hdr"}
+	legacy := catalogsync.State{Models: map[string]catalogsync.Entry{textModel.ID: {ID: textModel.ID, Rates: []catalogsync.Rate{{Unit: "second", Per: 1, Price: 235000, Region: "Singapore", Resolution: "1080p"}}}}}
+	m.SetCatalog(&providerCatalogFixture{state: legacy})
+	cost, _, err = provider.Quote(ctx, textModel, request)
+	if err != nil || cost.ExpectedUSD != 2820000 || cost.Pricing.AccountSpecific {
+		t.Fatal("legacy catalogue or SDR-only override repriced HDR", cost, err)
+	}
+	m.SetCatalog(&providerCatalogFixture{state: state})
+	cost, _, err = provider.Quote(ctx, textModel, request)
+	if err != nil || cost.ExpectedUSD != 2870000 || cost.Pricing.Source != source.URL {
+		t.Fatal("HDR did not follow updated public base price", cost, err)
+	}
+	if _, err = m.Update(ctx, "kling", ProviderUpdate{Extra: map[string]string{"kling4_1080p_hdr_price": "0.250001"}}); err != nil {
+		t.Fatal(err)
+	}
+	cost, _, err = provider.Quote(ctx, textModel, request)
+	if err != nil || cost.ExpectedUSD != 2500010 || !cost.Pricing.AccountSpecific {
+		t.Fatal("synchronization replaced explicit all-in HDR override", cost, err)
+	}
 	// A malformed later observation keeps confirmed rates and adds a warning.
 	bad := catalogsync.Observation{Source: source, Error: "interpretation failed", FetchedHash: "bad", Text: "HTML shell"}
 	next, failed := catalogsync.Reconcile(state, capture, []catalogsync.Observation{bad}, time.Now(), func(model core.MediaModel, rate catalogsync.Rate) error {
 		return m.CheckCatalogRate(ctx, "kling", model, rate)
 	})
-	if len(next.Models[kling.TextToVideo4].Rates) != 2 || len(failed.OpenWarnings) == 0 {
-		t.Fatal("failed source erased confirmed rates or warning", failed)
+	if len(state.Models[kling.TextToVideo4].Rates) != 5 || !reflect.DeepEqual(next.Models[kling.TextToVideo4].Rates, state.Models[kling.TextToVideo4].Rates) || len(failed.OpenWarnings) == 0 {
+		t.Fatalf("confirmed rates before=%+v after=%+v warnings=%d", state.Models[kling.TextToVideo4].Rates, next.Models[kling.TextToVideo4].Rates, len(failed.OpenWarnings))
 	}
 }
 

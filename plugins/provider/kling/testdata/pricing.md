@@ -11,20 +11,38 @@
 
 Resource package deduction rules for video generation and related video capabilities.
 
-Kling 4.0 and Kling 4.0 Flash are billed based on total video duration in seconds. The total duration depends on whether input videos are provided, their duration, and the output video duration.
+Kling 4.0 and Kling 4.0 Flash are billed based on total video duration in seconds. The total duration depends on whether input videos are provided, their duration, and the output video duration. Kling 4.0 supports HDR video output at 1080p and 4K resolutions. When HDR is enabled, an additional HDR fee is charged per second of the output video.
 
-- When input video duration > output video duration: Unit price × (Input video duration + Output video duration)
-- When input video duration ≤ output video duration: Unit price × Output video duration × 2
+**Kling 4.0 and Kling 4.0 Flash Billing**
 
-* Input video duration includes reference video duration and video character elements duration.
+**Video Generation Pricing**
+
+Kling 4.0 and Kling 4.0 Flash are billed based on the total duration in seconds, determined by the presence and duration of input videos and the output video duration:
+
+- No input video: price × output duration
+- Input video duration ≤ output duration: price × output duration × 2
+- Input video duration > output duration: price × (input video duration + output duration)
+
+* Input video duration includes the duration of reference videos and Video Character Elements.
+
+**HDR Pricing**
+
+When HDR is enabled in Kling 4.0, the HDR fee is calculated as: HDR price × output duration.
+
+**Kling 4.0 HDR Pricing Example**
+
+Input video: 6 seconds; output video: 5 seconds; output resolution: 4K
+
+Total Cost $4.009 = Base Cost $3.619 (0.329 × (6 + 5)) + HDR Cost $0.39 (0.078 × 5)
 
 ## Pricing Table
 
-| Model | Features | Billing Type | Price (720P) | Price (1080P) | Price (4K) |
+| Model | Features | Billing Type | Price (720p) | Price (1080p) | Price (4K) |
 | --- | --- | --- | --- | --- | --- |
-| Kling 4.0 | No Input Video (Input videos include reference videos (feature video and base video), and video character element.) | Per second (Total duration = Output duration) | 1.0 Unit ($0.157) /s | 1.5 Units ($0.235) /s | - |
-| Kling 4.0 | With Input Video (Input Duration ≤ Output Duration) (Input videos include reference videos (feature video and base video), and video character element.) | Per second (Total duration = Output duration × 2) | 0.6 Units ($0.094) /s | 0.9 Units ($0.141) /s | - |
-| Kling 4.0 | With Input Video (Input Duration > Output Duration) (Input videos include reference videos (feature video and base video), and video character element.) | Per second (Total duration = Input duration + Output duration) | 0.6 Units ($0.094) /s | 0.9 Units ($0.141) /s | - |
+| Kling 4.0 | No Input Video (Input videos include reference videos (feature video and base video), and video character element.) | Per second (Total duration = Output duration) | 1.0 Unit ($0.157) /s | 1.5 Units ($0.235) /s | 3.5 Units ($0.549) /s |
+| Kling 4.0 | With Input Video (Input Duration ≤ Output Duration) (Input videos include reference videos (feature video and base video), and video character element.) | Per second (Total duration = Output duration × 2) | 0.6 Units ($0.094) /s | 0.9 Units ($0.141) /s | 2.1 Units ($0.329) /s |
+| Kling 4.0 | With Input Video (Input Duration > Output Duration) (Input videos include reference videos (feature video and base video), and video character element.) | Per second (Total duration = Input duration + Output duration) | 0.6 Units ($0.094) /s | 0.9 Units ($0.141) /s | 2.1 Units ($0.329) /s |
+| Kling 4.0 | HDR Output (Additional charges apply when HDR is enabled) | Per second (HDR billing duration = Output duration<br>When HDR is enabled, an additional HDR fee is charged on top of the base cost shown above) | - | + 0.3 Units ($0.047) /s | + 0.5 Units ($0.078) /s |
 | Kling 4.0 Flash | No Input Video (Input videos include reference videos (feature video and base video), and video character element.) | Per second (Total duration = Output duration) | 0.6 Units ($0.094) /s | - | - |
 | Kling 4.0 Flash | With Input Video (Input Duration ≤ Output Duration) (Input videos include reference videos (feature video and base video), and video character element.) | Per second (Total duration = Output duration × 2) | 0.4 Units ($0.063) /s | - | - |
 | Kling 4.0 Flash | With Input Video (Input Duration > Output Duration) (Input videos include reference videos (feature video and base video), and video character element.) | Per second (Total duration = Input duration + Output duration) | 0.4 Units ($0.063) /s | - | - |

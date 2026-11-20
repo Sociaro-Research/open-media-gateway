@@ -34,7 +34,10 @@ func Definition() providerkit.Definition {
 			{Key: "api_key", Label: "API key (current API)", Secret: true, Required: true, Env: "KLING_API_KEY"},
 			{Key: "base_url", Label: "API endpoint", Default: DefaultBaseURL, Env: "KLING_BASE_URL"},
 			{Key: "kling4_720p_price", Label: "4.0 720p override (USD/s, optional)", Env: "KLING4_720P_PRICE"},
-			{Key: "kling4_1080p_price", Label: "4.0 1080p override (USD/s, optional)", Env: "KLING4_1080P_PRICE"},
+			{Key: "kling4_1080p_price", Label: "4.0 1080p SDR override (USD/s, optional)", Env: "KLING4_1080P_PRICE"},
+			{Key: "kling4_4k_price", Label: "4.0 4K SDR override (USD/s, optional)", Env: "KLING4_4K_PRICE"},
+			{Key: "kling4_1080p_hdr_price", Label: "4.0 1080p HDR total (USD/s, optional)", Env: "KLING4_1080P_HDR_PRICE"},
+			{Key: "kling4_4k_hdr_price", Label: "4.0 4K HDR total (USD/s, optional)", Env: "KLING4_4K_HDR_PRICE"},
 			{Key: "selection_init_price", Label: "Confirmed selection initialization tariff (USD/request, optional)", Env: "KLING_SELECTION_INIT_PRICE"},
 			{Key: "selection_add_price", Label: "Confirmed add-selection tariff (USD/request, optional)", Env: "KLING_SELECTION_ADD_PRICE"},
 			{Key: "selection_delete_price", Label: "Confirmed delete-selection tariff (USD/request, optional)", Env: "KLING_SELECTION_DELETE_PRICE"},
@@ -52,7 +55,7 @@ func Definition() providerkit.Definition {
 		CatalogSources:             reviewedSources(),
 		CatalogInterpret:           interpretPrices,
 		CatalogSourceAliases:       aliases,
-		CatalogVerificationSources: flash4VerificationSources(),
+		CatalogVerificationSources: videoVerificationSources(),
 		// Model versions live in routes, not a JSON model field. The generic
 		// manual-model override cannot safely substitute these upstream IDs.
 		BillingHelp: "Published USD list prices supply estimates automatically; optional account overrides are preserved. Prepaid units, trials, discounts and CNY are not converted to USD or treated as confirmed bills. Check connection uses the free authenticated account query without retaining balances; success verifies authentication, not model entitlement or funded generation. Fresh queries are limited to one per second per gateway process; successful checks are cached for five minutes.",

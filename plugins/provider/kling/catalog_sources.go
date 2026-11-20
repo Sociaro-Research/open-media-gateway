@@ -80,3 +80,17 @@ func reviewedSources() []catalogsync.Source {
 		{ID: "doc-guides-protocols-service-level-agreement-history-v1", URL: docsBase + "guides/protocols/service-level-agreement/history/v1.md", Parser: "document"},
 	}
 }
+
+func videoVerificationSources() map[string][]catalogsync.Source {
+	source := func(id, path string) catalogsync.Source {
+		return catalogsync.Source{ID: id, URL: docsBase + "api/video/" + path + ".md", Parser: "document"}
+	}
+	return map[string][]catalogsync.Source{
+		OmniVideo4:         {source("kling4-omni", "4-0/video-omni")},
+		TextToVideo4:       {source("kling4-text-to-video", "4-0/text-to-video")},
+		ImageToVideo4:      {source("kling4-image-to-video", "4-0/image-to-video")},
+		TextToVideo4Flash:  {source("kling4-flash-text-to-video", "4-0-flash/text-to-video")},
+		ImageToVideo4Flash: {source("kling4-flash-image-to-video", "4-0-flash/image-to-video")},
+		OmniVideo4Flash:    {source("kling4-flash-omni", "4-0-flash/video-omni"), source("kling4-flash-elements", "4-0-flash/elements")},
+	}
+}

@@ -142,20 +142,23 @@ func TestPublishedPricingGoldenConditionalPrices(t *testing.T) {
 	// Explicit expected USD values and selectors, independently transcribed from
 	// the four official tables. These do not derive expected values from helpers.
 	type golden struct {
-		doc, id, res, parameterAudio    string
-		audio, video, image, voice, bgm *bool
-		resourceMin                     *int
-		roleMin                         *int
-		want                            money.USD
-		unit                            string
+		doc, id, res, parameterAudio, dynamicRange string
+		audio, video, image, voice, bgm            *bool
+		resourceMin                                *int
+		roleMin                                    *int
+		want                                       money.USD
+		unit                                       string
 	}
 	pInt := func(n int) *int { return &n }
 	rows := []golden{
 		{doc: "video", id: TextToVideo, res: "720p", audio: priceBool(false), want: 84000, unit: "second"},
 		{doc: "video", id: ImageToVideo, res: "1080p", audio: priceBool(true), want: 168000, unit: "second"},
-		{doc: "video", id: TextToVideo4, res: "1080p", want: 235000, unit: "second"},
-		{doc: "video", id: OmniVideo4, res: "720p", video: priceBool(true), want: 94000, unit: "second"},
-		{doc: "video", id: OmniVideo4, res: "1080p", video: priceBool(true), want: 141000, unit: "second"},
+		{doc: "video", id: TextToVideo4, res: "1080p", dynamicRange: "sdr", want: 235000, unit: "second"},
+		{doc: "video", id: TextToVideo4, res: "1080p", dynamicRange: "hdr", video: priceBool(false), want: 282000, unit: "second"},
+		{doc: "video", id: ImageToVideo4, res: "4k", dynamicRange: "sdr", video: priceBool(false), want: 549000, unit: "second"},
+		{doc: "video", id: ImageToVideo4, res: "4k", dynamicRange: "hdr", video: priceBool(false), want: 627000, unit: "second"},
+		{doc: "video", id: OmniVideo4, res: "720p", dynamicRange: "sdr", video: priceBool(true), want: 94000, unit: "second"},
+		{doc: "video", id: OmniVideo4, res: "1080p", dynamicRange: "sdr", video: priceBool(true), want: 141000, unit: "second"},
 		{doc: "video", id: TextToVideo3Turbo, res: "720p", want: 112000, unit: "second"},
 		{doc: "video", id: ImageToVideo25Turbo, res: "1080p", want: 70000, unit: "second"},
 		{doc: "video", id: TextToVideo26, res: "720p", audio: priceBool(false), want: 42000, unit: "second"},
@@ -179,7 +182,7 @@ func TestPublishedPricingGoldenConditionalPrices(t *testing.T) {
 			entry := pricingEntries(t, g.doc)[g.id]
 			matches := 0
 			for _, r := range entry.Rates {
-				if r.Resolution != g.res || g.audio != nil && (r.Audio == nil || *r.Audio != *g.audio) || g.video != nil && (r.VideoInput == nil || *r.VideoInput != *g.video) || g.image != nil && (r.ImageInput == nil || *r.ImageInput != *g.image) || g.voice != nil && (r.VoiceInput == nil || *r.VoiceInput != *g.voice) || g.parameterAudio != "" && r.Parameters["audio"] != g.parameterAudio {
+				if r.Parameters["dynamic_range"] != g.dynamicRange || r.Resolution != g.res || g.audio != nil && (r.Audio == nil || *r.Audio != *g.audio) || g.video != nil && (r.VideoInput == nil || *r.VideoInput != *g.video) || g.image != nil && (r.ImageInput == nil || *r.ImageInput != *g.image) || g.voice != nil && (r.VoiceInput == nil || *r.VoiceInput != *g.voice) || g.parameterAudio != "" && r.Parameters["audio"] != g.parameterAudio {
 					continue
 				}
 				if g.bgm != nil && (r.AudioInput == nil || *r.AudioInput != *g.bgm) {
@@ -309,7 +312,7 @@ func TestPublishedPricingRejectsDriftAndKeepsCurrencySeparate(t *testing.T) {
 	for _, e := range updated {
 		if e.ID == TextToVideo4 {
 			for _, r := range e.Rates {
-				if r.Resolution == "1080p" {
+				if r.Resolution == "1080p" && r.Parameters["dynamic_range"] == "sdr" {
 					changedRate = r
 				}
 			}
@@ -330,9 +333,14 @@ func TestPublishedPricingRejectsDriftAndKeepsCurrencySeparate(t *testing.T) {
 	}
 	cases := map[string]string{
 		"HTML shell": "<html>JavaScript required</html>", "wrong currency": strings.Replace(text, "($0.235)", "(CNY0.235)", 1), "unit only": strings.Replace(text, " ($0.235)", "", 1),
-		"missing reviewed row": strings.Replace(text, "| Kling 3.0 | No Native Audio", "| Unknown | No Native Audio", 1), "changed header": strings.Replace(text, "Price (720P)", "Price (480P)", 1),
+		"missing reviewed row": strings.Replace(text, "| Kling 3.0 | No Native Audio", "| Unknown | No Native Audio", 1), "changed header": strings.Replace(text, "Price (720p)", "Price (480P)", 1),
 		"changed billing": strings.Replace(text, "Total duration = Output duration)", "Total duration = Input duration)", 1), "preview": text + "\nPreview prices", "locale": strings.Replace(text, "> Locale: en", "> Locale: zh", 1),
-		"input branches diverge": strings.Replace(text, "($0.094)", "($0.095)", 1), "added 4k": strings.Replace(text, "1.5 Units ($0.235) /s | - |", "1.5 Units ($0.235) /s | 2 Units ($0.3) /s |", 1),
+		"input branches diverge": strings.Replace(text, "($0.094)", "($0.095)", 1), "unexpected Flash 4k": strings.Replace(text, "0.6 Units ($0.094) /s | - | - |", "0.6 Units ($0.094) /s | - | 2 Units ($0.3) /s |", 1),
+		"4k input branches diverge":    strings.Replace(text, "($0.329)", "($0.399)", 1),
+		"HDR missing surcharge marker": strings.Replace(text, "+ 0.3 Units", "0.3 Units", 1),
+		"HDR charged on input":         strings.Replace(text, "HDR billing duration = Output duration", "HDR billing duration = Input duration", 1),
+		"unknown HDR 720p":             strings.Replace(text, "| - | + 0.3 Units", "| + 0.1 Units ($0.01) /s | + 0.3 Units", 1),
+		"missing HDR fee":              strings.Replace(text, "+ 0.5 Units ($0.078) /s", "-", 1),
 	}
 	for _, line := range strings.Split(text, "\n") {
 		if strings.HasPrefix(line, "| Kling 3.0 | No Native Audio") {
@@ -384,7 +392,7 @@ func TestCatalogRateRequestRejectsUnreviewedSelectors(t *testing.T) {
 func TestPublishedSelectorIsolationAndDeduplication(t *testing.T) {
 	entries := pricingEntries(t, "video")
 	a := &Adapter{}
-	for _, id := range []string{ImageToVideo26, OmniVideo3, OmniVideo4} {
+	for _, id := range []string{ImageToVideo26, OmniVideo3, OmniVideo4, TextToVideo4, ImageToVideo4} {
 		m, _ := pricingModel(id)
 		for _, selected := range entries[id].Rates {
 			r, err := a.CatalogRateRequest(m, selected)
@@ -501,5 +509,48 @@ func TestPublishedRateUpdateKeepsUnknownQuantityUnpriced(t *testing.T) {
 	}
 	if !checked {
 		t.Fatal("updated conditional tariff missing")
+	}
+}
+
+func TestKling4OmniPublishedTariffEvidence(t *testing.T) {
+	source, body := pricingFixture(t, "video")
+	// Both published header casings denote the same reviewed columns.
+	upper := strings.NewReplacer("Price (720p)", "Price (720P)", "Price (1080p)", "Price (1080P)").Replace(body)
+	for _, text := range []string{body, upper} {
+		entries, err := interpretPrices(source, text)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, entry := range entries {
+			if entry.ID != OmniVideo4 {
+				continue
+			}
+			if len(entry.Rates) != 10 {
+				t.Fatal("missing exact Omni tariffs", entry.Rates)
+			}
+			var tariffs []klingPublishedTariff
+			if err := json.Unmarshal(entry.OperationalFields["kling_tariff_contract"], &tariffs); err != nil {
+				t.Fatal(err)
+			}
+			inputRows, hdrRows := 0, 0
+			for _, fact := range tariffs {
+				r := fact.Rate
+				switch {
+				case r.Resolution == "4k" && r.VideoInput != nil && *r.VideoInput:
+					if r.Price != 329000 || r.DurationBillingRule != "output_plus_max_input_output" || fact.UnavailableReason != "" {
+						t.Fatal(fact)
+					}
+					inputRows++
+				case fact.OutputSecondSurcharge:
+					if r.Parameters["dynamic_range"] != "hdr" || fact.UnavailableReason != "" || r.Price != map[string]money.USD{"1080p": 47000, "4k": 78000}[r.Resolution] {
+						t.Fatal(fact)
+					}
+					hdrRows++
+				}
+			}
+			if inputRows != 2 || hdrRows != 2 {
+				t.Fatalf("input rows %d, HDR rows %d", inputRows, hdrRows)
+			}
+		}
 	}
 }

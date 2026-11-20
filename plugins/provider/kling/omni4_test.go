@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -420,6 +421,63 @@ func TestOmni4ResourceMetadataRejectsKnownContradictions(t *testing.T) {
 			tc.edit(&r)
 			if err := validateOmni4(omni4Model(), r); !errors.Is(err, core.ErrOptionsInvalid) {
 				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestOmni4HDRBillsSeparateOutputSeconds(t *testing.T) {
+	const video = "https://cdn.example/input.mp4"
+	for _, tc := range []struct {
+		input, reportedInput string
+		expected, metered    int64
+	}{
+		{"3", "3.50", 3680000, 3680000}, // Two times five base seconds plus five HDR seconds.
+		{"5", "5.00", 3680000, 3680000},
+		{"6", "6.00", 4009000, 4009000}, // Published 4K example.
+		{"6", "7.25", 4009000, 4420250}, // Meter provider-normalized input.
+		{"6", "", 4009000, 0}, {"6", "malformed", 4009000, 0},
+	} {
+		t.Run(tc.input+"/"+tc.reportedInput, func(t *testing.T) {
+			input, err := strconv.ParseFloat(tc.input, 64)
+			if err != nil {
+				t.Fatal(err)
+			}
+			r := core.MediaRequest{Model: OmniVideo4, Prompt: "Fixture", Options: core.MediaOptions{Duration: 5, Resolution: "4k", Parameters: map[string]any{"dynamic_range": "hdr"}, VideoURLs: []string{video}, ReferenceMediaEvidence: map[string]core.InputMediaEvidence{video: {Type: "video", Duration: input}}}}
+			a := adapter(t, func(req *http.Request) (*http.Response, error) {
+				if req.Method == "POST" {
+					var body omni4Payload
+					if req.URL.Path != "/omni-video/kling-4.0" || json.NewDecoder(req.Body).Decode(&body) != nil || body.Settings.Resolution != "4k" || body.Settings.DynamicRange != "hdr" || len(body.Contents) != 2 || body.Contents[1].Type != "feature_video" {
+						t.Fatal(req.URL, body)
+					}
+					return response(200, `{"code":0,"data":{"id":"omni4","status":"submitted"}}`), nil
+				}
+				return response(200, fmt.Sprintf(`{"code":0,"data":[{"id":"omni4","status":"succeeded","usage":{"input_duration":%q,"output_duration":"5"},"outputs":[{"type":"video","url":"https://cdn.example/output.mp4","duration":"5.75"}]}]}`, tc.reportedInput)), nil
+			})
+			ctx := context.Background()
+			cost, _, err := a.Quote(ctx, core.MediaModel{}, r)
+			if err != nil || int64(cost.ExpectedUSD) != tc.expected || len(cost.Pricing.Components) != 2 || cost.Pricing.Components[0].Price != 329000 || cost.Pricing.Components[1].Price != 78000 {
+				t.Fatal(cost, err)
+			}
+			encoded, err := json.Marshal(cost)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var accepted core.TaskCost
+			if err := json.Unmarshal(encoded, &accepted); err != nil {
+				t.Fatal(err)
+			}
+			task, err := a.Generate(ctx, r)
+			if err != nil {
+				t.Fatal(err)
+			}
+			result, err := a.GetTask(core.WithProviderPollRequest(ctx, r), task.ID)
+			if err != nil || result.Status != core.ProviderSucceeded || result.Artifacts[0].Duration != 5.75 || result.Usage == nil {
+				t.Fatal(result, err)
+			}
+			metered := accepted.MeterUsage(*result.Usage)
+			if metered != (tc.metered != 0) || metered && int64(*accepted.MeteredUSD) != tc.metered || accepted.ActualUSD != nil {
+				t.Fatal(accepted, result.Usage)
 			}
 		})
 	}

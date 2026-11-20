@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/Sociaro-Research/open-media-gateway/internal/money"
+	"math"
 	"time"
 )
 
@@ -19,6 +20,10 @@ var (
 // PricingSnapshot is immutable once a task is accepted. The same tariff is used
 // to price the provider's reported billable units, independently of later updates.
 type PricingSnapshot struct {
+	// Used while selecting a catalogue rate for this quote. The accepted
+	// snapshot retains the resulting price and needs no selectors for metering.
+	RequiredCatalogParameters map[string]string `json:"-"`
+
 	AccountSpecific     bool               `json:"account_specific,omitempty"` // Explicit account tariff; public catalogue rates must not replace it.
 	EstimateDescription string             `json:"estimate_description,omitempty"`
 	Components          []PricingComponent `json:"components,omitempty"`
@@ -105,7 +110,7 @@ func (c *TaskCost) MeterUsage(usage ProviderUsage) bool {
 					continue
 				}
 				part, err := component.Price.Multiply(metric.Quantity, component.Per)
-				if err != nil {
+				if err != nil || amount > money.USD(math.MaxInt64)-part {
 					return false
 				}
 				amount += part

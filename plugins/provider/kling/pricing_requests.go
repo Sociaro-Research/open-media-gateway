@@ -22,7 +22,18 @@ func (a *Adapter) CatalogRateRequest(model core.MediaModel, rate catalogsync.Rat
 	if rate.VideoInputIncludesResources && m.ID != OmniVideo4 && m.ID != OmniVideo4Flash {
 		return core.MediaRequest{}, errors.New("unreviewed video-resource tariff condition")
 	}
-	if rate.Region != "Singapore" || rate.InputImages != nil || len(rate.Components) > 0 || rate.Quality != "" || rate.ValidateConditions() != nil {
+	inputHDR := m.ID == OmniVideo4 && rate.Parameters["dynamic_range"] == "hdr" && rate.VideoInput != nil && *rate.VideoInput
+	if inputHDR {
+		if !rate.VideoInputIncludesResources || rate.DurationBillingRule != kling4InputBilling || len(rate.Components) != 2 {
+			return core.MediaRequest{}, errors.New("unreviewed Kling HDR input billing formula")
+		}
+		// The first component prices total billable seconds, the second output seconds.
+		base, fee := rate.Components[0], rate.Components[1]
+		if base.Metric != billedVideoMetric || base.Per != 1 || base.Price != rate.Price || base.Price <= 0 || fee.Metric != "output_video_duration" || fee.Per != 1 || fee.Price <= 0 {
+			return core.MediaRequest{}, errors.New("unreviewed Kling HDR price components")
+		}
+	}
+	if rate.Region != "Singapore" || rate.InputImages != nil || !inputHDR && len(rate.Components) > 0 || rate.Quality != "" || rate.ValidateConditions() != nil {
 		return core.MediaRequest{}, errors.New("unreviewed Kling tariff selector or region")
 	}
 	r := core.MediaRequest{Model: m.ID, TaskID: "d45de672-3245-49b7-85b5-410d89a284bf", Prompt: "Synthetic catalogue pricing schema probe", Options: core.MediaOptions{Parameters: map[string]any{}, ReferenceRoles: map[string]string{}}}

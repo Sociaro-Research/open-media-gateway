@@ -34,10 +34,12 @@ concrete connection prefix, for example `kling/kling-4.0-omni-video`.
 | Internal input preparation | Element/voice creation, editing initialization and selections, scoped to an authorized media consumer | [Elements](https://kling.ai/document-api/api/video/4-0/elements.md), [Voices](https://kling.ai/document-api/api/video/4-0/voice-customization.md) |
 
 Use the authorized `/v1/models` response for exact operation IDs, controls,
-reference modes, resource schemas and price availability. Capability maps do not
-override specific endpoint contracts:4.0's direct API currently exposes720p and
-1080p. Flash has its own reviewed routes and 720p-only contract. No undocumented
-4K parameter is synthesized.
+reference modes, resource schemas and price availability. Standard 4.0 text-to-video, image-to-video and Omni accept 720p,
+1080p (default) and 4k. Set `options.parameters.dynamic_range` to `hdr` at 1080p or 4k.
+Omitting it selects SDR. Flash supports 720p SDR.
+[Text-to-video](https://kling.ai/document-api/api/video/4-0/text-to-video.md),
+[image-to-video](https://kling.ai/document-api/api/video/4-0/image-to-video.md)
+and [Omni](https://kling.ai/document-api/api/video/4-0/video-omni.md).
 
 ## Kling 4.0 Flash
 
@@ -246,10 +248,21 @@ Published USD Balance prices are synchronized from the separate official
 Units, USD/CNY cash, list prices, discounts and actual invoices remain separate.
 Never apply one universal Unit-to-USD conversion.
 
-4Omni without video input costs output seconds×USD0.157at720p or0.235at1080p.
-With reference/base/video-Element input, billed seconds are
-`output + max(total_input, output)`, atUSD0.094/0.141 respectively. Missing Element
-duration cannot be guessed.3Omni's resource tariff rules remain separate.
+For standard 4.0 text-to-video and image-to-video, the SDR base prices per
+output second are $0.157 at 720p, $0.235 at 1080p and $0.549 at 4k.
+HDR adds $0.047 at 1080p or $0.078 at 4k per output second. At completion
+the gateway meters the provider’s `usage.output_duration`. A missing billing
+duration leaves usage unpriced and the generated file available.
+[Video pricing](https://kling.ai/document-api/pricing/base/video.md).
+
+Omni 4.0 uses the same no-video-input prices. With a reference video, base
+video or video-character element, its base prices are $0.094 at 720p, $0.141
+at 1080p and $0.329 at 4k per billable second. Billable seconds equal
+`output + max(input, output)`. HDR adds the same per-output-second fee as the
+other standard routes. A six-second input and five-second 4k HDR output
+therefore cost `11 × $0.329 + 5 × $0.078 = $4.009` at list price.
+Estimates require inspected input duration. Metering uses the provider's
+reported input and output billing durations.
 Images charge per output image; fixed series count overrides `n`, while automatic
 series count is unknown in advance. AI Multi-Shot instead charges per call.
 
@@ -264,7 +277,9 @@ optional `effect_prices` (`KLING_EFFECT_PRICES`) JSON object mapping exact
 catalogue `effect_scene` keys to positive decimal USD/request strings. Unknown
 scene keys, duplicates and malformed prices are rejected. Leaving a scene
 unpriced keeps it unavailable; no template-dependent fee is guessed. Existing
-`kling4_720p_price`/`kling4_1080p_price` USD/second overrides remain supported.
+`kling4_720p_price`/`kling4_1080p_price` USD/second overrides apply to SDR. For standard 4.0 generation without video input, the adapter also supports `kling4_4k_price` for SDR and separate all-in
+`kling4_1080p_hdr_price` and `kling4_4k_hdr_price` overrides for HDR.
+A mode without its own override uses its published price.
 
 All required normalized outputs are archived before success: multiple images/audio,
 recognition JSON, masks, previews and supported watermarked variants. The

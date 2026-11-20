@@ -15,6 +15,9 @@ import (
 )
 
 const (
+	kling4HDRRow         = "Kling 4.0|HDR Output (Additional charges apply when HDR is enabled)"
+	kling4HDRBilling     = "Per second (HDR billing duration = Output duration<br>When HDR is enabled, an additional HDR fee is charged on top of the base cost shown above)"
+	videoPriceHeader     = "Model|Features|Billing Type|Price (720p)|Price (1080p)|Price (4K)"
 	imagePriceSource     = docsBase + "pricing/base/image"
 	ecommercePriceSource = docsBase + "pricing/solutions/ecommerce"
 	effectsPriceSource   = docsBase + "pricing/solutions/effects"
@@ -25,11 +28,12 @@ var klingPriceCell = regexp.MustCompile(`^([0-9]+(?:\.[0-9]+)?) Units? \(\$([0-9
 // A reviewed row ties exact native operation IDs to an explicit USD Balance
 // price and typed selectors. Package units remain separately denominated facts.
 type klingPublishedTariff struct {
-	Row               string           `json:"row"`
-	SourceColumn      string           `json:"source_column,omitempty"`
-	PackageUnits      string           `json:"package_units,omitempty"`
-	Rate              catalogsync.Rate `json:"rate"`
-	UnavailableReason string           `json:"unavailable_reason,omitempty"`
+	Row                   string           `json:"row"`
+	SourceColumn          string           `json:"source_column,omitempty"`
+	PackageUnits          string           `json:"package_units,omitempty"`
+	Rate                  catalogsync.Rate `json:"rate"`
+	OutputSecondSurcharge bool             `json:"output_second_surcharge,omitempty"`
+	UnavailableReason     string           `json:"unavailable_reason,omitempty"`
 }
 type klingPriceVariant struct {
 	ids    []string
@@ -68,10 +72,13 @@ func videoPriceTables() []klingPriceTable {
 			klingPriceVariant{ids: []string{TextToVideo4Flash, ImageToVideo4Flash}, rate: catalogsync.Rate{VideoInput: priceBool(false)}}, klingPriceVariant{ids: []string{OmniVideo4Flash}, rate: catalogsync.Rate{VideoInput: priceBool(false), VideoInputIncludesResources: true}}),
 		row("Kling 4.0 Flash", "With Input Video (Input Duration ≤ Output Duration) (Input videos include reference videos (feature video and base video), and video character element.)", "Per second (Total duration = Output duration × 2)", "s", flash, klingPriceVariant{ids: []string{OmniVideo4Flash}, rate: catalogsync.Rate{VideoInput: priceBool(true), VideoInputIncludesResources: true, DurationBillingRule: "output_plus_max_input_output"}}),
 		row("Kling 4.0 Flash", "With Input Video (Input Duration > Output Duration) (Input videos include reference videos (feature video and base video), and video character element.)", "Per second (Total duration = Input duration + Output duration)", "s", flash, klingPriceVariant{ids: []string{OmniVideo4Flash}, rate: catalogsync.Rate{VideoInput: priceBool(true), VideoInputIncludesResources: true, DurationBillingRule: "output_plus_max_input_output"}}),
-		row("Kling 4.0", "No Input Video (Input videos include reference videos (feature video and base video), and video character element.)", out, "s", low,
-			klingPriceVariant{ids: []string{TextToVideo4, ImageToVideo4}, rate: catalogsync.Rate{VideoInput: priceBool(false)}}, klingPriceVariant{ids: []string{OmniVideo4}, rate: catalogsync.Rate{VideoInput: priceBool(false), VideoInputIncludesResources: true}}),
-		row("Kling 4.0", "With Input Video (Input Duration ≤ Output Duration) (Input videos include reference videos (feature video and base video), and video character element.)", "Per second (Total duration = Output duration × 2)", "s", low, klingPriceVariant{ids: []string{OmniVideo4}, rate: catalogsync.Rate{VideoInput: priceBool(true), VideoInputIncludesResources: true, DurationBillingRule: "output_plus_max_input_output"}}),
-		row("Kling 4.0", "With Input Video (Input Duration > Output Duration) (Input videos include reference videos (feature video and base video), and video character element.)", "Per second (Total duration = Input duration + Output duration)", "s", low, klingPriceVariant{ids: []string{OmniVideo4}, rate: catalogsync.Rate{VideoInput: priceBool(true), VideoInputIncludesResources: true, DurationBillingRule: "output_plus_max_input_output"}}),
+		row("Kling 4.0", "No Input Video (Input videos include reference videos (feature video and base video), and video character element.)", out, "s", columns,
+			klingPriceVariant{ids: []string{TextToVideo4, ImageToVideo4}, rate: catalogsync.Rate{VideoInput: priceBool(false), Parameters: map[string]string{"dynamic_range": "sdr"}}}, klingPriceVariant{ids: []string{OmniVideo4}, rate: catalogsync.Rate{VideoInput: priceBool(false), Parameters: map[string]string{"dynamic_range": "sdr"}, VideoInputIncludesResources: true}}),
+		row("Kling 4.0", "With Input Video (Input Duration ≤ Output Duration) (Input videos include reference videos (feature video and base video), and video character element.)", "Per second (Total duration = Output duration × 2)", "s", columns, klingPriceVariant{ids: []string{OmniVideo4}, rate: catalogsync.Rate{VideoInput: priceBool(true), Parameters: map[string]string{"dynamic_range": "sdr"}, VideoInputIncludesResources: true, DurationBillingRule: "output_plus_max_input_output"}}),
+		row("Kling 4.0", "With Input Video (Input Duration > Output Duration) (Input videos include reference videos (feature video and base video), and video character element.)", "Per second (Total duration = Input duration + Output duration)", "s", columns, klingPriceVariant{ids: []string{OmniVideo4}, rate: catalogsync.Rate{VideoInput: priceBool(true), Parameters: map[string]string{"dynamic_range": "sdr"}, VideoInputIncludesResources: true, DurationBillingRule: "output_plus_max_input_output"}}),
+		{key: kling4HDRRow, billing: kling4HDRBilling, suffix: "s", columns: map[int]string{4: "1080p", 5: "4k"}, variants: []klingPriceVariant{
+			{ids: []string{TextToVideo4, ImageToVideo4, OmniVideo4}, rate: catalogsync.Rate{Parameters: map[string]string{"dynamic_range": "hdr"}}},
+		}},
 		row("Kling 3.0 Turbo", "With Native Audio", out, "s", low, priceVideoVariants([]string{TextToVideo3Turbo, ImageToVideo3Turbo}, nil, false)...),
 		row("Kling 3.0", "No Native Audio", out, "s", columns, priceVideoVariants([]string{TextToVideo, ImageToVideo}, priceBool(false), false)...),
 		row("Kling 3.0", "With Native Audio", out, "s", columns, priceVideoVariants([]string{TextToVideo, ImageToVideo}, priceBool(true), false)...),
@@ -105,7 +112,7 @@ func videoPriceTables() []klingPriceTable {
 		row("Audio Generation", "Custom Voice", "Per request", "call", call, klingPriceVariant{ids: []string{ResourceCreateVoice}}),
 		row("Image Recognition", "Image Recognition", "Per request", "call", call, klingPriceVariant{ids: []string{ImageRecognition}}),
 	)
-	return []klingPriceTable{{header: "Model|Features|Billing Type|Price (720P)|Price (1080P)|Price (4K)", rows: rows}}
+	return []klingPriceTable{{header: videoPriceHeader, rows: rows}}
 }
 func imagePriceTables() []klingPriceTable {
 	row := func(model, function, resolution string, ids []string, input *bool) klingPriceRow {
@@ -274,6 +281,7 @@ func interpretPrices(source catalogsync.Source, text string) ([]catalogsync.Entr
 	selectors := map[string]map[string]catalogsync.Rate{}
 	seen := map[string]bool{}
 	active := -1
+	var sourceColumns []string
 	for lineIndex, line := range strings.Split(text, "\n") {
 		if !strings.HasPrefix(strings.TrimSpace(line), "|") {
 			continue
@@ -285,8 +293,9 @@ func interpretPrices(source catalogsync.Source, text string) ([]catalogsync.Entr
 		header := strings.Join(cells, "|")
 		matchedHeader := false
 		for i, t := range tables {
-			if header == t.header {
+			if header == t.header || t.header == videoPriceHeader && header == "Model|Features|Billing Type|Price (720P)|Price (1080P)|Price (4K)" {
 				active = i
+				sourceColumns = cells
 				matchedHeader = true
 				break
 			}
@@ -344,9 +353,18 @@ func interpretPrices(source catalogsync.Source, text string) ([]catalogsync.Entr
 			if canonical == imagePriceSource && row.variants[0].ids[0] != MultiImage21 && row.variants[0].ids[0] != ImageOutpainting && row.variants[0].ids[0] != ImageMultiShot {
 				resolutions = strings.Split(strings.ToLower(cells[2]), "、")
 			}
+			priceCell := cells[column]
+			isSurcharge := key == kling4HDRRow
+			if isSurcharge {
+				var ok bool
+				priceCell, ok = strings.CutPrefix(priceCell, "+ ")
+				if !ok {
+					return nil, errors.New("Kling HDR tariff must be an explicit additional output-second fee")
+				}
+			}
 			for _, resolution := range resolutions {
 				for _, variant := range row.variants {
-					rate, units, err := klingPriceRate(source.URL, cells[column], row.suffix, resolution, variant.rate)
+					rate, units, err := klingPriceRate(source.URL, priceCell, row.suffix, resolution, variant.rate)
 					if err != nil {
 						return nil, err
 					}
@@ -355,8 +373,8 @@ func interpretPrices(source catalogsync.Source, text string) ([]catalogsync.Entr
 							entries[id] = &catalogsync.Entry{ID: id}
 							selectors[id] = map[string]catalogsync.Rate{}
 						}
-						contracts[id] = append(contracts[id], klingPublishedTariff{Row: key, SourceColumn: strings.Split(t.header, "|")[column], PackageUnits: units, Rate: rate, UnavailableReason: variant.reason})
-						if variant.reason != "" {
+						contracts[id] = append(contracts[id], klingPublishedTariff{Row: key, SourceColumn: sourceColumns[column], PackageUnits: units, Rate: rate, OutputSecondSurcharge: isSurcharge, UnavailableReason: variant.reason})
+						if variant.reason != "" || isSurcharge {
 							continue
 						}
 						selector := klingRateKey(rate)
@@ -391,6 +409,11 @@ func interpretPrices(source catalogsync.Source, text string) ([]catalogsync.Entr
 	sort.Strings(ids)
 	for _, id := range ids {
 		e := entries[id]
+		if isKling4(id) || id == OmniVideo4 {
+			if err := addKling4HDRRates(e, contracts[id]); err != nil {
+				return nil, err
+			}
+		}
 		if len(contracts[id]) > 0 {
 			raw, _ := json.Marshal(contracts[id])
 			e.OperationalFields = map[string]json.RawMessage{"kling_tariff_contract": raw}
@@ -421,4 +444,32 @@ func interpretPrices(source catalogsync.Source, text string) ([]catalogsync.Entr
 		result = append(result, *e)
 	}
 	return result, nil
+}
+
+// A fee is a second price dimension. Collapse it into a scalar only when
+// both charges have the same quantity (no input video).
+func addKling4HDRRates(entry *catalogsync.Entry, facts []klingPublishedTariff) error {
+	baseRates := entry.Rates
+	for _, fee := range facts {
+		if !fee.OutputSecondSurcharge {
+			continue
+		}
+		for _, base := range baseRates {
+			if base.Resolution != fee.Rate.Resolution || base.Parameters["dynamic_range"] != "sdr" || base.VideoInput == nil {
+				continue
+			}
+			if *base.VideoInput {
+				base.Components = kling4HDRComponents(base.Price, fee.Rate.Price, 0, 0)
+			} else {
+				price, err := kling4TotalRate(base.Price, fee.Rate.Price)
+				if err != nil {
+					return err
+				}
+				base.Price = price
+			}
+			base.Parameters = map[string]string{"dynamic_range": "hdr"}
+			entry.Rates = append(entry.Rates, base)
+		}
+	}
+	return nil
 }

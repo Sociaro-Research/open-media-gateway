@@ -98,7 +98,7 @@ func TestKling4ValidationPublishedPricesAndAccountOverrides(t *testing.T) {
 		}
 	}
 	for name, mutate := range map[string]func(*core.MediaRequest){
-		"4k absent from API":               func(r *core.MediaRequest) { r.Options.Resolution = "4k" },
+		"unsupported resolution":           func(r *core.MediaRequest) { r.Options.Resolution = "8k" },
 		"long duration":                    func(r *core.MediaRequest) { r.Options.Duration = 31 },
 		"audio switch absent from API":     func(r *core.MediaRequest) { r.Options.GenerateAudio = ptr(false) },
 		"multi shot field absent from API": func(r *core.MediaRequest) { r.Options.Parameters = map[string]any{"multi_shot": true} },
@@ -162,5 +162,103 @@ func TestReferencePromptMetadataMatchesReviewedKlingRoutes(t *testing.T) {
 	}
 	if Definition().Profiles != nil {
 		t.Fatal("Kling routes must not enable generic manual model overrides")
+	}
+}
+
+func TestKling4DynamicRangeRequestAndBilling(t *testing.T) {
+	for _, id := range []string{TextToVideo4, ImageToVideo4} {
+		for _, tc := range []struct {
+			res, dynamicRange string
+			micros            int64
+		}{
+			{"", "", 235000}, {"720p", "sdr", 157000}, {"1080p", "hdr", 282000},
+			{"4k", "", 549000}, {"4k", "sdr", 549000}, {"4k", "hdr", 627000},
+		} {
+			t.Run(id+"/"+tc.res+"/"+tc.dynamicRange, func(t *testing.T) {
+				r := core.MediaRequest{Model: id, Prompt: "Test video", Options: core.MediaOptions{Resolution: tc.res, Duration: 5}}
+				path := "/text-to-video/kling-4.0"
+				if id == ImageToVideo4 {
+					path = "/image-to-video/kling-4.0"
+					r.Options.ImageURLs = []string{"https://cdn.example/first.png"}
+				}
+				if tc.dynamicRange != "" {
+					r.Options.Parameters = map[string]any{"dynamic_range": tc.dynamicRange}
+				}
+				a := adapter(t, func(req *http.Request) (*http.Response, error) {
+					if req.Method == "GET" {
+						return response(200, `{"code":0,"data":[{"id":"video4","status":"succeeded","usage":{"output_duration":"4","input_duration":"99.50"},"outputs":[{"type":"video","url":"https://cdn.example/result.mp4","duration":"4.7"}]}]}`), nil
+					}
+					var body struct{ Settings map[string]any }
+					if req.URL.Path != path || json.NewDecoder(req.Body).Decode(&body) != nil {
+						t.Fatal(req.URL.Path, body)
+					}
+					res := tc.res
+					if res == "" {
+						res = "1080p"
+					}
+					value, present := body.Settings["dynamic_range"]
+					if body.Settings["resolution"] != res || present != (tc.dynamicRange != "") || present && value != tc.dynamicRange {
+						t.Fatal(body)
+					}
+					return response(200, `{"code":0,"data":{"id":"video4","status":"submitted"}}`), nil
+				})
+				ctx := context.Background()
+				cost, _, err := a.Quote(ctx, core.MediaModel{}, r)
+				if err != nil || int64(cost.ExpectedUSD) != 5*tc.micros {
+					t.Fatal(cost, err)
+				}
+				task, err := a.Generate(ctx, r)
+				if err != nil {
+					t.Fatal(err)
+				}
+				result, err := a.GetTask(core.WithProviderPollRequest(ctx, r), task.ID)
+				if err != nil || len(result.Artifacts) != 1 || result.Artifacts[0].Duration != 4.7 || result.Usage == nil || !cost.MeterUsage(*result.Usage) || *cost.BilledUnits != 4 || int64(*cost.MeteredUSD) != 4*tc.micros || cost.ActualUSD != nil {
+					t.Fatal(result, cost, err)
+				}
+			})
+		}
+	}
+}
+
+func TestKling4MissingBillableOutputPreservesMedia(t *testing.T) {
+	for _, usage := range []string{`{}`, `{"output_duration":"bad"}`, `{"output_duration":"0"}`} {
+		a := adapter(t, func(*http.Request) (*http.Response, error) {
+			return response(200, fmt.Sprintf(`{"code":0,"data":[{"id":"video4","status":"succeeded","usage":%s,"outputs":[{"type":"video","url":"https://cdn.example/result.mp4","duration":"5"}]}]}`, usage)), nil
+		})
+		r := core.MediaRequest{Model: TextToVideo4, Prompt: "Test", Options: core.MediaOptions{Parameters: map[string]any{"dynamic_range": "hdr"}}}
+		cost, _, err := a.Quote(context.Background(), core.MediaModel{}, r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		result, err := a.GetTask(core.WithProviderPollRequest(context.Background(), r), "video4")
+		if err != nil || result.Status != core.ProviderSucceeded || result.Artifacts[0].Duration != 5 || result.Usage != nil && cost.MeterUsage(*result.Usage) || cost.MeteredUSD != nil {
+			t.Fatal(result, cost, err)
+		}
+	}
+}
+
+func TestKling4RejectsUnsupportedRangeBeforeDispatch(t *testing.T) {
+	a := adapter(t, func(*http.Request) (*http.Response, error) {
+		t.Fatal("invalid settings reached provider")
+		return nil, nil
+	})
+	for _, tc := range []struct{ id, res, dr string }{
+		{TextToVideo4, "720p", "hdr"}, {ImageToVideo4, "720p", "hdr"}, {TextToVideo4, "4k", "auto"},
+		{TextToVideo4Flash, "720p", "hdr"}, {ImageToVideo4Flash, "4k", ""}, {OmniVideo4Flash, "720p", "hdr"},
+		{OmniVideo4, "720p", "hdr"}, {OmniVideo4, "4k", "invalid"},
+	} {
+		r := core.MediaRequest{Model: tc.id, Prompt: "Test", Options: core.MediaOptions{Resolution: tc.res, Duration: 5}}
+		if tc.id == ImageToVideo4 || tc.id == ImageToVideo4Flash {
+			r.Options.ImageURLs = []string{"https://cdn.example/first.png"}
+		}
+		if tc.dr != "" {
+			r.Options.Parameters = map[string]any{"dynamic_range": tc.dr}
+		}
+		if _, err := a.Generate(pricingProbeContext(), r); !errors.Is(err, core.ErrOptionsInvalid) {
+			t.Fatal(tc, err)
+		}
+		if _, _, err := a.Quote(pricingProbeContext(), core.MediaModel{}, r); !errors.Is(err, core.ErrOptionsInvalid) {
+			t.Fatal(tc, err)
+		}
 	}
 }
