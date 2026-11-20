@@ -32,8 +32,9 @@ func (s diagnosticService) GetTask(context.Context, string) (core.Task, error) {
 func (s diagnosticService) ListTasks(context.Context, int) ([]core.Task, error) {
 	return []core.Task{s.task}, nil
 }
-func (s diagnosticService) ListProviders(context.Context) []core.ProviderDescriptor { return nil }
-func (s diagnosticService) Info() core.ServiceInfo                                  { return core.ServiceInfo{} }
+func (s diagnosticService) ProviderModels(context.Context, string) []core.MediaModel { return nil }
+func (s diagnosticService) ListProviders(context.Context) []core.ProviderDescriptor  { return nil }
+func (s diagnosticService) Info() core.ServiceInfo                                   { return core.ServiceInfo{} }
 
 type diagnosticHealth struct{}
 

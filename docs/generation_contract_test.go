@@ -87,6 +87,9 @@ type documentedCountService struct {
 	created int
 }
 
+func (s *documentedCountService) ProviderModels(context.Context, string) []core.MediaModel {
+	return nil
+}
 func (s *documentedCountService) ListProviders(context.Context) []core.ProviderDescriptor {
 	return []core.ProviderDescriptor{{ID: "fixture", Models: []core.MediaModel{{
 		ID: "image", MediaType: "image", MaxOutputs: s.maximum,

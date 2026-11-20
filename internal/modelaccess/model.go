@@ -36,7 +36,7 @@ type Access struct {
 
 type Store interface {
 	Ensure(context.Context, []Ref) error
-	List(context.Context, string) ([]Model, error)
+	List(ctx context.Context, organization string, providers ...string) ([]Model, error)
 	Update(context.Context, string, string, Update) (Model, error)
 	Organization(context.Context, string, string) (Access, error)
 	SaveOrganization(context.Context, string, string, Access) (Access, error)

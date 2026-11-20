@@ -467,6 +467,9 @@ func (s *accountService) Estimate(ctx context.Context, input core.CreateMediaInp
 	}
 	return core.CostEstimate{Cost: core.FreeCost(time.Now().UTC()), CanGenerate: true}, nil
 }
+func (s *accountService) ProviderModels(ctx context.Context, id string) []core.MediaModel {
+	return fixtureProviderModels(ctx, s, id)
+}
 func (s *accountService) ListProviders(ctx context.Context) []core.ProviderDescriptor {
 	models, _ := mock.New(0, "").ListModels(ctx)
 	return []core.ProviderDescriptor{{ID: "mock", Name: "Test provider", DefaultModel: "mock-video-v1", CredentialsConfigured: true, Models: models}}

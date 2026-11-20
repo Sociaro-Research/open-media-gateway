@@ -33,6 +33,9 @@ type logoBrowserService struct {
 	manager *providers.Manager
 }
 
+func (s logoBrowserService) ProviderModels(ctx context.Context, id string) []core.MediaModel {
+	return fixtureProviderModels(ctx, s, id)
+}
 func (s logoBrowserService) ListProviders(ctx context.Context) []core.ProviderDescriptor {
 	items, err := s.manager.List(ctx)
 	if err != nil {

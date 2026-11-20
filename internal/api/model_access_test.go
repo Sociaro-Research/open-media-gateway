@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 
@@ -40,13 +41,17 @@ func (m *modelAccessMemory) Ensure(_ context.Context, refs []modelaccess.Ref) er
 	}
 	return nil
 }
-func (m *modelAccessMemory) List(_ context.Context, org string) ([]modelaccess.Model, error) {
+func (m *modelAccessMemory) List(_ context.Context, org string, providers ...string) ([]modelaccess.Model, error) {
 	if m.fail {
 		return nil, errors.New("unavailable")
 	}
-	result := append([]modelaccess.Model{}, m.models...)
-	for i := range result {
-		result[i].Granted = m.org[org][result[i].ID]
+	result := []modelaccess.Model{}
+	for _, model := range m.models {
+		if len(providers) != 0 && !slices.Contains(providers, model.Provider) {
+			continue
+		}
+		model.Granted = m.org[org][model.ID]
+		result = append(result, model)
 	}
 	return result, nil
 }

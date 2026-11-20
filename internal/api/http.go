@@ -40,6 +40,7 @@ type Service interface {
 	GetTask(context.Context, string) (core.Task, error)
 	ListTasks(context.Context, int) ([]core.Task, error)
 	ListProviders(context.Context) []core.ProviderDescriptor
+	ProviderModels(context.Context, string) []core.MediaModel
 	Info() core.ServiceInfo
 }
 

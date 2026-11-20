@@ -86,13 +86,28 @@ func TestProviderLogoRemovalAuthorizationScopeFailureAndIdempotency(t *testing.T
 	}
 }
 
+// A denied logo read must stop before protected bytes are fetched.
+func (f *logoReadRepository) checkRead(t *testing.T, h http.Handler, path, actor, key string, status int) {
+	t.Helper()
+	before := len(f.reads)
+	w := sendTest(h, "GET", path, "", actor, key)
+	wantReads := 0
+	if status == http.StatusOK {
+		wantReads = 1
+	}
+	t.Logf("GET %s: status=%d blob reads=%d", path, w.Code, len(f.reads)-before)
+	if w.Code != status || len(f.reads)-before != wantReads {
+		t.Fatalf("GET %s: status=%d reads=%d, want status=%d reads=%d", path, w.Code, len(f.reads)-before, status, wantReads)
+	}
+}
+
 func TestProviderLogoReadResourceModesAndRevokedVisibility(t *testing.T) {
 	s, keys := newPersonalTestServer()
 	settings := system.Defaults()
 	settings.SharedResources = false
 	sys := &systemFixture{settings: settings, admins: map[string]bool{"alice": true}}
 	s.system = sys
-	s.providerAdmin = &logoAdminFixture{logos: map[string][]byte{"bob:mock": {1}, identity.SharedOwnerID + ":mock": {2}}}
+	logos := managedLogoFixture(s, map[logoKey][]byte{{"bob", "mock"}: {1}, {identity.SharedOwnerID, "mock"}: {2}})
 	h := s.handler()
 	_, personal := issueTestKey(t, h, "bob", `{"name":"Personal","resource_mode":"personal","scopes":["generation"]}`)
 	sys.settings.SharedResources = true
@@ -104,34 +119,26 @@ func TestProviderLogoReadResourceModesAndRevokedVisibility(t *testing.T) {
 		status   int
 	}{{privateURL, personal, 200}, {sharedURL, shared, 200}, {privateURL, shared, 404}, {sharedURL, personal, 404}} {
 		sys.settings.SharedResources = tc.key == shared
-		if w := sendTest(h, "GET", tc.url, "", "", tc.key); w.Code != tc.status {
-			t.Fatal(tc.url, w.Code, w.Body)
-		}
+		logos.checkRead(t, h, tc.url, "", tc.key, tc.status)
 	}
+	logos.checkRead(t, h, privateURL, "alice", "", 404)
 	sys.settings.SharedResources = true
 	sys.settings.PersonalProviders = false
-	if w := sendTest(h, "GET", privateURL, "", "", personal); w.Code != 404 {
-		t.Fatal("disabled personal logo exposed", w.Code)
-	}
+	logos.checkRead(t, h, privateURL, "", personal, 404)
 	sys.settings.PersonalProviders = true
 	sys.settings.SharedResources = false
-	if w := sendTest(h, "GET", sharedURL, "", "", shared); w.Code != 404 {
-		t.Fatal("disabled shared logo exposed", w.Code)
-	}
+	logos.checkRead(t, h, sharedURL, "", shared, 404)
 	central, err := WithPublicAPI(h, "", installation.DefaultCentralOrigin, "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if w := sendTest(central, "GET", sharedURL, "", "", shared); w.Code != 200 {
-		t.Fatal("central derived shared logo policy", w.Code)
-	}
-	if w := sendTest(central, "GET", privateURL, "", "", personal); w.Code != 404 {
-		t.Fatal("central derived personal logo policy", w.Code)
-	}
+	logos.checkRead(t, central, sharedURL, "", shared, 200)
+	logos.checkRead(t, central, privateURL, "", personal, 404)
 	sys.settings.SharedResources = true
 	policy := &modelAccessMemory{org: map[string]map[string]bool{}}
 	s.modelAccess = policy
-	models := s.service.ListProviders(context.Background())[0].Models
+	ctx := identity.WithResourceOwners(context.Background(), identity.SharedOwnerID, identity.SharedOwnerID)
+	models := s.service.ProviderModels(ctx, "mock")
 	refs := []modelaccess.Ref{}
 	for _, m := range models {
 		refs = append(refs, modelaccess.Ref{Provider: "mock", Model: m.ID})
@@ -140,47 +147,39 @@ func TestProviderLogoReadResourceModesAndRevokedVisibility(t *testing.T) {
 	for i := range policy.models {
 		policy.models[i].EnabledByDefault = false
 	}
-	if w := sendTest(h, "GET", sharedURL, "", "", shared); w.Code != 404 {
-		t.Fatal("model-hidden provider logo exposed", w.Code)
-	}
+	logos.checkRead(t, h, sharedURL, "", shared, 404)
 	// A simultaneous personal browser session must not discard an explicit
 	// organization key's model grants when its catalog logo is loaded.
 	company := "11111111-1111-4111-8111-111111111111"
 	policy.org[company] = map[string]bool{policy.models[0].ID: true}
 	secret := "gw_" + strings.Repeat("a", 43)
-	keys.records = append(keys.records, storedTestKey{owner: "bob", key: apikey.Key{ID: "org-logo-key", ResourceMode: "shared", OrganizationID: company, OrganizationRole: "member", Scopes: []string{apikey.Generation}}, hash: apikey.Hash(secret)})
-	if w := sendTest(h, "GET", sharedURL+"&generation=1", "", "bob", secret); w.Code != 200 {
-		t.Fatal("organization grant lost during logo read", w.Code, w.Body)
-	}
+	keys.records = append(keys.records, storedTestKey{owner: "bob", key: apikey.Key{ID: "org-logo-key", ResourceMode: "shared", OrganizationID: company, OrganizationRole: "member", Scopes: []string{apikey.KeysManage}}, hash: apikey.Hash(secret)})
+	key := &keys.records[len(keys.records)-1].key
+	logos.checkRead(t, h, sharedURL+"&generation=1", "bob", secret, 403)
+	key.Scopes = []string{apikey.Generation}
+	key.OrganizationID = "22222222-2222-4222-8222-222222222222"
+	logos.checkRead(t, h, sharedURL+"&generation=1", "bob", secret, 404)
+	key.OrganizationID = company
+	logos.checkRead(t, h, sharedURL+"&generation=1", "bob", secret, 200)
 	delete(policy.org[company], policy.models[0].ID)
-	if w := sendTest(h, "GET", sharedURL+"&generation=1", "", "bob", secret); w.Code != 404 {
-		t.Fatal("revoked organization grant retained logo", w.Code, w.Body)
-	}
+	logos.checkRead(t, h, sharedURL+"&generation=1", "bob", secret, 404)
 }
 
 func TestCommercialProviderLogoReadRequiresCurrentGrant(t *testing.T) {
 	s, _ := newPersonalTestServer()
 	f := &permissionFixture{salesFixture: &salesFixture{clientManagerFixture: &clientManagerFixture{systemFixture: &systemFixture{settings: system.Defaults(), admins: map[string]bool{"alice": true}}, manager: true, assigned: "11111111-1111-4111-8111-111111111111"}, role: system.ClientManager}, granted: map[string]bool{}}
 	s.system = f
-	s.providerAdmin = &logoAdminFixture{logos: map[string][]byte{identity.SharedOwnerID + ":mock": {1}}}
+	logos := managedLogoFixture(s, map[logoKey][]byte{{identity.SharedOwnerID, "mock"}: {1}})
 	h := s.handler()
 	url := "/provider-assets/" + identity.SharedOwnerID + "/mock/icon.png?v=fixture&organization=" + f.assigned
-	if w := sendTest(h, "GET", url, "", "bob", ""); w.Code != 404 {
-		t.Fatal("ungranted commercial logo", w.Code)
-	}
+	logos.checkRead(t, h, url, "bob", "", 404)
 	f.granted["models"] = true
-	if w := sendTest(h, "GET", url, "", "bob", ""); w.Code != 200 {
-		t.Fatal("granted commercial picker lost logo", w.Code, w.Body)
-	}
+	logos.checkRead(t, h, url, "bob", "", 200)
 	f.granted["models"] = false
 	f.granted["pricing"] = true
-	if w := sendTest(h, "GET", url, "", "bob", ""); w.Code != 200 {
-		t.Fatal("granted markup picker lost logo", w.Code, w.Body)
-	}
+	logos.checkRead(t, h, url, "bob", "", 200)
 	f.granted["pricing"] = false
-	if w := sendTest(h, "GET", url, "", "bob", ""); w.Code != 404 {
-		t.Fatal("revoked grant retained logo", w.Code)
-	}
+	logos.checkRead(t, h, url, "bob", "", 404)
 }
 
 func (f *logoAdminFixture) Logo(ctx context.Context, id string) ([]byte, error) {

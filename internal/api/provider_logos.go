@@ -10,6 +10,7 @@ import (
 	"slices"
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/apikey"
+	"github.com/Sociaro-Research/open-media-gateway/internal/core"
 	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
 	"github.com/Sociaro-Research/open-media-gateway/internal/providerconfig"
 	"github.com/Sociaro-Research/open-media-gateway/internal/system"
@@ -107,19 +108,7 @@ func (s *Server) providerLogo(w http.ResponseWriter, r *http.Request) {
 				allowed = true
 			} else if (!key || owner == identity.ProviderOwnerID(ctx)) && ((owner == identity.SharedOwnerID && settings.SharedResources) || (owner == identity.ActorID(ctx) && settings.PersonalProviders)) {
 				catalogCtx := identity.WithResourceOwners(ctx, owner, identity.StorageOwnerID(ctx))
-				if s.service != nil {
-					catalog, catalogErr := s.applyModelAccess(catalogCtx, s.service.ListProviders(catalogCtx), false)
-					if catalogErr != nil {
-						http.NotFound(w, r)
-						return
-					}
-					for _, provider := range catalog {
-						if provider.ID == r.PathValue("id") {
-							allowed = true
-							break
-						}
-					}
-				}
+				allowed = s.catalogProviderVisible(catalogCtx, r.PathValue("id"))
 			}
 		}
 	}
@@ -139,4 +128,16 @@ func (s *Server) providerLogo(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Content-Security-Policy", "default-src 'none'; sandbox")
 	_, _ = w.Write(data)
+}
+
+func (s *Server) catalogProviderVisible(ctx context.Context, id string) bool {
+	if s.service == nil {
+		return false
+	}
+	models := s.service.ProviderModels(ctx, id)
+	if len(models) == 0 {
+		return false
+	}
+	visible, err := s.applyModelAccess(ctx, []core.ProviderDescriptor{{ID: id, Models: models}}, false)
+	return err == nil && len(visible) != 0
 }
