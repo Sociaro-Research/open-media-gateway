@@ -181,8 +181,10 @@ func (s *Server) applyModelAccess(ctx context.Context, catalog []core.ProviderDe
 		return catalog, nil
 	}
 
+	providers := make([]string, 0, len(catalog))
 	refs := []modelaccess.Ref{}
 	for _, p := range catalog {
+		providers = append(providers, p.ID)
 		for _, m := range p.Models {
 			refs = append(refs, modelaccess.Ref{Provider: p.ID, Model: m.ID, Name: m.DisplayName})
 		}
@@ -190,7 +192,7 @@ func (s *Server) applyModelAccess(ctx context.Context, catalog []core.ProviderDe
 	if err := s.modelAccess.Ensure(ctx, refs); err != nil {
 		return nil, err
 	}
-	settings, err := s.modelAccess.List(ctx, identity.OrganizationFromContext(ctx).ID)
+	settings, err := s.modelAccess.List(ctx, identity.OrganizationFromContext(ctx).ID, providers...)
 	if err != nil {
 		return nil, err
 	}

@@ -703,6 +703,37 @@ func (s *TaskService) findModel(ctx context.Context, provider, model string) (Me
 	return MediaModel{}, false
 }
 
+// ProviderModels returns the available generation models for one catalog ID,
+// before customer pricing, artwork and organization model grants are applied.
+func (s *TaskService) ProviderModels(ctx context.Context, id string) []MediaModel {
+	provider, ok := s.providerFor(ctx, id)
+	// Directory lookups may resolve legacy aliases that the catalog does not list.
+	if !ok || (s.directory != nil && (provider == nil || provider.Name() != id)) {
+		return nil
+	}
+	return s.catalogModels(ctx, id, provider)
+}
+
+func (s *TaskService) catalogModels(ctx context.Context, id string, provider MediaProvider) []MediaModel {
+	if availability, ok := provider.(ProviderAvailability); ok {
+		enabled, configured, err := availability.Availability(ctx)
+		if err != nil || !enabled || !configured {
+			return nil
+		}
+	}
+	var models []MediaModel
+	if catalog, ok := provider.(ModelCatalog); ok {
+		var err error
+		models, err = catalog.ListModels(ctx)
+		if err != nil {
+			return nil
+		}
+	} else {
+		models = []MediaModel{fallbackMediaModel(s.providerDefaults[id])}
+	}
+	return MediaGenerationModels(uniqueModels(models, ""))
+}
+
 func (s *TaskService) ListProviders(ctx context.Context) []ProviderDescriptor {
 	available := s.providers
 	if s.directory != nil {
@@ -728,24 +759,8 @@ func (s *TaskService) ListProviders(ctx context.Context) []ProviderDescriptor {
 
 	result := make([]ProviderDescriptor, 0, len(ids))
 	for _, id := range ids {
-		configured := true
-		if availability, ok := available[id].(ProviderAvailability); ok {
-			enabled, available, err := availability.Availability(ctx)
-			if err != nil || !enabled || !available {
-				continue
-			}
-			configured = available
-		}
 		defaultModel := s.providerDefaults[id]
-		models := []MediaModel{fallbackMediaModel(defaultModel)}
-		if catalog, ok := available[id].(ModelCatalog); ok {
-			listed, err := catalog.ListModels(ctx)
-			if err != nil || len(listed) == 0 {
-				continue
-			}
-			models = listed
-		}
-		models = MediaGenerationModels(uniqueModels(models, ""))
+		models := s.catalogModels(ctx, id, available[id])
 		if len(models) == 0 {
 			continue
 		}
@@ -792,7 +807,7 @@ func (s *TaskService) ListProviders(ctx context.Context) []ProviderDescriptor {
 			name = presentation.DisplayName()
 		}
 		descriptor := ProviderDescriptor{
-			ID: id, Name: name, Live: !ProviderIsFree(available[id]), CredentialsConfigured: configured,
+			ID: id, Name: name, Live: !ProviderIsFree(available[id]), CredentialsConfigured: true,
 			DefaultModel: defaultModel, Models: models,
 		}
 		if artwork, ok := available[id].(interface {

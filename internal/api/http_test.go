@@ -33,6 +33,19 @@ func (s serviceStub) ListProviders(context.Context) []core.ProviderDescriptor {
 	return []core.ProviderDescriptor{{ID: "mock", Name: "Mock", DefaultModel: "mock-video-v1", Models: []core.MediaModel{{ID: "mock-video-v1", MediaType: "video"}, {ID: "mock-image-v1", MediaType: "image"}}}}
 }
 
+func fixtureProviderModels(ctx context.Context, service Service, id string) []core.MediaModel {
+	for _, p := range service.ListProviders(ctx) {
+		if p.ID == id {
+			return p.Models
+		}
+	}
+	return nil
+}
+
+func (s serviceStub) ProviderModels(ctx context.Context, id string) []core.MediaModel {
+	return fixtureProviderModels(ctx, s, id)
+}
+
 type healthStub struct{ err error }
 
 func (h healthStub) Check(context.Context) error { return h.err }

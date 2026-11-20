@@ -112,12 +112,12 @@ func TestModelSettingsPersistenceGrantsAndAdmission(t *testing.T) {
 	if _, err = repo.SaveOrganization(ctx, admin.ID, org.ID, modelaccess.Access{ModelIDs: []string{first.ID}, Version: 1}); !errors.Is(err, system.ErrConflict) {
 		t.Fatal("stale grants overwrite", err)
 	}
-	allowed, err := repo.List(ctx, org.ID)
-	if err != nil || !allowed[0].Granted {
+	allowed, err := repo.List(ctx, org.ID, "mock")
+	if err != nil || len(allowed) != 1 || allowed[0].Provider != "mock" || !allowed[0].Granted {
 		t.Fatal(allowed, err)
 	}
-	denied, err := repo.List(ctx, other.ID)
-	if err != nil || denied[0].Granted {
+	denied, err := repo.List(ctx, other.ID, "mock")
+	if err != nil || len(denied) != 1 || denied[0].Provider != "mock" || denied[0].Granted {
 		t.Fatal("grant leaked", denied, err)
 	}
 	tasks := NewTaskRepository(db)

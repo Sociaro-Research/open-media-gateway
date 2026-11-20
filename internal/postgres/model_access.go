@@ -93,10 +93,16 @@ func (r *SystemRepository) Ensure(ctx context.Context, refs []modelaccess.Ref) e
 	}
 	return tx.Commit()
 }
-func (r *SystemRepository) List(ctx context.Context, org string) ([]modelaccess.Model, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT id,provider,model,name,public_id,enabled_by_default,version,
+func (r *SystemRepository) List(ctx context.Context, org string, providers ...string) ([]modelaccess.Model, error) {
+	query := `SELECT id,provider,model,name,public_id,enabled_by_default,version,
  EXISTS(SELECT 1 FROM organization_model_grants g WHERE g.model_id=s.id AND g.organization_id=NULLIF($1,'')::uuid)
- FROM model_settings s ORDER BY provider,name,model`, org)
+ FROM model_settings s`
+	args := []any{org}
+	if len(providers) != 0 {
+		query += ` WHERE s.provider = ANY($2::text[])`
+		args = append(args, providers)
+	}
+	rows, err := r.db.QueryContext(ctx, query+` ORDER BY provider,name,model`, args...)
 	if err != nil {
 		return nil, err
 	}
