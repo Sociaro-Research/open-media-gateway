@@ -16,6 +16,8 @@ import (
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/catalogsync"
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
+	"github.com/Sociaro-Research/open-media-gateway/internal/mediafile"
+	"github.com/Sociaro-Research/open-media-gateway/internal/referencevalidation"
 )
 
 const flashID = "dreamina-seedance-2-5-flash-261115"
@@ -246,6 +248,17 @@ func TestSeedance25SeriesLayoutKeepsModelLimitsApart(t *testing.T) {
 	if got := read(strings.ReplaceAll(string(body), "Dreamina Seedance 2.5 flash", "Dreamina Seedance 2.5 flash-future")); len(got) != 1 || got["dreamina-seedance-2-5-260628"] != base {
 		t.Fatal("unreviewed snapshot mapped", got)
 	}
+	// Losing the 2.5 series pixel row must not borrow the adjacent 2.0 range.
+	noPixels := strings.Replace(string(body), "Dreamina Seedance 2.5 series:** `[614", "Other series:** `[614", 1)
+	partial, err := interpretVideoAPI(videoAPISource, noPixels)
+	if err != nil || len(partial) != 2 {
+		t.Fatal(partial, err)
+	}
+	for _, e := range partial {
+		if _, ok := e.OperationalFields["workflow.references.video.dimensions"]; ok {
+			t.Fatal("unverified 2.5 pixel limit", e.ID)
+		}
+	}
 	// The current published contract fully covers both native descriptors.
 	_, text, err := catalogsync.Parse(videoAPISource, body)
 	if err != nil {
@@ -260,6 +273,29 @@ func TestSeedance25SeriesLayoutKeepsModelLimitsApart(t *testing.T) {
 	for _, model := range c.Models {
 		if model.Status != "complete" {
 			t.Fatalf("%s: %s %+v", model.Model, model.Status, model.Fields)
+		}
+	}
+}
+
+func TestSeedanceReferenceVideoPixelBoundaries(t *testing.T) {
+	for _, id := range []string{base25ID, flashID, "dreamina-seedance-2-0-260128", "dreamina-seedance-2-0-fast-260128", "dreamina-seedance-2-0-mini-260615"} {
+		model := describeModel(id)
+		for _, tc := range []struct {
+			width, height int
+			valid         bool
+		}{
+			{613, 664, false}, {614, 664, true},
+			{3326, 2494, true}, {4096, 2160, id == base25ID || id == flashID}, {4097, 2160, false},
+		} {
+			t.Run(fmt.Sprintf("%s/%dx%d", id, tc.width, tc.height), func(t *testing.T) {
+				file := referencevalidation.File{Type: "video", Info: mediafile.Info{
+					ContentType: "video/mp4", Codec: "avc1", Width: tc.width, Height: tc.height, Size: 100000, Duration: 5, FPS: 30,
+				}}
+				err := referencevalidation.ValidateFiles(model, []referencevalidation.File{file}, true)
+				if tc.valid && err != nil || !tc.valid && (!errors.Is(err, referencevalidation.ErrInvalid) || !strings.Contains(err.Error(), "in total")) {
+					t.Fatalf("valid=%v, got %v", tc.valid, err)
+				}
+			})
 		}
 	}
 }
