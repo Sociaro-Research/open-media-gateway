@@ -124,7 +124,7 @@ func ValidateReferenceMode(m MediaModel, o MediaOptions) error {
 		}
 		if len(o.ReferenceVoices) > 0 {
 			if !p.SupportsReferenceVoice {
-				return fmt.Errorf("%w: this mode does not support per-reference voices", ErrOptionsInvalid)
+				return optionError("reference_voices", "is not supported by the "+p.Label+" reference mode")
 			}
 			visual := map[string]bool{}
 			for i, u := range o.ImageURLs {
@@ -137,10 +137,10 @@ func ValidateReferenceMode(m MediaModel, o MediaOptions) error {
 			}
 			for u, voice := range o.ReferenceVoices {
 				if !visual[u] || voice == "" {
-					return fmt.Errorf("%w: voice must belong to an ordinary image or video reference", ErrOptionsInvalid)
+					return optionError("reference_voices", "keys must be image or video references sent in this request, with a voice URL for each")
 				}
 				if err := validateOptionalURL(voice); err != nil {
-					return ErrOptionsInvalid
+					return optionError("reference_voices", "values must be absolute http or https URLs without credentials")
 				}
 			}
 		}
