@@ -8,8 +8,10 @@ import (
 )
 
 var knownGenerationFailures = map[string]string{
-	"provider task failed":    "Task failed at the provider without a verified diagnostic. Check the original provider task and billing; ask an operator to inspect the provider connection before creating another generation.",
-	"provider task timed out": "Provider task status could not be confirmed before its deadline. Check the original provider task and billing; ask an operator to inspect polling and timeout settings before creating another generation.",
+	UnchargedImageRejection{}.Error():      UnchargedImageRejection{}.Error(),
+	ErrProviderSubmissionUncertain.Error(): ErrProviderSubmissionUncertain.Error(),
+	"provider task failed":                 "Task failed at the provider without a verified diagnostic. Check the original provider task and billing; ask an operator to inspect the provider connection before creating another generation.",
+	"provider task timed out":              "Provider task status could not be confirmed before its deadline. Check the original provider task and billing; ask an operator to inspect polling and timeout settings before creating another generation.",
 	"worker interrupted during provider submission; task was not resubmitted to avoid duplicate generation": "Worker stopped during provider submission. The request was not resubmitted. Check the original provider task and billing before creating another generation.",
 	"result storage is not configured":                 "Result storage is not configured. Ask an operator to configure result storage and inspect the original provider task before creating another generation.",
 	"result storage configuration could not be loaded": "Result storage configuration could not be loaded. Ask an operator to check the saved storage connection and worker health; check the original provider task before creating another generation.",

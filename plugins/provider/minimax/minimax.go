@@ -31,6 +31,7 @@ const maxRequestBytes = 64_000_000
 var numericID = regexp.MustCompile(`^[0-9]{1,40}$`)
 
 type Adapter struct {
+	connectionTimeout  time.Duration
 	fileOperationPrice *money.USD
 	key, base          string
 	client             *http.Client
@@ -102,6 +103,9 @@ func (a *Adapter) do(ctx context.Context, method, path string, body io.Reader, c
 	req.Header.Set("User-Agent", "OpenMediaGateway-MiniMax/1.0")
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
+	}
+	if h3ImageRoutes.MatchesPath(req.URL.Path) {
+		return a.readH3ImageResponse(req, path)
 	}
 	resp, e := httpclient.Do(a.client, req)
 	if e != nil {

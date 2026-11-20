@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"github.com/Sociaro-Research/open-media-gateway/internal/catalogsync"
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
+	"github.com/Sociaro-Research/open-media-gateway/internal/httpclient"
 	"github.com/Sociaro-Research/open-media-gateway/internal/providerassets"
 	"net/http"
 	"net/url"
@@ -61,6 +62,7 @@ type Field struct {
 	Env      string `json:"-"`
 }
 type Definition struct {
+	SinglePOSTRoutes        *httpclient.SinglePOSTRoutes
 	AssetLibrary            func(Credentials, *http.Client) (providerassets.Client, error)
 	CatalogSources          []catalogsync.Source
 	CatalogLifecycleSources []catalogsync.Source

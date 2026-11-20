@@ -26,6 +26,10 @@ var _ core.AcceptedReceiptProgressRepository = (*TaskRepository)(nil)
 // lockAcceptedTask independently checks the supplied immutable task snapshot.
 // A claim token alone never grants another owner or connection's receipt.
 func lockAcceptedTask(ctx context.Context, tx *sql.Tx, t core.Task) (*string, error) {
+	return lockProviderResultTask(ctx, tx, t, core.TaskRunning)
+}
+
+func lockProviderResultTask(ctx context.Context, tx *sql.Tx, t core.Task, expected core.TaskStatus) (*string, error) {
 	if core.ClaimToken(ctx) == "" {
 		return nil, core.ErrLeaseLost
 	}
@@ -44,7 +48,7 @@ func lockAcceptedTask(ctx context.Context, tx *sql.Tx, t core.Task) (*string, er
 	if expected := core.ProviderRevision(ctx); expected != "" && expected != actual.ProviderIdentity {
 		return nil, core.ErrProviderChanged
 	}
-	if actual.Status != core.TaskRunning || actual.ID != t.ID || actual.OwnerID != t.OwnerID || actual.ProviderOwnerID != t.ProviderOwnerID || actual.StorageOwnerID != t.StorageOwnerID || actual.Provider != t.Provider || actual.Model != t.Model || actual.ProviderIdentity != t.ProviderIdentity || actual.MediaType != t.MediaType || actual.ActorID != t.ActorID || identity.OwnerID(ctx) != actual.OwnerID || identity.ProviderOwnerID(ctx) != actual.ProviderOwnerID || identity.StorageOwnerID(ctx) != actual.StorageOwnerID {
+	if actual.Status != expected || actual.ID != t.ID || actual.OwnerID != t.OwnerID || actual.ProviderOwnerID != t.ProviderOwnerID || actual.StorageOwnerID != t.StorageOwnerID || actual.Provider != t.Provider || actual.Model != t.Model || actual.ProviderIdentity != t.ProviderIdentity || actual.MediaType != t.MediaType || actual.ActorID != t.ActorID || identity.OwnerID(ctx) != actual.OwnerID || identity.ProviderOwnerID(ctx) != actual.ProviderOwnerID || identity.StorageOwnerID(ctx) != actual.StorageOwnerID {
 		return nil, core.ErrAcceptedReceiptInvalid
 	}
 	return remote, nil

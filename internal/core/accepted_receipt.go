@@ -24,6 +24,10 @@ const (
 	MaxAcceptedReceiptBytes         = MaxAcceptedReceiptInlineBytes + MaxAcceptedReceiptMetadataBytes
 )
 
+// This fixed diagnostic can be retained under minimized logging. It contains
+// no request, provider identifier, native result or price.
+var ErrProviderSubmissionUncertain = errors.New("Provider acceptance and charges are uncertain. The task was not resubmitted. Ask an operator to check the original provider history and billing before creating another generation.")
+
 var ErrAcceptedReceiptInvalid = errors.New("accepted provider receipt is invalid or does not match the task")
 
 // AcceptedReceiptRepository is private worker persistence. A receipt records an

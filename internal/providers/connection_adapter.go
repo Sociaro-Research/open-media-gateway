@@ -16,6 +16,7 @@ import (
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/catalogsync"
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
+	"github.com/Sociaro-Research/open-media-gateway/internal/httpclient"
 	"github.com/Sociaro-Research/open-media-gateway/internal/money"
 	"github.com/Sociaro-Research/open-media-gateway/internal/providerkit"
 )
@@ -26,6 +27,7 @@ type manualRequest struct {
 	body  map[string]any
 }
 type connectionTransport struct {
+	singlePOSTs   *httpclient.SinglePOSTRoutes
 	base          http.RoundTripper
 	credentials   Credentials
 	mediaRedirect func(*http.Request, []*http.Request) error
@@ -78,14 +80,17 @@ func (t *connectionTransport) RoundTrip(original *http.Request) (*http.Response,
 		request.URL = u
 		request.Host = ""
 	}
+	headerOverridden := false
 	for _, scope := range []string{"", operation} {
 		for _, h := range c.Headers {
 			if h.Operation == scope && h.Value != nil {
+				headerOverridden = true
 				request.Header.Set(h.Name, *h.Value)
 			}
 		}
 	}
-	if operation == "generate" && request.Body != nil && strings.Contains(request.Header.Get("Content-Type"), "application/json") {
+	singlePOST := t.singlePOSTs.MatchesPath(original.URL.Path)
+	if !singlePOST && operation == "generate" && request.Body != nil && strings.Contains(request.Header.Get("Content-Type"), "application/json") {
 		raw, err := io.ReadAll(request.Body)
 		if err != nil {
 			return nil, errors.New("cannot read provider request")
@@ -107,6 +112,18 @@ func (t *connectionTransport) RoundTrip(original *http.Request) (*http.Response,
 		request.Body = io.NopCloser(bytes.NewReader(raw))
 		request.ContentLength = int64(len(raw))
 		request.GetBody = func() (io.ReadCloser, error) { return io.NopCloser(bytes.NewReader(raw)), nil }
+	}
+	// Native synchronous POSTs must retain the exact validated JSON bytes. Check
+	// both sides of a route rewrite at the last boundary before the outbound transport.
+	if singlePOST || t.singlePOSTs.MatchesPath(request.URL.Path) {
+		_, manual := original.Context().Value(manualRequestKey{}).(manualRequest)
+		overridden := c.Endpoints[operation] != "" || headerOverridden || len(c.ExtraBody) != 0 || manual
+		if !singlePOST || overridden || t.singlePOSTs.Prepare(request, original.URL.Path) != nil {
+			if request.Body != nil {
+				_ = request.Body.Close()
+			}
+			return nil, httpclient.ErrSinglePOSTConfiguration
+		}
 	}
 	response, err := t.base.RoundTrip(request)
 	if err != nil {

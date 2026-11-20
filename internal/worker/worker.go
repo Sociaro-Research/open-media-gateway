@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/core"
+	"github.com/Sociaro-Research/open-media-gateway/internal/httpclient"
 	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
 	"github.com/Sociaro-Research/open-media-gateway/internal/storage"
 )
@@ -110,12 +111,27 @@ func (w *Worker) process(ctx context.Context, id string) error {
 		if err := w.repo.MarkRunning(ctx, id); err != nil {
 			return err
 		}
-		providerTask, err := provider.Generate(ctx, core.MediaRequest{
+		submission := httpclient.WithSinglePOSTDeadline(ctx, time.Now().Add(w.taskTimeout))
+		providerTask, err := provider.Generate(submission, core.MediaRequest{
 			TaskID: task.ID, Prompt: task.Prompt, Model: task.Model, Options: task.Options.ProviderOptions(), ProviderIdentity: task.ProviderIdentity,
 		})
 		if err != nil {
+			// An acknowledged rejection can outlive local cancellation. The bounded
+			// terminal write preserves owner and claim; the repository verifies both.
+			var rejection core.UnchargedImageRejection
+			if errors.Is(err, rejection) {
+				if repo, ok := w.repo.(core.UnchargedImageRepository); ok {
+					return persistClaimedOutcome(ctx, func(persist context.Context) error {
+						return repo.MarkImagesRejectedWithoutCharge(persist, task, rejection)
+					})
+				}
+				return w.repo.MarkFailed(ctx, id, core.ErrProviderSubmissionUncertain.Error())
+			}
 			if ctx.Err() != nil {
 				return ctx.Err()
+			}
+			if errors.Is(err, core.ErrProviderSubmissionUncertain) {
+				return w.repo.MarkFailed(ctx, id, core.ErrProviderSubmissionUncertain.Error())
 			}
 			if errors.Is(err, core.ErrProviderChanged) {
 				if accounting, ok := w.repo.(interface {
@@ -143,7 +159,7 @@ func (w *Worker) process(ctx context.Context, id string) error {
 		}
 		return &pollLater{}
 	} else if providerTaskID == "" {
-		return w.repo.MarkFailed(ctx, id, "worker interrupted during provider submission; task was not resubmitted to avoid duplicate generation")
+		return w.repo.MarkFailed(ctx, id, core.ErrProviderSubmissionUncertain.Error())
 	}
 
 	started := task.WorkerStartedAt
