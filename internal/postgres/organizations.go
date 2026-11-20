@@ -537,7 +537,20 @@ func (r *SystemRepository) CreateOrganizationInvite(ctx context.Context, actor, 
 	if e = guardCompanyMutation(ctx, tx, id); e != nil {
 		return i, e
 	}
-	access, e := orgLock(ctx, tx, actor, id)
+	if _, e = orgLock(ctx, tx, actor, id); e != nil {
+		return i, e
+	}
+	// A demotion locks the account, then revokes its invitations. Hold the
+	// issuer's row (company before user) and read authority again, so an
+	// invitation is either refused or committed before that sweep runs.
+	var ignored string
+	if e = tx.QueryRowContext(ctx, `SELECT id FROM users WHERE id=$1 FOR SHARE`, actor).Scan(&ignored); e != nil {
+		if errors.Is(e, sql.ErrNoRows) {
+			return i, org.ErrForbidden
+		}
+		return i, e
+	}
+	access, e := organizationAccess(ctx, tx, actor, id)
 	if e != nil {
 		return i, e
 	}

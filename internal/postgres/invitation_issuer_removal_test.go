@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
 	org "github.com/Sociaro-Research/open-media-gateway/internal/organization"
@@ -161,5 +162,95 @@ func TestInvitationsOfFormerAdministratorsAreRevoked(t *testing.T) {
 				t.Fatalf("revocations in the audit log: %d %v", audited, err)
 			}
 		})
+	}
+}
+
+// Issuance reads the issuer's authority, a demotion of that issuer commits, then
+// issuance resumes. The test holds a transaction that replays SetAdmin's
+// demotion steps, so this order is fixed rather than left to timing.
+func TestInvitationIssuedDuringAdministratorDemotionIsNotUsable(t *testing.T) {
+	ctx := context.Background()
+	db := auditDatabase(t, true)
+	people, repo := NewAuthRepository(db), NewSystemRepository(db)
+	user := func(name string) identity.User {
+		t.Helper()
+		u, err := people.UpsertGoogleUser(ctx, uuid.NewString(), uuid.NewString()+"@fixture.test", name, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		return u
+	}
+	admin, former, owner, guest := user("Administrator"), user("Former administrator"), user("Owner"), user("Guest")
+	if _, err := db.Exec(`UPDATE users SET is_system_admin=TRUE WHERE id IN ($1,$2)`, admin.ID, former.ID); err != nil {
+		t.Fatal(err)
+	}
+	company, err := repo.CreateOrganization(ctx, admin.ID, "Issued during demotion", owner.ID, uuid.NewString()+".fixture.test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	demotion, err := beginAuditTx(ctx, db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer demotion.Rollback()
+	var pid int
+	if err = demotion.QueryRowContext(ctx, `SELECT pg_backend_pid()`).Scan(&pid); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = readSystemSettings(ctx, demotion, true); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = systemActor(ctx, demotion, admin.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = demotion.ExecContext(ctx, `SELECT id FROM users WHERE id=$1 FOR UPDATE`, former.ID); err != nil {
+		t.Fatal(err)
+	}
+	type issued struct {
+		invite org.Invite
+		err    error
+	}
+	done := make(chan issued, 1)
+	go func() {
+		i, err := repo.CreateOrganizationInvite(ctx, former.ID, company.ID, org.Supermanager)
+		done <- issued{i, err}
+	}()
+	wait, stop := context.WithTimeout(ctx, 5*time.Second)
+	defer stop()
+	for blocked := false; !blocked; {
+		select {
+		case early := <-done:
+			t.Fatal("issuance finished while the demotion held the issuer", early.err)
+		case <-wait.Done():
+			t.Fatal("issuance never waited for the demotion", wait.Err())
+		case <-time.After(10 * time.Millisecond):
+		}
+		if err = db.QueryRowContext(wait, `SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE $1::int=ANY(pg_blocking_pids(pid)) AND wait_event_type='Lock')`, pid).Scan(&blocked); err != nil {
+			t.Fatal("could not observe issuance waiting", err)
+		}
+	}
+	if _, err = demotion.ExecContext(ctx, `UPDATE users SET is_system_admin=FALSE WHERE id=$1`, former.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err = revokeFormerAdministratorInvites(ctx, demotion, former.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err = demotion.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	var got issued
+	select {
+	case got = <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("issuance did not finish after the demotion committed")
+	}
+	if got.err != nil {
+		if !errors.Is(got.err, org.ErrForbidden) {
+			t.Fatal(got.err)
+		}
+		return
+	}
+	if _, err = repo.OrganizationInvitation(ctx, guest.ID, got.invite.Token, false); !errors.Is(err, org.ErrInvitationUnavailable) {
+		t.Fatal("an invitation issued during the demotion still grants Supermanager", err)
 	}
 }
