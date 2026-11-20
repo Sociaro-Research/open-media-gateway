@@ -81,10 +81,12 @@ func (s *Server) costReport(w http.ResponseWriter, r *http.Request) {
 	f.From = core.ReportDayStart(fromDate, location)
 	f.Until = core.ReportDayStart(toDate.AddDate(0, 0, 1), location)
 	if f.UserID != "" {
-		if _, err = uuid.Parse(f.UserID); err != nil {
+		id, parseErr := uuid.Parse(f.UserID)
+		if parseErr != nil {
 			bad()
 			return
 		}
+		f.UserID = id.String()
 	}
 	if f.GenerationID != "" {
 		id, parseErr := uuid.Parse(f.GenerationID)
@@ -95,10 +97,12 @@ func (s *Server) costReport(w http.ResponseWriter, r *http.Request) {
 		f.GenerationID = id.String()
 	}
 	if f.KeyID != "" {
-		if _, err = uuid.Parse(f.KeyID); err != nil {
+		id, parseErr := uuid.Parse(f.KeyID)
+		if parseErr != nil {
 			bad()
 			return
 		}
+		f.KeyID = id.String()
 	}
 	if q.Has("limit") {
 		f.Limit, err = strconv.Atoi(q.Get("limit"))
