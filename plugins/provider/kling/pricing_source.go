@@ -132,6 +132,33 @@ func imagePriceTables() []klingPriceTable {
 	rows[7].suffix = "call"
 	return []klingPriceTable{{header: "Model|Function|Resolution|Price", rows: rows}}
 }
+
+const (
+	imagePriceHeaderCurrent  = "Model|Function|Billing Method|Reference Image/Element Input Price|Output Specs - Length|Output Specs - Resolution|Output Price"
+	imagePriceOutputBilling  = "Total cost = Output images × Output unit price"
+	image4InputOutputBilling = "Total cost = Reference images and elements × Input unit price + Output images × Output unit price"
+	image4InputPrice         = "0.8 Units ($0.003) / image (1 reference element = 1 reference image)"
+)
+
+// Standard Image 4.0 is not an executable Gateway operation. Recognize the
+// reviewed source shapes so those rows do not disable legacy tariff refreshes,
+// without ever mapping them into a price, selector or model.
+func reviewedImage4EvidenceKeys() map[string]bool {
+	keys := make(map[string]bool, 14)
+	add := func(function, length string, resolutions ...string) {
+		for _, resolution := range resolutions {
+			keys[function+"|"+length+"|"+resolution] = true
+		}
+	}
+	add("Single Image (Text-to-Image, Image-to-Image)", "-", "2K", "4K", "8K")
+	add("Image Series (Text-to-Image, Image-to-Image)", "-", "2K", "4K", "8K")
+	add("Long Image · Webpage Design (Text-to-Image, Image-to-Image)", "-", "1K", "2K")
+	for _, length := range []string{"Short", "Medium", "Long"} {
+		add("Long Image · E-commerce Detail Page (Image-to-Image only)", length, "1K", "2K")
+	}
+	return keys
+}
+
 func ecommercePriceTables() []klingPriceTable {
 	out := "Per second (Total duration = Output duration)"
 	row := func(name, feature string, variant klingPriceVariant) klingPriceRow {
@@ -282,16 +309,33 @@ func interpretPrices(source catalogsync.Source, text string) ([]catalogsync.Entr
 	seen := map[string]bool{}
 	active := -1
 	var sourceColumns []string
+	imageCurrent, imageHeaderSeen := false, false
+	var remainingImage4 map[string]bool
 	for lineIndex, line := range strings.Split(text, "\n") {
 		if !strings.HasPrefix(strings.TrimSpace(line), "|") {
 			continue
 		}
 		cells := normalizePriceCells(line)
 		if isPriceSeparator(cells) {
+			if canonical == imagePriceSource && (!imageHeaderSeen || len(cells) != len(sourceColumns)) {
+				return nil, errors.New("Kling image pricing separator does not match its header")
+			}
 			continue
 		}
 		header := strings.Join(cells, "|")
 		matchedHeader := false
+		if canonical == imagePriceSource && (header == tables[0].header || header == imagePriceHeaderCurrent) {
+			if imageHeaderSeen {
+				return nil, errors.New("Kling image pricing header duplicated")
+			}
+			imageHeaderSeen = true
+			imageCurrent = header == imagePriceHeaderCurrent
+			if imageCurrent {
+				remainingImage4 = reviewedImage4EvidenceKeys()
+			}
+			active, sourceColumns = 0, cells
+			continue
+		}
 		for i, t := range tables {
 			if header == t.header || t.header == videoPriceHeader && header == "Model|Features|Billing Type|Price (720P)|Price (1080P)|Price (4K)" {
 				active = i
@@ -307,8 +351,29 @@ func interpretPrices(source catalogsync.Source, text string) ([]catalogsync.Entr
 			return nil, errors.New("Kling pricing header changed")
 		}
 		t := tables[active]
-		if len(cells) != len(strings.Split(t.header, "|")) {
+		if len(cells) != len(sourceColumns) {
 			return nil, errors.New("Kling pricing column count changed")
+		}
+		if imageCurrent {
+			if cells[0] == "Kling Image 4.0" {
+				evidenceKey := cells[1] + "|" + cells[4] + "|" + cells[5]
+				if !remainingImage4[evidenceKey] || cells[2] != image4InputOutputBilling || cells[3] != image4InputPrice {
+					return nil, errors.New("Kling Image 4.0 out-of-scope tariff evidence changed")
+				}
+				if _, _, err := klingPriceRate(source.URL, cells[6], "image", "", catalogsync.Rate{}); err != nil {
+					return nil, err
+				}
+				delete(remainingImage4, evidenceKey)
+				continue
+			}
+			billing := imagePriceOutputBilling
+			if cells[0] == "General" && cells[1] == "AI Multi-Shot" {
+				billing = "Billed per call"
+			}
+			if cells[2] != billing || cells[3] != "-" || cells[4] != "-" {
+				return nil, errors.New("Kling legacy image billing method or input/length conditions changed")
+			}
+			cells = []string{cells[0], cells[1], cells[5], cells[6]}
 		}
 		keyCols := 2
 		if canonical == imagePriceSource || canonical == ecommercePriceSource {
@@ -373,7 +438,11 @@ func interpretPrices(source catalogsync.Source, text string) ([]catalogsync.Entr
 							entries[id] = &catalogsync.Entry{ID: id}
 							selectors[id] = map[string]catalogsync.Rate{}
 						}
-						contracts[id] = append(contracts[id], klingPublishedTariff{Row: key, SourceColumn: sourceColumns[column], PackageUnits: units, Rate: rate, OutputSecondSurcharge: isSurcharge, UnavailableReason: variant.reason})
+						sourceColumn := sourceColumns[column]
+						if imageCurrent {
+							sourceColumn = sourceColumns[6]
+						}
+						contracts[id] = append(contracts[id], klingPublishedTariff{Row: key, SourceColumn: sourceColumn, PackageUnits: units, Rate: rate, OutputSecondSurcharge: isSurcharge, UnavailableReason: variant.reason})
 						if variant.reason != "" || isSurcharge {
 							continue
 						}
@@ -390,6 +459,9 @@ func interpretPrices(source catalogsync.Source, text string) ([]catalogsync.Entr
 				}
 			}
 		}
+	}
+	if len(remainingImage4) != 0 {
+		return nil, errors.New("Kling Image 4.0 out-of-scope evidence rows are missing; retain confirmed rates")
 	}
 	for i, t := range tables {
 		for _, r := range t.rows {
