@@ -1,13 +1,13 @@
 {
   "name": "seedance-2-5-series",
   "url": "https://ai.byteplus.com/ark/region:ap-southeast-1/docs/create-video-generation-task-api.md",
-  "final_url": "https://ai.byteplus.com/ark/region:ap-southeast-1/docs/create-video-generation-task-api.md",
-  "checked_at": "2026-11-17T12:16:00+00:00",
+  "final_url": "https://ai.byteplus.com/ark/region%3Aap-southeast-1/docs/create-video-generation-task-api.md",
+  "checked_at": "2026-11-20T08:44:06+00:00",
   "status": 200,
   "content_type": "text/markdown; charset=utf-8",
-  "sha256": "0a916ea7df3f78b26bdad798f5ab83521dc8a808e8bfed1acce1be03bd62f6f9",
-  "bytes": 125505,
-  "normalized_sha256": "0a916ea7df3f78b26bdad798f5ab83521dc8a808e8bfed1acce1be03bd62f6f9",
+  "sha256": "a03ffc1fc408a17cb020b1aab59ee77bc2efdd56e2b42c806dbd1225229a91bb",
+  "bytes": 125629,
+  "normalized_sha256": "a03ffc1fc408a17cb020b1aab59ee77bc2efdd56e2b42c806dbd1225229a91bb",
   "fixture_type": "Normalized factual parameter fixture; not a verbatim or complete source snapshot",
-  "fixture_sha256": "f7cc7c14be2a24f7989b9ca6dda16e9b751fc80dac0f48c6e505702fca71dcac"
+  "fixture_sha256": "84060c4fa39d279be1f6e4250f4ee7aef1ad5685d22c29340d8a8df1891b9475"
 }

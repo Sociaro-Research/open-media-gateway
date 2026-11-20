@@ -61,7 +61,9 @@ Image-to-video (reference images)
 > * Dimensions:
 >   * Aspect ratio (width/height): `[0.4, 2.5]`
 >   * Width and height (px): `[300, 6000]`
->   * Total pixels: `[614×664=407696, 3326×2494=8295044]`, that is, the product of width and height must fall in the range `[407696, 8295044]`.
+>   * Total pixels:
+>     * **Dreamina Seedance 2.5 series:** `[614 × 664 = 407696, 4096 × 2160 = 8847360]`
+>     * **Dreamina Seedance 2.0 series:** `[614 × 664 = 407696, 3326 × 2494 = 8295044]`
 > * Size: Each video must not exceed 200 MB.
 > * Frame rate (FPS): `[24, 60]`
 

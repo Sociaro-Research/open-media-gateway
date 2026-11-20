@@ -63,6 +63,19 @@ func interpretVideoAPI(source catalogsync.Source, text string) ([]catalogsync.En
 	catalogdoc.Rule(shared, []string{"references", "first_frame", "first_last_frames"}, "image", image)
 	video := catalogdoc.Between(text, `Video input requirements`, `role\s+string`)
 	catalogdoc.Rule(shared, []string{"references"}, "video", video)
+	// The November layout separates series inside the otherwise shared video
+	// dimensions block. Scope pixel evidence to the named series.
+	pixels := catalogdoc.Between(video, `Total pixels:`, `Size:`)
+	if strings.Contains(pixels, "Dreamina Seedance") {
+		const field = "workflow.references.video.dimensions"
+		delete(shared, field)
+		dims := catalogdoc.ImageDimensions(video)
+		series := ownValue(pixels, "Dreamina Seedance 2.5 series")
+		if min, max, ok := catalogdoc.Range(series, `^\s*\[\d+\s*×\s*\d+\s*=\s*(\d+),\s*\d+\s*×\s*\d+\s*=\s*(\d+)\]\s*$`); ok && dims != nil {
+			dims["min_pixels"], dims["max_pixels"] = min, max
+			shared.Put(field, dims)
+		}
+	}
 	audio := catalogdoc.Between(text, `Audio input requirements`, `role\s+string`)
 	catalogdoc.Rule(shared, []string{"references"}, "audio", audio)
 
