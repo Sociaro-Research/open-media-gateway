@@ -108,10 +108,12 @@
  pages.push('Support');
  if(clientManager&&(commercial.pricing||commercial.models))pages.push('Commercial settings');
  if(manage)pages.push('Audit Log');if(manage||systemAdministrator||window.RemoteWorkspace?.managesCompany(o.id))pages.push('Management');if(systemAdministrator)pages.push('Settings');
- async function page(name,initial=false){if(!pages.includes(name))return;window.syncWorkspacePage?.(name,{initial});window.ContactLinks?.closeMember();activePage=name;for(const tab of tabs.children){tab.setAttribute('aria-pressed',String(tab.textContent===name))}subsections?.sync();GatewayLayout.clear(body);body.replaceChildren();FormUI.message(status,'');try{
- if(name==='Support'){await ContactLinks.support(body,api,o,()=>token===epoch&&activePage==='Support');
+ // A newer tab load (even of the same tab) replaces the body; older loads stop.
+ let pageCall=0;
+ async function page(name,initial=false){if(!pages.includes(name))return;const call=++pageCall;window.syncWorkspacePage?.(name,{initial});window.ContactLinks?.closeMember();activePage=name;for(const tab of tabs.children){tab.setAttribute('aria-pressed',String(tab.textContent===name))}subsections?.sync();GatewayLayout.clear(body);body.replaceChildren();FormUI.message(status,'');try{
+ if(name==='Support'){await ContactLinks.support(body,api,o,()=>token===epoch&&call===pageCall);
  }else if(name==='Requests'){await window.OrganizationJournal.mount(body,o,api);
- }else if(name==='Audit Log'){await window.AuditLog.mount(body,api,{organization:o,current:()=>token===epoch&&activePage==='Audit Log'});
+ }else if(name==='Audit Log'){await window.AuditLog.mount(body,api,{organization:o,current:()=>token===epoch&&call===pageCall});
  }else if(name==='API keys'){await window.GatewayKeys.open(body,o.id);
  }else if(name==='Management'){
  if(manage||systemAdministrator){
@@ -127,11 +129,11 @@
  const loggingLabel=el('label',null,'system-toggle'),loggingText=el('span');minimize=el('input');minimize.type='checkbox';minimize.checked=savedLogging;loggingText.append(el('strong','Minimize request logging'),el('small','After a request finishes, its prompt, instructions and input links are removed. Usage, cost and status remain. Applies to new requests only.'));loggingLabel.append(minimize,loggingText);f.append(loggingLabel);f.finish();
  if(o.billing_profile){const b=o.billing_profile,a=b.address||{},card=el('section',null,'organization-billing-details'),list=el('dl');card.append(el('h2','Billing details'),list);for(const [label,value] of [['Legal name',b.business_name],['Billing email',b.email],['Billing address',[a.line1,a.line2,a.city,a.state,a.postal_code,a.country].filter(Boolean).join(', ')],['Tax IDs',(b.tax_ids||[]).map(t=>t.value).join(', ')]]){if(!value)continue;const row=el('div');row.append(el('dt',label),el('dd',value));list.append(row)}body.append(card);}
  }
- await window.RemoteWorkspace?.mountCompanyManagement(body,o.id,()=>token===epoch&&activePage==='Management');
- if(token!==epoch||activePage!=='Management')return;
+ await window.RemoteWorkspace?.mountCompanyManagement(body,o.id,()=>token===epoch&&call===pageCall);
+ if(token!==epoch||call!==pageCall)return;
  if(manage||systemAdministrator)await window.OrganizationStorage.open(body,o.id);
  }else if(name==='Commercial settings'){
- const current=()=>token===epoch&&activePage==='Commercial settings';
+ const current=()=>token===epoch&&call===pageCall;
  if(commercial.models){await window.ModelAccess.organization(body,api,{organization:o.id,current});if(!current())return;}
  if(commercial.pricing)await window.MarkupSettings.mount(body,api,{organization:o.id,current});
  }else if(name==='Settings'){
@@ -147,14 +149,14 @@
   await window.Workspace?.refresh();
  });
  f.classList.add('organization-settings-grid');credit=field(f,'Credit Limit (USD)','number',o.credit_limit_usd,true);manager=field(f,'Client manager','text',savedManager);manager.title='Email or user ID';const managerHint=el('p','Enter an email or user ID. The user must already have a sales role assigned in Administration → Users.','field-explanation');managerHint.id='organization-manager-hint';manager.setAttribute('aria-describedby',managerHint.id);f.append(managerHint);f.finish();
- const current=()=>token===epoch&&activePage==='Settings';
+ const current=()=>token===epoch&&call===pageCall;
  await window.ModelAccess.organization(body,api,{organization:o.id,current});if(!current())return;
  await window.MarkupSettings.mount(body,api,{organization:o.id,current});if(!current())return;
  await window.RequestLimits.mount(body,api,{organization:o.id,current});
  }else if(name==='Members'){
- const members=(await api(base+'/members')).data;if(token!==epoch)return;
+ const members=(await api(base+'/members')).data;if(token!==epoch||call!==pageCall)return;
  if(members.length)FormUI.sectionHeading(body,'Members');
- const memberIdentity=m=>ContactLinks.memberIdentity(m,{current:()=>token===epoch&&activePage==='Members'});
+ const memberIdentity=m=>ContactLinks.memberIdentity(m,{current:()=>token===epoch&&call===pageCall});
  if(!manage){if(members.length)table('organization_members',body,['Member',OrganizationRoles.heading(),'This week','Total consumption','Weekly limit'],members.map(m=>[memberIdentity(m),memberRoleLabel(m.role),money(m.weekly_committed_usd),money(m.total_consumed_usd??0),money(m.weekly_limit_usd)]));return;}
  if(members.length)table('organization_members',body,['Member',OrganizationRoles.heading(),'This week','Total consumption','Weekly limit (USD)'],members.map(m=>{
    const edit=el('form',null,'member-limit-form'),limit=el('input'),roleForm=el('form',null,'role-editor member-role-editor'),role=el('select'),roleApply=el('button','Apply','secondary'),save=el('button','Save','secondary'),msg=el('small'),roleMsg=el('small');
@@ -182,10 +184,10 @@
  inviteRole.setAttribute('aria-label','Invitation role');
  for(const value of OrganizationRoles.assign(systemAdministrator?'system_admin':o.role,'member')){const option=el('option',memberRoleLabel(value));option.value=value;inviteRole.append(option)}inviteRole.value='member';
  roleLabel.append(inviteRole);createInvite.type='submit';inviteStatus.setAttribute('role','status');actions.append(roleLabel,createInvite);invitationForm.append(actions,inviteStatus);
- invitationForm.onsubmit=async event=>{event.preventDefault();if(createInvite.disabled)return;const role=inviteRole.value;createInvite.disabled=inviteRole.disabled=true;inviteStatus.classList.remove('settings-warning');FormUI.message(inviteStatus,'');try{const invite=await api(base+'/invitations',{method:'POST',body:JSON.stringify({role})});if(token!==epoch||activePage!=='Members')return;const url=location.origin+'/organizations#invite='+invite.token,input=el('input');input.readOnly=true;input.value=url;input.setAttribute('aria-label','One-time invitation link');linkPanel.replaceChildren(el('p','Invited role: '+memberRoleLabel(invite.role||role)),input);await InvitationFeedback.created(inviteStatus,()=>token===epoch&&activePage==='Members'&&inviteStatus.isConnected);await loadInvitations();}catch(e){FormUI.message(inviteStatus,e.message,'error')}finally{createInvite.disabled=inviteRole.disabled=false}};
+ invitationForm.onsubmit=async event=>{event.preventDefault();if(createInvite.disabled)return;const role=inviteRole.value;createInvite.disabled=inviteRole.disabled=true;inviteStatus.classList.remove('settings-warning');FormUI.message(inviteStatus,'');try{const invite=await api(base+'/invitations',{method:'POST',body:JSON.stringify({role})});if(token!==epoch||call!==pageCall)return;const url=location.origin+'/organizations#invite='+invite.token,input=el('input');input.readOnly=true;input.value=url;input.setAttribute('aria-label','One-time invitation link');linkPanel.replaceChildren(el('p','Invited role: '+memberRoleLabel(invite.role||role)),input);await InvitationFeedback.created(inviteStatus,()=>token===epoch&&call===pageCall&&inviteStatus.isConnected);await loadInvitations();}catch(e){FormUI.message(inviteStatus,e.message,'error')}finally{createInvite.disabled=inviteRole.disabled=false}};
  heading.append(el('h2','Invitations'));invitations.append(heading,invitationForm,linkPanel,history);body.append(invitations);
  async function loadInvitations(){
-  const items=(await api(base+'/invitations')).data;if(token!==epoch||activePage!=='Members')return;
+  const items=(await api(base+'/invitations')).data;if(token!==epoch||call!==pageCall)return;
   history.replaceChildren();if(!items.length)return;
   const now=Date.now();
   table('organization_invitations',history,['Role','Expires','Status','Accepted by',''],items.map(i=>{
@@ -196,8 +198,8 @@
  await loadInvitations();
  }else if(name==='Billing'){
  if(readStatistics){
- if(manage)await window.PaymentTopups.mount(body,api,o,()=>token===epoch&&activePage==='Billing',async()=>{await window.Workspace?.refresh();await reload()});
- if(token!==epoch||activePage!=='Billing')return;
+ if(manage)await window.PaymentTopups.mount(body,api,o,()=>token===epoch&&call===pageCall,async()=>{await window.Workspace?.refresh();await reload()});
+ if(token!==epoch||call!==pageCall)return;
  if(clientManager&&commercial.topup){
  let amount,reason;const operation=crypto.randomUUID();
  const f=form(body,'Top up balance',async()=>{await api(base+'/credits',{method:'POST',body:JSON.stringify({amount_usd:Number(amount.value),kind:'payment',reason:reason.value.trim(),external_id:operation})});await reload()});
@@ -206,9 +208,9 @@
  f.append(el('p','Confirm receipt of payment before crediting the balance.','field-explanation'));
  f.finish('Top up',()=>Number(amount.value)>0&&!!reason.value.trim());
  }
- if(systemAdministrator)await window.VATSettingsUI.verification(body,api,o,()=>token===epoch&&activePage==='Billing');
+ if(systemAdministrator)await window.VATSettingsUI.verification(body,api,o,()=>token===epoch&&call===pageCall);
  if(systemAdministrator){let amount,kind,reason,external;const f=form(body,'Add credit or correction',async()=>{await api(base+'/credits',{method:'POST',body:JSON.stringify({amount_usd:Number(amount.value),kind:kind.value,reason:reason.value,external_id:external.value})});await reload()});f.querySelector('h2').outerHTML='<h3>Add credit or correction</h3>';amount=field(f,'Amount (USD)','number','',true);amount.min='-1000000';amount.removeAttribute('max');kind=el('select');kind.setAttribute('aria-label','Credit type');['payment','promo','adjustment'].forEach(v=>{const opt=el('option',v);opt.value=v;kind.append(opt)});const kindLabel=el('label','Credit type','organization-field');kindLabel.append(kind);f.append(kindLabel);reason=field(f,'Reason');reason.maxLength=1000;external=field(f,'Payment / operation ID','text',crypto.randomUUID(),true);const validateAmount=()=>{amount.min=kind.value==='adjustment'?'-1000000':'0.000001';amount.setCustomValidity(amount.value!==''&&Number(amount.value)===0?'Enter a non-zero amount.':'');FormUI.update(f);/* FormUI's capture-phase update ran before this custom error was set. */};kind.addEventListener('change',validateAmount);amount.addEventListener('input',validateAmount);validateAmount();f.finish('Add credit');}
- await window.BalanceHistory.mount(body,api,o,()=>token===epoch&&activePage==='Billing',async()=>{await window.Workspace?.refresh();await reload()},manage);
+ await window.BalanceHistory.mount(body,api,o,()=>token===epoch&&call===pageCall,async()=>{await window.Workspace?.refresh();await reload()},manage);
  }
  const reports=el('section',null,'organization-reports');body.append(reports);
  await window.GatewayReports.open(false,{organization:o,parent:reports});
