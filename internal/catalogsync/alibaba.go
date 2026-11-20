@@ -12,7 +12,11 @@ import (
 )
 
 var alibabaMediaID = regexp.MustCompile(`\b(?:(?:vidu|pixverse)/[a-zA-Z0-9_-]+|happyhorse-[a-zA-Z0-9._-]*|qwen-mt-image[a-zA-Z0-9._-]*|qwen-image[a-zA-Z0-9._-]*|qwen-audio-[0-9.]+-tts[a-zA-Z0-9._-]*|qwen3-tts[a-zA-Z0-9._-]*|qwen-tts[a-zA-Z0-9._-]*|cosyvoice-[a-zA-Z0-9._-]*|wan[0-9x][a-zA-Z0-9._-]*|z-image[a-zA-Z0-9._-]*)\b`)
-var alibabaAmount = regexp.MustCompile(`^\$([0-9]+(?:\.[0-9]+)?)/(image|second)$`)
+var alibabaAmount = regexp.MustCompile(`^\$([0-9]+(?:\.[0-9]+)?)/(image|second|s)$`)
+
+// Extract only the explicitly labelled original tariff, never the promotional
+// amount. Unknown trailing conditions remain unparsed evidence.
+var alibabaOriginalAmount = regexp.MustCompile(`^Original\s*(\$[0-9]+(?:\.[0-9]+)?\s*/\s*(?:image|second|s))\s*\(30% off for a limited time\)$`)
 
 // Preserve regional heading scope through lower-level subheadings, expand HTML
 // rowspans, and keep conditional prices distinct. Unknown conditions remain
@@ -57,7 +61,7 @@ func parseAlibabaPrices(body []byte) ([]Entry, string, error) {
 				case strings.Contains(h, "input") && strings.Contains(h, "10,000 characters"):
 					priceCol = i
 					speech = true
-				case h == "output price" || h == "input and output price" || h == "output unit price" || h == "input and output unit price" || h == "unit price":
+				case h == "output price" || h == "input and output price" || h == "output unit price" || h == "input and output unit price" || h == "input and output unit prices" || h == "unit price":
 					if !speech {
 						priceCol = i
 					}
@@ -108,10 +112,16 @@ func parseAlibabaPrices(body []byte) ([]Entry, string, error) {
 				entry := Entry{ID: id, Metadata: &core.ModelMetadata{Facts: []core.ModelFact{{Label: "Published tariff: " + selector, Value: strings.Join(row, " | ")}}}}
 				value := strings.TrimSpace(row[priceCol])
 				if id == "wan2.2-s2v" {
-					for _, part := range regexp.MustCompile(`(480|720)P:\s*\$([0-9.]+)/second`).FindAllStringSubmatch(value, -1) {
-						price, e := money.Parse(part[2] + "e3")
-						if e == nil {
-							entry.Rates = append(entry.Rates, Rate{Region: region, Resolution: part[1] + "p", Unit: "second", Per: 1000, Price: price})
+					// Match the entire reviewed two-resolution cell. Do not extract a
+					// scalar from a cell that adds unknown billing conditions.
+					compact := strings.Join(strings.Fields(value), "")
+					shape := regexp.MustCompile(`^(?:Outputvideo:)?480P:\$[0-9]+(?:\.[0-9]+)?/(?:second|s)720P:\$[0-9]+(?:\.[0-9]+)?/(?:second|s)$`)
+					if !unknownColumn && conditionCol < 0 && inputCol < 0 && resCol < 0 && shape.MatchString(compact) {
+						for _, part := range regexp.MustCompile(`(480|720)P:\$([0-9]+(?:\.[0-9]+)?)/(?:second|s)`).FindAllStringSubmatch(compact, -1) {
+							price, e := money.Parse(part[2] + "e3")
+							if e == nil {
+								entry.Rates = append(entry.Rates, Rate{Region: region, Resolution: part[1] + "p", Unit: "second", Per: 1000, Price: price})
+							}
 						}
 					}
 					entries = append(entries, entry)
@@ -124,6 +134,9 @@ func parseAlibabaPrices(body []byte) ([]Entry, string, error) {
 					if m != nil {
 						value = "$" + m[1] + "/image"
 					}
+				}
+				if original := alibabaOriginalAmount.FindStringSubmatch(value); original != nil {
+					value = original[1]
 				}
 				if strings.HasPrefix(value, "List price") {
 					value = strings.TrimSpace(strings.TrimPrefix(value, "List price"))
@@ -144,6 +157,9 @@ func parseAlibabaPrices(body []byte) ([]Entry, string, error) {
 				if valid {
 					amount := match[1]
 					rate.Unit = match[2]
+					if rate.Unit == "s" {
+						rate.Unit = "second"
+					}
 					if rate.Unit == "second" {
 						amount += "e3"
 						rate.Per = 1000
