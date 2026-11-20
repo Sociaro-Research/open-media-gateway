@@ -36,7 +36,9 @@ func (s *Server) costReport(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	now := time.Now().In(location)
-	f := core.ReportFilter{From: time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, location), Until: time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, location), Limit: 50, KeyID: q.Get("api_key_id"), GenerationID: strings.TrimSpace(q.Get("generation_id"))}
+	fromDate := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+	toDate := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	f := core.ReportFilter{Limit: 50, KeyID: q.Get("api_key_id"), GenerationID: strings.TrimSpace(q.Get("generation_id"))}
 	f.AllOrganizations = strings.HasPrefix(r.URL.Path, "/v1/system/")
 	if identity.FinancialAuthorFilter(r.Context()) == "" {
 		user := strings.TrimSpace(q.Get("user"))
@@ -59,24 +61,25 @@ func (s *Server) costReport(w http.ResponseWriter, r *http.Request) {
 	}
 	var err error
 	if q.Get("from") != "" {
-		f.From, err = time.ParseInLocation("2006-01-02", q.Get("from"), location)
+		fromDate, err = time.Parse("2006-01-02", q.Get("from"))
 		if err != nil {
 			bad()
 			return
 		}
 	}
 	if q.Get("to") != "" {
-		f.Until, err = time.ParseInLocation("2006-01-02", q.Get("to"), location)
+		toDate, err = time.Parse("2006-01-02", q.Get("to"))
 		if err != nil {
 			bad()
 			return
 		}
-		f.Until = f.Until.AddDate(0, 0, 1)
 	}
-	if !f.From.Before(f.Until) {
+	if fromDate.After(toDate) {
 		bad()
 		return
 	}
+	f.From = core.ReportDayStart(fromDate, location)
+	f.Until = core.ReportDayStart(toDate.AddDate(0, 0, 1), location)
 	if f.UserID != "" {
 		if _, err = uuid.Parse(f.UserID); err != nil {
 			bad()
