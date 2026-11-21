@@ -17,6 +17,37 @@ MODULE = importlib.util.module_from_spec(SPEC);SPEC.loader.exec_module(MODULE)
 
 
 class PullRequestBoundary(unittest.TestCase):
+    def assert_read_only_permissions(self, ci):
+        self.assertIn('permissions:\n  contents: read\n', ci)
+        lines = ci.splitlines()
+        for index, line in enumerate(lines):
+            permission = re.fullmatch(r'( *)permissions:\s*(.*)', line)
+            if not permission:
+                continue
+            self.assertEqual(permission[2], '', 'Use explicit read-only permission mappings')
+            entries = []
+            for child in lines[index + 1:]:
+                if not child.strip() or child.lstrip().startswith('#'):
+                    continue
+                if len(child) - len(child.lstrip()) <= len(permission[1]):
+                    break
+                self.assertRegex(child, r'^ +[a-z-]+: (?:read|none)\s*(?:#.*)?$')
+                entries.append(child)
+            self.assertTrue(entries, 'Missing explicit permission scope')
+
+    def assert_checkout_boundaries(self, ci):
+        # Check checkout behavior independently of the action's version or pinned SHA.
+        checkouts = list(re.finditer(
+            r'^[ \t]*- (?:name: [^\n]+\n[ \t]+)?uses: actions/checkout@[^\s#]+'
+            r'[ \t]*(?:#[^\n]*)?\n(.*?)(?=^[ \t]*- |\Z)', ci, re.M | re.S))
+        self.assertEqual(len(checkouts), 8)
+        for match in checkouts:
+            block = match[1]
+            self.assertRegex(block, r'(?m)^ +persist-credentials: false\s*(?:#.*)?$')
+            self.assertNotRegex(block, r'(?m)^\s+ref:')
+            self.assertNotRegex(block, r'(?m)^\s+repository:')
+        self.assertNotIn('pull_request.head.sha', ci)
+
     def test_only_requested_main_pr_events_and_existing_manual_reusable_routes(self):
         ci=(ROOT/'.github/workflows/ci.yml').read_text()
         self.assertIn('  pull_request:\n    branches: [main]\n    types: [opened, synchronize, reopened]',ci)
@@ -25,6 +56,7 @@ class PullRequestBoundary(unittest.TestCase):
         self.assertNotIn('secrets: inherit',ci)
         self.assertNotIn('secrets.',ci)
         self.assertNotIn('packages: write',ci);self.assertNotIn('contents: write',ci)
+        self.assert_read_only_permissions(ci)
 
     def test_superseded_runs_group_by_pr_number_and_do_not_cancel_manual_run(self):
         ci=(ROOT/'.github/workflows/ci.yml').read_text()
@@ -33,17 +65,41 @@ class PullRequestBoundary(unittest.TestCase):
         self.assertNotIn('github.head_ref',ci)
 
     def test_fork_checkouts_use_event_merge_sha_without_persisted_credentials(self):
-        ci=(ROOT/'.github/workflows/ci.yml').read_text();count=0
-        for match in re.finditer(r'^\s+- (?:name: [^\n]+\n\s+)?uses: actions/checkout@v6\n(.*?)(?=^\s+- |\Z)',ci,re.M|re.S):
-            count+=1;block=match[1]
-            self.assertIn('persist-credentials: false',block)
-            self.assertNotRegex(block,r'(?m)^\s+ref:')
-            self.assertNotRegex(block,r'(?m)^\s+repository:')
-        self.assertEqual(count,8)
+        ci=(ROOT/'.github/workflows/ci.yml').read_text()
+        self.assert_checkout_boundaries(ci)
         # Default checkout uses GITHUB_SHA (PR merge commit), not the fork head or mutable branch.
-        self.assertNotIn('pull_request.head.sha',ci)
         action=(ROOT/'.github/actions/ui-checks/action.yml').read_text()
         self.assertIn('--source-sha "$GITHUB_SHA"',action)
+
+    def test_checkout_action_updates_preserve_boundary_checks(self):
+        ci = (ROOT/'.github/workflows/ci.yml').read_text()
+        for ref in ('v6', 'v7', 'v7.0.1', 'f' * 40 + ' # v7'):
+            with self.subTest(ref=ref):
+                updated, count = re.subn(r'actions/checkout@[^\s#]+', 'actions/checkout@' + ref, ci)
+                self.assertEqual(count, 8)
+                self.assert_checkout_boundaries(updated)
+                self.assert_read_only_permissions(updated)
+
+    def test_updated_checkout_rejects_unsafe_or_missing_configuration(self):
+        ci = re.sub(r'actions/checkout@[^\s#]+', 'actions/checkout@v7',
+                    (ROOT/'.github/workflows/ci.yml').read_text())
+        for replacement in ('persist-credentials: true', '',
+                            'persist-credentials: false\n          ref: ${{ github.event.pull_request.head.sha }}',
+                            'persist-credentials: false\n          repository: contributor/fork'):
+            with self.subTest(replacement=replacement), self.assertRaises(AssertionError):
+                self.assert_checkout_boundaries(ci.replace('persist-credentials: false', replacement, 1))
+        with self.assertRaises(AssertionError):
+            self.assert_checkout_boundaries(ci.replace('actions/checkout@v7', 'actions/setup-node@v4', 1))
+
+    def test_checkout_update_never_allows_write_permissions(self):
+        ci = re.sub(r'actions/checkout@[^\s#]+', 'actions/checkout@v7',
+                    (ROOT/'.github/workflows/ci.yml').read_text())
+        for unsafe in (ci.replace('contents: read', 'contents: write', 1),
+                       ci.replace('actions: read', 'actions: write', 1),
+                       ci.replace('permissions:\n  contents: read', 'permissions: write-all', 1),
+                       ci.replace('      actions: read', '      actions: read\n      id-token: write', 1)):
+            with self.subTest(workflow=unsafe), self.assertRaises(AssertionError):
+                self.assert_read_only_permissions(unsafe)
 
     def test_pr_never_exposes_api_token_to_prior_run_validation(self):
         ci=(ROOT/'.github/workflows/ci.yml').read_text()
