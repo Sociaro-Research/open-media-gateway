@@ -31,6 +31,7 @@ type AuthorizationRepository interface {
 	AuthorizationAttempt(context.Context, string) (Attempt, error)
 	SaveAuthorizationAttempt(context.Context, Attempt) (Attempt, error)
 	ClearAuthorizationAttempt(context.Context, string, string) error
+	ClearUnsharedAuthorizationAttempt(context.Context, string, string) error
 }
 type AuthorizationView struct {
 	CurrentRevision int64 `json:"current_connection_revision"`
@@ -94,7 +95,7 @@ func (m *Manager) BeginAuthorization(ctx context.Context, owner, origin, name, c
 func (m *Manager) BeginCompanyAuthorization(ctx context.Context, owner, origin, name, clientOrigin string, version int64) (AuthorizationView, error) {
 	return m.beginAuthorization(ctx, owner, origin, name, clientOrigin, version, wa.CompanyAccess)
 }
-func (m *Manager) beginAuthorization(ctx context.Context, owner, origin, name, clientOrigin string, version int64, access string) (AuthorizationView, error) {
+func (m *Manager) beginAuthorization(ctx context.Context, owner, origin, name, clientOrigin string, version int64, access string) (view AuthorizationView, err error) {
 	repo, err := m.authorizationRepo()
 	if err != nil {
 		return AuthorizationView{}, err
@@ -143,9 +144,27 @@ func (m *Manager) beginAuthorization(ctx context.Context, owner, origin, name, c
 	if err != nil {
 		return AuthorizationView{}, err
 	}
-	attempt, err := repo.SaveAuthorizationAttempt(ctx, Attempt{Access: access, Owner: owner, ID: uuid.NewString(), Origin: origin, Name: name, ClientOrigin: clientOrigin, Cipher: encrypted, Version: version, Expires: time.Now().UTC().Add(wa.Lifetime)})
+	id := uuid.NewString()
+	attempt, err := repo.SaveAuthorizationAttempt(ctx, Attempt{Access: access, Owner: owner, ID: id, Origin: origin, Name: name, ClientOrigin: clientOrigin, Cipher: encrypted, Version: version, Expires: time.Now().UTC().Add(wa.Lifetime)})
 	if err != nil {
 		return AuthorizationView{}, err
+	}
+	accepted := false
+	if attempt.ID == id {
+		// This call created the request and nothing has redeemed its proof, so no key
+		// can exist for it. Drop it on failure: keeping it blocks every retry until the
+		// central server confirms a cancellation it may never have received.
+		// Once the central server has accepted this start, or another start has
+		// reused the request and may still have it accepted, keep it: the owner can
+		// still finish or cancel it.
+		defer func() {
+			if err != nil && !accepted {
+				// Bounded: a blocked delete must not hold the failed start's response.
+				cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+				defer cancel()
+				_ = repo.ClearUnsharedAuthorizationAttempt(cleanup, owner, id)
+			}
+		}()
 	}
 	if !attempt.Expires.After(time.Now()) {
 		return AuthorizationView{}, wa.ErrUnavailable
@@ -201,6 +220,9 @@ func (m *Manager) beginAuthorization(ctx context.Context, owner, origin, name, c
 	if response.StatusCode != 200 {
 		return AuthorizationView{}, ErrUnavailable
 	}
+	// A 200 may mean the central server accepted this start even when its reply
+	// cannot be read or checked, so from here on the request is kept.
+	accepted = true
 	data, err := io.ReadAll(io.LimitReader(response.Body, MaxJSON+1))
 	if err != nil || len(data) > MaxJSON {
 		return AuthorizationView{}, ErrUnavailable
@@ -211,7 +233,7 @@ func (m *Manager) beginAuthorization(ctx context.Context, owner, origin, name, c
 	if json.Unmarshal(data, &reply) != nil || reply.Code != wa.UserCode(string(raw)) {
 		return AuthorizationView{}, ErrUnavailable
 	}
-	view, e := m.Authorization(ctx, owner)
+	view, e = m.Authorization(ctx, owner)
 	if e != nil {
 		return AuthorizationView{}, e
 	}

@@ -2,11 +2,14 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -37,6 +40,9 @@ func (f *cancelConfirmationFixture) ClearAuthorizationAttempt(context.Context, s
 		f.beforeClear()
 	}
 	f.cleared = true
+	return nil
+}
+func (f *cancelConfirmationFixture) ClearUnsharedAuthorizationAttempt(context.Context, string, string) error {
 	return nil
 }
 func TestCancellationKeepsProofUnlessHostConfirms(t *testing.T) {
@@ -174,6 +180,198 @@ func TestExpiredLocalAttemptCannotLoseRevocationProofOnNewStart(t *testing.T) {
 	}
 }
 
+func TestFailedNewStartKeepsNoRequestSoRetryWorks(t *testing.T) {
+	db := workspaceDatabase(t)
+	ctx := context.Background()
+	owner, e := postgres.NewAuthRepository(db).UpsertGoogleUser(ctx, uuid.NewString(), uuid.NewString()+"@fixture.test", "Local admin", "")
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = db.Exec(`UPDATE users SET is_system_admin=TRUE WHERE id=$1`, owner.ID); e != nil {
+		t.Fatal(e)
+	}
+	var status atomic.Int32
+	status.Store(http.StatusServiceUnavailable)
+	host := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if code := int(status.Load()); code != http.StatusOK {
+			w.WriteHeader(code)
+			return
+		}
+		var in struct {
+			Device string `json:"device_code"`
+		}
+		if json.NewDecoder(r.Body).Decode(&in) != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		fmt.Fprintf(w, `{"user_code":%q}`, wa.UserCode(in.Device))
+	}))
+	defer host.Close()
+	down := httptest.NewTLSServer(http.NotFoundHandler())
+	downURL, downClient := down.URL, down.Client()
+	down.Close()
+	cipher, _ := providerconfig.NewCipher(strings.Repeat("r", 32))
+	repo := postgres.NewSystemRepository(db)
+	manager := remote.New(repo, cipher, host.Client())
+	begin := func(m *remote.Manager, origin string) (remote.AuthorizationView, error) {
+		return m.BeginAuthorization(ctx, owner.ID, origin, "Local installation", "http://localhost:8088", 0)
+	}
+	kept := func() (remote.Attempt, bool) {
+		attempt, err := repo.AuthorizationAttempt(ctx, owner.ID)
+		return attempt, !errors.Is(err, remote.ErrNotFound)
+	}
+	if _, e = begin(remote.New(repo, cipher, downClient), downURL); !errors.Is(e, remote.ErrUnavailable) {
+		t.Fatal("unreachable server accepted start", e)
+	}
+	if _, ok := kept(); ok {
+		t.Fatal("unreachable server left a request that blocks the next try")
+	}
+	if _, e = begin(manager, host.URL); !errors.Is(e, remote.ErrUnavailable) {
+		t.Fatal("refused start succeeded", e)
+	}
+	if _, ok := kept(); ok {
+		t.Fatal("refused start left a request that blocks the next try")
+	}
+	status.Store(http.StatusOK)
+	view, e := begin(manager, host.URL)
+	if e != nil || view.Code == "" {
+		t.Fatal("retry after a failed start did not begin at once", e)
+	}
+	// A request the server already accepted keeps its proof when a later retry fails.
+	status.Store(http.StatusBadGateway)
+	if _, e = begin(manager, host.URL); !errors.Is(e, remote.ErrUnavailable) {
+		t.Fatal("failed retry succeeded", e)
+	}
+	if attempt, ok := kept(); !ok || attempt.ID != view.ID {
+		t.Fatal("accepted request lost its proof on a failed retry")
+	}
+}
+
+func TestFailedCreatorKeepsRequestAConcurrentStartReturned(t *testing.T) {
+	db := workspaceDatabase(t)
+	ctx := context.Background()
+	owner, e := postgres.NewAuthRepository(db).UpsertGoogleUser(ctx, uuid.NewString(), uuid.NewString()+"@fixture.test", "Local admin", "")
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = db.Exec(`UPDATE users SET is_system_admin=TRUE WHERE id=$1`, owner.ID); e != nil {
+		t.Fatal(e)
+	}
+	var starts atomic.Int32
+	held, release := make(chan struct{}), make(chan struct{})
+	host := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/auth/workspace/cancel" {
+			fmt.Fprint(w, `{"cancelled":true}`)
+			return
+		}
+		var in struct {
+			Device string `json:"device_code"`
+		}
+		if json.NewDecoder(r.Body).Decode(&in) != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		// The first start (the creator) is held, then fails after the second one succeeded.
+		if starts.Add(1) == 1 {
+			close(held)
+			<-release
+			w.WriteHeader(http.StatusBadGateway)
+			return
+		}
+		fmt.Fprintf(w, `{"user_code":%q}`, wa.UserCode(in.Device))
+	}))
+	defer host.Close()
+	letCreatorFail := sync.OnceFunc(func() { close(release) })
+	defer letCreatorFail()
+	cipher, _ := providerconfig.NewCipher(strings.Repeat("s", 32))
+	repo := postgres.NewSystemRepository(db)
+	manager := remote.New(repo, cipher, host.Client())
+	begin := func() (remote.AuthorizationView, error) {
+		return manager.BeginAuthorization(ctx, owner.ID, host.URL, "Local installation", "http://localhost:8088", 0)
+	}
+	creator := make(chan error, 1)
+	go func() { _, err := begin(); creator <- err }()
+	select {
+	case <-held:
+	case e := <-creator:
+		t.Fatal("creator start failed before the host received it", e)
+	case <-time.After(30 * time.Second):
+		t.Fatal("host never received the creator start")
+	}
+	view, e := begin()
+	if e != nil || view.Code == "" {
+		t.Fatal("concurrent start did not reuse the pending request", e)
+	}
+	letCreatorFail()
+	if e = <-creator; !errors.Is(e, remote.ErrUnavailable) {
+		t.Fatal("held start did not fail", e)
+	}
+	kept, e := repo.AuthorizationAttempt(ctx, owner.ID)
+	if e != nil || kept.ID != view.ID || len(kept.Cipher) == 0 {
+		t.Fatal("failed creator dropped the request another start returned", e)
+	}
+	if resumed, e := manager.Authorization(ctx, owner.ID); e != nil || resumed.ID != view.ID || resumed.Code != view.Code {
+		t.Fatal("returned request cannot be resumed", e)
+	}
+	if e = manager.CancelAuthorization(ctx, owner.ID, view.ID); e != nil {
+		t.Fatal("returned request cannot be cancelled", e)
+	}
+}
+
+// failingLookupRepository fails the read that follows an accepted start, like a
+// database error right after the central server said yes.
+type failingLookupRepository struct {
+	*postgres.SystemRepository
+	fail atomic.Bool
+}
+
+func (r *failingLookupRepository) AuthorizationAttempt(ctx context.Context, owner string) (remote.Attempt, error) {
+	if r.fail.Load() {
+		return remote.Attempt{}, errors.New("synthetic database failure")
+	}
+	return r.SystemRepository.AuthorizationAttempt(ctx, owner)
+}
+
+func TestAcceptedStartKeepsRequestWhenReadingItBackFails(t *testing.T) {
+	db := workspaceDatabase(t)
+	ctx := context.Background()
+	owner, e := postgres.NewAuthRepository(db).UpsertGoogleUser(ctx, uuid.NewString(), uuid.NewString()+"@fixture.test", "Local admin", "")
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = db.Exec(`UPDATE users SET is_system_admin=TRUE WHERE id=$1`, owner.ID); e != nil {
+		t.Fatal(e)
+	}
+	repo := &failingLookupRepository{SystemRepository: postgres.NewSystemRepository(db)}
+	host := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var in struct {
+			Device string `json:"device_code"`
+		}
+		if json.NewDecoder(r.Body).Decode(&in) != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		// The central server accepts; only the local read after it fails.
+		repo.fail.Store(true)
+		fmt.Fprintf(w, `{"user_code":%q}`, wa.UserCode(in.Device))
+	}))
+	defer host.Close()
+	cipher, _ := providerconfig.NewCipher(strings.Repeat("a", 32))
+	manager := remote.New(repo, cipher, host.Client())
+	if _, e = manager.BeginAuthorization(ctx, owner.ID, host.URL, "Local installation", "http://localhost:8088", 0); e == nil {
+		t.Fatal("start succeeded although reading the request back failed")
+	}
+	repo.fail.Store(false)
+	kept, e := repo.AuthorizationAttempt(ctx, owner.ID)
+	if e != nil || len(kept.Cipher) == 0 {
+		t.Fatal("request the central server accepted was dropped", e)
+	}
+	// The owner can still see the code and finish or cancel it.
+	if view, e := manager.Authorization(ctx, owner.ID); e != nil || view.ID != kept.ID || view.Code == "" {
+		t.Fatal("accepted request cannot be resumed", e)
+	}
+}
+
 func TestLegacyIssuedReplyCannotBecomeDedicated(t *testing.T) {
 	calls := 0
 	host := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -191,5 +389,125 @@ func TestLegacyIssuedReplyCannotBecomeDedicated(t *testing.T) {
 	manager := remote.New(repo, cipher, host.Client())
 	if _, err := manager.PollAuthorization(context.Background(), "alice", "attempt"); !errors.Is(err, wa.ErrLegacy) || repo.cleared || calls != 1 {
 		t.Fatal("legacy reply relabeled or discarded", err, calls)
+	}
+}
+
+// The creator fails after the central server answered the reusing start but before
+// that start has finished, so nothing has marked the request accepted yet.
+func TestFailedCreatorKeepsRequestAReusingStartIsStillFinishing(t *testing.T) {
+	db := workspaceDatabase(t)
+	ctx := context.Background()
+	owner, e := postgres.NewAuthRepository(db).UpsertGoogleUser(ctx, uuid.NewString(), uuid.NewString()+"@fixture.test", "Local admin", "")
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = db.Exec(`UPDATE users SET is_system_admin=TRUE WHERE id=$1`, owner.ID); e != nil {
+		t.Fatal(e)
+	}
+	var starts atomic.Int32
+	creatorHeld, releaseCreator := make(chan struct{}), make(chan struct{})
+	reuserAnswered, finishReuser := make(chan struct{}), make(chan struct{})
+	host := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var in struct {
+			Device string `json:"device_code"`
+		}
+		if json.NewDecoder(r.Body).Decode(&in) != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		if starts.Add(1) == 1 {
+			close(creatorHeld)
+			<-releaseCreator
+			w.WriteHeader(http.StatusBadGateway)
+			return
+		}
+		// The reply is sent, but the body only ends once the creator has failed.
+		fmt.Fprintf(w, `{"user_code":%q}`, wa.UserCode(in.Device))
+		w.(http.Flusher).Flush()
+		close(reuserAnswered)
+		<-finishReuser
+	}))
+	defer host.Close()
+	letCreatorFail, letReuserFinish := sync.OnceFunc(func() { close(releaseCreator) }), sync.OnceFunc(func() { close(finishReuser) })
+	defer letReuserFinish()
+	defer letCreatorFail()
+	cipher, _ := providerconfig.NewCipher(strings.Repeat("s", 32))
+	repo := postgres.NewSystemRepository(db)
+	manager := remote.New(repo, cipher, host.Client())
+	type result struct {
+		view remote.AuthorizationView
+		err  error
+	}
+	begin := func(out chan<- result) {
+		view, err := manager.BeginAuthorization(ctx, owner.ID, host.URL, "Local installation", "http://localhost:8088", 0)
+		out <- result{view, err}
+	}
+	wait := func(ready <-chan struct{}, what string) {
+		select {
+		case <-ready:
+		case <-time.After(30 * time.Second):
+			t.Fatal(what)
+		}
+	}
+	creator, reuser := make(chan result, 1), make(chan result, 1)
+	go begin(creator)
+	wait(creatorHeld, "host never received the creator start")
+	go begin(reuser)
+	wait(reuserAnswered, "host never answered the reusing start")
+	letCreatorFail()
+	if r := <-creator; !errors.Is(r.err, remote.ErrUnavailable) {
+		t.Fatal("held creator start did not fail", r.err)
+	}
+	if _, e = repo.AuthorizationAttempt(ctx, owner.ID); e != nil {
+		t.Fatal("failed creator dropped the request another start was still finishing", e)
+	}
+	letReuserFinish()
+	r := <-reuser
+	if r.err != nil || r.view.Code == "" {
+		t.Fatal("start the central server accepted failed after the creator failed", r.err)
+	}
+	if resumed, e := manager.Authorization(ctx, owner.ID); e != nil || resumed.ID != r.view.ID || resumed.Code != r.view.Code {
+		t.Fatal("returned request cannot be resumed", e)
+	}
+}
+
+// A 200 whose body is cut off may still be an accepted start: keep its request.
+func TestUnreadableAcceptedStartKeepsRequest(t *testing.T) {
+	db := workspaceDatabase(t)
+	ctx := context.Background()
+	owner, e := postgres.NewAuthRepository(db).UpsertGoogleUser(ctx, uuid.NewString(), uuid.NewString()+"@fixture.test", "Local admin", "")
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = db.Exec(`UPDATE users SET is_system_admin=TRUE WHERE id=$1`, owner.ID); e != nil {
+		t.Fatal(e)
+	}
+	host := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/auth/workspace/cancel" {
+			fmt.Fprint(w, `{"cancelled":true}`)
+			return
+		}
+		fmt.Fprint(w, `{"user_code":`)
+	}))
+	defer host.Close()
+	cipher, _ := providerconfig.NewCipher(strings.Repeat("u", 32))
+	repo := postgres.NewSystemRepository(db)
+	manager := remote.New(repo, cipher, host.Client())
+	if _, e = manager.BeginAuthorization(ctx, owner.ID, host.URL, "Local installation", "http://localhost:8088", 0); !errors.Is(e, remote.ErrUnavailable) {
+		t.Fatal("unreadable reply was taken as a usable start", e)
+	}
+	kept, e := repo.AuthorizationAttempt(ctx, owner.ID)
+	if e != nil || len(kept.Cipher) == 0 {
+		t.Fatal("start with a 200 reply dropped its request", e)
+	}
+	resumed, e := manager.Authorization(ctx, owner.ID)
+	if e != nil || resumed.ID != kept.ID || resumed.Code == "" {
+		t.Fatal("kept request cannot be resumed", e)
+	}
+	if e = manager.CancelAuthorization(ctx, owner.ID, kept.ID); e != nil {
+		t.Fatal("kept request cannot be cancelled", e)
+	}
+	if _, e = repo.AuthorizationAttempt(ctx, owner.ID); !errors.Is(e, remote.ErrNotFound) {
+		t.Fatal("cancelled request is still saved", e)
 	}
 }

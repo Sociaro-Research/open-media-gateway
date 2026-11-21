@@ -5,7 +5,7 @@ const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),
 const root=path.resolve(__dirname,'../../web/public/ui'),base='/v1/system/remote-workspace',company='11111111-1111-4111-8111-111111111111';
 const engine=process.env.UI_BROWSER_ENGINE||'chromium',out=process.env.UI_SCREENSHOT_DIR||'/tmp/gateway-workspace-authorization';
 let localOrigin,centralOrigin,attempt=null,status='pending',connection={connected:false,version:0},starts=0,approvals=0,cancels=0,polls=0,signed=false,account='customer',fingerprint,replacePrevious=false;
-let loseStart=false,losePoll=false,loseCancel=false,loseApproval=false,slow=false,failCancel=false,malformed=false,holdInspect,holdConnection,heldInspect,heldConnection,heldPoll,holdPoll=false,holdApproval=false,heldApproval;
+let refuseStart=false,refused=0,loseStart=false,losePoll=false,loseCancel=false,loseApproval=false,slow=false,failCancel=false,malformed=false,holdInspect,holdConnection,heldInspect,heldConnection,heldPoll,holdPoll=false,holdApproval=false,heldApproval;
 const requests=[],errors=[],external=[],checks=[];
 checks.push=((push)=>function(...items){console.log('CHECK',...items);return push.apply(this,items);})(checks.push);
 const codes=['ABCDEFGHJKLMN','BCDEFGHJKLMNP','CDEFGHJKLMNPQ','DEFGHJKLMNPQR','EFGHJKLMNPQRS','FGHJKLMNPQRST','GHJKLMNPQRSTU','HJKLMNPQRSTUV','JKLMNPQRSTUVW'];
@@ -23,6 +23,7 @@ const local=http.createServer(async(req,res)=>{try{const url=new URL(req.url,'ht
   if(req.method==='GET')return json(res,200,attempt||{pending:false});
   if(req.method==='DELETE'){cancels++;assert.equal(b.id,attempt?.id);if(failCancel)return json(res,502,{error:{message:'Cancellation could not be confirmed'}});attempt=null;status='cancelled';if(loseCancel){loseCancel=false;return json(res,502,{error:{message:'Synthetic lost success response'}});}return json(res,200,{cancelled:true});}
   assert.deepEqual(Object.keys(b).sort(),['consent','version']);assert.equal(b.consent,true);assert.equal(b.version,connection.version);
+  if(refuseStart){refused++;return json(res,502,{error:{code:'remote_unavailable',message:'remote workspace could not be verified; check server, key and membership'}});}
   if(!attempt){assert.ok(codes[starts],'fixture has bounded codes');const code=codes[starts++];attempt={id:'request-'+starts,base_version:connection.version,user_code:code,origin:centralOrigin,client_name:'My installation',client_origin:localOrigin,expires_at:new Date(Date.now()+600000).toISOString(),verification_uri:centralOrigin+'/#workspace_authorize='+code};status='pending';fingerprint=undefined;}
   if(loseStart){loseStart=false;return json(res,502,{error:{message:'Synthetic lost success response'}});}return json(res,200,attempt);
  }
@@ -79,6 +80,10 @@ const central=http.createServer(async(req,res)=>{try{const url=new URL(req.url,'
  try{
   page.setDefaultTimeout(10000);host.setDefaultTimeout(10000);await page.goto(localOrigin);await page.getByRole('button',{name:'Change Mode'}).waitFor();assert.equal(starts,0);assert.equal(approvals,0);
   await page.getByRole('button',{name:'Change Mode'}).click();await page.locator('input[value=central]').check();assert.equal(starts,0);await page.keyboard.press('Escape');await page.locator('.setup-dialog').waitFor({state:'hidden'});checks.push('render and radio selection create no request');
+  // A start the server refused keeps nothing: say so plainly and allow a new try at once.
+  refuseStart=true;await page.getByRole('button',{name:'Change Mode',exact:true}).click();const setup=page.locator('.setup-dialog');await setup.waitFor({state:'visible'});await setup.locator('input[value=central]').check();await setup.getByText(/Unlock ready-to-use providers/).waitFor();await setup.getByRole('button',{name:'Connect to central server',exact:true}).focus();await page.keyboard.press('Enter');
+  await localDialog.getByText('Could not connect to the central server at '+new URL(centralOrigin).host+'. Nothing was saved, so you can try again.',{exact:true}).waitFor();assert.equal(refused,1);assert.equal(attempt,null);assert.equal(await localDialog.getByText(/Check this code/).count(),0);
+  await localDialog.getByRole('button',{name:'Connect to central server',exact:true}).click();await until(()=>refused===2);await page.waitForFunction(()=>[...document.querySelectorAll('.remote-dialog button')].some(b=>b.textContent==='Connect to central server'&&!b.disabled));assert.equal(starts,0);refuseStart=false;await close();checks.push('refused start keeps nothing and retries at once');
   const uri=await connect();assert.equal(starts,1);assert.equal(await localDialog.locator('input').count(),0);assert.ok(uri.startsWith(centralOrigin+'/#workspace_authorize='));assert.equal(approvals,0);await matrix(page,'local-pending');
   // Real login shell remembers only the bounded code; no grant exists on sign-in.
   await host.goto(uri);await host.getByRole('button',{name:'Sign in',exact:true}).waitFor();assert.equal(await host.evaluate(()=>JSON.parse(sessionStorage.getItem('gateway-workspace-authorization')).code),attempt.user_code);await host.getByRole('button',{name:'Sign in',exact:true}).click();await hostDialog.getByRole('button',{name:'Connect',exact:true}).waitFor();assert.equal(approvals,0);assert.equal(await hostDialog.locator('input[type=checkbox]').count(),0);await hostDialog.getByText(/Check that this code matches/).waitFor();await matrix(host,'central-approval');

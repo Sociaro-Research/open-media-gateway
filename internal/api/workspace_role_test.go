@@ -102,12 +102,8 @@ func TestAuthorizationForbiddenProvenance(t *testing.T) {
 			if tc.disabled != errors.Is(err, wa.ErrDisabled) || !tc.disabled && !errors.Is(err, wa.ErrForbidden) {
 				t.Fatalf("classification: %v", err)
 			}
-			attempt, e := repo.AuthorizationAttempt(context.Background(), u.ID)
-			if e != nil {
-				t.Fatal(e)
-			}
-			if e = repo.ClearAuthorizationAttempt(context.Background(), u.ID, attempt.ID); e != nil {
-				t.Fatal(e)
+			if _, e := repo.AuthorizationAttempt(context.Background(), u.ID); !errors.Is(e, remote.ErrNotFound) {
+				t.Fatal("refused start kept its request", e)
 			}
 		})
 	}

@@ -96,7 +96,8 @@
    FormUI.message(status,'Finish connecting in the central server window. If it did not open, choose Open central server.');if(Date.parse(view.expires_at)<=Date.now())offerRecovery();schedule(5000);
   }
   async function recoverStart(error){
-   try{const saved=await api(endpoint);if(!active())return;if(saved.id){waiting(saved);clearTimeout(timer);FormUI.message(status,error.message+' The same request is kept. Retry it or cancel before starting again.','error');button('Retry request',false,start);offerRecovery();return;}}catch{/* Never replace an uncertain request automatically. */}
+   try{const saved=await api(endpoint);if(!active())return;if(saved.id){waiting(saved);clearTimeout(timer);FormUI.message(status,error.message+' The same request is kept. Retry it or cancel before starting again.','error');button('Retry request',false,start);offerRecovery();return;}
+    if(saved.pending===false){closeBlank();ready();FormUI.message(status,(error.status===502?'Could not connect to the central server at '+new URL(site.central_origin).host+'.':error.message)+' Nothing was saved, so you can try again.','error');return;}}catch{/* Never replace an uncertain request automatically. */}
    if(active()){closeBlank();details.replaceChildren();actions.replaceChildren();FormUI.message(status,error.message+' Check the saved request before trying again.','error');button('Check saved request',true,load);}
   }
   async function start(){
