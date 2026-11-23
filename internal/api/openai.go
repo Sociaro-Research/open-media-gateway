@@ -540,7 +540,9 @@ func (s *Server) openAIInput(r *http.Request, fields map[string]json.RawMessage)
 		// Only reviewed public names may be echoed, including deliberately
 		// unsupported controls documented in openai-api.md. Unknown keys can be
 		// arbitrarily long or contain credentials accidentally pasted as keys.
-		if slices.Contains([]string{"provider", "media_type", "input", "voice", "instructions", "size", "seconds", "quality", "background", "output_format", "response_format", "image", "input_reference", "stream", "n", "speed"}, key) {
+		if slices.Contains([]string{"provider", "media_type", "input", "voice", "instructions", "size", "seconds", "quality", "background", "output_format", "response_format", "image", "input_reference", "stream", "n", "speed",
+			// Other OpenAI image/speech request fields; the gateway does not implement them.
+			"mask", "input_fidelity", "user", "moderation", "output_compression", "partial_images", "style", "stream_format"}, key) {
 			if key == "speed" {
 				return fail("speed", "unsupported parameter: speed; remove this top-level field and inspect GET /v1/models. Provider-specific controls belong in options.parameters and must be advertised by the model")
 			}
