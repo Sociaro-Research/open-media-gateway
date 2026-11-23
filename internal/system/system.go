@@ -14,6 +14,15 @@ var ErrRoleConflict = errors.New("remove administrator and manager roles before 
 
 var ErrLastAdmin = errors.New("the last administrator cannot be removed")
 var ErrNotFound = errors.New("user not found")
+
+// ErrOrganizationNotFound matches ErrNotFound but names the missing organization.
+var ErrOrganizationNotFound error = organizationNotFound{}
+
+type organizationNotFound struct{}
+
+func (organizationNotFound) Error() string        { return "organization not found" }
+func (organizationNotFound) Is(target error) bool { return target == ErrNotFound }
+
 var ErrClientManagerRole = errors.New("The selected user does not have the Client manager role.")
 var ErrSetupBusy = errors.New("finish active generations before disabling their provider access")
 

@@ -112,7 +112,7 @@ func TestModelSettingsPersistenceGrantsAndAdmission(t *testing.T) {
 	if _, err = repo.SaveOrganization(ctx, admin.ID, org.ID, modelaccess.Access{ModelIDs: []string{first.ID}, Version: 1}); !errors.Is(err, system.ErrConflict) {
 		t.Fatal("stale grants overwrite", err)
 	}
-	if _, err = repo.SaveOrganization(ctx, admin.ID, uuid.NewString(), modelaccess.Access{ModelIDs: []string{first.ID}, Version: 1}); !errors.Is(err, system.ErrNotFound) {
+	if _, err = repo.SaveOrganization(ctx, admin.ID, uuid.NewString(), modelaccess.Access{ModelIDs: []string{first.ID}, Version: 1}); !errors.Is(err, system.ErrNotFound) || err.Error() != "organization not found" {
 		t.Fatal("unknown organization reported as", err)
 	}
 	allowed, err := repo.List(ctx, org.ID, "mock")

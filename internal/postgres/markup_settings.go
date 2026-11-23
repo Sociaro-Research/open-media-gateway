@@ -74,7 +74,7 @@ func (r *SystemRepository) Markups(ctx context.Context, actor, org string) (mark
 		return p, err
 	}
 	if org != "" && p.Company.Version == 0 {
-		return p, system.ErrNotFound
+		return p, system.ErrOrganizationNotFound
 	}
 	return p, tx.Commit()
 }

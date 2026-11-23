@@ -17,7 +17,7 @@ func readRequestLimits(ctx context.Context, q rowQuerier, org string) (limits.Po
 		return p, err
 	}
 	if org != "" && p.Organization.Version == 0 {
-		return p, system.ErrNotFound
+		return p, system.ErrOrganizationNotFound
 	}
 	if err = json.Unmarshal(global, &p.System.Values); err != nil {
 		return p, err
@@ -44,7 +44,7 @@ func versionConflict(ctx context.Context, q rowQuerier, org string) error {
 		return err
 	}
 	if !exists {
-		return system.ErrNotFound
+		return system.ErrOrganizationNotFound
 	}
 	return system.ErrConflict
 }

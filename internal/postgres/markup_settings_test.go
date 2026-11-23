@@ -79,7 +79,7 @@ func TestMarkupRulesPersistenceAndPricing(t *testing.T) {
 	if _, err = sys.SaveMarkups(ctx, admin.ID, "", config); !errors.Is(err, system.ErrConflict) {
 		t.Fatalf("stale version: %v", err)
 	}
-	if _, err = sys.SaveMarkups(ctx, admin.ID, uuid.NewString(), markup.Config{Version: 1}); !errors.Is(err, system.ErrNotFound) {
+	if _, err = sys.SaveMarkups(ctx, admin.ID, uuid.NewString(), markup.Config{Version: 1}); !errors.Is(err, system.ErrNotFound) || err.Error() != "organization not found" {
 		t.Fatalf("unknown organization reported as %v", err)
 	}
 	// Updating other system settings must retain all exceptions.
