@@ -183,6 +183,13 @@ func TestAuditFiltersPaginationAndSafeFailures(t *testing.T) {
 	if w.Code != 200 || f.filters[len(f.filters)-1].BeforeID != 10 {
 		t.Fatal("cursor ignored")
 	}
+	// Stored organization IDs are lowercase text, so an accepted UUID is matched in that form.
+	const upper, lower = "ABCDEF01-2345-4678-89AB-CDEF01234567", "abcdef01-2345-4678-89ab-cdef01234567"
+	for _, path := range []string{"/v1/audit/events?organization_id=" + upper, "/v1/audit/revoked-keys?organization_id=" + upper, "/v1/organizations/" + upper + "/audit/events", "/v1/organizations/" + upper + "/audit/revoked-keys"} {
+		if w := sendTest(h, "GET", path, "", "alice", ""); w.Code != 200 || f.filters[len(f.filters)-1].OrganizationID != lower {
+			t.Errorf("%s: HTTP %d, filtered by %q", path, w.Code, f.filters[len(f.filters)-1].OrganizationID)
+		}
+	}
 	w = sendTest(h, "PUT", "/v1/system/settings?token=never-log", "{\"secret\":\"never-log\"}", "bob", "")
 	if w.Code != 403 || f.failures != 1 || f.correlation == "" {
 		t.Fatal("denied mutation absent", w.Code, f)

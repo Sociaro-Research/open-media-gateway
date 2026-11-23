@@ -141,9 +141,12 @@ func auditFilter(w http.ResponseWriter, r *http.Request, org string, revoked boo
 		return bad(param, "from must be on or before to. Without them, from is the first day of this month and to is today.")
 	}
 	if f.OrganizationID != "" {
-		if _, e := uuid.Parse(f.OrganizationID); e != nil {
+		id, e := uuid.Parse(f.OrganizationID)
+		if e != nil {
 			return bad("organization_id", "organization_id must be an organization ID (UUID)")
 		}
+		// Audit rows store the canonical lowercase text form.
+		f.OrganizationID = id.String()
 	}
 	for _, name := range []string{"actor_id", "action", "object_type", "object_id", "correlation_id"} {
 		if len(q.Get(name)) > 200 {
