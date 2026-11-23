@@ -378,6 +378,8 @@ makes their download routes unavailable, while retaining history and costs.
   When admission cannot be confirmed (HTTP 503) for a request without
   `Idempotency-Key`, the response carries `X-Should-Retry: false` so SDKs do not
   resend it automatically. Send an `Idempotency-Key` to make retries safe.
+  Every HTTP 409 also carries `X-Should-Retry: false`: SDKs treat 409 as a
+  retryable lock timeout, but resending cannot clear a Gateway conflict.
 
 ## Single generation contract
 

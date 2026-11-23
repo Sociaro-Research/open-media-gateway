@@ -105,6 +105,10 @@ func TestS3ReferenceRedirectAndEarlyUploadRejection(t *testing.T) {
 		if w.Code != 409 || !strings.Contains(w.Body.String(), "direct_upload_required") {
 			t.Fatalf("%s: %d %s", endpoint, w.Code, w.Body)
 		}
+		// Otherwise an OpenAI SDK resends the whole upload twice before failing.
+		if w.Header().Get("X-Should-Retry") != "false" {
+			t.Fatalf("%s: X-Should-Retry=%q", endpoint, w.Header().Get("X-Should-Retry"))
+		}
 	}
 }
 func TestS3ResultRedirectsPreserveOwnerAndArtifact(t *testing.T) {
