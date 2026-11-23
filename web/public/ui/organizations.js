@@ -98,7 +98,7 @@
   ];
   const timezone=Intl.DateTimeFormat().resolvedOptions().timeZone;let members=null;
   const checks={
-   key:async()=>(await api('/v1/api-keys?organization_id='+encodeURIComponent(o.id))).data.some(k=>k.organization_id===o.id),
+   key:async()=>(await api('/v1/api-keys?organization_id='+encodeURIComponent(o.id))).data.some(k=>k.organization_id===o.id&&!k.revoked_at&&!(k.expires_at&&Date.parse(k.expires_at)<=Date.now())),
    credit:async()=>Number(o.balance_usd)>0||Number(o.credit_limit_usd)>0,
    request:async()=>(await api(base+'/reports?'+new URLSearchParams({from:'0001-01-01',to:'9999-12-30',limit:'1',timezone}))).data.length>0,
    team:async()=>(members=(await api(base+'/members')).data).length>1||(await api(base+'/invitations')).data.some(i=>invitationState(i)==='Pending'),
