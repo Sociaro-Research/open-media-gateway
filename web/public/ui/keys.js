@@ -58,8 +58,8 @@
       recipientField.append(recipientLabel,recipient);const creationFields=form.querySelector('.keys-fields');creationFields.classList.add('key-creation-fields-with-recipient');creationFields.prepend(recipientField);
       const orgScope=node('label');orgScope.innerHTML='<input type="checkbox" name="organizations"> Manage organization';form.querySelector('fieldset').append(orgScope);
       form.elements.providers.closest('label').remove();form.elements.storage.closest('label').remove();
-      // A key acts with its recipient's role, so offer only the scopes that role can use. Members carry no system flag, so Manage system stays on the administrator's own key.
-      syncScopes=()=>{const role=members.find(m=>m.id===recipient.value)?.role;for(const [name,usable] of [['keys',OrganizationRoles.issue(role,true)||OrganizationRoles.statistics(role)],['organizations',OrganizationRoles.statistics(role)],['system',Workspace.isSelf(recipient.value)]]){const box=form.elements[name];if(!box)continue;box.closest('label').hidden=!usable;if(!usable)box.checked=false;}};
+      // A key acts with its recipient's role, so offer only the scopes that role can use. Every role keeps Manage API keys: a Member's key uses it to list that Member's own keys. Members carry no system flag, so Manage system stays on the administrator's own key.
+      syncScopes=()=>{const role=members.find(m=>m.id===recipient.value)?.role;for(const [name,usable] of [['keys',!!role],['organizations',OrganizationRoles.statistics(role)],['system',Workspace.isSelf(recipient.value)]]){const box=form.elements[name];if(!box)continue;box.closest('label').hidden=!usable;if(!usable)box.checked=false;}};
       recipient.addEventListener('change',syncScopes);form.addEventListener('reset',()=>setTimeout(syncScopes));syncScopes();
     }
     content.append(form);
