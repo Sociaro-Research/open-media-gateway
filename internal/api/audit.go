@@ -295,8 +295,10 @@ func (s *Server) recordAuditFailure(r *http.Request, status int) {
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), 2*time.Second)
 	defer cancel()
 	org := r.PathValue("org")
-	if _, err := uuid.Parse(org); err != nil {
+	if id, err := uuid.Parse(org); err != nil {
 		org = ""
+	} else {
+		org = id.String() // rows are matched by the lowercase form
 	}
 	// The registered route template excludes arbitrary path tokens and query text.
 	if err := store.AuditFailure(ctx, org, "management_request", "request", r.Pattern, status); err != nil {

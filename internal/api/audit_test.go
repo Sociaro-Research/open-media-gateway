@@ -200,6 +200,11 @@ func TestAuditFiltersPaginationAndSafeFailures(t *testing.T) {
 	if w.Code != 403 || f.failures != 2 {
 		t.Fatal("insufficient scope mutation absent", w.Code, f.failures)
 	}
+	// A denied request on an uppercase organization path is stored under the lowercase ID the filters use.
+	w = sendTest(h, "PUT", "/v1/organizations/"+upper+"/limits", "{}", "", secret)
+	if w.Code != 403 || f.failures != 3 || f.failedOrg != lower {
+		t.Fatalf("uppercase organization failure: HTTP %d, %d failures, org %q", w.Code, f.failures, f.failedOrg)
+	}
 	// The old public reader is removed; it must never silently return legacy data.
 	w = sendTest(h, http.MethodGet, "/v1/system/events", "", "alice", "")
 	if w.Code == 200 {
