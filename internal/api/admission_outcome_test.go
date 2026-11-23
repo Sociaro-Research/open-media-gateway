@@ -142,8 +142,8 @@ func TestGenerationKnownAdmissionRejectionsKeepContract(t *testing.T) {
 				t.Fatal("known rejection changed", w.Code, w.Body.String(), svc.creates)
 			}
 			// OpenAI SDKs resend a 409 twice as a lock timeout; these conflicts never clear by resending.
-			if want := map[bool]string{true: "false"}[tc.status == http.StatusConflict]; w.Header().Get("X-Should-Retry") != want {
-				t.Fatalf("X-Should-Retry=%q, want %q", w.Header().Get("X-Should-Retry"), want)
+			if want := map[bool]string{true: "false"}[tc.status == http.StatusConflict]; w.Result().Header.Get("X-Should-Retry") != want {
+				t.Fatalf("X-Should-Retry=%q, want %q", w.Result().Header.Get("X-Should-Retry"), want)
 			}
 		})
 	}

@@ -106,8 +106,8 @@ func TestS3ReferenceRedirectAndEarlyUploadRejection(t *testing.T) {
 			t.Fatalf("%s: %d %s", endpoint, w.Code, w.Body)
 		}
 		// Otherwise an OpenAI SDK resends the whole upload twice before failing.
-		if w.Header().Get("X-Should-Retry") != "false" {
-			t.Fatalf("%s: X-Should-Retry=%q", endpoint, w.Header().Get("X-Should-Retry"))
+		if w.Result().Header.Get("X-Should-Retry") != "false" {
+			t.Fatalf("%s: X-Should-Retry=%q", endpoint, w.Result().Header.Get("X-Should-Retry"))
 		}
 	}
 }
