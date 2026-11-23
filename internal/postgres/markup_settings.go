@@ -118,7 +118,7 @@ func (r *SystemRepository) SaveMarkups(ctx context.Context, actor, org string, n
 		return markup.Policy{}, err
 	}
 	if n == 0 {
-		return markup.Policy{}, system.ErrConflict
+		return markup.Policy{}, versionConflict(ctx, tx, org)
 	}
 	next.Version++
 	p, err := readMarkupPolicy(ctx, tx, org, false)

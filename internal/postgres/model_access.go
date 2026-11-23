@@ -210,7 +210,9 @@ func (r *SystemRepository) SaveOrganization(ctx context.Context, actor, org stri
 		return a, err
 	}
 	var locked string
-	if err = tx.QueryRowContext(ctx, `SELECT id FROM organizations WHERE id=$1 FOR UPDATE`, org).Scan(&locked); err != nil {
+	if err = tx.QueryRowContext(ctx, `SELECT id FROM organizations WHERE id=$1 FOR UPDATE`, org).Scan(&locked); errors.Is(err, sql.ErrNoRows) {
+		return a, system.ErrNotFound
+	} else if err != nil {
 		return a, err
 	}
 	before, err := readModelAccess(ctx, tx, org)

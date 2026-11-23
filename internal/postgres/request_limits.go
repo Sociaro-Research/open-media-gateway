@@ -32,6 +32,22 @@ func readRequestLimits(ctx context.Context, q rowQuerier, org string) (limits.Po
 	p.Resolve()
 	return p, nil
 }
+
+// versionConflict explains a versioned settings update that changed no row:
+// the organization does not exist, or the version is stale.
+func versionConflict(ctx context.Context, q rowQuerier, org string) error {
+	if org == "" {
+		return system.ErrConflict
+	}
+	var exists bool
+	if err := q.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM organizations WHERE id=$1)`, org).Scan(&exists); err != nil {
+		return err
+	}
+	if !exists {
+		return system.ErrNotFound
+	}
+	return system.ErrConflict
+}
 func (r *SystemRepository) RequestLimits(ctx context.Context, org string) (limits.Policy, error) {
 	return readRequestLimits(ctx, r.db, org)
 }
@@ -81,7 +97,7 @@ func (r *SystemRepository) SaveLimits(ctx context.Context, actor, org string, ne
 		return limits.Policy{}, err
 	}
 	if n == 0 {
-		return limits.Policy{}, system.ErrConflict
+		return limits.Policy{}, versionConflict(ctx, tx, org)
 	}
 	p, err := readRequestLimits(ctx, tx, org)
 	if err != nil {

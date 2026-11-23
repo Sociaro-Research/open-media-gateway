@@ -86,6 +86,9 @@ func TestRequestLimitsPersistenceAndConcurrentKeyCount(t *testing.T) {
 	if _, err = sys.SaveLimits(ctx, admin.ID, org.ID, p.Organization); !errors.Is(err, system.ErrConflict) {
 		t.Fatal("stale write allowed", err)
 	}
+	if _, err = sys.SaveLimits(ctx, admin.ID, uuid.NewString(), p.Organization); !errors.Is(err, system.ErrNotFound) {
+		t.Fatal("unknown organization reported as", err)
+	}
 	if updated.Effective["user_active_keys"] != 3 || updated.Effective["key_reads_minute"] != 1200 {
 		t.Fatal(updated)
 	}
