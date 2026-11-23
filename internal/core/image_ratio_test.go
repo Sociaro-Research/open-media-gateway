@@ -28,6 +28,16 @@ func TestImageRatioIsCheckedAgainstTheModel(t *testing.T) {
 			}
 		})
 	}
+	// A reference mode with its own ratios overrides the model's, as for video.
+	moded := core.MediaModel{ID: "mode-image", MediaType: "image", Ratios: []string{"1:1"}, SupportsImageInput: true,
+		ReferenceModes: []core.ReferenceMode{{ID: "wide", Label: "Wide", MaxImages: 1, Ratios: []string{"21:9"}}}}
+	if got, err := core.NormalizeModelOptions(moded, core.MediaOptions{ReferenceMode: "wide", Ratio: "21:9"}); err != nil || got.Ratio != "21:9" {
+		t.Fatalf("mode ratio: %v %q", err, got.Ratio)
+	}
+	_, err := core.NormalizeModelOptions(moded, core.MediaOptions{ReferenceMode: "wide", Ratio: "1:1"})
+	if option := (*core.OptionValidationError)(nil); !errors.As(err, &option) || option.Hint != "must be one of: 21:9" {
+		t.Fatalf("base ratio in a mode with its own ratios: %v", err)
+	}
 	for _, ok := range []struct {
 		model core.MediaModel
 		ratio string

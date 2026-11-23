@@ -551,8 +551,8 @@ func normalizeModelOptions(descriptor MediaModel, options MediaOptions, deferRes
 			return MediaOptions{}, optionChoices("resolution", descriptor.Resolutions)
 		}
 		// Providers that take an image ratio advertise it; others dropped or vaguely rejected it.
-		if options.Ratio != "" && !slices.Contains(descriptor.Ratios, options.Ratio) {
-			return MediaOptions{}, optionChoices("ratio", descriptor.Ratios)
+		if ratios := modeRatios(descriptor, options.ReferenceMode); options.Ratio != "" && !slices.Contains(ratios, options.Ratio) {
+			return MediaOptions{}, optionChoices("ratio", ratios)
 		}
 	case "speech":
 		resourceVoice := hasVoiceResourceIntent(descriptor, options)
@@ -612,13 +612,18 @@ func normalizeModelOptions(descriptor MediaModel, options MediaOptions, deferRes
 	return options, nil
 }
 
-func normalizeVideoOptions(descriptor MediaModel, options MediaOptions) (MediaOptions, error) {
+// modeRatios returns the selected reference mode's ratios when it declares its own.
+func modeRatios(descriptor MediaModel, referenceMode string) []string {
 	for _, mode := range ReferenceModesFor(descriptor) {
-		if mode.ID == options.ReferenceMode && len(mode.Ratios) > 0 {
-			descriptor.Ratios = mode.Ratios
-			break
+		if mode.ID == referenceMode && len(mode.Ratios) > 0 {
+			return mode.Ratios
 		}
 	}
+	return descriptor.Ratios
+}
+
+func normalizeVideoOptions(descriptor MediaModel, options MediaOptions) (MediaOptions, error) {
+	descriptor.Ratios = modeRatios(descriptor, options.ReferenceMode)
 	if options.Resolution == "" {
 		if len(descriptor.Resolutions) > 0 {
 			options.Resolution = descriptor.Resolutions[0]
