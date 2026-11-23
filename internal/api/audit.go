@@ -13,6 +13,7 @@ import (
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/apikey"
 	"github.com/Sociaro-Research/open-media-gateway/internal/audit"
+	"github.com/Sociaro-Research/open-media-gateway/internal/core"
 	"github.com/Sociaro-Research/open-media-gateway/internal/identity"
 	org "github.com/Sociaro-Research/open-media-gateway/internal/organization"
 	"github.com/google/uuid"
@@ -118,22 +119,24 @@ func auditFilter(w http.ResponseWriter, r *http.Request, org string, revoked boo
 		}
 	}
 	now := time.Now().In(zone)
-	f.From = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, zone)
-	f.Until = time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, zone)
+	fromDate := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+	toDate := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 	if v := q.Get("from"); v != "" {
-		f.From, err = time.ParseInLocation("2006-01-02", v, zone)
+		fromDate, err = time.Parse("2006-01-02", v)
 		if err != nil {
 			return bad("from", "from must be a date in YYYY-MM-DD format")
 		}
 	}
 	if v := q.Get("to"); v != "" {
-		f.Until, err = time.ParseInLocation("2006-01-02", v, zone)
+		toDate, err = time.Parse("2006-01-02", v)
 		if err != nil {
 			return bad("to", "to must be a date in YYYY-MM-DD format")
 		}
-		f.Until = f.Until.AddDate(0, 0, 1)
 	}
-	if !f.From.Before(f.Until) {
+	// Same calendar days as reports, also where midnight is skipped or repeats.
+	f.From = core.ReportDayStart(fromDate, zone)
+	f.Until = core.ReportDayStart(toDate.AddDate(0, 0, 1), zone)
+	if fromDate.After(toDate) {
 		param := "from"
 		if q.Get("to") != "" {
 			param = "to"
