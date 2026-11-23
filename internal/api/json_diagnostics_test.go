@@ -162,6 +162,30 @@ func TestSpeechKnownUnsupportedControlAndUnknownNameDiagnostics(t *testing.T) {
 	}
 }
 
+// docs/openai-api.md names masks, input fidelity and user tracking next to speed
+// as rejected OpenAI controls; the error must say which one was sent.
+func TestUnsupportedOpenAIFieldsAreNamed(t *testing.T) {
+	for _, tc := range []struct{ path, field, body string }{
+		{"/v1/images/generations", "user", `{"model":"mock/image","prompt":"p","user":"u-1"}`},
+		{"/v1/images/generations", "moderation", `{"model":"mock/image","prompt":"p","moderation":"low"}`},
+		{"/v1/images/generations", "output_compression", `{"model":"mock/image","prompt":"p","output_compression":80}`},
+		{"/v1/images/generations", "partial_images", `{"model":"mock/image","prompt":"p","partial_images":2}`},
+		{"/v1/images/generations", "style", `{"model":"mock/image","prompt":"p","style":"vivid"}`},
+		{"/v1/images/edits", "mask", `{"model":"mock/image","prompt":"p","image":"https://example.com/a.png","mask":"https://example.com/m.png"}`},
+		{"/v1/images/edits", "input_fidelity", `{"model":"mock/image","prompt":"p","image":"https://example.com/a.png","input_fidelity":"high"}`},
+		{"/v1/audio/speech", "stream_format", `{"model":"mock/speech","input":"hello","stream_format":"audio"}`},
+	} {
+		t.Run(tc.field, func(t *testing.T) {
+			svc := openAIFixture()
+			w := openAIRequest(New(svc, healthStub{}, "secret"), tc.path, tc.body)
+			assertJSONDiagnostic(t, w, tc.field, "unsupported parameter: "+tc.field)
+			if svc.calls != 0 {
+				t.Fatal("dispatched a rejected control")
+			}
+		})
+	}
+}
+
 func assertJSONDiagnostic(t *testing.T, w *httptest.ResponseRecorder, param, hint string) {
 	t.Helper()
 	var got struct {
