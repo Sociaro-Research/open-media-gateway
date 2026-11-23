@@ -61,7 +61,8 @@ func (r *SystemRepository) Organizations(ctx context.Context, actor string, all 
 }
 
 func (r *SystemRepository) OrganizationsWithUsage(ctx context.Context, actor string, all bool, from, until time.Time) ([]org.Organization, error) {
-	if !from.Before(until) {
+	// Equal bounds are a skipped calendar day: an empty range with zero spend.
+	if from.After(until) {
 		return nil, org.ErrInvalid
 	}
 	return r.organizations(ctx, actor, all, &from, &until)

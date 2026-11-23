@@ -122,6 +122,10 @@ func TestClientManagerAssignmentsAndRevocation(t *testing.T) {
 			t.Fatalf("unused company: %+v", o.Usage)
 		}
 	}
+	// A skipped calendar day gives equal bounds: zero spend, not an invalid range.
+	if items, err = repo.OrganizationsWithUsage(ctx, manager, true, until, until); err != nil || len(items) != 2 || items[0].Usage == nil || items[0].Usage.Spend != 0 || items[1].Usage == nil || items[1].Usage.Spend != 0 {
+		t.Fatalf("empty range: %+v %v", items, err)
+	}
 	rows, err := NewTaskRepository(db).CostReport(identity.WithOwnerID(ctx, ids[0]), core.ReportFilter{From: from, Until: until, Limit: 100})
 	if err != nil {
 		t.Fatal(err)
