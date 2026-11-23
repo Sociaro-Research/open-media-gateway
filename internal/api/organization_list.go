@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/Sociaro-Research/open-media-gateway/internal/core"
 	org "github.com/Sociaro-Research/open-media-gateway/internal/organization"
 )
 
@@ -27,29 +28,30 @@ func organizationList(r *http.Request, repo org.Repository, actor string, all bo
 		}
 	}
 	local := now.In(location)
-	from := time.Date(local.Year(), local.Month(), 1, 0, 0, 0, 0, location)
-	until := time.Date(local.Year(), local.Month(), local.Day()+1, 0, 0, 0, 0, location)
+	fromDate := time.Date(local.Year(), local.Month(), 1, 0, 0, 0, 0, time.UTC)
+	toDate := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, time.UTC)
 	var err error
 	if q.Get("from") != "" {
-		from, err = time.ParseInLocation("2006-01-02", q.Get("from"), location)
+		fromDate, err = time.Parse("2006-01-02", q.Get("from"))
 		if err != nil {
 			return nil, now, org.ErrInvalid
 		}
 	}
 	if q.Get("to") != "" {
-		until, err = time.ParseInLocation("2006-01-02", q.Get("to"), location)
+		toDate, err = time.Parse("2006-01-02", q.Get("to"))
 		if err != nil {
 			return nil, now, org.ErrInvalid
 		}
-		until = until.AddDate(0, 0, 1)
 	}
-	if !from.Before(until) {
+	if fromDate.After(toDate) {
 		return nil, now, org.ErrInvalid
 	}
 	reader, ok := repo.(org.UsageReader)
 	if !ok {
 		return nil, now, errors.New("organization usage is unavailable")
 	}
+	// Same calendar days as reports, also where midnight is skipped or repeats.
+	from, until := core.ReportDayStart(fromDate, location), core.ReportDayStart(toDate.AddDate(0, 0, 1), location)
 	items, err := reader.OrganizationsWithUsage(r.Context(), actor, all, from, until)
 	return items, now, err
 }
