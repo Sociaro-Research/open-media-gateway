@@ -74,7 +74,7 @@ func (r *SystemRepository) Markups(ctx context.Context, actor, org string) (mark
 		return p, err
 	}
 	if org != "" && p.Company.Version == 0 {
-		return p, system.ErrNotFound
+		return p, system.ErrOrganizationNotFound
 	}
 	return p, tx.Commit()
 }
@@ -118,7 +118,7 @@ func (r *SystemRepository) SaveMarkups(ctx context.Context, actor, org string, n
 		return markup.Policy{}, err
 	}
 	if n == 0 {
-		return markup.Policy{}, system.ErrConflict
+		return markup.Policy{}, versionConflict(ctx, tx, org)
 	}
 	next.Version++
 	p, err := readMarkupPolicy(ctx, tx, org, false)

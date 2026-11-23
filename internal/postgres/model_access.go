@@ -148,7 +148,7 @@ func (r *SystemRepository) Update(ctx context.Context, actor, id string, u model
 func readModelAccess(ctx context.Context, tx *sql.Tx, org string) (modelaccess.Access, error) {
 	a := modelaccess.Access{ModelIDs: []string{}}
 	if err := tx.QueryRowContext(ctx, `SELECT model_access_version FROM organizations WHERE id=$1`, org).Scan(&a.Version); errors.Is(err, sql.ErrNoRows) {
-		return a, system.ErrNotFound
+		return a, system.ErrOrganizationNotFound
 	} else if err != nil {
 		return a, err
 	}
@@ -210,7 +210,9 @@ func (r *SystemRepository) SaveOrganization(ctx context.Context, actor, org stri
 		return a, err
 	}
 	var locked string
-	if err = tx.QueryRowContext(ctx, `SELECT id FROM organizations WHERE id=$1 FOR UPDATE`, org).Scan(&locked); err != nil {
+	if err = tx.QueryRowContext(ctx, `SELECT id FROM organizations WHERE id=$1 FOR UPDATE`, org).Scan(&locked); errors.Is(err, sql.ErrNoRows) {
+		return a, system.ErrOrganizationNotFound
+	} else if err != nil {
 		return a, err
 	}
 	before, err := readModelAccess(ctx, tx, org)
