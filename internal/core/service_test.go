@@ -418,3 +418,22 @@ func TestAudioDurationAndVideoSeedContracts(t *testing.T) {
 		t.Fatal("unsupported video format accepted")
 	}
 }
+
+// Like quality, background and image resolution, a format the model does not
+// advertise is rejected instead of being dropped by the provider.
+func TestFormatWithoutAdvertisedFormatsIsRejected(t *testing.T) {
+	s := &TaskService{}
+	for _, m := range []MediaModel{
+		{MediaType: "video", Resolutions: []string{"720p"}, Ratios: []string{"16:9"}, MinDuration: 4, MaxDuration: 12, DefaultDuration: 5},
+		{MediaType: "image"}, {MediaType: "speech"}, {MediaType: "music"},
+	} {
+		if o, err := s.normalizeOptions(m, MediaOptions{}); err != nil || o.Format != "" {
+			t.Fatalf("%s without format: %+v, %v", m.MediaType, o, err)
+		}
+		_, err := s.normalizeOptions(m, MediaOptions{Format: "webm"})
+		var option *OptionValidationError
+		if !errors.As(err, &option) || option.Field != "format" || option.Hint != "is not supported by this model; omit it" {
+			t.Fatalf("%s accepted an unadvertised format: %v", m.MediaType, err)
+		}
+	}
+}
