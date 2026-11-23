@@ -599,7 +599,7 @@ func normalizeModelOptions(descriptor MediaModel, options MediaOptions, deferRes
 	if options.Format == "" && len(descriptor.Formats) > 0 {
 		options.Format = descriptor.Formats[0]
 	}
-	if len(descriptor.Formats) > 0 && !slices.Contains(descriptor.Formats, options.Format) {
+	if options.Format != "" && !slices.Contains(descriptor.Formats, options.Format) {
 		return MediaOptions{}, optionChoices("format", descriptor.Formats)
 	}
 	if descriptor.MediaType != "video" && options.Seed != nil && (*options.Seed < 0 || *options.Seed > 2147483647) {
