@@ -571,6 +571,9 @@ func modelSize(model core.MediaModel, size, mediaType string) (string, string, e
 			}
 			ratio := fmt.Sprintf("%d:%d", w/a, h/a)
 			resolution := strconv.Itoa(min(w, h)) + "p"
+			if min(w, h) == 2160 && slices.Contains(model.Resolutions, "4k") {
+				resolution = "4k" // Catalogs name UHD "4k", not "2160p".
+			}
 			if slices.Contains(model.Resolutions, resolution) && slices.Contains(model.Ratios, ratio) {
 				return resolution, ratio, nil
 			}
