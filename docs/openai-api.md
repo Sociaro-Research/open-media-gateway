@@ -379,8 +379,10 @@ makes their download routes unavailable, while retaining history and costs.
   `Idempotency-Key`, the response carries `X-Should-Retry: false` so SDKs do not
   resend it automatically. Send an `Idempotency-Key` to make retries safe.
   HTTP 409 errors on these routes and on reference uploads also carry
-  `X-Should-Retry: false`: SDKs treat 409 as a retryable lock timeout, but
-  resending cannot clear a Gateway conflict.
+  `X-Should-Retry: false`: SDKs treat 409 as a lock timeout and resend at
+  once, which does not clear a Gateway conflict. For `estimate_changed`, get a
+  new estimate and send it as `max_expected_cost_usd`; the same request only
+  passes again if the quote falls back to the old ceiling.
 
 ## Single generation contract
 
