@@ -153,6 +153,12 @@ func auditFilter(w http.ResponseWriter, r *http.Request, org string, revoked boo
 			return bad(name, name+" must be at most 200 bytes")
 		}
 	}
+	// Stored IDs are lowercase text; a standard UUID typed in capitals must still match.
+	for _, id := range []*string{&f.ActorID, &f.ObjectID, &f.CorrelationID} {
+		if _, e := uuid.Parse(*id); e == nil && len(*id) == 36 {
+			*id = strings.ToLower(*id)
+		}
+	}
 	if f.Scope != "" && f.Scope != "system" && f.Scope != "organization" && f.Scope != "personal" {
 		return bad("scope", "scope must be system, organization or personal")
 	}

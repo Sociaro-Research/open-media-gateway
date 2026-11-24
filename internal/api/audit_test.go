@@ -190,6 +190,19 @@ func TestAuditFiltersPaginationAndSafeFailures(t *testing.T) {
 			t.Errorf("%s: HTTP %d, filtered by %q", path, w.Code, f.filters[len(f.filters)-1].OrganizationID)
 		}
 	}
+	w = sendTest(h, "GET", "/v1/audit/events?actor_id="+upper+"&object_id="+upper+"&correlation_id="+upper, "", "alice", "")
+	if got := f.filters[len(f.filters)-1]; w.Code != 200 || got.ActorID != lower || got.ObjectID != lower || got.CorrelationID != lower {
+		t.Errorf("upper-case IDs: HTTP %d, filter %+v", w.Code, got)
+	}
+	w = sendTest(h, "GET", "/v1/audit/revoked-keys?object_id="+upper, "", "alice", "")
+	if got := f.filters[len(f.filters)-1].ObjectID; w.Code != 200 || got != lower {
+		t.Errorf("revoked key ID: HTTP %d, filtered by %q", w.Code, got)
+	}
+	// Other identifiers, such as 32-digit provider IDs or names, are left exactly as sent.
+	w = sendTest(h, "GET", "/v1/audit/events?object_id=ABCDEF0123456789ABCDEF0123456789&actor_id=Alice", "", "alice", "")
+	if got := f.filters[len(f.filters)-1]; w.Code != 200 || got.ObjectID != "ABCDEF0123456789ABCDEF0123456789" || got.ActorID != "Alice" {
+		t.Errorf("non-UUID IDs changed: HTTP %d, filter %+v", w.Code, got)
+	}
 	w = sendTest(h, "PUT", "/v1/system/settings?token=never-log", "{\"secret\":\"never-log\"}", "bob", "")
 	if w.Code != 403 || f.failures != 1 || f.correlation == "" {
 		t.Fatal("denied mutation absent", w.Code, f)
