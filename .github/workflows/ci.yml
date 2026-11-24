@@ -31,7 +31,7 @@ jobs:
     outputs:
       reuse: ${{ github.event_name != 'pull_request' && steps.prior.outputs.reuse == 'true' }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: Test CI reuse guard offline
@@ -52,7 +52,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PRIOR_CI_RUN_ID: ${{ inputs.prior_ci_run_id }}
         run: python3 scripts/ci/validate-prior-run.py --run-id "$PRIOR_CI_RUN_ID" --receipt prior-ci.json
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: prior-ci-validation
           path: prior-ci.json
@@ -65,7 +65,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Check out complete history
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -118,7 +118,7 @@ jobs:
       GATEWAY_TEST_REDIS_URL: redis://127.0.0.1:6379/0
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -129,7 +129,7 @@ jobs:
           cache-dependency-path: go.sum
 
       - name: Set up Node for the persisted profile browser workflow
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '24'
 
@@ -149,7 +149,7 @@ jobs:
         run: make verify-ci TEST_FLAGS='-count=1 -coverprofile=coverage.out'
 
       - name: Retain persisted profile browser evidence
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: profile-contact-browser
@@ -189,7 +189,7 @@ jobs:
       UI_SCREENSHOT_DIR: profile-name-browser
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -200,7 +200,7 @@ jobs:
           cache-dependency-path: go.sum
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '24'
 
@@ -225,7 +225,7 @@ jobs:
           UI_EVIDENCE_DIR="$GITHUB_WORKSPACE/legal-browser/webkit" UI_BROWSER_ENGINE=webkit go test -race -count=1 -v -run '^TestLegalDocumentsBrowserWorkflow$' ./internal/api
 
       - name: Retain legal settings browser evidence
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: legal-browser-workflow
@@ -233,7 +233,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: Retain profile name evidence
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: profile-name-browser
@@ -251,7 +251,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -303,7 +303,7 @@ jobs:
             --postgres gateway-postgres:ci --redis gateway-redis:ci
 
       - name: Set up Node for UI checks
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '24'
 
@@ -332,7 +332,7 @@ jobs:
           digest=$(python3 scripts/ci/ui-runtime.py pack --staging .local/ci-ui-stage --output ci-ui-runtime.tar.gz --source-sha "$GITHUB_SHA" --image-id "$image_id")
           echo "sha256=$digest" >> "$GITHUB_OUTPUT"
           echo "image_id=$image_id" >> "$GITHUB_OUTPUT"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ci-ui-runtime
           path: ci-ui-runtime.tar.gz
@@ -356,7 +356,7 @@ jobs:
         run: docker compose -p gateway-monitoring-ci --profile monitoring -f compose.yaml -f monitoring/grafana/compose.test.yaml down
 
       - name: Retain browser performance evidence
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: browser-performance
@@ -374,7 +374,7 @@ jobs:
       actions: read
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: Run isolated UI partition
@@ -395,7 +395,7 @@ jobs:
       actions: read
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: Run isolated UI partition
@@ -416,7 +416,7 @@ jobs:
       actions: read
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
       - name: Run isolated UI partition
