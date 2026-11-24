@@ -89,8 +89,8 @@ speech, `size`, `seconds` (integer string), image `quality`, `background`,
 `options`, even when equal to their top-level counterpart.
 
 Image `1024x1024` is translated to the provider's catalog representation. Video
-`1280x720` maps to `720p` and `16:9` when supported; catalog size values such as
-`720p` are also supported with `options.ratio`.
+`1280x720` maps to `720p` and `16:9` when supported, and `3840x2160` to `4k`;
+catalog size values such as `720p` are also supported with `options.ratio`.
 
 `options` contains provider extensions: negative prompts, seeds, reference modes,
 video/audio reference arrays, reference voices, audio creation, draft, watermark,
