@@ -81,6 +81,10 @@ func writeAPIError(w http.ResponseWriter, status int, code, message string, para
 	case status >= 500:
 		typ = "server_error"
 	}
+	if status == http.StatusConflict {
+		// OpenAI SDKs resend a 409 as a lock timeout; a gateway conflict never clears that way.
+		w.Header().Set("X-Should-Retry", "false")
+	}
 	writeJSON(w, status, map[string]any{"error": map[string]any{"type": typ, "code": code, "message": message, "param": param}})
 }
 
