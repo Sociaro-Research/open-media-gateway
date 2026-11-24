@@ -141,13 +141,22 @@ func auditFilter(w http.ResponseWriter, r *http.Request, org string, revoked boo
 		return bad(param, "from must be on or before to. Without them, from is the first day of this month and to is today.")
 	}
 	if f.OrganizationID != "" {
-		if _, e := uuid.Parse(f.OrganizationID); e != nil {
+		id, e := uuid.Parse(f.OrganizationID)
+		if e != nil {
 			return bad("organization_id", "organization_id must be an organization ID (UUID)")
 		}
+		// Audit rows store the canonical lowercase text form.
+		f.OrganizationID = id.String()
 	}
 	for _, name := range []string{"actor_id", "action", "object_type", "object_id", "correlation_id"} {
 		if len(q.Get(name)) > 200 {
 			return bad(name, name+" must be at most 200 bytes")
+		}
+	}
+	// Stored IDs are lowercase text; a standard UUID typed in capitals must still match.
+	for _, id := range []*string{&f.ActorID, &f.ObjectID, &f.CorrelationID} {
+		if _, e := uuid.Parse(*id); e == nil && len(*id) == 36 {
+			*id = strings.ToLower(*id)
 		}
 	}
 	if f.Scope != "" && f.Scope != "system" && f.Scope != "organization" && f.Scope != "personal" {
@@ -292,8 +301,10 @@ func (s *Server) recordAuditFailure(r *http.Request, status int) {
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), 2*time.Second)
 	defer cancel()
 	org := r.PathValue("org")
-	if _, err := uuid.Parse(org); err != nil {
+	if id, err := uuid.Parse(org); err != nil {
 		org = ""
+	} else {
+		org = id.String() // rows are matched by the lowercase form
 	}
 	// The registered route template excludes arbitrary path tokens and query text.
 	if err := store.AuditFailure(ctx, org, "management_request", "request", r.Pattern, status); err != nil {

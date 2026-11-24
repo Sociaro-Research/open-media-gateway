@@ -97,8 +97,12 @@ func scanAudit(row rowScanner) (audit.Event, error) {
 	err := row.Scan(&e.ID, &e.At, &e.Scope, &e.SchemaVersion, &e.OrganizationID, &e.OrganizationName, &e.ActorID, &e.ActorName, &e.ActorEmail, &e.ActorType, &e.CallingKeyID, &e.Action, &e.ObjectType, &e.ObjectID, &e.ObjectName, &e.Outcome, &e.CorrelationID, &e.Details, &e.LegacySource, &e.LegacyID, &e.ActorPicture, &e.ObjectPicture)
 	return e, err
 }
+
+// Audit rows are immutable, and denied requests stored the organization ID as
+// typed until the API canonicalised it, so filters also match the upper-case form.
+// Mixed-case IDs are not matched; that would need a lower(organization_id) index.
 func (r *SystemRepository) AuditEvents(ctx context.Context, f audit.Filter) ([]audit.Event, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT `+auditColumns+` FROM audit_events WHERE ($1='' OR organization_id=$1) AND ($2='' OR actor_id=$2 OR actor_email ILIKE '%'||$2||'%' OR actor_name ILIKE '%'||$2||'%') AND ($3='' OR action=$3) AND ($4='' OR object_type=$4) AND ($5='' OR object_id=$5) AND ($6='' OR outcome=$6) AND ($7='' OR correlation_id=$7) AND created_at >= $8 AND created_at < $9 AND ($10=0 OR id<$10) AND ($12='' OR scope=$12) ORDER BY id DESC LIMIT $11`, f.OrganizationID, f.ActorID, f.Action, f.ObjectType, f.ObjectID, f.Outcome, f.CorrelationID, f.From, f.Until, f.BeforeID, f.Limit, f.Scope)
+	rows, err := r.db.QueryContext(ctx, `SELECT `+auditColumns+` FROM audit_events WHERE ($1='' OR organization_id IN ($1,lower($1),upper($1))) AND ($2='' OR actor_id=$2 OR actor_email ILIKE '%'||$2||'%' OR actor_name ILIKE '%'||$2||'%') AND ($3='' OR action=$3) AND ($4='' OR object_type=$4) AND ($5='' OR object_id=$5) AND ($6='' OR outcome=$6) AND ($7='' OR correlation_id=$7) AND created_at >= $8 AND created_at < $9 AND ($10=0 OR id<$10) AND ($12='' OR scope=$12) ORDER BY id DESC LIMIT $11`, f.OrganizationID, f.ActorID, f.Action, f.ObjectType, f.ObjectID, f.Outcome, f.CorrelationID, f.From, f.Until, f.BeforeID, f.Limit, f.Scope)
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +118,7 @@ func (r *SystemRepository) AuditEvents(ctx context.Context, f audit.Filter) ([]a
 	return result, rows.Err()
 }
 func (r *SystemRepository) AuditEvent(ctx context.Context, id int64, org string) (audit.Event, error) {
-	return scanAudit(r.db.QueryRowContext(ctx, `SELECT `+auditColumns+` FROM audit_events WHERE id=$1 AND ($2='' OR organization_id=$2)`, id, org))
+	return scanAudit(r.db.QueryRowContext(ctx, `SELECT `+auditColumns+` FROM audit_events WHERE id=$1 AND ($2='' OR organization_id IN ($2,lower($2),upper($2)))`, id, org))
 }
 func (r *SystemRepository) RevokedKeys(ctx context.Context, f audit.Filter) ([]audit.RevokedKey, error) {
 	rows, err := r.db.QueryContext(ctx, `SELECT h.key_id,h.organization_id,h.revoked_at,h.snapshot,

@@ -183,6 +183,26 @@ func TestAuditFiltersPaginationAndSafeFailures(t *testing.T) {
 	if w.Code != 200 || f.filters[len(f.filters)-1].BeforeID != 10 {
 		t.Fatal("cursor ignored")
 	}
+	// Stored organization IDs are lowercase text, so an accepted UUID is matched in that form.
+	const upper, lower = "ABCDEF01-2345-4678-89AB-CDEF01234567", "abcdef01-2345-4678-89ab-cdef01234567"
+	for _, path := range []string{"/v1/audit/events?organization_id=" + upper, "/v1/audit/revoked-keys?organization_id=" + upper, "/v1/organizations/" + upper + "/audit/events", "/v1/organizations/" + upper + "/audit/revoked-keys"} {
+		if w := sendTest(h, "GET", path, "", "alice", ""); w.Code != 200 || f.filters[len(f.filters)-1].OrganizationID != lower {
+			t.Errorf("%s: HTTP %d, filtered by %q", path, w.Code, f.filters[len(f.filters)-1].OrganizationID)
+		}
+	}
+	w = sendTest(h, "GET", "/v1/audit/events?actor_id="+upper+"&object_id="+upper+"&correlation_id="+upper, "", "alice", "")
+	if got := f.filters[len(f.filters)-1]; w.Code != 200 || got.ActorID != lower || got.ObjectID != lower || got.CorrelationID != lower {
+		t.Errorf("upper-case IDs: HTTP %d, filter %+v", w.Code, got)
+	}
+	w = sendTest(h, "GET", "/v1/audit/revoked-keys?object_id="+upper, "", "alice", "")
+	if got := f.filters[len(f.filters)-1].ObjectID; w.Code != 200 || got != lower {
+		t.Errorf("revoked key ID: HTTP %d, filtered by %q", w.Code, got)
+	}
+	// Other identifiers, such as 32-digit provider IDs or names, are left exactly as sent.
+	w = sendTest(h, "GET", "/v1/audit/events?object_id=ABCDEF0123456789ABCDEF0123456789&actor_id=Alice", "", "alice", "")
+	if got := f.filters[len(f.filters)-1]; w.Code != 200 || got.ObjectID != "ABCDEF0123456789ABCDEF0123456789" || got.ActorID != "Alice" {
+		t.Errorf("non-UUID IDs changed: HTTP %d, filter %+v", w.Code, got)
+	}
 	w = sendTest(h, "PUT", "/v1/system/settings?token=never-log", "{\"secret\":\"never-log\"}", "bob", "")
 	if w.Code != 403 || f.failures != 1 || f.correlation == "" {
 		t.Fatal("denied mutation absent", w.Code, f)
@@ -192,6 +212,11 @@ func TestAuditFiltersPaginationAndSafeFailures(t *testing.T) {
 	w = sendTest(h, "PUT", "/v1/system/settings", "{}", "", secret)
 	if w.Code != 403 || f.failures != 2 {
 		t.Fatal("insufficient scope mutation absent", w.Code, f.failures)
+	}
+	// A denied request on an uppercase organization path is stored under the lowercase ID the filters use.
+	w = sendTest(h, "PUT", "/v1/organizations/"+upper+"/limits", "{}", "", secret)
+	if w.Code != 403 || f.failures != 3 || f.failedOrg != lower {
+		t.Fatalf("uppercase organization failure: HTTP %d, %d failures, org %q", w.Code, f.failures, f.failedOrg)
 	}
 	// The old public reader is removed; it must never silently return legacy data.
 	w = sendTest(h, http.MethodGet, "/v1/system/events", "", "alice", "")
