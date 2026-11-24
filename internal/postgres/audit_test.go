@@ -332,3 +332,33 @@ func TestAuditMigrationPreservesLegacyAndUnknownFacts(t *testing.T) {
 		}
 	}
 }
+
+func TestAuditOrganizationFilterFindsUppercaseLegacyRows(t *testing.T) {
+	db := auditDatabase(t, true)
+	ctx := context.Background()
+	repo := NewSystemRepository(db)
+	org := uuid.NewString()
+	// Before the API canonicalised path IDs, a denied request stored the ID as typed.
+	if err := repo.AuditFailure(ctx, strings.ToUpper(org), "organization.update", "organization", org, 403); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.AuditFailure(ctx, org, "organization.update", "organization", org, 403); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.AuditFailure(ctx, uuid.NewString(), "organization.update", "organization", org, 403); err != nil {
+		t.Fatal(err)
+	}
+	for _, filter := range []string{org, strings.ToUpper(org)} {
+		f := allAudit()
+		f.OrganizationID = filter
+		events, err := repo.AuditEvents(ctx, f)
+		if err != nil || len(events) != 2 {
+			t.Fatal("organization filter missed rows", filter, events, err)
+		}
+		for _, e := range events {
+			if _, err := repo.AuditEvent(ctx, e.ID, filter); err != nil {
+				t.Fatal("organization detail missed row", filter, e.OrganizationID, err)
+			}
+		}
+	}
+}
