@@ -230,6 +230,10 @@ func (s *Server) createAPIKey(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	key, secret, err := apikey.Generate(input, time.Now())
+	if field := (*apikey.FieldError)(nil); errors.As(err, &field) {
+		invalidParameter(w, field.Field, field.Message)
+		return
+	}
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
 		return
