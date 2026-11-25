@@ -541,6 +541,10 @@ func (s *Server) authenticate(next http.Handler) http.Handler {
 	next = s.auditRequest(s.clientManagerPolicy(s.organizationPolicy(s.systemPolicy(s.requestLimits(s.generationIntent(s.modelCatalogPolicy(next)))))))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
+		// Organization IDs are stored lowercase; a UUID typed in capitals must reach the same company.
+		if id, err := uuid.Parse(r.PathValue("org")); err == nil {
+			r.SetPathValue("org", id.String())
+		}
 		// An explicit credential must never silently fall back to a browser session.
 		bearer := r.Header.Get("Authorization")
 		hasBearer, hasXKey := len(r.Header.Values("Authorization")) > 0, len(r.Header.Values("X-API-Key")) > 0
