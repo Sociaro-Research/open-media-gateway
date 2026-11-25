@@ -1,7 +1,7 @@
 # Local development
 
 Build the current source checkout for development and integration testing. For
-installation without a build, use the [release Quick Start](../README.md#quick-start).
+installation without a build, use the [release Quick Start](../deploy/ghcr/README.md#quick-start).
 
 Do not expose this development configuration to the public internet.
 

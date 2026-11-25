@@ -2,7 +2,7 @@
 
 ## Install
 
-Start with the [Quick start](../README.md#quick-start). Download a version's
+Start with the [Quick start](../deploy/ghcr/README.md#quick-start). Download a version's
 archive and checksum from [GitHub Releases](https://github.com/Sociaro-Research/open-media-gateway/releases),
 verify and extract them, then follow **that bundle's README**. The
 [current bundle template](../deploy/ghcr/README.md) covers local installation,
