@@ -152,7 +152,7 @@ func (s *Server) listProviderAssets(w http.ResponseWriter, r *http.Request) {
 		err = nil
 	}
 	if err != nil || offset < 0 || offset > 1000000 {
-		writeError(w, 400, "invalid_request", "invalid asset offset")
+		invalidParameter(w, "offset", "offset must be from 0 to 1000000")
 		return
 	}
 	items, more, err := s.providerAssets.List(r.Context(), r.PathValue("provider"), offset)

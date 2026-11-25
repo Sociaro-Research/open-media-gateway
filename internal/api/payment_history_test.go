@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/Sociaro-Research/open-media-gateway/internal/payments"
@@ -38,7 +39,7 @@ func TestBalanceHistoryScopeAndBinding(t *testing.T) {
 			t.Fatal("unauthorized repository access")
 		}
 	}
-	if w := sendTest(h, "GET", "/v1/organizations/"+fixtureOrg+"/balance-history?offset=-1", "", "alice", ""); w.Code != 400 {
+	if w := sendTest(h, "GET", "/v1/organizations/"+fixtureOrg+"/balance-history?offset=-1", "", "alice", ""); w.Code != 400 || !strings.Contains(w.Body.String(), `"param":"offset"`) {
 		t.Fatal(w.Code, w.Body.String())
 	}
 }

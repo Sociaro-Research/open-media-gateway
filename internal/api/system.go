@@ -223,7 +223,7 @@ func systemPage(w http.ResponseWriter, r *http.Request) (int, bool) {
 		offset, err = strconv.Atoi(r.URL.Query().Get("offset"))
 	}
 	if err != nil || offset < 0 || offset > 100000 {
-		writeError(w, 400, "invalid_request", "offset must be from 0 to 100000")
+		invalidParameter(w, "offset", "offset must be from 0 to 100000")
 		return 0, false
 	}
 	return offset, true

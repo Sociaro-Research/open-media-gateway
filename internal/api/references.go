@@ -88,7 +88,7 @@ func (s *Server) listReferences(w http.ResponseWriter, r *http.Request) {
 		var err error
 		offset, err = strconv.Atoi(raw)
 		if err != nil || offset < 0 || offset > 1000000 {
-			writeError(w, 400, "invalid_request", "offset must be from 0 to 1000000")
+			invalidParameter(w, "offset", "offset must be from 0 to 1000000")
 			return
 		}
 	}
