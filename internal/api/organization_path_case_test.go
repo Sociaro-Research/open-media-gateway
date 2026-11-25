@@ -33,3 +33,21 @@ func TestOrganizationPathAcceptsUpperCaseID(t *testing.T) {
 		}
 	}
 }
+
+func TestAPIKeysAcceptUpperCaseOrganizationID(t *testing.T) {
+	s, _ := newPersonalTestServer()
+	f := &letteredOrganizationFixture{&organizationFixture{systemFixture: &systemFixture{settings: system.Defaults(), admins: map[string]bool{}}}}
+	f.settings.SharedResources, f.settings.PersonalProviders = true, false
+	s.system = f
+	h := s.handler()
+	upper := strings.ToUpper(letteredOrg)
+	created, key := issueTestKey(t, h, "alice", `{"name":"Org","organization_id":"`+upper+`","scopes":["generation","organizations:manage","keys:manage"]}`)
+	if created.OrganizationID != letteredOrg {
+		t.Fatalf("stored organization %q", created.OrganizationID)
+	}
+	for _, path := range []string{"/v1/api-keys?organization_id=" + upper, "/v1/api-keys/usage?organization_id=" + upper} {
+		if w := sendTest(h, "GET", path, "", "", key); w.Code != 200 {
+			t.Fatalf("GET %s: %d %s", path, w.Code, w.Body.String())
+		}
+	}
+}

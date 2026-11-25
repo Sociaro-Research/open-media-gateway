@@ -85,10 +85,12 @@ func (s *Server) listAPIKeys(w http.ResponseWriter, r *http.Request) {
 	keys, err := s.keys.List(r.Context(), owner)
 	organizationID := r.URL.Query().Get("organization_id")
 	if organizationID != "" {
-		if _, e := uuid.Parse(organizationID); e != nil {
+		id, e := uuid.Parse(organizationID)
+		if e != nil {
 			orgError(w, org.ErrInvalid)
 			return
 		}
+		organizationID = id.String()
 	}
 	if organizationID == "" {
 		organizationID = credentialOrganization(r.Context())
@@ -126,6 +128,12 @@ func (s *Server) createAPIKey(w http.ResponseWriter, r *http.Request) {
 	var input apikey.CreateInput
 	if !decodeSystemLimit(w, r, &input, 4<<10) {
 		return
+	}
+	// Stored IDs are lowercase; the same UUIDs typed in capitals must match them.
+	for _, id := range []*string{&input.OrganizationID, &input.UserID} {
+		if parsed, err := uuid.Parse(*id); err == nil {
+			*id = parsed.String()
+		}
 	}
 	if centralInstallation(r) && (input.OrganizationID == "" || input.ResourceMode == "personal" || input.StorageMode == "personal") {
 		centralModeError(w)
@@ -330,6 +338,9 @@ func (s *Server) apiKeyUsage(w http.ResponseWriter, r *http.Request) {
 		organizationID = credentialOrganization(r.Context())
 	}
 	if organizationID != "" {
+		if id, e := uuid.Parse(organizationID); e == nil {
+			organizationID = id.String()
+		}
 		if bound := credentialOrganization(r.Context()); bound != "" && bound != organizationID {
 			orgError(w, org.ErrForbidden)
 			return
