@@ -1,6 +1,6 @@
 # Documentation
 
-Start with [Quick Start](../README.md#quick-start) for a local release installation.
+Start with [Quick Start](../deploy/ghcr/README.md#quick-start) for a local release installation.
 Use the README bundled with your chosen release; installation files and images
 must come from the same version. For HTTPS, other installation modes, updates,
 and troubleshooting, see the [installation guide](../deploy/ghcr/README.md).

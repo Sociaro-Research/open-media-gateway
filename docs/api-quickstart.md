@@ -1,7 +1,7 @@
 # Create, poll and download a mock image
 
 Start a local installation and create your owner account with the
-[Quick Start](../README.md#quick-start), or use an existing Gateway installation.
+[Quick Start](../deploy/ghcr/README.md#quick-start), or use an existing Gateway installation.
 
 Create a key in **API keys** after signing in, then set `GATEWAY_API_KEY` to its
 secret for the examples below. Use your console's HTTPS origin on a server.
