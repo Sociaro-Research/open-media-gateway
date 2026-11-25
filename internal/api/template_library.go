@@ -115,7 +115,7 @@ func (s *Server) sharedTemplateReferences(w http.ResponseWriter, r *http.Request
 	if raw := r.URL.Query().Get("offset"); raw != "" {
 		value, err := strconv.Atoi(raw)
 		if err != nil || value < 0 || value > 1000000 {
-			writeError(w, 400, "invalid_request", "offset must be from 0 to 1000000")
+			invalidParameter(w, "offset", "offset must be from 0 to 1000000")
 			return
 		}
 		offset = value

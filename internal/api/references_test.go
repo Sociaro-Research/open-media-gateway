@@ -144,8 +144,8 @@ func TestReferenceHTTPLifecycle(t *testing.T) {
 		}
 		response = httptest.NewRecorder()
 		handler.ServeHTTP(response, request)
-		if response.Code != tc.status {
-			t.Fatalf("%s %s: %d", tc.method, tc.path, response.Code)
+		if response.Code != tc.status || tc.status == 400 && !strings.Contains(response.Body.String(), `"param":"offset"`) {
+			t.Fatalf("%s %s: %d %s", tc.method, tc.path, response.Code, response.Body.String())
 		}
 	}
 	bob := identity.WithOwnerID(context.Background(), uuid.NewString())
