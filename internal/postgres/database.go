@@ -33,6 +33,23 @@ func Open(ctx context.Context, databaseURL string) (*sql.DB, error) {
 }
 
 func Migrate(db *sql.DB) error {
+	// Replicas starting together must not run the same migration; the loser would exit.
+	ctx := context.Background()
+	// The lock keeps one connection for the whole run; goose still needs the caller's pool.
+	if limit := db.Stats().MaxOpenConnections; limit > 0 {
+		db.SetMaxOpenConns(limit + 1)
+		defer db.SetMaxOpenConns(limit)
+	}
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return fmt.Errorf("lock migrations: %w", err)
+	}
+	defer conn.Close()
+	const key = "hashtext('goose_db_version:' || current_schema())"
+	if _, err := conn.ExecContext(ctx, "SELECT pg_advisory_lock("+key+")"); err != nil {
+		return fmt.Errorf("lock migrations: %w", err)
+	}
+	defer conn.ExecContext(ctx, "SELECT pg_advisory_unlock("+key+")")
 	goose.SetBaseFS(migrations)
 	if err := goose.SetDialect("postgres"); err != nil {
 		return fmt.Errorf("set migration dialect: %w", err)
