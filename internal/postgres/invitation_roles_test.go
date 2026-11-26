@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 
@@ -264,5 +265,47 @@ func TestInvitationRevocationFollowsInviterRole(t *testing.T) {
 	}
 	if err = repo.RevokeOrganizationInvite(ctx, owner.ID, company.ID, uuid.NewString()); !errors.Is(err, org.ErrNotFound) {
 		t.Fatalf("unknown invitation: %v", err)
+	}
+}
+
+// An accepted invitation cannot be revoked: the member stays, so "revoked" would
+// be untrue in the list and the Audit Log.
+func TestRevokingAUsedInvitationIsRefused(t *testing.T) {
+	ctx := context.Background()
+	db := auditDatabase(t, true)
+	people, repo := NewAuthRepository(db), NewSystemRepository(db)
+	user := func(name string) identity.User {
+		t.Helper()
+		u, err := people.UpsertGoogleUser(ctx, uuid.NewString(), uuid.NewString()+"@fixture.test", name, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		return u
+	}
+	admin, owner, guest := user("Administrator"), user("Supermanager"), user("Guest")
+	if _, err := db.Exec(`UPDATE users SET is_system_admin=TRUE WHERE id=$1`, admin.ID); err != nil {
+		t.Fatal(err)
+	}
+	company, err := repo.CreateOrganization(ctx, admin.ID, "Used invitation", owner.ID, uuid.NewString()+".fixture.test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	i, err := repo.CreateOrganizationInvite(ctx, owner.ID, company.ID, org.Developer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = repo.OrganizationInvitation(ctx, guest.ID, i.Token, true); err != nil {
+		t.Fatal(err)
+	}
+	if err = repo.RevokeOrganizationInvite(ctx, owner.ID, company.ID, i.ID); !errors.Is(err, org.ErrConflict) || !strings.Contains(err.Error(), "remove the member") {
+		t.Fatalf("revoked a used invitation: %v", err)
+	}
+	var revoked bool
+	var audited int
+	if err = db.QueryRow(`SELECT revoked_at IS NOT NULL FROM organization_invites WHERE id=$1`, i.ID).Scan(&revoked); err != nil || revoked {
+		t.Fatal("used invitation marked revoked", revoked, err)
+	}
+	if err = db.QueryRow(`SELECT count(*) FROM audit_events WHERE action='invite_revoked' AND object_id=$1`, i.ID).Scan(&audited); err != nil || audited != 0 {
+		t.Fatal("Audit Log says a used invitation was revoked", audited, err)
 	}
 }

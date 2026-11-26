@@ -19,6 +19,9 @@ var ErrInvalid = errors.New("invalid organization request")
 // ErrLastSupermanager is still an ErrConflict for callers, with a message people can act on.
 var ErrLastSupermanager error = diagnostic{ErrConflict, "A company needs at least one Supermanager. Make another member Supermanager first."}
 
+// ErrInvitationUsed is still an ErrConflict: an accepted invitation cannot be revoked.
+var ErrInvitationUsed error = diagnostic{ErrConflict, "This invitation was already accepted. To take away access, remove the member."}
+
 // diagnostic keeps errors.Is matching a broad sentinel while showing a specific message.
 type diagnostic struct {
 	base    error

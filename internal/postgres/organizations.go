@@ -577,7 +577,8 @@ func (r *SystemRepository) RevokeOrganizationInvite(ctx context.Context, actor, 
 		return e
 	}
 	var role string
-	if e = tx.QueryRowContext(ctx, `SELECT role FROM organization_invites WHERE id=$1 AND organization_id=$2`, invite, id).Scan(&role); errors.Is(e, sql.ErrNoRows) {
+	var used bool
+	if e = tx.QueryRowContext(ctx, `SELECT role, accepted_by IS NOT NULL FROM organization_invites WHERE id=$1 AND organization_id=$2`, invite, id).Scan(&role, &used); errors.Is(e, sql.ErrNoRows) {
 		return org.ErrNotFound
 	} else if e != nil {
 		return e
@@ -585,6 +586,9 @@ func (r *SystemRepository) RevokeOrganizationInvite(ctx context.Context, actor, 
 	// Revoke only invitations the actor's role could create.
 	if !org.MutateMember(access, org.MemberRole, role) {
 		return org.ErrForbidden
+	}
+	if used {
+		return org.ErrInvitationUsed
 	}
 	_, e = tx.ExecContext(ctx, `UPDATE organization_invites SET revoked_at=COALESCE(revoked_at,NOW()) WHERE id=$1 AND organization_id=$2`, invite, id)
 	if e != nil {
