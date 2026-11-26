@@ -10,6 +10,8 @@
     return el;
   };
   const paragraph = (text, parent = content) => parent.append(node('p', text));
+  // The Create form's permission labels; an unknown scope keeps its ID.
+  const scopeLabels = {generation:'Generation and results','providers:manage':'Manage providers','storage:manage':'Manage storage','keys:manage':'Manage API keys','organizations:manage':'Manage organization','system:manage':'Manage system'};
   function table(id, headers, rows, parent = content) {
     const wrap = node('div', undefined, 'docs-table-wrap');
     const t = node('table', undefined, 'docs-table');
@@ -118,7 +120,7 @@
           spend.append(node('small',`${item.tasks} ${item.tasks===1?'task':'tasks'}`));
           if(item.unknown_cost_tasks) spend.append(node('small',`${item.unknown_cost_tasks} legacy tasks with unknown cost`, 'keys-incomplete'));
         }
-        return [identity,...(organizationID?[UserUI.identity(members.find(m=>m.id===key.user_id)||{id:key.user_id,email:key.user_email,picture:key.user_picture}),UserUI.identity(members.find(m=>m.id===key.created_by)||{id:key.created_by,email:key.creator_email,picture:key.creator_picture})]:[]),spend,key.scopes.join(', '),activity,node('span',({revoked:'Revoked',expired:'Expired',disabled:'Disabled by system settings',active:'Active'})[state],'table-status '+({active:'report-success',disabled:'report-warning'}[state]||'')),revoked?'':revoke];
+        return [identity,...(organizationID?[UserUI.identity(members.find(m=>m.id===key.user_id)||{id:key.user_id,email:key.user_email,picture:key.user_picture}),UserUI.identity(members.find(m=>m.id===key.created_by)||{id:key.created_by,email:key.creator_email,picture:key.creator_picture})]:[]),spend,key.scopes.map(scope=>scopeLabels[scope]||scope).join(', '),activity,node('span',({revoked:'Revoked',expired:'Expired',disabled:'Disabled by system settings',active:'Active'})[state],'table-status '+({active:'report-success',disabled:'report-warning'}[state]||'')),revoked?'':revoke];
       }),keyList);
     }
     function confirmRevoke(key,button) {
