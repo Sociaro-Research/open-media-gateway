@@ -28,6 +28,8 @@ class RedisNoticesTests(unittest.TestCase):
         self.assertIn('/refs/tags/' + version + '.tar.gz',
                       self.provenance['upstream_source_archive']['url'])
         self.assertEqual(set(image['platform_manifests']), {'linux/arm64', 'linux/amd64'})
+        bundle_readme = ' '.join((ROOT / 'deploy/ghcr/README.md').read_text().split())
+        self.assertIn('Redis ' + version + ' is a separate third-party component', bundle_readme)
         for digest in image['platform_manifests'].values():
             self.assertRegex(digest, r'^sha256:[0-9a-f]{64}$')
 

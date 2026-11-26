@@ -137,7 +137,7 @@ storage/capacity before normal use.
 ## Third-party notices
 
 The Gateway's own code is licensed under Apache License 2.0; see the root
-`LICENSE` and `NOTICE`. Redis 7.4.11 is a separate third-party component with its
+`LICENSE` and `NOTICE`. Redis 7.4.12 is a separate third-party component with its
 own upstream terms. The installation bundle includes its complete license,
 copyright and contribution notices, bundled dependency notices and provenance
 under `licenses/redis/`. The Redis image includes the same files under
