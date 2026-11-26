@@ -149,7 +149,7 @@ func (r *SystemRepository) CreateOrganization(ctx context.Context, actor, name, 
 	var user string
 	if firstAdmin = strings.TrimSpace(firstAdmin); firstAdmin != "" {
 		if e = tx.QueryRowContext(ctx, `SELECT id FROM users WHERE (id::text=$1 OR lower(email)=lower($1)) AND NOT is_client_manager ORDER BY id LIMIT 1 FOR UPDATE`, firstAdmin).Scan(&user); e != nil {
-			return o, org.ErrNotFound
+			return o, org.ErrUnknownUser
 		}
 	}
 	if e = tx.QueryRowContext(ctx, `INSERT INTO organizations(id,name,domain) VALUES($1,$2,$3) RETURNING created_at`, o.ID, o.Name, o.Domain).Scan(&o.CreatedAt); e != nil {
