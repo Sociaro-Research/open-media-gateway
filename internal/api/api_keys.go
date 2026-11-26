@@ -191,7 +191,7 @@ func (s *Server) createAPIKey(w http.ResponseWriter, r *http.Request) {
 			mode = "shared"
 		}
 		if input.ResourceMode != "" && input.ResourceMode != mode {
-			writeError(w, 400, "invalid_request", "organization keys use shared providers; personal keys omit organization_id")
+			invalidParameter(w, "resource_mode", "organization keys use shared providers; personal keys omit organization_id")
 			return
 		}
 		input.ResourceMode = mode
@@ -230,6 +230,10 @@ func (s *Server) createAPIKey(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	key, secret, err := apikey.Generate(input, time.Now())
+	if field := (*apikey.FieldError)(nil); errors.As(err, &field) {
+		invalidParameter(w, field.Field, field.Message)
+		return
+	}
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_request", err.Error())
 		return

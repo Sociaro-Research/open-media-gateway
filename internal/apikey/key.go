@@ -93,6 +93,11 @@ type Repository interface {
 	Authenticate(context.Context, []byte) (identity.User, Key, error)
 }
 
+// FieldError names the request field a key input was rejected for.
+type FieldError struct{ Field, Message string }
+
+func (e *FieldError) Error() string { return e.Message }
+
 func Generate(input CreateInput, now time.Time) (Key, string, error) {
 	if input.ResourceMode == "" {
 		input.ResourceMode = "personal"
@@ -101,15 +106,15 @@ func Generate(input CreateInput, now time.Time) (Key, string, error) {
 		input.StorageMode = "personal"
 	}
 	if (input.ResourceMode != "personal" && input.ResourceMode != "shared") || (input.StorageMode != "personal" && input.StorageMode != "shared") {
-		return Key{}, "", errors.New("resource_mode and storage_mode must be personal or shared")
+		return Key{}, "", &FieldError{"resource_mode", "resource_mode and storage_mode must be personal or shared"}
 	}
 
 	name := strings.TrimSpace(input.Name)
 	if name == "" || utf8.RuneCountInString(name) > 80 || identity.UnreadableName(name) {
-		return Key{}, "", errors.New("name must contain 1 to 80 characters, at least one visible, without text-direction characters")
+		return Key{}, "", &FieldError{"name", "name must contain 1 to 80 characters, at least one visible, without text-direction characters"}
 	}
 	if input.ExpiresAt != nil && !input.ExpiresAt.After(now) {
-		return Key{}, "", errors.New("expires_at must be in the future")
+		return Key{}, "", &FieldError{"expires_at", "expires_at must be in the future"}
 	}
 	if len(input.Scopes) == 0 {
 		input.Scopes = []string{Generation}
@@ -117,14 +122,14 @@ func Generate(input CreateInput, now time.Time) (Key, string, error) {
 	scopes := make([]string, 0, 3)
 	for _, scope := range input.Scopes {
 		if scope != OrganizationsManage && scope != Generation && scope != ProvidersManage && scope != KeysManage && scope != StorageManage && scope != SystemManage {
-			return Key{}, "", errors.New("unknown scope: " + scope)
+			return Key{}, "", &FieldError{"scopes", "unknown scope: " + scope}
 		}
 		if !slices.Contains(scopes, scope) {
 			scopes = append(scopes, scope)
 		}
 	}
 	if !slices.Contains(scopes, Generation) {
-		return Key{}, "", errors.New("generation scope is required")
+		return Key{}, "", &FieldError{"scopes", "generation scope is required"}
 	}
 	var entropy [32]byte
 	if _, err := rand.Read(entropy[:]); err != nil {
