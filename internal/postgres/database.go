@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"embed"
 	"fmt"
 	"time"
@@ -45,11 +46,15 @@ func Migrate(db *sql.DB) error {
 		return fmt.Errorf("lock migrations: %w", err)
 	}
 	defer conn.Close()
-	const key = "hashtext('goose_db_version:' || current_schema())"
-	if _, err := conn.ExecContext(ctx, "SELECT pg_advisory_lock("+key+")"); err != nil {
+	if _, err := conn.ExecContext(ctx, `SELECT pg_advisory_lock(hashtext('goose_db_version:' || current_schema()))`); err != nil {
 		return fmt.Errorf("lock migrations: %w", err)
 	}
-	defer conn.ExecContext(ctx, "SELECT pg_advisory_unlock("+key+")")
+	defer func() {
+		// A session that still holds the lock must not go back to the pool.
+		if _, err := conn.ExecContext(ctx, `SELECT pg_advisory_unlock(hashtext('goose_db_version:' || current_schema()))`); err != nil {
+			conn.Raw(func(any) error { return driver.ErrBadConn })
+		}
+	}()
 	goose.SetBaseFS(migrations)
 	if err := goose.SetDialect("postgres"); err != nil {
 		return fmt.Errorf("set migration dialect: %w", err)
