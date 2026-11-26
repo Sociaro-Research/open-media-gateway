@@ -197,6 +197,12 @@ func Load() (Config, error) {
 	if c.ResendAPIKey != "" && c.SessionSigningSecret == "" {
 		return Config{}, errors.New("email authentication requires SESSION_SIGNING_SECRET")
 	}
+	// Later checks run after migrations and cannot tell which variable was wrong.
+	for _, origin := range [][2]string{{"AUTH_PUBLIC_URL", c.AuthPublicURL}, {"UI_PUBLIC_URL", c.UIPublicURL}, {"DOCS_PUBLIC_URL", c.DocsPublicURL}} {
+		if _, err := installation.NormalizeOrigin(origin[1]); origin[1] != "" && err != nil {
+			return Config{}, fmt.Errorf("%s: %w", origin[0], err)
+		}
+	}
 	if c.AuthPublicURL == "" && c.GoogleOAuthRedirectURL != "" {
 		u, err := url.Parse(c.GoogleOAuthRedirectURL)
 		if err != nil || u.Host == "" {
