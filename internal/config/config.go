@@ -214,6 +214,12 @@ func Load() (Config, error) {
 	if c.UIPublicURL == "" {
 		c.UIPublicURL = c.AuthPublicURL
 	}
+	// Later checks run after migrations and cannot tell which variable was wrong; this also covers the fallbacks above.
+	for _, origin := range [][2]string{{"AUTH_PUBLIC_URL", c.AuthPublicURL}, {"UI_PUBLIC_URL", c.UIPublicURL}, {"DOCS_PUBLIC_URL", c.DocsPublicURL}} {
+		if _, err := installation.NormalizeOrigin(origin[1]); origin[1] != "" && err != nil {
+			return Config{}, fmt.Errorf("%s: %w", origin[0], err)
+		}
+	}
 	if c.SessionSigningSecret != "" && c.AuthPublicURL == "" {
 		return Config{}, errors.New("AUTH_PUBLIC_URL is required for browser authentication")
 	}

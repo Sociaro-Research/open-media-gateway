@@ -158,3 +158,44 @@ func TestLegacyAPIOriginConfiguration(t *testing.T) {
 		t.Fatal("legacy host enabled without canonical origin")
 	}
 }
+
+func TestPublicOriginsAreCheckedBeforeStartup(t *testing.T) {
+	for _, name := range []string{"DATABASE_URL", "REDIS_URL", "CLIENT_API_KEY", "WEBHOOK_SIGNING_SECRET", "MEDIA_URL_SIGNING_SECRET"} {
+		t.Setenv(name, "fixture")
+	}
+	for _, name := range []string{"GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET", "GOOGLE_OAUTH_REDIRECT_URL", "RESEND_API_KEY", "EMAIL_FROM", "SESSION_SIGNING_SECRET", "LEGACY_API_ORIGIN"} {
+		t.Setenv(name, "")
+	}
+	names := []string{"AUTH_PUBLIC_URL", "UI_PUBLIC_URL", "DOCS_PUBLIC_URL"}
+	for _, bad := range []string{"http://192.168.1.10:8088", "gateway.example.test", "https://gateway.example.test/console"} {
+		for _, name := range names {
+			t.Setenv("AUTH_PUBLIC_URL", "https://gateway.example.test")
+			t.Setenv("UI_PUBLIC_URL", "")
+			t.Setenv("DOCS_PUBLIC_URL", "")
+			t.Setenv(name, bad)
+			if _, err := Load(); err == nil || !strings.Contains(err.Error(), name) {
+				t.Fatalf("%s=%q: want an error naming %s, got %v", name, bad, name, err)
+			}
+		}
+	}
+	// An origin taken from the Google redirect URL is checked too.
+	t.Setenv("AUTH_PUBLIC_URL", "")
+	t.Setenv("DOCS_PUBLIC_URL", "")
+	t.Setenv("GOOGLE_OAUTH_CLIENT_ID", "fixture")
+	t.Setenv("GOOGLE_OAUTH_CLIENT_SECRET", "fixture")
+	t.Setenv("SESSION_SIGNING_SECRET", strings.Repeat("s", 32))
+	t.Setenv("GOOGLE_OAUTH_REDIRECT_URL", "http://192.168.1.10:8088/auth/google/callback")
+	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "AUTH_PUBLIC_URL") {
+		t.Fatalf("origin from GOOGLE_OAUTH_REDIRECT_URL not checked: %v", err)
+	}
+	for _, name := range []string{"GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET", "SESSION_SIGNING_SECRET", "GOOGLE_OAUTH_REDIRECT_URL"} {
+		t.Setenv(name, "")
+	}
+	t.Setenv("AUTH_PUBLIC_URL", "http://localhost:8088")
+	t.Setenv("UI_PUBLIC_URL", "")
+	t.Setenv("DOCS_PUBLIC_URL", "https://docs.example.test/")
+	c, err := Load()
+	if err != nil || c.UIPublicURL != "http://localhost:8088" {
+		t.Fatalf("valid public origins rejected: %q %v", c.UIPublicURL, err)
+	}
+}
