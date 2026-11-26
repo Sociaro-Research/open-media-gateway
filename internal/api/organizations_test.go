@@ -150,7 +150,7 @@ func TestOrganizationAPIRequiresRoleScopeAndKeyBinding(t *testing.T) {
 		t.Fatal("stale personal key bypassed company admission", admission.Code, admission.Body)
 	}
 	for _, body := range []string{`{"name":"Invalid","resource_mode":"shared"}`, `{"name":"Invalid","organization_id":"` + fixtureOrg + `","resource_mode":"personal"}`} {
-		if result := sendTest(h, "POST", "/v1/api-keys", body, "alice", ""); result.Code != 400 {
+		if result := sendTest(h, "POST", "/v1/api-keys", body, "alice", ""); result.Code != 400 || !strings.Contains(result.Body.String(), `"param":"resource_mode"`) {
 			t.Fatalf("accepted contradictory key context: %d %s", result.Code, result.Body.String())
 		}
 	}
