@@ -13,6 +13,29 @@ import (
 	"github.com/google/uuid"
 )
 
+// A first Supermanager typed with no account names the user, not "organization
+// or invitation", and creates no company.
+func TestCreateOrganizationWithUnknownFirstSupermanager(t *testing.T) {
+	ctx := context.Background()
+	db := auditDatabase(t, true)
+	people, repo := NewAuthRepository(db), NewSystemRepository(db)
+	admin, err := people.UpsertGoogleUser(ctx, uuid.NewString(), uuid.NewString()+"@fixture.test", "Administrator", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = db.Exec(`UPDATE users SET is_system_admin=TRUE WHERE id=$1`, admin.ID); err != nil {
+		t.Fatal(err)
+	}
+	_, err = repo.CreateOrganization(ctx, admin.ID, "Unknown owner", "nobody@fixture.test", uuid.NewString()+".fixture.test")
+	if !errors.Is(err, org.ErrUnknownUser) || !errors.Is(err, org.ErrNotFound) {
+		t.Fatal("unknown first Supermanager must say the user is not found or unavailable", err)
+	}
+	var companies int
+	if err = db.QueryRow(`SELECT count(*) FROM organizations WHERE name='Unknown owner'`).Scan(&companies); err != nil || companies != 0 {
+		t.Fatal("company created without its first Supermanager", companies, err)
+	}
+}
+
 // This real-PostgreSQL gate must run on a verified disposable fixture. The
 // in-memory driver's passes do not replace this SQL/lock/persistence coverage.
 func TestPostgresOrganizationAssignment(t *testing.T) {
