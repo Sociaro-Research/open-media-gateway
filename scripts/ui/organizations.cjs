@@ -3,7 +3,7 @@ const {evidencePath} = require('./evidence.cjs');
 // Organization console fixtures: no provider calls or production data.
 const {[process.env.UI_BROWSER_ENGINE||'chromium']:chromium}=require('playwright'),http=require('node:http'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const root=process.env.UI_SOURCE_DIR||path.resolve(__dirname,'../../web/public/ui');const server=http.createServer((req,res)=>{let file=path.join(root,path.basename(req.url.split('?')[0]));if(!path.extname(file))file=path.join(root,'index.html');if(!fs.existsSync(file))return res.writeHead(404).end();res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html');res.end(fs.readFileSync(file));});
-(async()=>{await new Promise(r=>server.listen(0,'127.0.0.1',r));const browser=await chromium.launch({headless:true,executablePath:process.env.UI_BROWSER_PATH}),page=await browser.newPage({viewport:{width:1440,height:1080}}),errors=[],writes=[];page.on('pageerror',e=>errors.push(e.message));page.setDefaultTimeout(10000);let storageFixture={driver:'gateway'};let clientManagerFixture=false,assignedManager='',admin=true,role='admin',balance=100,accepted=false,summaryFailure=0,summaryState='all';let bootstrapDelayed=false;const companyRequests=[];let onboardingCards=[],createFailure=false,duplicateFailure='',ownerInvitation=false;const onboardingRequests=[];
+(async()=>{await new Promise(r=>server.listen(0,'127.0.0.1',r));const browser=await chromium.launch({headless:true,executablePath:process.env.UI_BROWSER_PATH}),page=await browser.newPage({viewport:{width:1440,height:1080}}),errors=[],writes=[];page.on('pageerror',e=>errors.push(e.message));page.setDefaultTimeout(10000);let storageFixture={driver:'gateway'};let clientManagerFixture=false,assignedManager='',admin=true,role='admin',balance=100,creditKind='',accepted=false,summaryFailure=0,summaryState='all';let bootstrapDelayed=false;const companyRequests=[];let onboardingCards=[],createFailure=false,duplicateFailure='',ownerInvitation=false;const onboardingRequests=[];
 const oid='22222222-2222-4222-8222-222222222222',uid='11111111-1111-4111-8111-111111111111';const organization=()=>({id:oid,name:'Example team',role,balance_usd:balance,available_usd:balance,credit_limit_usd:0,default_weekly_limit_usd:0,weekly_limit_usd:20,weekly_committed_usd:5,storage_bytes:2048,client_manager_email:assignedManager});
 const members=[{id:uid,email:'tester@example.test',name:'Tester',role:process.env.UI_MEMBER_ROLE_ONLY?'supermanager':'admin',weekly_limit_usd:20,weekly_committed_usd:5}];
 let holdMembers=null;
@@ -60,7 +60,7 @@ if(p.includes('/members/')){
  }
  return route.fulfill({status:204});
 }
-if(p.endsWith('/credits')){if(method==='POST'){balance+=data.amount_usd;return json(data)}return json({data:[]})}
+if(p.endsWith('/credits')){if(method==='POST'){balance+=data.amount_usd;creditKind=data.kind;return json(data)}return json({data:[]})}
 if(p.endsWith('/invitations'))return method==='POST'?json({id:'invite-id',token:'x'.repeat(43),expires_at:'2026-10-01T00:00:00Z'}):json({data:[]});
 if(p.startsWith('/v1/invitations/')){if(p.endsWith('/accept'))accepted=true;return json({organization_name:'Example team',organization_id:oid,role:ownerInvitation?'supermanager':undefined,first_owner:ownerInvitation});}
 if(p.endsWith('/generations'))return json({data:[],has_more:false});
@@ -89,8 +89,8 @@ try{const base='http://127.0.0.1:'+server.address().port;
  await page.getByRole('tab',{name:'Billing',exact:true}).click();
  // Add credit stays disabled while a native field rule fails: Reason edited with no Amount, or a zero adjustment.
  const addCredit=page.getByRole('button',{name:'Add credit',exact:true});await page.getByLabel('Reason',{exact:true}).fill('QA correction');assert.equal(await addCredit.isDisabled(),true);
- await page.getByRole('combobox',{name:'Credit type',exact:true}).click();await page.getByRole('option',{name:'adjustment',exact:true}).click();await page.getByLabel('Amount (USD)',{exact:true}).fill('0');assert.equal(await addCredit.isDisabled(),true);
- await page.getByLabel('Amount (USD)',{exact:true}).fill('50');assert.equal(await addCredit.isEnabled(),true);await page.getByRole('button',{name:'Add credit',exact:true}).click();await page.waitForFunction(()=>document.querySelector('.organization-summary')?.textContent.includes('$150'));assert.equal(balance,150);
+ await page.getByRole('combobox',{name:'Credit type',exact:true}).click();assert.equal(await page.getByRole('option',{name:'promo',exact:true}).count(),0,'Credit type shows a raw value');await page.getByRole('option',{name:'Balance adjustment',exact:true}).click();await page.getByLabel('Amount (USD)',{exact:true}).fill('0');assert.equal(await addCredit.isDisabled(),true);
+ await page.getByLabel('Amount (USD)',{exact:true}).fill('50');assert.equal(await addCredit.isEnabled(),true);await page.getByRole('button',{name:'Add credit',exact:true}).click();await page.waitForFunction(()=>document.querySelector('.organization-summary')?.textContent.includes('$150'));assert.equal(balance,150);assert.equal(creditKind,'adjustment');
  // The updated balance precedes the async Billing/report reload. Finish it before
  // replacing the mocked account and document; an old networkidle load state does not.
  await page.locator('.organization-reports').getByText('No requests yet.',{exact:true}).waitFor();
