@@ -178,6 +178,19 @@ func TestPublicOriginsAreCheckedBeforeStartup(t *testing.T) {
 			}
 		}
 	}
+	// An origin taken from the Google redirect URL is checked too.
+	t.Setenv("AUTH_PUBLIC_URL", "")
+	t.Setenv("DOCS_PUBLIC_URL", "")
+	t.Setenv("GOOGLE_OAUTH_CLIENT_ID", "fixture")
+	t.Setenv("GOOGLE_OAUTH_CLIENT_SECRET", "fixture")
+	t.Setenv("SESSION_SIGNING_SECRET", strings.Repeat("s", 32))
+	t.Setenv("GOOGLE_OAUTH_REDIRECT_URL", "http://192.168.1.10:8088/auth/google/callback")
+	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "AUTH_PUBLIC_URL") {
+		t.Fatalf("origin from GOOGLE_OAUTH_REDIRECT_URL not checked: %v", err)
+	}
+	for _, name := range []string{"GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET", "SESSION_SIGNING_SECRET", "GOOGLE_OAUTH_REDIRECT_URL"} {
+		t.Setenv(name, "")
+	}
 	t.Setenv("AUTH_PUBLIC_URL", "http://localhost:8088")
 	t.Setenv("UI_PUBLIC_URL", "")
 	t.Setenv("DOCS_PUBLIC_URL", "https://docs.example.test/")
