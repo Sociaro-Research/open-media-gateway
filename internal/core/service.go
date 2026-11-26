@@ -581,6 +581,10 @@ func normalizeModelOptions(descriptor MediaModel, options MediaOptions, deferRes
 		if descriptor.DurationFromInput && options.Duration != 0 {
 			return MediaOptions{}, optionError("duration", "follows the input media; omit it")
 		}
+		// Without a range no adapter reads options.duration, so it would be dropped.
+		if !descriptor.DurationFromInput && descriptor.MaxDuration == 0 && options.Duration != 0 {
+			return MediaOptions{}, optionChoices("duration", nil)
+		}
 		if !descriptor.DurationFromInput && descriptor.MaxDuration > 0 {
 			if options.Duration == 0 {
 				options.Duration = descriptor.DefaultDuration
