@@ -122,13 +122,16 @@ func (r *CatalogRepository) EnsureSchedule(ctx context.Context, s catalogsync.Sc
 	return err
 }
 
-// errNoSchedule matches system.ErrNotFound, whose own text is "user not found".
-var errNoSchedule error = noSchedule{}
+// catalogNotFound matches system.ErrNotFound, whose own text is "user not found".
+type catalogNotFound string
 
-type noSchedule struct{}
+func (e catalogNotFound) Error() string      { return string(e) }
+func (catalogNotFound) Is(target error) bool { return target == system.ErrNotFound }
 
-func (noSchedule) Error() string        { return "no catalogue schedule for this provider" }
-func (noSchedule) Is(target error) bool { return target == system.ErrNotFound }
+const (
+	errNoSchedule = catalogNotFound("no catalogue schedule for this provider")
+	errNoDocument = catalogNotFound("catalogue document not found")
+)
 
 func (r *CatalogRepository) SaveSchedule(ctx context.Context, actor string, s catalogsync.Schedule) (catalogsync.Schedule, error) {
 	if err := s.Validate(); err != nil {
@@ -388,7 +391,7 @@ func (r *CatalogRepository) Document(ctx context.Context, hash string) (string, 
 	var text string
 	err := r.db.QueryRowContext(ctx, `SELECT content FROM catalog_sync_documents WHERE hash=$1`, hash).Scan(&text)
 	if errors.Is(err, sql.ErrNoRows) {
-		return "", system.ErrNotFound
+		return "", errNoDocument
 	}
 	return text, err
 }

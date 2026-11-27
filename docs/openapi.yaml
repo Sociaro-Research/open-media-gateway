@@ -8421,6 +8421,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         "403":
           description: Administrator role or scope required
+        "404":
+          description: No stored document with this hash
         "503":
           description: Catalogue synchronization unavailable
       security:

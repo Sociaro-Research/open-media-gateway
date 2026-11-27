@@ -173,6 +173,9 @@ func TestCatalogSyncPersistedWorkflow(t *testing.T) {
 	if err = repo.Request(ctx, user.ID, unknown.Provider); !errors.Is(err, system.ErrNotFound) || err.Error() != "no catalogue schedule for this provider" {
 		t.Fatal("unknown provider check", err)
 	}
+	if _, err = repo.Document(ctx, strings.Repeat("ab", 32)); !errors.Is(err, system.ErrNotFound) || err.Error() != "catalogue document not found" {
+		t.Fatal("unknown source document", err)
+	}
 	if err = repo.Commit(ctx, stale, state, catalogsync.Run{ID: uuid.NewString(), Provider: "fixture", CompletedAt: time.Now()}, time.Now()); !errors.Is(err, system.ErrConflict) {
 		t.Fatal("obsolete sources published", err)
 	}
