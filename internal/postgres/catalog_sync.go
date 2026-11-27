@@ -121,6 +121,18 @@ func (r *CatalogRepository) EnsureSchedule(ctx context.Context, s catalogsync.Sc
 	_, err = r.db.ExecContext(ctx, `INSERT INTO catalog_sync_schedules(provider,enabled,clock,sources,next_check) VALUES($1,$2,$3,$4,$5) ON CONFLICT(provider) DO NOTHING`, s.Provider, s.Enabled, s.Time, data, catalogsync.NextDaily(time.Now(), s.Time, settings.Timezone))
 	return err
 }
+
+// catalogNotFound matches system.ErrNotFound, whose own text is "user not found".
+type catalogNotFound string
+
+func (e catalogNotFound) Error() string      { return string(e) }
+func (catalogNotFound) Is(target error) bool { return target == system.ErrNotFound }
+
+const (
+	errNoSchedule = catalogNotFound("no catalogue schedule for this provider")
+	errNoDocument = catalogNotFound("catalogue document not found")
+)
+
 func (r *CatalogRepository) SaveSchedule(ctx context.Context, actor string, s catalogsync.Schedule) (catalogsync.Schedule, error) {
 	if err := s.Validate(); err != nil {
 		return s, err
@@ -158,6 +170,14 @@ func (r *CatalogRepository) SaveSchedule(ctx context.Context, actor string, s ca
 		return s, err
 	}
 	if n != 1 {
+		// No row at all means the provider has no schedule, not a stale version.
+		var exists bool
+		if err = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM catalog_sync_schedules WHERE provider=$1)`, s.Provider).Scan(&exists); err != nil {
+			return s, err
+		}
+		if !exists {
+			return s, errNoSchedule
+		}
 		return s, system.ErrConflict
 	}
 	if err = auditSystem(ctx, tx, name, "catalog_sync_schedule", s.Provider, map[string]any{"time": s.Time, "enabled": s.Enabled, "sources": s.Sources}); err != nil {
@@ -192,7 +212,7 @@ func (r *CatalogRepository) Request(ctx context.Context, actor, provider string)
 		return err
 	}
 	if n != 1 {
-		return system.ErrNotFound
+		return errNoSchedule
 	}
 	if err = auditSystem(ctx, tx, name, "catalog_sync_requested", provider, nil); err != nil {
 		return err
@@ -371,7 +391,7 @@ func (r *CatalogRepository) Document(ctx context.Context, hash string) (string, 
 	var text string
 	err := r.db.QueryRowContext(ctx, `SELECT content FROM catalog_sync_documents WHERE hash=$1`, hash).Scan(&text)
 	if errors.Is(err, sql.ErrNoRows) {
-		return "", system.ErrNotFound
+		return "", errNoDocument
 	}
 	return text, err
 }
