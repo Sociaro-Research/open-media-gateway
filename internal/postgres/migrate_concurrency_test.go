@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/pressly/goose/v3"
@@ -68,15 +69,25 @@ func concurrentStarts(t *testing.T, dsn string, existing int64) {
 			t.Fatal(err)
 		}
 	}
+	// A start stuck on the lock is killed at the deadline instead of hanging the test.
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
 	children := make([]*exec.Cmd, 3)
 	output := make([]bytes.Buffer, len(children))
 	for i := range children {
-		children[i] = exec.Command(os.Args[0], "-test.run=^TestMigrationStartChild$", "-test.count=1")
+		children[i] = exec.CommandContext(ctx, os.Args[0], "-test.run=^TestMigrationStartChild$", "-test.count=1")
 		children[i].Env = append(os.Environ(), "GATEWAY_TEST_MIGRATION_CHILD=1", "GATEWAY_TEST_MIGRATION_DSN="+u.String())
 		children[i].Stdout, children[i].Stderr = &output[i], &output[i]
 		if err := children[i].Start(); err != nil {
 			t.Fatal(err)
 		}
+		child := children[i]
+		t.Cleanup(func() {
+			if child.ProcessState == nil {
+				child.Process.Kill()
+				child.Wait()
+			}
+		})
 	}
 	for i, child := range children {
 		if err := child.Wait(); err != nil {
