@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"embed"
 	"fmt"
 	"time"
@@ -33,6 +34,27 @@ func Open(ctx context.Context, databaseURL string) (*sql.DB, error) {
 }
 
 func Migrate(db *sql.DB) error {
+	// Replicas starting together must not run the same migration; the loser would exit.
+	ctx := context.Background()
+	// The lock keeps one connection for the whole run; goose still needs the caller's pool.
+	if limit := db.Stats().MaxOpenConnections; limit > 0 {
+		db.SetMaxOpenConns(limit + 1)
+		defer db.SetMaxOpenConns(limit)
+	}
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return fmt.Errorf("lock migrations: %w", err)
+	}
+	defer conn.Close()
+	if _, err := conn.ExecContext(ctx, `SELECT pg_advisory_lock(hashtext('goose_db_version:' || current_schema()))`); err != nil {
+		return fmt.Errorf("lock migrations: %w", err)
+	}
+	defer func() {
+		// A session that still holds the lock must not go back to the pool.
+		if _, err := conn.ExecContext(ctx, `SELECT pg_advisory_unlock(hashtext('goose_db_version:' || current_schema()))`); err != nil {
+			conn.Raw(func(any) error { return driver.ErrBadConn })
+		}
+	}()
 	goose.SetBaseFS(migrations)
 	if err := goose.SetDialect("postgres"); err != nil {
 		return fmt.Errorf("set migration dialect: %w", err)
