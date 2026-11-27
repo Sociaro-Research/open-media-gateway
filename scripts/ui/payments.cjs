@@ -123,6 +123,11 @@ const server=http.createServer((req,res)=>{if(req.method==='GET'&&new URL(req.ur
   assert.equal(await cards.nth(1).getByLabel('Display name',{exact:true}).inputValue(),'Unsaved second provider');
   assert.equal(providers[1].name,'Second Stripe');
   await page.locator('#settings-panel-payments').screenshot({path:evidencePath('/tmp/gateway-payment-cards-desktop.png')});
+  // Only an Administrator is told where to add a payment provider or change the mode that turns organization keys off.
+  const enabled=providers,tabs=page.locator('#organizationsContent .organization-tabs'),shows=async(tab,text)=>{await tabs.getByRole('tab',{name:tab,exact:true}).click();await page.getByText(text,{exact:true}).waitFor();};
+  providers=[];await page.goto(base+'/organizations');await shows('Billing','No payment provider is enabled. Add one in Administration > Settings > Payments.');
+  await page.evaluate(()=>{serviceInfo.console.shared_resources=false;});await shows('API keys','Organization keys need the Service for companies mode. Change it in Administration > Settings > System > Change Mode.');
+  await page.evaluate(()=>{systemAdministrator=false;});await shows('Billing','No payment provider is enabled. Contact an administrator.');await shows('API keys','Organization keys need the Service for companies mode.');providers=enabled;
   // Organization administrators see the current mode before payment.
   administrator=false;await page.goto(base+'/organizations');await page.getByRole('button',{name:'Top Up',exact:true}).click();const topup=page.locator('.topup-form');await topup.waitFor();await topup.getByText('Applicable taxes are deducted from your payment before your balance is credited.',{exact:true}).waitFor();const balance=page.locator('.balance-history');await balance.getByText('$5 (€4.33)',{exact:true}).waitFor();await balance.getByText('Paid by Payments team',{exact:true}).first().waitFor();
   assert.equal(await balance.locator('tbody tr').count(),3);assert.equal(await page.getByRole('heading',{name:'Payment history',exact:true}).count(),0);assert.equal(await balance.getByRole('button',{name:'Refresh',exact:true}).count(),0);
