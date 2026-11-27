@@ -8617,6 +8617,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         "403":
           description: Administrator role or scope required
+        "404":
+          description: No schedule for this provider
         "409":
           description: Version changed. Reload before saving.
         "503":
@@ -8653,6 +8655,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         "403":
           description: Administrator role or scope required
+        "404":
+          description: No schedule for this provider
         "503":
           description: Catalogue synchronization unavailable
       security:
