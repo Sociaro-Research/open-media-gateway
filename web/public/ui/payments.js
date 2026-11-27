@@ -119,7 +119,7 @@
     let busy=false;form.onsubmit=async e=>{e.preventDefault();if(busy)return;busy=true;submit.disabled=true;
      try{const method=methods.find(p=>p.id===choice.value),payload=JSON.stringify({provider_id:choice.value,amount_usd:Number(amount.value),fee_mode:method.fee_mode,...(method.kind==='stablecoin'?extras.payload():method.stripe_invoices===false?{billing:extras.payload().billing}:{})});if((method.kind!=='stablecoin'&&method.stripe_invoices!==false)||payload!==attemptPayload){attemptKey=crypto.randomUUID();attemptPayload=payload}const p=await api(base+'/payments',{method:'POST',headers:{'Idempotency-Key':attemptKey},body:payload});if(!current())return;if(p.stablecoin){attemptPayload='';show(p);requests?.reload()}else if(p.checkout_url){location.assign(p.checkout_url)}else{attemptPayload='';FormUI.message(status,'This checkout is closed. You can start a new payment.');await onChanged()}}catch(e){FormUI.message(status,e.message,'error')}finally{busy=false;submit.disabled=false}
     };
-   }else{section.append(el('p','No payment provider is enabled. Contact an administrator.','field-explanation'));}
+   }else{section.append(el('p','No payment provider is enabled. '+(systemAdministrator?'Add one in Administration > Settings > Payments.':'Contact an administrator.'),'field-explanation'));}
    section.append(viewer,requestList);requests=await StablecoinUI.requests(requestList,{api,base,current,onView:show});
    if(!current()||!section.isConnected)return;
    if(returned?.org===org.id){

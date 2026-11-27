@@ -51,7 +51,9 @@
     const sharedAllowed=!!serviceInfo.console?.shared_resources;
     const membershipRequired=!!organizationID&&!organizationMember;
     const unavailable=membershipRequired||(organizationID?!sharedAllowed:!personalAllowed);
-    if(unavailable){FormUI.message(status,membershipRequired?'Only organization members can create keys.':'Key creation is disabled by system settings.');form.hidden=true;}
+    // Name the mode that turns keys off. Only an Administrator can switch modes, and a central server has no other mode.
+    const keysOff=organizationID?'Organization keys need the Service for companies mode.':sharedAllowed?'Personal keys are off in Service for companies mode. Create keys in an organization.':'Key creation is disabled by system settings.';
+    if(unavailable){FormUI.message(status,membershipRequired?'Only organization members can create keys.':keysOff+(systemAdministrator&&!sharedAllowed&&serviceInfo.console?.installation_role!=='central'?' Change it in Administration > Settings > System > Change Mode.':''));form.hidden=true;}
     if(organizationID){
       const recipientField=node('div'),recipientLabel=node('label','User'),recipient=node('select');recipient.id='newKeyUser';recipient.name='user_id';recipientLabel.htmlFor=recipient.id;
       for(const member of members.filter(m=>OrganizationRoles.issue(organizationRole,Workspace.isSelf(m.id),m.role))){const option=UserUI.option(member,member.name?member.name+' · '+member.email:member.email);recipient.append(option);if(Workspace.isSelf(member.id)){option.defaultSelected=true;recipient.value=member.id;}}
